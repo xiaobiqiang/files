@@ -2476,11 +2476,13 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
 			data_addr = log_record->offset;
 			data_len = log_record->len;
             zil_replay_disk_data(os, data_record->data);
-        } else if (data_record->data_type == R_CACHE_DATA) {
+        } else {
         	zfs_mirror_cache_data_t *cache_data = 
 				(zfs_mirror_cache_data_t *)data_record->data;
 			zfs_mirror_msg_mirrordata_header_t *header = 
 				(zfs_mirror_msg_mirrordata_header_t *)cache_data->cs_data->ex_head;
+
+			VERIFY(data_record->data_type == R_CACHE_DATA);
 			data_addr = header->blk_offset;
 			data_len = header->len;
             err = zfs_replay_cache_data(os, (zfs_mirror_cache_data_t *)data_record->data);
@@ -2497,6 +2499,7 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
 
         kmem_free(data_record, sizeof(zil_data_record_t));
     }
+	cmn_err(CE_WARN, "%s, %d, finished replay all data!", __func__, __LINE__);
 }
 
 #endif

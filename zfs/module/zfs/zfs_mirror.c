@@ -34,7 +34,7 @@
 #include <sys/cluster_san.h>
 #include <sys/zil_impl.h>
 
-static boolean_t zfs_mirror_performace_flag = B_FALSE;
+static int zfs_mirror_performace_flag = B_FALSE;
 
 /* DEBUG */
 int debug_msg = 0;
@@ -1417,7 +1417,7 @@ zfs_mirror_log_clean(objset_t *os,
         }
 
         if (taskq_dispatch(zfs_mirror_mac_port->mirror_log_clean,
-            (task_func_t *)clear_func, para, TQ_NOSLEEP) == NULL) {
+            (task_func_t *)clear_func, para, TQ_NOSLEEP) == 0) {
             cmn_err(CE_NOTE, "mirror log clean dispath failed, %d", data_type);
             clear_func(para);
         }
@@ -1837,8 +1837,8 @@ zfs_mirror_walk_host_cb(cluster_san_hostinfo_t *cshi, void *arg)
 static int
 mirror_candidate_host_compare(const void *a, const void *b)
 {
-	zfs_mirror_candidate_node_t *n1 = a;
-	zfs_mirror_candidate_node_t *n2 = b;
+	const zfs_mirror_candidate_node_t *n1 = a;
+	const zfs_mirror_candidate_node_t *n2 = b;
 
 	if (n1->hostid < n2->hostid)
 		return (-1);
@@ -2564,6 +2564,7 @@ int zfs_replay_cache_data(objset_t *os,
     boolean_t b_meta_type = B_FALSE;
     zfs_mirror_msg_mirrordata_header_t *header =
         cache_data->cs_data->ex_head;
+	int err = 0;
 
     object_id = header->object_id;
     blk_txg = header->txg;
@@ -2594,7 +2595,7 @@ int zfs_replay_cache_data(objset_t *os,
 
     if (b_newer) {
         if (b_meta_type == B_TRUE) {
-            zfs_replay_meta_worker(meta_para);
+            err = zfs_replay_meta_worker(meta_para);
         } else {
             zfs_replay_worker(para);
         }
@@ -2610,6 +2611,7 @@ int zfs_replay_cache_data(objset_t *os,
     }
     csh_rx_data_free(cache_data->cs_data, B_TRUE);
     kmem_free(cache_data, sizeof(zfs_mirror_cache_data_t));
+	return (err);
 }
 
 static void zfs_mirror_get_all_unalign_buf(objset_t *os)
@@ -3842,5 +3844,6 @@ boolean_t zfs_mirror_mdata_enable(void)
 }
 EXPORT_SYMBOL(zfs_mirror_mdata_enable);
 
-
+module_param(zfs_mirror_performace_flag, int, 0644);
+MODULE_PARM_DESC(zfs_mirror_performace_flag, "Mirror performance flag");
 
