@@ -4293,15 +4293,15 @@ stmf_create_kstat_lport(stmf_i_local_port_t *ilport)
 	len = ilport->ilport_lport->lport_id->ident_length;
 	bcopy(ilport->ilport_lport->lport_id->ident,
 	    ilport->ilport_kstat_tgt_name, len);
-	ilport->ilport_kstat_tgt_name[len + 1] = '\0';
+	ilport->ilport_kstat_tgt_name[len] = '\0';
 	kstat_named_setstr(&ks_tgt->i_tgt_name,
 	    (const char *)ilport->ilport_kstat_tgt_name);
 	kstat_named_setstr(&ks_tgt->i_tgt_alias,
 	    (const char *)ilport->ilport_lport->lport_alias);
 	/* protocol */
-	if ((id = ilport->ilport_lport->lport_id->protocol_id) > PROTOCOL_ANY) {
+	if ((id = ilport->ilport_lport->lport_id->protocol_id) >= PROTOCOL_ANY) {
 		cmn_err(CE_WARN, "STMF: protocol_id out of bound");
-		id = PROTOCOL_ANY;
+		id = PROTOCOL_ANY - 1;
 	}
 	kstat_named_setstr(&ks_tgt->i_protocol, protocol_ident[id]);
 	kstat_install(ilport->ilport_kstat_info);
@@ -5647,8 +5647,8 @@ stmf_setup_itl_kstats(stmf_itl_data_t *itl)
 	kstat_named_setstr(&ks_itl->i_lport_alias, strbuf);
 	strbuf += len + 1;
 
-	id = (ss->ss_lport->lport_id->protocol_id > PROTOCOL_ANY) ?
-	    PROTOCOL_ANY : ss->ss_lport->lport_id->protocol_id;
+	id = (ss->ss_lport->lport_id->protocol_id >= PROTOCOL_ANY) ?
+	    (PROTOCOL_ANY - 1) : ss->ss_lport->lport_id->protocol_id;
 	kstat_named_setstr(&ks_itl->i_protocol, protocol_ident[id]);
 
 	/* LU */
