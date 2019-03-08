@@ -4294,7 +4294,7 @@ stmf_create_kstat_lport(stmf_i_local_port_t *ilport)
 	len = ilport->ilport_lport->lport_id->ident_length;
 	bcopy(ilport->ilport_lport->lport_id->ident,
 	    ilport->ilport_kstat_tgt_name, len);
-	ilport->ilport_kstat_tgt_name[len + 1] = '\0';
+	ilport->ilport_kstat_tgt_name[len] = '\0';
 	kstat_named_setstr(&ks_tgt->i_tgt_name,
 	    (const char *)ilport->ilport_kstat_tgt_name);
 	kstat_named_setstr(&ks_tgt->i_tgt_alias,
