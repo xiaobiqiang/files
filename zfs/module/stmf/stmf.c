@@ -318,7 +318,7 @@ int stmf_max_cur_task = 4096;
 int stmf_io_policy = 0;
 int stmf_io_delay_time_threshold = 20000; /* unit: ms */
 int stmf_lu_xfer_time_threshold = 15000; /* unit: ms */
-int stmf_waitq_time_threshold = 10000;	/* uint: ms */
+int stmf_waitq_time_threshold = 1000000;	/* uint: ms */
 int stmf_checker_time = 2000;	/* uint: ms */
 
 static clock_t stmf_wm_last = 0;
@@ -6541,8 +6541,9 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			continue;
         }
 
-		cmn_err(CE_NOTE, "%s (task=%p itask_flags=%x) to abort, starttime=%ld, curtime=%ld, to=%d",
-			__func__, task, itask->itask_flags, itask->itask_start_time, l, to);
+		cmn_err(CE_NOTE, "%s (task=%p itask_flags=%x cdb=%02x%02x) to abort, starttime=%ld, curtime=%ld, to=%d",
+			__func__, task, itask->itask_flags, task->task_cdb[0], task->task_cdb[1],
+			itask->itask_start_time, l, to);
 		
 		if ((itask->itask_flags & ITASK_IN_TRANSITION) && (itask->itask_flags & ITASK_HOLD_INSTOP)) {
 			uint32_t new, old;
@@ -9674,7 +9675,7 @@ stmf_proxy_task_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	if ((dbuf->db_flags & DB_DIRECTION_TO_RPORT) &&
 		(dbuf->db_flags & DB_SEND_STATUS_GOOD)) {
-		printk(KERN_INFO "zjn %s task=%p, free task\n", __func__, task);
+		// printk(KERN_INFO "zjn %s task=%p, free task\n", __func__, task);
 		free_it = B_TRUE;
 	}
 	
@@ -9703,7 +9704,7 @@ stmf_proxy_task_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	if (free_it) {
 		uint32_t new, old;
-		printk(KERN_INFO "zjn %s task=%p, itask_flags=%x\n", __func__, task, itask->itask_flags);
+		// printk(KERN_INFO "zjn %s task=%p, itask_flags=%x\n", __func__, task, itask->itask_flags);
 		
 		do {
 			new = old = itask->itask_flags;
@@ -11850,6 +11851,7 @@ EXPORT_SYMBOL(stmf_data_xfer_done);
 EXPORT_SYMBOL(stmf_register_local_port);
 EXPORT_SYMBOL(stmf_register_scsi_session);
 EXPORT_SYMBOL(stmf_task_alloc);
+EXPORT_SYMBOL(stmf_task_free);
 EXPORT_SYMBOL(stmf_set_lu_state);
 EXPORT_SYMBOL(stmf_find_and_hold_task);
 EXPORT_SYMBOL(stmf_reset_lport);

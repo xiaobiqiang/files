@@ -861,6 +861,7 @@ static struct qla_tgt_sess *qlt_create_sess(
 	 * code will adjust these flags as necessary. */
 	sess->logout_on_delete = 1;
 	sess->keep_nport_handle = 0;
+	sess->in_unreg_process = 0;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf006,
 	    "Adding sess %p to tgt %p via ->check_initiator_node_acl()\n",
@@ -4206,7 +4207,7 @@ qlt_do_atio(struct work_struct *atio_work)
 	qcmd = (struct qla_tgt_cmd *)cmd->cmd_fca_private;
 
 	if (!qlt_24xx_fill_cmd(vha, atio, qcmd)) {
-		fct_cmd_free(cmd);
+		stmf_task_free(task);
 		goto atio_end;
 	}
 	

@@ -429,6 +429,7 @@ void stmf_free(void *struct_ptr);
 struct scsi_task *stmf_task_alloc(struct stmf_local_port *lport,
     struct stmf_scsi_session *ss, uint8_t *lun, uint16_t cdb_length,
     uint64_t ext_id);
+void stmf_task_free(scsi_task_t *task);
 int stmf_get_lun_id(struct stmf_scsi_session *ss,  uint8_t *ident, int *entry);
 void stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf);
 void stmf_direct_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf);
