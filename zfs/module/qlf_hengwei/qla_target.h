@@ -1001,6 +1001,7 @@ struct qla_tgt_sess {
 	union {
 		struct imm_ntfy_from_isp tm_iocb;
 	};
+	int in_unreg_process;
 };
 
 struct qla_dbuf_para {

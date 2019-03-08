@@ -267,6 +267,19 @@ woptimize_changed_cb(void *arg, uint64_t newval)
 }
 
 static void
+appmeta_changed_cb(void *arg, uint64_t newval)
+{
+	objset_t *os = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval == ZFS_APPMETA_ON || newval == ZFS_APPMETA_OFF);
+	os->os_appmeta = newval;
+}
+
+
+static void
 redundant_metadata_changed_cb(void *arg, uint64_t newval)
 {
 	objset_t *os = arg;
@@ -926,6 +939,11 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 					zfs_prop_to_name(ZFS_PROP_WOPTIMZE),
 					woptimize_changed_cb, os);
 			}
+			if (err == 0) {
+				err = dsl_prop_register(ds,
+					zfs_prop_to_name(ZFS_PROP_APPMETA),
+					appmeta_changed_cb, os);
+			}
 			dmu_objset_get_group_parameters(ds, os);
 		}
 		if (err != 0) {
@@ -1253,6 +1271,9 @@ dmu_objset_evict(objset_t *os)
 			VERIFY0(dsl_prop_unregister(ds,
 				zfs_prop_to_name(ZFS_PROP_WOPTIMZE),
 				woptimize_changed_cb, os));
+			VERIFY0(dsl_prop_unregister(ds,
+				zfs_prop_to_name(ZFS_PROP_APPMETA),
+				appmeta_changed_cb, os));
 		}
 		VERIFY0(dsl_prop_unregister(ds,
 		    zfs_prop_to_name(ZFS_PROP_PRIMARYCACHE),

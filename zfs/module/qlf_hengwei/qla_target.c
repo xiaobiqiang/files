@@ -481,6 +481,7 @@ static void qlt_free_session_done(struct work_struct *work)
 	unsigned long flags;
 	bool logout_started = false;
 	fc_port_t fcport;
+	struct list_head *entry = NULL;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf084,
 		"%s: se_sess %p / sess %p from port %8phC loop_id %#04x"
@@ -541,7 +542,13 @@ static void qlt_free_session_done(struct work_struct *work)
 		qlt_send_notify_ack(vha, &sess->tm_iocb,
 				    0, 0, 0, 0, 0, 0);
 
-	list_del(&sess->sess_list_entry);
+	entry = &sess->sess_list_entry;
+	if (entry->next != LIST_POISON1 &&
+		entry->prev != LIST_POISON2) {
+		list_del(&sess->sess_list_entry);
+	} else {
+		printk("%s entry is deleted\n", __func__);
+	}
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -861,6 +868,7 @@ static struct qla_tgt_sess *qlt_create_sess(
 	 * code will adjust these flags as necessary. */
 	sess->logout_on_delete = 1;
 	sess->keep_nport_handle = 0;
+	sess->in_unreg_process = 0;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf006,
 	    "Adding sess %p to tgt %p via ->check_initiator_node_acl()\n",
@@ -3778,6 +3786,8 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 		}
 
 		dbuf->db_xfer_status = fc_st;
+		if (fct_cmd_is_aborted(cmd))
+			return;
 
 		msg = kmem_cache_zalloc(ctio_msg_cachep, GFP_ATOMIC);
 			
@@ -3801,6 +3811,9 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 		/*
 		 * This was just a pure status xfer.
 		 */
+		if (fct_cmd_is_aborted(cmd))
+			return;
+		
 		msg = kmem_cache_zalloc(ctio_msg_cachep, GFP_ATOMIC);
 	
 		if (!msg) {
@@ -4201,7 +4214,7 @@ qlt_do_atio(struct work_struct *atio_work)
 	qcmd = (struct qla_tgt_cmd *)cmd->cmd_fca_private;
 
 	if (!qlt_24xx_fill_cmd(vha, atio, qcmd)) {
-		fct_cmd_free(cmd);
+		stmf_task_free(task);
 		goto atio_end;
 	}
 	
@@ -7162,7 +7175,14 @@ qlt_logout_session(struct fct_local_port *port, uint8_t *irp_port_name, int size
 	list_for_each_entry(sess, &vha->vha_tgt.qla_tgt->sess_list,
 		sess_list_entry) {
 		if (!memcmp(sess->port_name, irp_port_name, size)) {
-			qlt_unreg_sess(sess);
+			if (sess->in_unreg_process == 0) {
+				sess->in_unreg_process = 1;
+				qlt_unreg_sess(sess);
+			} else {
+				printk("%s attention: port %8phC is in unreg process\n",
+					__func__, irp_port_name);
+			}
+			
 			break;
 		}
 	}
