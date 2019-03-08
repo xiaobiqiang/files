@@ -481,6 +481,7 @@ static void qlt_free_session_done(struct work_struct *work)
 	unsigned long flags;
 	bool logout_started = false;
 	fc_port_t fcport;
+	struct list_head *entry = NULL;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf084,
 		"%s: se_sess %p / sess %p from port %8phC loop_id %#04x"
@@ -541,7 +542,13 @@ static void qlt_free_session_done(struct work_struct *work)
 		qlt_send_notify_ack(vha, &sess->tm_iocb,
 				    0, 0, 0, 0, 0, 0);
 
-	list_del(&sess->sess_list_entry);
+	entry = &sess->sess_list_entry;
+	if (entry->next != LIST_POISON1 &&
+		entry->prev != LIST_POISON2) {
+		list_del(&sess->sess_list_entry);
+	} else {
+		printk("%s entry is deleted\n", __func__);
+	}
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -7168,7 +7175,14 @@ qlt_logout_session(struct fct_local_port *port, uint8_t *irp_port_name, int size
 	list_for_each_entry(sess, &vha->vha_tgt.qla_tgt->sess_list,
 		sess_list_entry) {
 		if (!memcmp(sess->port_name, irp_port_name, size)) {
-			qlt_unreg_sess(sess);
+			if (sess->in_unreg_process == 0) {
+				sess->in_unreg_process = 1;
+				qlt_unreg_sess(sess);
+			} else {
+				printk("%s attention: port %8phC is in unreg process\n",
+					__func__, irp_port_name);
+			}
+			
 			break;
 		}
 	}
