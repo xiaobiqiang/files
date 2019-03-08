@@ -249,6 +249,8 @@ out:
 static int
 kstat_seq_show_named(struct seq_file *f, kstat_named_t *knp)
 {
+        char *tmpbuf = NULL;
+
         seq_printf(f, "%-31s %-4d ", knp->name, knp->data_type);
 
         switch (knp->data_type) {
@@ -278,9 +280,15 @@ kstat_seq_show_named(struct seq_file *f, kstat_named_t *knp)
                         seq_printf(f, "%lu", knp->value.ul);
                         break;
                 case KSTAT_DATA_STRING:
-                        KSTAT_NAMED_STR_PTR(knp)
-                                [KSTAT_NAMED_STR_BUFLEN(knp)-1] = '\0';
-                        seq_printf(f, "%s", KSTAT_NAMED_STR_PTR(knp));
+                        tmpbuf = vmem_alloc(KSTAT_NAMED_STR_BUFLEN(knp) + 1, KM_SLEEP);
+                        if (tmpbuf == NULL) {
+                            seq_printf(f, "%s", "NULL");
+                            break;
+                        }
+                        bzero(tmpbuf, KSTAT_NAMED_STR_BUFLEN(knp) + 1);
+                        strncpy(tmpbuf, KSTAT_NAMED_STR_PTR(knp), KSTAT_NAMED_STR_BUFLEN(knp));
+                        seq_printf(f, "%s", tmpbuf);
+                        vmem_free(tmpbuf, KSTAT_NAMED_STR_BUFLEN(knp) + 1);
                         break;
                 default:
                         PANIC("Undefined kstat data type %d\n", knp->data_type);
@@ -673,7 +681,7 @@ kstat_named_setstr(kstat_named_t *knp, const char *src)
 
 	KSTAT_NAMED_STR_PTR(knp) = (char *)src;
 	if (src != NULL)
-		KSTAT_NAMED_STR_BUFLEN(knp) = strlen(src) + 1;
+		KSTAT_NAMED_STR_BUFLEN(knp) = strlen(src);
 	else
 		KSTAT_NAMED_STR_BUFLEN(knp) = 0;
 }
