@@ -3778,6 +3778,8 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 		}
 
 		dbuf->db_xfer_status = fc_st;
+		if (fct_cmd_is_aborted(cmd))
+			return;
 
 		msg = kmem_cache_zalloc(ctio_msg_cachep, GFP_ATOMIC);
 			
@@ -3801,6 +3803,9 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 		/*
 		 * This was just a pure status xfer.
 		 */
+		if (fct_cmd_is_aborted(cmd))
+			return;
+		
 		msg = kmem_cache_zalloc(ctio_msg_cachep, GFP_ATOMIC);
 	
 		if (!msg) {

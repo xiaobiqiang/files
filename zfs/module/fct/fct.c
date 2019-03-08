@@ -3675,6 +3675,18 @@ fct_init_kstats(fct_i_local_port_t *iport)
 	kstat_install(ks);
 }
 
+boolean_t 
+fct_cmd_is_aborted(fct_cmd_t *cmd)
+{
+	fct_i_cmd_t *icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
+	if (icmd->icmd_flags & ICMD_BEING_ABORTED)
+		return B_TRUE;
+	
+	return B_FALSE;
+}
+EXPORT_SYMBOL(fct_cmd_is_aborted);
+
+
 module_init(fct_init);
 module_exit(fct_fini);
 
