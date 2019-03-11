@@ -233,6 +233,23 @@ static struct qla_tgt_sess *qlt_find_sess_by_sid(
     return NULL;
 }
 
+static fc_port_t *qlt_find_fcport_by_sid(
+		struct scsi_qla_host *vha,
+		uint8_t *s_id)
+{
+	fc_port_t *fcport;
+
+	list_for_each_entry(fcport, &vha->vp_fcports, list) {
+		if (fcport->d_id.b.domain == s_id[0] &&
+			fcport->d_id.b.area == s_id[1] &&
+			fcport->d_id.b.al_pa == s_id[2]) {
+			return fcport;
+		}
+	}
+
+	return NULL;
+}
+
 
 /* Might release hw lock, then reaquire!! */
 static inline int qlt_issue_marker(struct scsi_qla_host *vha, int vha_locked)
@@ -5903,13 +5920,29 @@ qlt_24xx_print_sess(struct scsi_qla_host *vha)
 	struct qla_tgt_sess *sess;
 
     list_for_each_entry(sess, &vha->vha_tgt.qla_tgt->sess_list, sess_list_entry) {
-		printk("sess=%p sid=%x%x%x loopid=%x port_name=%8phC",
+		printk("sess=%p sid=%x%x%x loopid=%x port_name=%8phC\n",
 			sess,
 			sess->s_id.b.domain,
 			sess->s_id.b.area,
 			sess->s_id.b.al_pa,
 			sess->loop_id,
 			sess->port_name);
+    }
+}
+
+void 
+qlt_24xx_print_fcport(struct scsi_qla_host *vha)
+{
+	fc_port_t *fcport;
+
+    list_for_each_entry(fcport, &vha->vp_fcports, list) {
+		printk("fcport=%p sid=%x%x%x loopid=%x port_name=%8phC\n",
+			fcport,
+			fcport->d_id.b.domain,
+			fcport->d_id.b.area,
+			fcport->d_id.b.al_pa,
+			fcport->loop_id,
+			fcport->port_name);
     }
 }
 
@@ -5921,6 +5954,7 @@ boolean_t qlt_24xx_fill_cmd(struct scsi_qla_host *vha,
 	unsigned char *cdb;
 	uint32_t data_length;
 	int fcp_task_attr, data_dir, bidi = 0;
+	fc_port_t *fcport;
 	struct qla_tgt_sess *sess;
 
 	memset(cmd, 0, sizeof(struct qla_tgt_cmd));
@@ -5933,20 +5967,28 @@ boolean_t qlt_24xx_fill_cmd(struct scsi_qla_host *vha,
 	cmd->vha = vha;
 	cmd->reset_count = vha->hw->chip_reset;
 
-	sess = qlt_find_sess_by_sid(vha->vha_tgt.qla_tgt, atio_from->u.isp24.fcp_hdr.s_id);
-    if(sess == NULL) {	
-        printk("zjn %s can not find the session! qla_tgt=%p sid=%x%x%x\n", __func__,
-			vha->vha_tgt.qla_tgt,
-			atio_from->u.isp24.fcp_hdr.s_id[0],
-			atio_from->u.isp24.fcp_hdr.s_id[1],
-			atio_from->u.isp24.fcp_hdr.s_id[2]
-			);
-		qlt_24xx_print_sess(vha);
-        return B_FALSE;
-    }
-
-	/* TODO: */
-	cmd->loop_id = sess->loop_id; 
+	fcport = qlt_find_fcport_by_sid(vha, atio_from->u.isp24.fcp_hdr.s_id);
+	if (!fcport) {
+		qlt_24xx_print_fcport(vha);
+		printk("zjn %s can not find the fcport, find session instead. vha=%p vp_fcports=%p\n",
+			__func__, vha, &vha->vp_fcports);
+		sess = qlt_find_sess_by_sid(vha->vha_tgt.qla_tgt, atio_from->u.isp24.fcp_hdr.s_id);
+		if(!sess) {	
+			printk("zjn %s can not find the session! qla_tgt=%p sid=%x%x%x\n", __func__,
+				vha->vha_tgt.qla_tgt,
+				atio_from->u.isp24.fcp_hdr.s_id[0],
+				atio_from->u.isp24.fcp_hdr.s_id[1],
+				atio_from->u.isp24.fcp_hdr.s_id[2]
+				);
+			qlt_24xx_print_sess(vha);
+			return B_FALSE;
+		} else {
+			cmd->loop_id = sess->loop_id;
+		}
+	} else {
+		cmd->loop_id = fcport->loop_id;
+	}
+	
 	cdb = &atio->u.isp24.fcp_cmnd.cdb[0];
 	//cmd->tag = atio->u.isp24.exchange_addr;
 	cmd->unpacked_lun = scsilun_to_int(
