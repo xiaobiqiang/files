@@ -1422,8 +1422,11 @@ dsl_scan_free_block_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 			return (SET_ERROR(ERESTART));
 	}
 
-	zio_nowait(zio_free_sync(scn->scn_zio_root, scn->scn_dp->dp_spa,
-	    dmu_tx_get_txg(tx), bp, 0));
+	if (!BP_IS_TOGTHER(bp)) {
+		zio_nowait(zio_free_sync(scn->scn_zio_root, scn->scn_dp->dp_spa,
+	    	dmu_tx_get_txg(tx), bp, 0));
+	}
+	
 	dsl_dir_diduse_space(tx->tx_pool->dp_free_dir, DD_USED_HEAD,
 	    -bp_get_dsize_sync(scn->scn_dp->dp_spa, bp),
 	    -BP_GET_PSIZE(bp), -BP_GET_UCSIZE(bp), tx);
