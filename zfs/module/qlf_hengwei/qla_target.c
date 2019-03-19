@@ -3264,14 +3264,18 @@ static void qlt_send_term_exchange(struct scsi_qla_host *vha,
 
 	if (ha_locked) {
 		rc = __qlt_send_term_exchange(vha, cmd, atio);
+#if 0
 		if (rc == -ENOMEM)
 			qlt_alloc_qfull_cmd(vha, atio, 0, 0);
+#endif
 		goto done;
 	}
 	spin_lock_irqsave(&vha->hw->hardware_lock, flags);
 	rc = __qlt_send_term_exchange(vha, cmd, atio);
+#if 0	
 	if (rc == -ENOMEM)
 		qlt_alloc_qfull_cmd(vha, atio, 0, 0);
+#endif
 
 done:
 	if (cmd && ((cmd->state != QLA_TGT_STATE_ABORTED) ||
@@ -5741,6 +5745,7 @@ static void
 qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 	struct atio_from_isp *atio, uint16_t status, int qfull)
 {
+#if 0
 	struct qla_tgt *tgt = vha->vha_tgt.qla_tgt;
 	struct qla_hw_data *ha = vha->hw;
 	struct qla_tgt_sess *sess;
@@ -5822,6 +5827,7 @@ qlt_alloc_qfull_cmd(struct scsi_qla_host *vha,
 		vha->hw->qla_stats.stat_max_qfull_cmds_alloc)
 		vha->hw->qla_stats.stat_max_qfull_cmds_alloc =
 			vha->hw->tgt.num_qfull_cmds_alloc;
+#endif
 }
 
 int
@@ -5895,8 +5901,10 @@ qlt_send_busy(struct scsi_qla_host *vha,
 	int rc = 0;
 
 	rc = __qlt_send_busy(vha, atio, status);
+#if 0	
 	if (rc == -ENOMEM)
 		qlt_alloc_qfull_cmd(vha, atio, status, 1);
+#endif
 }
 
 static int
