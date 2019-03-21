@@ -24,6 +24,8 @@ perf_stat_SOURCES = \
 	perf_stat_nfs.c \
 	perf_stat_zpool.c \
 	perf_stat_fc.c \
+	perf_stat_disk.c \
+	perf_stat_sys.c \
 	perf_util.c \
 	perf_util.h
 

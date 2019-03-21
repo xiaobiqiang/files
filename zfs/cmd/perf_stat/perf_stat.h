@@ -19,5 +19,7 @@ extern void perf_stat_zpool_fini(void);
 extern void perf_stat_zpool2(void);
 extern void *zpool_iostat_thread(void *arg);
 extern void perf_stat_fc(void);
+extern void perf_stat_disk(void);
+extern void perf_stat_sys(void);
 
 #endif

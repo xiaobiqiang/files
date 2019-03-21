@@ -199,7 +199,7 @@ perf_stat_fc(void)
 	struct fc_stat_snapshot *snap = NULL;
 	char path[128];
 
-    (void)system("fc_stat.sh");
+    (void)system("fc_stat.sh fc_stat");
 	result = parse_file(PROC_FCINFO); /*file name not confirm yet*/
 	if (result == NULL) {
 		syslog(LOG_ERR, "parse file %s failed", PROC_FCINFO);
