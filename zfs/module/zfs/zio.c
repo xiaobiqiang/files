@@ -1867,6 +1867,12 @@ zio_rewrite_gang(zio_t *pio, blkptr_t *bp, zio_gang_node_t *gn, void *data)
 zio_t *
 zio_free_gang(zio_t *pio, blkptr_t *bp, zio_gang_node_t *gn, void *data)
 {
+	
+	if (BP_IS_TOGTHER(bp)) {
+			cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
+			return (zio_null(pio, pio->io_spa, NULL, NULL, NULL, 0));
+	}
+	
 	return (zio_free_sync(pio, pio->io_spa, pio->io_txg, bp,
 	    ZIO_GANG_CHILD_FLAGS(pio)));
 }
