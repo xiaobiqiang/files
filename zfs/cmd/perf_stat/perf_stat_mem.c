@@ -16,6 +16,8 @@ struct mem_stat_snapshot {
 	uint32_t	timestamp;
 	uint32_t	mem_total;
 	uint32_t	mem_free;
+    uint32_t    buffers;
+    uint32_t    cached;
 };
 
 struct mem_stat_snapshot	*mem_stat_snapshot_minute = NULL;
@@ -44,7 +46,8 @@ store_mem_stat_history(struct mem_stat_snapshot *snap, const char *dir)
 {
 	xmlNodePtr root_node = NULL;
 	xmlDocPtr perf_doc = NULL;
-	xmlNodePtr mem_node, time_node, total_node, free_node;
+	xmlNodePtr mem_node, time_node, total_node, 
+	free_node,buffers_node,cached_node;
 	char buf[32];
 	char path[128];
 
@@ -61,7 +64,12 @@ store_mem_stat_history(struct mem_stat_snapshot *snap, const char *dir)
 	free_node = xmlNewChild(mem_node, NULL, (xmlChar *)"MemFree", NULL);
 	sprintf(buf, "%u", snap->mem_free);
 	xmlNodeSetContent(free_node, (xmlChar *)buf);
-
+    buffers_node = xmlNewChild(mem_node, NULL, (xmlChar *)"Buffers", NULL);
+	sprintf(buf, "%u", snap->buffers);
+	xmlNodeSetContent(buffers_node, (xmlChar *)buf);
+    cached_node = xmlNewChild(mem_node, NULL, (xmlChar *)"Cached", NULL);
+	sprintf(buf, "%u", snap->cached);
+	xmlNodeSetContent(cached_node, (xmlChar *)buf);
 	if (do_mkdir(dir) != 0) {
 		close_xml_file(&perf_doc, NULL);
 		return;
@@ -110,6 +118,22 @@ perf_stat_mem(void)
 			}
 			snap->mem_free = num;
 		}
+        else if(strcmp(buf->bufv[0], "Buffers:") == 0)
+        {
+            if ((num = str2ul(buf->bufv[1])) == INVAL_UL) {
+				syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[1]);
+				goto failed;
+			}
+			snap->buffers = num;
+        }
+        else if(strcmp(buf->bufv[0], "Cached:") == 0)
+        {
+            if ((num = str2ul(buf->bufv[1])) == INVAL_UL) {
+				syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[1]);
+				goto failed;
+			}
+			snap->cached = num;
+        }
 	}
 
 	if (snap->mem_total == 0 || snap->mem_free == 0) {

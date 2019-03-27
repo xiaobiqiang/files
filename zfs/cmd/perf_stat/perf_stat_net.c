@@ -68,6 +68,30 @@ sort_netdev_stat_snapshot(struct netdev_stat_snapshot *snap)
 	snap->head = list;
 }
 
+static uint32_t
+get_bandwidth(const char *name)
+{
+	char command[128];
+	struct parse_result *result;
+	struct line_buf *line;
+	uint32_t band;
+	snprintf(command, 128, "ethtool '%s'|grep Speed|awk -F':' '{print $2}'|awk -F' ' '{print $1}'", name);
+	result = parse_cmd(command);
+	if (result == NULL || result->head == NULL || result->head != result->tail)
+		return (0);
+	line = result->head;
+	if (line->bufc != 1) {
+		free_parse_result(result);
+		return (0);
+	}
+    if(strcmp(line->bufv[0],"Unknown!") == 0)
+    {
+        return 0;
+    }
+	band = atoi(line->bufv[0]);
+	free_parse_result(result);
+	return (band);
+}
 static struct netdev_stat_snapshot *
 dup_netdev_stat_snapshot(struct netdev_stat_snapshot *snap)
 {
@@ -106,7 +130,8 @@ store_netdev_stat_history(struct netdev_stat_snapshot *old_snap, struct netdev_s
 {
 	xmlNodePtr root_node = NULL;
 	xmlDocPtr perf_doc = NULL;
-	xmlNodePtr nic_node, time_node, unique_node, name_node, rkps_node, wkps_node;
+	xmlNodePtr nic_node, time_node, unique_node, name_node, rkps_node, 
+	wkps_node,ierror_node,oerror_node,util_node, rps_node, wps_node;
 	struct per_netdev_stat *p0, *p1;
 	char buf[32];
 	char path[128];
@@ -121,8 +146,9 @@ store_netdev_stat_history(struct netdev_stat_snapshot *old_snap, struct netdev_s
 	for (p0 = old_snap->head, p1 = snap->head; p0 != NULL && p1 != NULL;) {
 		int cmp = strcmp(p0->ifname, p1->ifname);
 		if (cmp == 0) {
+            uint32_t band,i_error,o_error;
 			uint64_t diff_r, diff_x;
-			double rkps, wkps;
+			double rkps, wkps, rps, wps, util;
 
 			assert(p0->recv_bytes <= p1->recv_bytes);
 			assert(p0->xmit_bytes <= p1->xmit_bytes);  
@@ -130,7 +156,20 @@ store_netdev_stat_history(struct netdev_stat_snapshot *old_snap, struct netdev_s
 			diff_x = p1->xmit_bytes - p0->xmit_bytes;
 			rkps = (double)diff_r / (double)elapse;
 			wkps = (double)diff_x / (double)elapse;
-
+            i_error = p1->recv_stat[1] - p0->recv_stat[1];
+            o_error = p1->xmit_stat[1] - p0->xmit_stat[1];
+            diff_r = p1->recv_stat[0] - p0->recv_stat[0];
+			diff_x = p1->xmit_stat[0] - p0->xmit_stat[0];
+            rps = (double)diff_r / (double)elapse;
+            wps = (double)diff_x / (double)elapse;
+            if((band = get_bandwidth(p1->ifname)) != 0)
+            {
+                util = (rkps + wkps) / (double)band;
+            }
+            else
+            {
+                util = 0.0;
+            }
 			nic_node = xmlNewChild(root_node, NULL, (xmlChar *)"NIC", NULL);
 			time_node = xmlNewChild(nic_node, NULL, (xmlChar *)"time", NULL);
 			sprintf(buf, "%u", snap->timestamp);
@@ -141,13 +180,27 @@ store_netdev_stat_history(struct netdev_stat_snapshot *old_snap, struct netdev_s
 			name_node = xmlNewChild(nic_node, NULL, (xmlChar *)"name", NULL);
 			sprintf(buf, "%s", p0->ifname);
 			xmlNodeSetContent(name_node, (xmlChar *)buf);
+            rps_node = xmlNewChild(nic_node, NULL, (xmlChar *)"rps", NULL);
+			sprintf(buf, "%.2lf", rps);
+			xmlNodeSetContent(rps_node, (xmlChar *)buf);
+			wps_node = xmlNewChild(nic_node, NULL, (xmlChar *)"wps", NULL);
+			sprintf(buf, "%.2lf", wps);
+			xmlNodeSetContent(wps_node, (xmlChar *)buf);
 			rkps_node = xmlNewChild(nic_node, NULL, (xmlChar *)"rkps", NULL);
 			sprintf(buf, "%.2lf", rkps);
 			xmlNodeSetContent(rkps_node, (xmlChar *)buf);
 			wkps_node = xmlNewChild(nic_node, NULL, (xmlChar *)"wkps", NULL);
 			sprintf(buf, "%.2lf", wkps);
 			xmlNodeSetContent(wkps_node, (xmlChar *)buf);
-
+            ierror_node = xmlNewChild(nic_node, NULL, (xmlChar *)"ierror", NULL);
+			sprintf(buf, "%u", i_error);
+			xmlNodeSetContent(ierror_node, (xmlChar *)buf);
+            oerror_node = xmlNewChild(nic_node, NULL, (xmlChar *)"oerror", NULL);
+			sprintf(buf, "%u", o_error);
+			xmlNodeSetContent(oerror_node, (xmlChar *)buf);
+            util_node = xmlNewChild(nic_node, NULL, (xmlChar *)"util", NULL);
+			sprintf(buf, "%.2lf", util);
+			xmlNodeSetContent(util_node, (xmlChar *)buf);
 			p0 = p0->next;
 			p1 = p1->next;
 		} else if (cmp < 0)

@@ -860,22 +860,43 @@ construct_zpool_stat_snaphost(avl_tree_t *tree)
 }
 
 static struct zpool_stat_snapshot2 *
-cons_from_zpool_iostat_snapshot_list(avl_tree_t *tree, uint32_t timestamp)
+cons_from_zpool_iostat_snapshot_list(avl_tree_t *tree)
 {
 	struct zpool_stat_snapshot2 *snap, *new_snap, *p;
 	struct per_zpool_stat2 *stat, *p0;
+	uint32_t starttime;
 	avl_index_t where;
 	unsigned int count;
 
-	snap = avl_first(tree);
-	if (snap == NULL || snap->timestamp > timestamp)
+	snap = avl_last(tree);
+	if (snap == NULL)
+		return (NULL);
+	if (tree == &zpool_stat_snapshot_list_minute)
+		starttime = time_ago(snap->timestamp, di_hour);
+	else if (tree == &zpool_stat_snapshot_list_hour)
+		starttime = time_ago(snap->timestamp, di_day);
+	else if (tree == &zpool_stat_snapshot_list_day)
+		starttime = time_ago(snap->timestamp, di_week);
+	else if (tree == &zpool_stat_snapshot_list_week)
+		starttime = time_ago(snap->timestamp, di_month);
+	else if (tree == &zpool_stat_snapshot_list_month)
+		starttime = time_ago(snap->timestamp, di_year);
+	else
 		return (NULL);
 
 	new_snap = malloc(sizeof (struct zpool_stat_snapshot2));
+	new_snap->timestamp = starttime;
+	p = avl_find(tree, new_snap, &where);
+	if (p == NULL)
+		p = avl_nearest(tree, where, AVL_AFTER);
+	if (p == NULL) {
+		free(new_snap);
+		return (NULL);
+	}
 	avl_create(&new_snap->stat, per_zpool_stat_compare,
 		sizeof (struct per_zpool_stat2),
 		offsetof(struct per_zpool_stat2, node));
-	for (count = 0, p = snap; p; count++, p = AVL_NEXT(tree, p)) {
+	for (count = 0; p; count++, p = AVL_NEXT(tree, p)) {
 		for (p0 = avl_first(&p->stat); p0; p0 = AVL_NEXT(&p->stat, p0)) {
 			stat = avl_find(&new_snap->stat, p0, &where);
 			if (stat == NULL) {
@@ -906,35 +927,17 @@ cons_from_zpool_iostat_snapshot_list(avl_tree_t *tree, uint32_t timestamp)
 			stat->rps, stat->wps, stat->rbps, stat->wbps);
 	}
 
-	snap = avl_last(tree);
-	new_snap->timestamp = snap->timestamp;
 	return (new_snap);
 failed:
 	free_zpool_stat_snapshot2(new_snap);
 	return (NULL);
 }
 
-static void
-zpool_stat_snapshot_list_add(avl_tree_t *tree,
-	struct zpool_stat_snapshot2 *snap)
-{
-	ulong_t numnodes;
-	avl_add(tree, snap);
-	numnodes = avl_numnodes(tree);
-	if ((tree == &zpool_stat_snapshot_list_minute && numnodes > 61) ||
-		(tree == &zpool_stat_snapshot_list_hour && numnodes > 25) ||
-		(tree == &zpool_stat_snapshot_list_day && numnodes > 8) ||
-		(tree == &zpool_stat_snapshot_list_week && numnodes > 5) ||
-		(tree == &zpool_stat_snapshot_list_month && numnodes > 13)) {
-		struct zpool_stat_snapshot2 *node = avl_first(tree);
-		avl_remove(tree, node);
-	}
-}
 
 void
 perf_stat_zpool2(void)
 {
-	struct zpool_stat_snapshot2 *snap, *old_snap, *s;
+	struct zpool_stat_snapshot2 *snap, *old_snap;
 	char path[128], file[32];
 	avl_tree_t *tree;
 
@@ -962,60 +965,50 @@ perf_stat_zpool2(void)
 		snprintf(path, 128, "%s/minute/pool", PERF_STAT_DIR);
 		store_zpool_stat_history2(snap, path);
 	}
-	zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_minute, snap);
+	avl_add(&zpool_stat_snapshot_list_minute, snap);
 
 	old_snap = avl_last(&zpool_stat_snapshot_list_hour);
 	if (old_snap == NULL || diff_time(old_snap->timestamp, snap->timestamp) >= ONE_HOUR) {
-		s = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_minute,
-			snap->timestamp - ONE_HOUR);
-		if (s) {
+		snap = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_minute);
+		if (snap) {
 			snprintf(path, 128, "%s/hour/pool", PERF_STAT_DIR);
-			store_zpool_stat_history2(s, path);
-			zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_hour, s);
+			store_zpool_stat_history2(snap, path);
 		}
 	}
 
 	old_snap = avl_last(&zpool_stat_snapshot_list_day);
 	if (old_snap == NULL || diff_time(old_snap->timestamp, snap->timestamp) >= ONE_DAY) {
-		s = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_hour,
-			snap->timestamp - ONE_DAY);
-		if (s) {
+		snap = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_hour);
+		if (snap) {
 			snprintf(path, 128, "%s/day/pool", PERF_STAT_DIR);
-			store_zpool_stat_history2(s, path);
-			zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_day, s);
+			store_zpool_stat_history2(snap, path);
 		}
 	}
 
 	old_snap = avl_last(&zpool_stat_snapshot_list_week);
 	if (old_snap == NULL || diff_time(old_snap->timestamp, snap->timestamp) >= ONE_WEEK) {
-		s = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_day,
-			snap->timestamp - ONE_WEEK);
-		if (s) {
+		snap = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_day);
+		if (snap) {
 			snprintf(path, 128, "%s/week/pool", PERF_STAT_DIR);
-			store_zpool_stat_history2(s, path);
-			zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_week, s);
+			store_zpool_stat_history2(snap, path);
 		}
 	}
 
 	old_snap = avl_last(&zpool_stat_snapshot_list_month);
 	if (old_snap == NULL || diff_date(old_snap->timestamp, snap->timestamp) >= di_month) {
-		s = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_week,
-			snap->timestamp - ONE_MONTH);
-		if (s) {
+		snap = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_week);
+		if (snap) {
 			snprintf(path, 128, "%s/month/pool", PERF_STAT_DIR);
-			store_zpool_stat_history2(s, path);
-			zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_month, s);
+			store_zpool_stat_history2(snap, path);
 		}
 	}
 
 	old_snap = avl_last(&zpool_stat_snapshot_list_year);
 	if (old_snap == NULL || diff_date(old_snap->timestamp, snap->timestamp) >= di_year) {
-		s = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_month,
-			snap->timestamp - ONE_YEAR);
-		if (s) {
+		snap = cons_from_zpool_iostat_snapshot_list(&zpool_stat_snapshot_list_month);
+		if (snap) {
 			snprintf(path, 128, "%s/year/pool", PERF_STAT_DIR);
-			store_zpool_stat_history2(s, path);
-			zpool_stat_snapshot_list_add(&zpool_stat_snapshot_list_year, s);
+			store_zpool_stat_history2(snap, path);
 		}
 	}
 
