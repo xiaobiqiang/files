@@ -22,9 +22,10 @@ USER_C =  pool_transport.c pt_zfs.c
 libpool_transport_la_LIBADD = 					\
 	$(top_builddir)/lib/fm/topo/libtopo/common/libtopo.la	\
 	$(top_builddir)/lib/libdiskmgt/libdiskmgt.la	\
-	$(top_builddir)/lib/libzfs/libzfs.la 
+	$(top_builddir)/lib/libzfs/libzfs.la \
+	$(top_builddir)/lib/fm/libdiskstatus/common/libdiskstatus.la
 
-libpool_transport_la_LIBADD += -lxml2 -ldiskstatus -luutil -lstmf
+libpool_transport_la_LIBADD += -lxml2 -luutil
 
 dist_libpool_transport_la_SOURCES = \
 	$(USER_C)
