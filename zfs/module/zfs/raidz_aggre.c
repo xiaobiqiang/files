@@ -27,6 +27,7 @@ int bptg_store_map = 1;
 kmem_cache_t *aggre_io_cache=NULL;
 uint64_t aggre_io_alloc_n = 0;
 uint64_t aggre_io_free_n=0;
+uint64_t rzaggre_map_pos_last = 0;
 
 typedef enum {
 	DEBUG_NORMAL = 0,
@@ -82,6 +83,7 @@ raidz_aggre_check(spa_t *spa)
 			break;
 		}
 	}
+	spa->sap_map_pos_last = 0;
 
 	if (!spa->spa_raidz_aggre)
 		cmn_err(CE_NOTE, "%s %s isn't raidz aggre", __func__, spa->spa_name);
@@ -522,6 +524,8 @@ update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx)
 		uint64_t size = (blkid2 - blkid1) * map->hdr->blksize;
 		dmu_free_range(map->os, map->object, offset, size, tx);
 	}
+
+	cmn_err(CE_WARN, "%s %s pre=%ld pos=%ld \n", __func__,spa->spa_name, (long)pre_pos, (long)pos);
 }
 
 void
@@ -877,6 +881,15 @@ check_and_reclaim_space(spa_t *spa)
 	avail_count = map->hdr->avail_count;
 	count = map->hdr->blksize / map->hdr->recsize;
 	mutex_exit(&map->aggre_lock);
+	
+
+	if (spa->sap_map_pos_last && spa->sap_map_pos_last >= pos) {
+		cmn_err(CE_WARN, "%s %s error rzaggre_map_pos_last=%ld, pos=%ld \n",
+					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos);
+		return;
+	} 
+	cmn_err(CE_WARN, "%s %s runbegin rzaggre_map_pos_last=%ld, pos=%ld avail_count=%ld \n",
+					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos,(long)avail_count);
 
 	for (i = 0; i < avail_count; i++) {
 		mutex_enter(&spa->spa_space_reclaim_lock);
@@ -918,9 +931,14 @@ check_and_reclaim_space(spa_t *spa)
 		pos++;
 		data += map->hdr->recsize;
 	}
-
+	if(i > 0)
+		spa->sap_map_pos_last = pos-1;
+	
 	if (dbuf)
 		dmu_buf_rele(dbuf, FTAG);
+
+	cmn_err(CE_WARN, "%s %s runend rzaggre_map_pos_last=%ld, pos=%ld \n",
+					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos);
 }
 
 void

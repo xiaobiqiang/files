@@ -180,7 +180,7 @@ range_tree_add(void *arg, uint64_t start, uint64_t size)
 	if (rs != NULL && rs->rs_start <= start && rs->rs_end >= end) {
 		zfs_panic_recover("zfs: allocating allocated segment"
 		    "(offset=%llu size=%llu [off=%llu size=%llu]%s ops=%p allvar=%p)\n",
-		    (longlong_t)start, (longlong_t)size,(longlong_t)rs->rs_start, (longlong_t)rs->rs_end,__func__, rt->rt_ops, &metaslab_rt_ops);	
+		    (longlong_t)start, (longlong_t)size,(longlong_t)rs->rs_start, (longlong_t)(rs->rs_end-rs->rs_start),__func__, rt->rt_ops, &metaslab_rt_ops);	
 		return;
 	}
 

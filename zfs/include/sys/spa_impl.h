@@ -318,6 +318,7 @@ struct spa {
 	uint32_t	spa_raidz_ashift;
 	clist_t 	spa_aggre_maplist[TXG_SIZE];
 	map_pos_t	spa_map_process_pos[TXG_SIZE];
+	uint64_t		sap_map_pos_last;
 
 	taskq_t 	*spa_space_reclaim_tq;
 	int 		spa_space_reclaim_state;
