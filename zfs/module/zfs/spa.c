@@ -7423,12 +7423,14 @@ spa_sync(spa_t *spa, uint64_t txg)
 
 		clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
 			spa->spa_aggre_map, tx);
+		/*
 		pos_valid = get_and_clear_aggre_map_process_pos(spa, txg, &process_pos);
 		if (pos_valid) {
-			/* update map meta data */
 			update_aggre_map_process_pos(spa, process_pos, tx);
-		}
-
+		}*/
+		
+		update_aggre_map_free_range(spa, tx);
+		
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
 

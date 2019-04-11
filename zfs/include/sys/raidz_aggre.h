@@ -23,6 +23,7 @@ typedef struct aggre_map_hdr {
 	uint64_t total_count;	/* always increment, provide map_index */
 	uint64_t avail_count;	/* current available count, start from process_index */
 	uint64_t process_index;	/* always increment, provide space recovery start index */
+	uint64_t free_index;
 } aggre_map_hdr_t;
 
 typedef struct aggre_map_elem {
@@ -44,6 +45,7 @@ typedef struct aggre_map {
 	int dbuf_size;
 	uint64_t dbuf_id;
 	kmutex_t aggre_lock;
+	int owner;
 } aggre_map_t;
 
 typedef struct map_pos {
@@ -201,7 +203,7 @@ void raidz_aggre_process_dirty_map(spa_t *spa, dmu_tx_t *tx);
 void set_aggre_map_process_pos(spa_t *spa, uint64_t pos, uint64_t txg);
 boolean_t get_and_clear_aggre_map_process_pos(spa_t *spa, uint64_t txg, uint64_t *ppos);
 void update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx);
-
+void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx);
 extern int raidz_aggre_init(void);
 extern void raidz_aggre_fini(void);
 

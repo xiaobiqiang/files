@@ -40,7 +40,8 @@ typedef enum {
 } reclaim_mode;
 
 int raidz_reclaim_enable = 1;
-unsigned long raidz_space_reclaim_gap = 120;	/* unit: s */
+int raidz_reclaim_timeconsum = 10000;
+unsigned long raidz_space_reclaim_gap = 60;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
@@ -53,6 +54,7 @@ static int aggre_io_cons(void *vdb, void *unused, int kmflag)
         aggre_io_alloc_n++;
         return 0;
 }
+
 static void
 aggre_io_dest(void *vdb, void *unused)
 {
@@ -528,6 +530,61 @@ update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx)
 	cmn_err(CE_WARN, "%s %s pre=%ld pos=%ld \n", __func__,spa->spa_name, (long)pre_pos, (long)pos);
 }
 
+void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx)
+{
+	aggre_map_t *map = spa->spa_aggre_map;
+	uint64_t processed = 0;
+	uint64_t pre_pos=0;
+	uint64_t elem_per_blk;
+	uint64_t blkid1, blkid2;
+	uint64_t pos=0;
+
+	int state = spa->spa_space_reclaim_state;
+	
+	if(spa->spa_space_reclaim_state != 3) {
+		cmn_err(CE_WARN, "%s %s return not run \n",	__func__,spa->spa_name);
+		return;
+	}
+	
+	mutex_enter(&map->aggre_lock);
+	if ( map->owner == 2 ) {
+		mutex_exit(&map->aggre_lock);
+		return;
+	}
+	map->owner = 1;
+	pre_pos = map->hdr->free_index;
+	pos = map->hdr->process_index;
+	mutex_exit(&map->aggre_lock);
+	processed = pos - pre_pos;
+	
+	if(processed <100 ){
+		mutex_enter(&map->aggre_lock);
+		map->owner = 0;
+		mutex_exit(&map->aggre_lock);
+		return;
+	}
+	
+	dmu_buf_will_dirty(map->dbuf_hdr, tx);
+
+	elem_per_blk = map->hdr->blksize / map->hdr->recsize;
+	blkid1 = pre_pos / elem_per_blk;
+	blkid2 = pos / elem_per_blk;
+
+	if (blkid2 > blkid1) {
+		uint64_t offset = blkid1 * map->hdr->blksize;
+		uint64_t size = (blkid2 - blkid1) * map->hdr->blksize;
+		dmu_free_range(map->os, map->object, offset, size, tx);
+	}
+
+	mutex_enter(&map->aggre_lock);
+	map->hdr->free_index = pos;
+	map->owner = 0;
+	mutex_exit(&map->aggre_lock);
+
+	cmn_err(CE_WARN, "%s %s pre=%ld pos=%ld \n", __func__,spa->spa_name, (long)pre_pos, (long)pos);
+}
+
+
 void
 raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num)
 {
@@ -554,6 +611,7 @@ raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num)
 	hdr->total_count = 0;
 	hdr->avail_count = 0;
 	hdr->process_index = 0;
+	hdr->free_index = 0;
 	
 	dmu_buf_rele(dbp, FTAG);
 }
@@ -585,7 +643,8 @@ raidz_aggre_map_open(spa_t *spa)
 	map->dbuf_num = AGGRE_MAP_MAX_DBUF_NUM;
 	map->dbuf_array = (dmu_buf_t **)kmem_zalloc(sizeof(dmu_buf_t *) * map->dbuf_num, KM_SLEEP);
 	mutex_init(&map->aggre_lock, NULL, MUTEX_DEFAULT, NULL);
-	
+
+	map->owner = 0;
 	map->hdr = (aggre_map_hdr_t *)map->dbuf_hdr->db_data;
 	map->os = spa->spa_meta_objset;
 	map->object = spa->spa_map_obj;
@@ -644,10 +703,11 @@ raidz_aggre_elem_enqueue_cb(void *arg, void *data, dmu_tx_t *tx)
 	map->hdr->total_count++;
 	map->hdr->avail_count++;
 
+	/*
 	if (raidz_avail_map_thresh > 0) {
 		if (map->hdr->avail_count > raidz_avail_map_thresh)
 			cv_signal(&spa->spa_space_reclaim_cv);
-	}
+	}*/
 	
 	mutex_exit(&map->aggre_lock);
 	kmem_free(elem, map->hdr->recsize);
@@ -875,23 +935,29 @@ check_and_reclaim_space(spa_t *spa)
 	aggre_elem_state state;
 	int err, index, tq_state;
 	uint8_t *data = NULL;
-
+	hrtime_t timestampbegin;
+	hrtime_t timestampnow;
+	uint32_t elapsed_ms = 0 ;
+	
+redo:
+	cmn_err(CE_WARN, "%s %s , owner=%d\n", __func__, spa->spa_name, map->owner );
 	mutex_enter(&map->aggre_lock);
+	if(map->owner == 0)
+		map->owner = 2;
+	else{
+		mutex_exit(&map->aggre_lock);
+		msleep(1000);
+		goto redo;
+	}
 	pos = map->hdr->process_index;
 	avail_count = map->hdr->avail_count;
 	count = map->hdr->blksize / map->hdr->recsize;
 	mutex_exit(&map->aggre_lock);
-	
 
-	if (spa->sap_map_pos_last && spa->sap_map_pos_last >= pos) {
-		cmn_err(CE_WARN, "%s %s error rzaggre_map_pos_last=%ld, pos=%ld \n",
-					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos);
-		return;
-	} 
-	cmn_err(CE_WARN, "%s %s runbegin rzaggre_map_pos_last=%ld, pos=%ld avail_count=%ld \n",
-					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos,(long)avail_count);
+	timestampbegin = gethrtime();
 
-	for (i = 0; i < avail_count; i++) {
+	cmn_err(CE_WARN, "%s %s , avail_count=%d\n", __func__, spa->spa_name,avail_count);
+	for (i = 0; i < avail_count; ) {
 		mutex_enter(&spa->spa_space_reclaim_lock);
 		tq_state = spa->spa_space_reclaim_state;
 		mutex_exit(&spa->spa_space_reclaim_lock);
@@ -929,16 +995,29 @@ check_and_reclaim_space(spa_t *spa)
 				__func__, pos, err);
 		}
 		pos++;
+		i++;
 		data += map->hdr->recsize;
+		map->hdr->process_index++;
+				
+		timestampnow = gethrtime();
+				elapsed_ms =  (timestampnow - timestampbegin) / 1000000;
+		if (elapsed_ms >= raidz_reclaim_timeconsum) {
+			break;
+		}
 	}
-	if(i > 0)
-		spa->sap_map_pos_last = pos-1;
+
+	mutex_enter(&map->aggre_lock);
+	map->owner = 0;
+	map->hdr->avail_count -= i;
+	count = map->hdr->avail_count;
+	mutex_exit(&map->aggre_lock);
 	
+	cmn_err(CE_WARN, "%s %s , elapsedms=%d processcount=%d availcount=%ld\n",
+			__func__, spa->spa_name, elapsed_ms, i, count);
+
 	if (dbuf)
 		dmu_buf_rele(dbuf, FTAG);
-
-	cmn_err(CE_WARN, "%s %s runend rzaggre_map_pos_last=%ld, pos=%ld \n",
-					__func__,spa->spa_name,(long)spa->sap_map_pos_last , (long)pos);
+	
 }
 
 void
@@ -1026,4 +1105,8 @@ MODULE_PARM_DESC(raidz_space_reclaim_gap, "raidz reclaim time gap");
 
 module_param(raidz_avail_map_thresh, ulong, 0644);
 MODULE_PARM_DESC(raidz_avail_map_thresh, "raidz avail map threshold");
+
+module_param(raidz_reclaim_timeconsum, int, 0644);
+MODULE_PARM_DESC(raidz_reclaim_timeconsum, "raidz timeconsumimg");
+
 #endif
