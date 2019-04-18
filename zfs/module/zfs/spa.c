@@ -2931,8 +2931,11 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
-	if (spa_dir_prop(spa, DMU_POOL_RAIDZ_AGGRE_MAP, &spa->spa_map_obj) != 0)
+	error =zap_lookup(spa->spa_meta_objset, DMU_POOL_RAIDZ_AGGRE_MAP,
+	    DMU_POOL_RAIDZ_AGGRE_MAP, sizeof (uint64_t),AGGRE_MAP_MAX_OBJ_NUM,&spa->spa_map_obj_arr[0]);
+	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
+	
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -7422,14 +7425,14 @@ spa_sync(spa_t *spa, uint64_t txg)
 		}
 
 		clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
-			spa->spa_aggre_map, tx);
+			raidz_aggre_map_current(spa), tx);
 		/*
 		pos_valid = get_and_clear_aggre_map_process_pos(spa, txg, &process_pos);
 		if (pos_valid) {
 			update_aggre_map_process_pos(spa, process_pos, tx);
 		}*/
 		
-		update_aggre_map_free_range(spa, tx);
+		/*update_aggre_map_free_range(spa, tx);*/
 		
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);

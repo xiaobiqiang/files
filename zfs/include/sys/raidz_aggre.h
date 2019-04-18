@@ -2,6 +2,7 @@
 #define _RAIDZ_AGGRE_H
 #define TG_MAX_DISK_NUM 16
 
+#define AGGRE_MAP_MAX_OBJ_NUM 2
 #define AGGRE_MAP_MAX_DBUF_NUM	8
 
 #define SPACE_RECLAIM_START		1
@@ -25,6 +26,10 @@ typedef struct aggre_map_hdr {
 	uint64_t process_index;	/* always increment, provide space recovery start index */
 	uint64_t free_index;
 } aggre_map_hdr_t;
+
+typedef struct aggre_map_manager {
+	int active_obj_index;
+} aggre_map_manager_t;
 
 typedef struct aggre_map_elem {
 	uint64_t txg;
@@ -206,6 +211,8 @@ void update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx);
 void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx);
 extern int raidz_aggre_init(void);
 extern void raidz_aggre_fini(void);
+aggre_map_t *raidz_aggre_map_current(spa_t *spa);
+
 
 #endif
 

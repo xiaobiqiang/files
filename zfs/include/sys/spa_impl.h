@@ -310,8 +310,9 @@ struct spa {
 		int spa_queued;
 	} spa_queue_stats[ZIO_PRIORITY_NUM_QUEUEABLE];
 
-	uint64_t	spa_map_obj;
-	aggre_map_t *spa_aggre_map;
+	uint64_t	spa_map_obj_arr[AGGRE_MAP_MAX_OBJ_NUM];
+	aggre_map_t *spa_aggre_map_arr[AGGRE_MAP_MAX_OBJ_NUM];
+	aggre_map_manager_t spa_map_manager;
 	boolean_t	spa_raidz_aggre;
 	uint32_t	spa_raidz_aggre_num;
 	uint32_t	spa_raidz_aggre_nparity;
