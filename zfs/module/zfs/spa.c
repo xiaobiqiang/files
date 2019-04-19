@@ -4494,7 +4494,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	raidz_aggre_check(spa);
 	raidz_aggre_create_map_obj(spa, tx, spa->spa_raidz_aggre_num);
-
 	/*
 	 * Set pool properties.
 	 */
@@ -4529,9 +4528,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 */
 	spa_evicting_os_wait(spa);
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
-	raidz_aggre_map_open(spa);
 
 	mutex_exit(&spa_namespace_lock);
+	
+	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
 	return (0);
@@ -7430,9 +7430,11 @@ spa_sync(spa_t *spa, uint64_t txg)
 		pos_valid = get_and_clear_aggre_map_process_pos(spa, txg, &process_pos);
 		if (pos_valid) {
 			update_aggre_map_process_pos(spa, process_pos, tx);
-		}*/
+		}
 		
-		/*update_aggre_map_free_range(spa, tx);*/
+		update_aggre_map_free_range(spa, tx); */
+
+		raidz_aggre_map_free_range_all(spa, tx);
 		
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);

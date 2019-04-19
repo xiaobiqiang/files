@@ -17,6 +17,12 @@ typedef enum {
 	ELEM_STATE_ERR
 } aggre_elem_state;
 
+#define AGGRE_MAP_OBJ_CLEAR  0
+#define AGGRE_MAP_OBJ_FILLING  1
+#define AGGRE_MAP_OBJ_FILLED  2
+#define AGGRE_MAP_OBJ_RECLAIMING  3
+#define AGGRE_MAP_OBJ_RECLAIMED  4
+
 typedef struct aggre_map_hdr {
 	int aggre_num;
 	int recsize;
@@ -25,6 +31,8 @@ typedef struct aggre_map_hdr {
 	uint64_t avail_count;	/* current available count, start from process_index */
 	uint64_t process_index;	/* always increment, provide space recovery start index */
 	uint64_t free_index;
+	uint64_t aggre_map_filltime;
+	int aggre_map_state;
 } aggre_map_hdr_t;
 
 typedef struct aggre_map_manager {
@@ -190,8 +198,7 @@ void dbuf_aggre_leaf(void **drarray, uint8_t ntogether);
 
 int raidz_tgbp_compare(const void *a, const void *b);
 void raidz_tgbp_combine(tg_freebp_entry_t *a, tg_freebp_entry_t *b);
-
-void raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num);
+void raidz_aggre_create_map_obj(spa_t *spa , dmu_tx_t *tx, int aggre_num);
 int raidz_aggre_map_open(spa_t *spa);
 int raidz_aggre_elem_enqueue_cb(void *arg, void *data, dmu_tx_t *tx);
 void raidz_aggre_map_close(spa_t *spa);
@@ -212,6 +219,7 @@ void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx);
 extern int raidz_aggre_init(void);
 extern void raidz_aggre_fini(void);
 aggre_map_t *raidz_aggre_map_current(spa_t *spa);
+void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx);
 
 
 #endif
