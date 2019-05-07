@@ -465,6 +465,7 @@ struct zio {
 	aggre_io_t	*io_aggre_io;
 	boolean_t	io_aggre_root;
 	uint32_t	io_aggre_order;	
+	uint64_t 	io_stamp1;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,

@@ -43,9 +43,9 @@ int raidz_reclaim_enable = 1;
 int raidz_reclaim_timeconsum = 10000;
 unsigned long raidz_space_reclaim_gap = 60*2;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
-int raidz_reclaim_count = 30000;
-int raidz_filledtime_count = 60*60*24;
-int raidz_clearedtime_count = 60*5;
+int raidz_reclaim_count = 3000;
+int raidz_filledtime_count = 60*3;
+int raidz_clearedtime_count = 30;
 
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
 extern void vdev_raidz_generate_parity(raidz_map_t *rm);
@@ -623,7 +623,7 @@ raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num)
 		hdr->process_index = 0;
 		hdr->free_index = 0;
 		hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
-	
+		hdr->aggre_map_filltime = ddi_get_time();;
 		dmu_buf_rele(dbp, FTAG);
 
 	}
@@ -861,6 +861,8 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 	} while (0);
 
 	if (*state == ELEM_STATE_REWRITE) {
+		boolean_t waited = B_FALSE;
+	retry:		
 		tx = dmu_tx_create(dn->dn_objset);
 		for (i = 0; i < map->hdr->aggre_num; i++) {
 			if (dbp[i] && dbp[i]->db_blkptr &&
@@ -871,11 +873,25 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 			}
 		}
 
-		err = dmu_tx_assign(tx, TXG_WAIT);
+		err = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
 		if (err) {
 			cmn_err(CE_WARN, "%s txg assign failed, err=%d",
 				__func__, err);
+
+			if (err == ERESTART) {
+				waited = B_TRUE;
+				dmu_tx_wait(tx);
+				dmu_tx_abort(tx);
+				cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d",
+							__func__, err);
+				goto retry;
+			}
+			
+			cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d",
+							__func__, err);
 			dmu_tx_abort(tx);
+		
+			return (err);
 		} else {
 			for (i = 0; i < map->hdr->aggre_num; i++) {
 				if (dbp[i] && dbp[i]->db_blkptr &&
@@ -898,15 +914,30 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 		}
 	} else if (*state == ELEM_STATE_NO_CHANGE ||
 		*state == ELEM_STATE_FREE) {
+		boolean_t waited = B_FALSE;
+	retry1:
 		tx = dmu_tx_create_dd(NULL);
 		tx->tx_pool = spa->spa_dsl_pool;
 		tx->tx_objset = spa->spa_meta_objset;
-
-		err = dmu_tx_assign(tx, TXG_WAIT);
+		
+		err = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
 		if (err) {
-			cmn_err(CE_WARN, "%s txg assign failed, err=%d",
+			cmn_err(CE_WARN, "%s txg assign failed 1, err=%d",
 				__func__, err);
+			if (err == ERESTART) {
+				waited = B_TRUE;
+				dmu_tx_wait(tx);
+				dmu_tx_abort(tx);
+				cmn_err(CE_WARN, "%s txg assign failed 1, ERESTART retry err=%d",
+							__func__, err);
+				goto retry1;
+			}
+			
+			cmn_err(CE_WARN, "%s txg assign failed 1,not ERESTART err=%d",
+							__func__, err);
 			dmu_tx_abort(tx);
+			return (err);
+			
 		} else {
 			if (*state == ELEM_STATE_NO_CHANGE) {
 				aggre_map_elem_t *new_elem;
@@ -1069,7 +1100,8 @@ check_and_reclaim_space(spa_t *spa)
 		
 	timestampnow = gethrtime();
 	elapsed_ms =  (timestampnow - timestampbegin) / 1000000;
-  
+  	
+	cmn_err(CE_WARN, "%s %s ,elapsed:%d avail_count=%d\n", __func__, spa->spa_name,elapsed_ms,avail_count);
 }
 
 void

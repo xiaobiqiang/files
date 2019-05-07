@@ -2931,7 +2931,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
-	error =zap_lookup(spa->spa_meta_objset, DMU_POOL_RAIDZ_AGGRE_MAP,
+	error =zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_RAIDZ_AGGRE_MAP, sizeof (uint64_t),AGGRE_MAP_MAX_OBJ_NUM,&spa->spa_map_obj_arr[0]);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));

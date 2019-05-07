@@ -455,6 +455,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	int		flags = zvio->zvio_flags;
 	uint64_t	coffset, toffset, offset = zvio->zvio_offset;
 	uint64_t	resid, len = dbuf->db_data_size;
+	boolean_t waited = B_FALSE;
 
 	/* sbd_zvol_sgl_write_remote_mirror(sl, dbuf); */
 	write_direct = B_FALSE;
@@ -491,15 +492,32 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		}
 	}
 
+retry:
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)len);
-	error = dmu_tx_assign(tx, TXG_WAIT);
+
+	error = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
 	if (error) {
+		cmn_err(CE_WARN, "%s txg assign failed, err=%d %p",
+				__func__, error, dbuf);
+
+		if (error == ERESTART) {
+			waited = B_TRUE;
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
+			cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d %p",
+						__func__, error, dbuf);
+			goto retry;
+		}
+			
+		cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d %p",
+						__func__, error, dbuf);
 		dmu_tx_abort(tx);
 		zfs_range_unlock(rl);
 		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
 		return (error);
 	}
+	
 
 	toffset = offset;
 	resid = len;
@@ -614,6 +632,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	dmu_tx_t *tx;
     uint64_t write_flag;
     boolean_t write_meta;
+	boolean_t waited = B_FALSE;
 
     write_flag = 0;
     if (flags & DB_WRITE_META_DATA) {
@@ -666,11 +685,27 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 		write_flag |= WRITE_FLAG_APP_SYNC;
     }
 
+retry:	
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)uio->uio_resid);
-	error = dmu_tx_assign(tx, TXG_WAIT);
+	error = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
 	if (error) {
+		cmn_err(CE_WARN, "%s txg assign failed, err=%d %p",
+				__func__, error,uio);
+
+		if (error == ERESTART) {
+			waited = B_TRUE;
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
+			cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d %p",
+						__func__, error, uio);
+			goto retry;
+		}
+			
+		cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d %p",
+						__func__, error, uio);
 		dmu_tx_abort(tx);
+		return (error);
 	} else {
 		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
 		    uio, len, tx, write_flag);

@@ -599,6 +599,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	}
 
 	raidz_aggre_zio_create(pio, zio);
+	zio->io_stamp1 = ddi_get_time();
 	taskq_init_ent(&zio->io_tqent);
 
 	return (zio);
@@ -3594,6 +3595,13 @@ zio_done(zio_t *zio)
 		pio_next = zio_walk_parents(zio);
 		zio_remove_child(pio, zio, zl);
 		zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
+	}
+
+	if(ddi_get_time()-zio->io_stamp1 >1){
+		cmn_err(CE_WARN, "%s , zio_timeout=%d nows=%ld %ld", __func__, 
+			ddi_get_time()-zio->io_stamp1,(long)ddi_get_time(),(long)zio->io_stamp1);
+		cmn_err(CE_WARN, "%s ,zio=%p type=%d txg=%ld size=%ld io_vd=%p ", __func__, 
+			zio ,zio->io_type, zio->io_txg,zio->io_spa->spa_name,zio->io_size ,zio->io_vd);
 	}
 
 	raidz_aggre_zio_done(zio);
