@@ -590,8 +590,9 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	map->hdr->avail_count = 0;	
 	map->hdr->process_index = 0;
 	map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+	#ifdef _KERNEL 
 	map->hdr->aggre_map_filltime = ddi_get_time();
-	
+	#endif
 	cmn_err(CE_WARN, "%s %s dmu_free_range \n", __func__,spa->spa_name);
  	dmu_free_range(map->os, map->object, 0, DMU_OBJECT_END, tx);
 	
@@ -623,8 +624,11 @@ raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num)
 		hdr->process_index = 0;
 		hdr->free_index = 0;
 		hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+		#ifdef _KERNEL
 		hdr->aggre_map_filltime = ddi_get_time();;
+		#endif
 		dmu_buf_rele(dbp, FTAG);
+
 
 	}
 	VERIFY(zap_add(mos, DMU_POOL_DIRECTORY_OBJECT,
@@ -1001,7 +1005,9 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 	
 	mapfilling = spa->spa_aggre_map_arr[filling_obj];
 	mapreclaimed = spa->spa_aggre_map_arr[reclaimed_obj];
+	#ifdef _KERNEL	
 	nows = ddi_get_time();
+	#endif
 	
 	if (spa->spa_sync_pass>1) {
 		return mapfilling;
