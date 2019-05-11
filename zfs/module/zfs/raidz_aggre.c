@@ -865,8 +865,7 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 	} while (0);
 
 	if (*state == ELEM_STATE_REWRITE) {
-		boolean_t waited = B_FALSE;
-	retry:		
+	
 		tx = dmu_tx_create(dn->dn_objset);
 		for (i = 0; i < map->hdr->aggre_num; i++) {
 			if (dbp[i] && dbp[i]->db_blkptr &&
@@ -877,25 +876,13 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 			}
 		}
 
-		err = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
+		err = dmu_tx_assign(tx, TXG_WAIT);
 		if (err) {
 			cmn_err(CE_WARN, "%s txg assign failed, err=%d",
 				__func__, err);
 
-			if (err == ERESTART) {
-				waited = B_TRUE;
-				dmu_tx_wait(tx);
-				dmu_tx_abort(tx);
-				cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d",
-							__func__, err);
-				goto retry;
-			}
-			
-			cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d",
-							__func__, err);
 			dmu_tx_abort(tx);
 		
-			return (err);
 		} else {
 			for (i = 0; i < map->hdr->aggre_num; i++) {
 				if (dbp[i] && dbp[i]->db_blkptr &&
@@ -918,29 +905,15 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 		}
 	} else if (*state == ELEM_STATE_NO_CHANGE ||
 		*state == ELEM_STATE_FREE) {
-		boolean_t waited = B_FALSE;
-	retry1:
 		tx = dmu_tx_create_dd(NULL);
 		tx->tx_pool = spa->spa_dsl_pool;
 		tx->tx_objset = spa->spa_meta_objset;
 		
-		err = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
+		err = dmu_tx_assign(tx, TXG_WAIT);
 		if (err) {
-			cmn_err(CE_WARN, "%s txg assign failed 1, err=%d",
+			cmn_err(CE_WARN, "%s txg assign failed, err=%d",
 				__func__, err);
-			if (err == ERESTART) {
-				waited = B_TRUE;
-				dmu_tx_wait(tx);
-				dmu_tx_abort(tx);
-				cmn_err(CE_WARN, "%s txg assign failed 1, ERESTART retry err=%d",
-							__func__, err);
-				goto retry1;
-			}
-			
-			cmn_err(CE_WARN, "%s txg assign failed 1,not ERESTART err=%d",
-							__func__, err);
 			dmu_tx_abort(tx);
-			return (err);
 			
 		} else {
 			if (*state == ELEM_STATE_NO_CHANGE) {

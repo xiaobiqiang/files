@@ -492,32 +492,15 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		}
 	}
 
-retry:
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)len);
-
-	error = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
+	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
-		cmn_err(CE_WARN, "%s txg assign failed, err=%d %p",
-				__func__, error, dbuf);
-
-		if (error == ERESTART) {
-			waited = B_TRUE;
-			dmu_tx_wait(tx);
-			dmu_tx_abort(tx);
-			cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d %p",
-						__func__, error, dbuf);
-			goto retry;
-		}
-			
-		cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d %p",
-						__func__, error, dbuf);
 		dmu_tx_abort(tx);
 		zfs_range_unlock(rl);
 		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
 		return (error);
-	}
-	
+	}	
 
 	toffset = offset;
 	resid = len;
@@ -681,41 +664,24 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	}
 
 	sync = !zvol_get_volume_wce(sl->sl_zvol_minor_hdl);
-    if (sync) {
+    	if (sync) {
 		write_flag |= WRITE_FLAG_APP_SYNC;
-    }
+    	}
 
-retry:	
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)uio->uio_resid);
-	error = dmu_tx_assign(tx, waited ? TXG_WAITED : TXG_NOWAIT);
+	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
-		cmn_err(CE_WARN, "%s txg assign failed, err=%d %p",
-				__func__, error,uio);
-
-		if (error == ERESTART) {
-			waited = B_TRUE;
-			dmu_tx_wait(tx);
-			dmu_tx_abort(tx);
-			cmn_err(CE_WARN, "%s txg assign failed, ERESTART retry err=%d %p",
-						__func__, error, uio);
-			goto retry;
-		}
-			
-		cmn_err(CE_WARN, "%s txg assign failed,not ERESTART err=%d %p",
-						__func__, error, uio);
 		dmu_tx_abort(tx);
-		return (error);
 	} else {
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx, write_flag);
 		/*
 		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx, write_flag, initiator_wwn);
-		*/
+		    uio, len, tx, write_flag, initiator_wwn);*/
+		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len, tx, write_flag, initiator_wwn);
 		write_direct = dmu_tx_sync_log(tx);
 		dmu_tx_commit(tx);
 	}
+
 	zfs_range_unlock(rl);
 	if (sync && write_direct) {
 		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
