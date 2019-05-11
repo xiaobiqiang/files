@@ -742,7 +742,7 @@ raidz_aggre_map_close(spa_t *spa)
 {
 	aggre_map_t *map;
 	int i;
-
+	int j;
 	for(i=0; i<AGGRE_MAP_MAX_OBJ_NUM; i++){
 		map = spa->spa_aggre_map_arr[i];
 		mutex_destroy(&map->aggre_lock);
@@ -750,8 +750,8 @@ raidz_aggre_map_close(spa_t *spa)
 		if (map->dbuf_hdr)
 			dmu_buf_rele(map->dbuf_hdr, map);
 		
-		for (i = 0; i < map->dbuf_num; i++)
-			dmu_buf_rele(map->dbuf_array[i], map);
+		for (j = 0; j < map->dbuf_num; j++)
+			dmu_buf_rele(map->dbuf_array[j], map);
 
 		if (map->dbuf_array)
 			kmem_free(map->dbuf_array, sizeof(dmu_buf_t *) * map->dbuf_num);
