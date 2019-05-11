@@ -674,10 +674,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	if (error) {
 		dmu_tx_abort(tx);
 	} else {
-		/*
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx, write_flag, initiator_wwn);*/
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len, tx, write_flag, initiator_wwn);
+		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len, tx, write_flag);
 		write_direct = dmu_tx_sync_log(tx);
 		dmu_tx_commit(tx);
 	}
