@@ -1317,8 +1317,8 @@ void slot_map_find_value(slot_map_t *sm, disk_info_t *di)
 				strcasestr(search->sr_serial, di->dk_serial) != NULL ||
 				strcasestr(search->sr_addr, di->dk_scsid) != NULL ||
 				strcasestr(di->dk_scsid, search->sr_addr) != NULL) {
-		    syslog(LOG_WARNING, "di->dk_serial:%s, di->dk_scsid:%s, search->sr_serial:%s, search->sr_addr:%s",
-                    di->dk_serial, di->dk_scsid, search->sr_serial, search->sr_addr);
+		    /*syslog(LOG_WARNING, "di->dk_serial:%s, di->dk_scsid:%s, search->sr_serial:%s, search->sr_addr:%s",
+                    di->dk_serial, di->dk_scsid, search->sr_serial, search->sr_addr);*/
 			di->dk_enclosure = search->sr_enclosure;
 			di->dk_slot = search->sr_slot;
 			break;
