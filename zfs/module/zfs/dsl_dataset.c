@@ -602,8 +602,10 @@ dsl_dataset_own(dsl_pool_t *dp, const char *name,
     void *tag, dsl_dataset_t **dsp)
 {
 	int err = dsl_dataset_hold(dp, name, tag, dsp);
-	if (err != 0)
+	if (err != 0) {
+		cmn_err(CE_WARN, "dataset hold %s error %d", name, err);
 		return (err);
+	}
 	if (!dsl_dataset_tryown(*dsp, tag)) {
 		dsl_dataset_rele(*dsp, tag);
 		return (SET_ERROR(EBUSY));
@@ -709,6 +711,8 @@ dsl_dataset_tryown(dsl_dataset_t *ds, void *tag)
 		ds->ds_owner = tag;
 		dsl_dataset_long_hold(ds, tag);
 		gotit = TRUE;
+	} else {
+		cmn_err(CE_WARN, "dataset tryown failed: ds=%p, tag=%p", ds, tag);
 	}
 	mutex_exit(&ds->ds_lock);
 	return (gotit);

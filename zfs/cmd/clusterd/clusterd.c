@@ -102,6 +102,9 @@ char ipmi_passwd[16];
 #define	ZPOOL_IMPORT	zpool_import_cmd
 #define	ZPOOL_EXPORT	zpool_export_cmd
 
+int cluster_do_import_retry_times = 3;
+int cluster_do_export_retry_times = 3;
+
 typedef struct cluster_event_s {
 	int event;
 	char *data;
@@ -612,6 +615,58 @@ pool_in_cluster(nvlist_t *pool_config)
 	return (0);
 }
 
+static int
+cluster_do_import(const char *name, uint64_t guid)
+{
+	char buf[256];
+	int ret, retry = 0;
+
+	assert(name != NULL || guid > 0);
+	if (name) {
+		snprintf(buf, 256, "%s %s", ZPOOL_IMPORT, name);
+	} else {
+		snprintf(buf, 256, "%s %llu",
+			ZPOOL_IMPORT, (unsigned long long)guid);
+	}
+
+	while ((ret = excute_cmd_common(buf, B_TRUE)) != 0) {
+		if (retry >= cluster_do_import_retry_times)
+			break;
+		retry++;
+		sleep(1);
+	}
+	if (ret) {
+		if (name) {
+			syslog(LOG_WARNING, "import pool %s error %d", name, ret);
+		} else {
+			syslog(LOG_WARNING, "import pool %llu error %d",
+				(unsigned long long)guid, ret);
+		}
+	}
+
+	return (ret);
+}
+
+static int
+cluster_do_export(const char *name)
+{
+	char buf[256];
+	int ret, retry = 0;
+
+	snprintf(buf, 256, "%s %s", ZPOOL_EXPORT, name);
+	while ((ret = excute_cmd_common(buf, B_TRUE)) != 0) {
+		if (retry >= cluster_do_export_retry_times)
+			break;
+		retry++;
+		sleep(1);
+	}
+	if (ret) {
+		syslog(LOG_WARNING, "export pool %s error %d", name, ret);
+	}
+
+	return (ret);
+}
+
 typedef struct cluster_pool_thread {
 	list_node_t node;
 	pthread_t pid;
@@ -961,7 +1016,6 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 
 	(void) gettimeofday(&elapsed_time1, NULL);
 	if (cluster_failover_state->can_import_pools != 0) {
-		char buf[256];
 		pthread_t tid;
 		failover_pool_import_state_t import_state;
 		compete_pool_param_t	param;
@@ -988,13 +1042,8 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 		}
 		pthread_mutex_unlock(&import_state.mtx);
 
-		snprintf(buf, 256, "%s %llu", ZPOOL_IMPORT,
-			(unsigned long long)pool_guid);
-		ret = excute_cmd_common(buf, B_TRUE);
-		if (ret != 0) {
-			syslog(LOG_WARNING, "import pool: %s failed - %d", poolname, ret);
-		} else {
-			syslog(LOG_NOTICE, "import pool: %s successed", poolname);
+		ret = cluster_do_import(NULL, pool_guid);
+		if (ret == 0) {
 			/* remove the pool from host info */
 			hdl = libzfs_init();
 			if (hdl != NULL) {
@@ -1831,7 +1880,6 @@ cluster_change_pool_owner(char *buf, size_t buflen)
 	nvlist_t *ripool = NULL;
 	uint32_t hostid;
 	char *spa_name;
-	char cmd[256] = {"\0"};
 	int ret;
 
 	ret = nvlist_unpack(buf, buflen, &ripool, KM_SLEEP);
@@ -1855,34 +1903,7 @@ cluster_change_pool_owner(char *buf, size_t buflen)
 		return;
 	}
 
-#if	0
-	sprintf(cmd, ZPOOL_CMD_CHANGE_POOL_OWNER, hostid, spa_name);
-	syslog(LOG_NOTICE, "%s: %s", __func__, cmd);
-	ret = system(cmd);
-	if ((!WIFEXITED(ret)) || (WEXITSTATUS(ret) != 0)) {
-		syslog(LOG_ERR,"%s: import pool(%s) failed, "
-			"try again, use 'import -if' instead of 'import -ifs'!",
-			__func__, spa_name);
-		sprintf(cmd, ZPOOL_CMD_CHANGE_POOL_OWNER_LOCAL, spa_name);
-		ret = system(cmd);
-		if ((!WIFEXITED(ret)) || (WEXITSTATUS(ret) != 0)) {
-			syslog(LOG_ERR,"%s: failed use import -if %s",
-				__func__, spa_name);
-		} else {
-			hdl = libzfs_init();
-			if (hdl != NULL) {
-				zpool_remove_partner(hdl, spa_name, hostid);
-				libzfs_fini(hdl);
-			}
-		}
-	}
-#else
-	sprintf(cmd, "%s %s", ZPOOL_IMPORT, spa_name);
-	if ((ret = excute_cmd_common(cmd, B_TRUE)) != 0) {
-		syslog(LOG_ERR, "%s: import '%s' failed, exit_code=%d",
-			__func__, spa_name, ret);
-	}
-#endif
+	(void) cluster_do_import(spa_name, 0);
 	nvlist_free(ripool);
 }
 
@@ -2978,20 +2999,12 @@ static void *
 cluster_import_pools_thr(void *arg)
 {
 	todo_import_pool_node_t *pool;
-	char cmd[256];
-	
+
 	while (!import_thr_conf.exit_flag ||
 		!list_is_empty(&import_thr_conf.todo_import_pools)) {
 		pool = list_head(&import_thr_conf.todo_import_pools);
 		if (pool) {
-			snprintf(cmd, 256, "%s %llu", ZPOOL_IMPORT, 
-				(unsigned long long)pool->guid);
-			if (excute_cmd_common(cmd, B_TRUE) != 0)
-				syslog(LOG_ERR, "%s: import pool '%s' failed", __func__,
-					pool->poolname);
-			else
-				syslog(LOG_WARNING, "%s: import pool '%s' success",
-					__func__, pool->poolname);
+			(void) cluster_do_import(NULL, pool->guid);
 			pool->imported = 1;
 			pthread_mutex_lock(&import_thr_conf.list_mtx);
 			list_remove(&import_thr_conf.todo_import_pools, pool);
@@ -6256,7 +6269,6 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	failover_conf_t fconf;
 	struct link_list *p;
 	int i, err = 0;
-	char cmdstr[128];
 
 	/* get the todo import pools */
 	if (unpack_release_pool_param_list(buffer, bufsiz, &pool_list) != 0) {
@@ -6283,10 +6295,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	/* step 2: import the pools */
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
-		sprintf(cmdstr, "%s %s", ZPOOL_IMPORT, param->pool_name);
-		if ((err = excute_cmd(cmdstr)) != 0) {
-			syslog(LOG_ERR, "%s: import pool error - %d",
-				__func__, err);
+		if ((err = cluster_do_import(param->pool_name, 0)) != 0) {
 			err = -1;
 			unshielding_failover_poollist(pool_list);
 			goto exit_func;
@@ -6325,7 +6334,6 @@ handle_release_message_common(release_pools_message_t *r_msg)
 	struct link_list * pool_list = NULL, *node, **pp;
 	failover_conf_t fconf;
 	int err = 0, i, j;
-	char cmdstr[128];
 	char *buffer;
 	int bufsize;
 
@@ -6391,10 +6399,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 #endif
 			for (node = pool_list; node != NULL; node = node->next) {
 				param = (release_pool_param_t *) node->ptr;
-				sprintf(cmdstr, "%s %s", ZPOOL_EXPORT, param->pool_name);
-				if ((err = excute_cmd_common(cmdstr, B_TRUE)) != 0) {
-					syslog(LOG_ERR, "%s: excute export pool error - %d",
-						__func__, err);
+				if ((err = cluster_do_export(param->pool_name)) != 0) {
 					err = -1;
 					break;
 				}
