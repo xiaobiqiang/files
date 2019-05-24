@@ -1,5 +1,5 @@
-src = /root/workspace/zfsonlinux/zfs/module/vmpt3sas
-obj = /root/workspace/zfsonlinux/zfs/module/vmpt3sas
+src = /root/workspace/zfs/module/vmpt3sas
+obj = /root/workspace/zfs/module/vmpt3sas
 
 MODULE := vmpt3sas
 

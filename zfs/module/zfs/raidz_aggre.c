@@ -745,14 +745,22 @@ raidz_aggre_map_close(spa_t *spa)
 	int j;
 	for(i=0; i<AGGRE_MAP_MAX_OBJ_NUM; i++){
 		map = spa->spa_aggre_map_arr[i];
+		cmn_err(CE_WARN, "[SGG] raidz_aggre_map_close map=%p", map);
+		if (map == NULL) {
+			return;
+		}
 		mutex_destroy(&map->aggre_lock);
 		
+		cmn_err(CE_WARN, "[SGG] raidz_aggre_map_close dbuf_hdr=%p", map->dbuf_hdr);
 		if (map->dbuf_hdr)
 			dmu_buf_rele(map->dbuf_hdr, map);
 		
-		for (j = 0; j < map->dbuf_num; j++)
+		for (j = 0; j < map->dbuf_num; j++) {
+			cmn_err(CE_WARN, "[SGG] raidz_aggre_map_close dbuf_array[%d]=%p", j, map->dbuf_array[j]);
 			dmu_buf_rele(map->dbuf_array[j], map);
+		}
 
+		cmn_err(CE_WARN, "[SGG] raidz_aggre_map_close dbuf_array=%p", map->dbuf_array);
 		if (map->dbuf_array)
 			kmem_free(map->dbuf_array, sizeof(dmu_buf_t *) * map->dbuf_num);
 

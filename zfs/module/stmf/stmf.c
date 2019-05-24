@@ -6208,8 +6208,8 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 			ss->ss_rport_id->ident_length);
 		bcopy(lport->lport_id->ident, target_id,
 			lport->lport_id->ident_length);
-		cmn_err(CE_WARN,   "%s  luNbr=%d, initiator_id = %s, target_id = %s",
-			__func__, luNbr, initiator_id, target_id);
+	/*	cmn_err(CE_WARN,   "%s  luNbr=%d, initiator_id = %s, target_id = %s",
+			__func__, luNbr, initiator_id, target_id);*/
 		lu = dlun0;
 	} else {
 		lu = lun_map_ent->ent_lu;
@@ -8476,9 +8476,11 @@ stmf_scsilib_send_status(scsi_task_t *task, uint8_t st, uint32_t saa)
 	
 	task->task_scsi_status = st;
 	if((st != STATUS_GOOD) &&
-		(st != STATUS_QFULL)) {
+		(st != STATUS_QFULL)&&(saa != 0x52000)) {
+#if	0
 		cmn_err(CE_WARN, "%s task=%p cdb=%02x lun=%s status=%x saa=%x ",
 		__func__,task,task->task_cdb[0],task->task_lu->lu_alias,st,saa);
+#endif
 	}
 
 	if (st == 2) {
