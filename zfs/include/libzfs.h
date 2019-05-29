@@ -536,6 +536,7 @@ typedef struct importargs {
 	int no_blkid : 1;	/* don't use libblkid */
 	int cluster_switch : 1;	/* search remote's pools */
 	int cluster_ignore : 1;	/* don't filter remote's pools */
+	int scsi_only : 1;	/* only search scsi path */
 } importargs_t;
 
 extern nvlist_t *zpool_search_import(libzfs_handle_t *, importargs_t *);

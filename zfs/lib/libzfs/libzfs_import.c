@@ -1694,7 +1694,7 @@ scsi_disk_check(const char *name)
 {
 	char prefix[6] = "scsi-";
 	char suffix[7] = "-part1";
-	char *begin, *end, *p;
+	const char *begin, *end, *p;
 
 	if (strncmp(name, prefix, 5) != 0)
 		return (0);
@@ -1778,6 +1778,9 @@ dont_use_blkid:
 		char *rdsk;
 		int dfd;
 
+		if (iarg->scsi_only && i != 3)
+			continue;
+
 		/* use realpath to normalize the path */
 		if (realpath(dir[i], path) == 0) {
 
@@ -1852,6 +1855,8 @@ dont_use_blkid:
 				continue;
 
 			scsi_disk = scsi_disk_check(name);
+			if (iarg->scsi_only && !scsi_disk)
+				continue;
 
 			reopen_times = 0;
 reopen:

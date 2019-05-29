@@ -338,7 +338,6 @@ static int parse_failover_conf(const char *msg, failover_conf_t *conf);
 static int cluster_failover_conf_handler(int flag, const void *data);
 /*static int ifplumb(const char *linkname, const char *ifname, int af);*/
 static void *cluster_compete_pool(void *arg);
-static int cluster_import_pools(int is_boot, int *failover_remote);
 static int handle_release_pools_event(const void *buffer, int bufsiz);
 static int handle_release_message_common(release_pools_message_t *r_msg);
 static int cluster_import_event_handler(const void *buffer, int bufsize);
@@ -3768,17 +3767,6 @@ cluster_zpool_search_free(nvlist_t *nvl)
 	}
 }
 
-static nvlist_t *
-zpool_get_all_pools(libzfs_handle_t *hdl, int cluster_switch)
-{
-	importargs_t args;
-
-	memset(&args, 0, sizeof(args));
-	args.no_blkid = 1;
-	args.cluster_ignore = 1;
-	return (zpool_search_import(hdl, &args));
-}
-
 /*
  * return 1 the pool can be import, return 0 the pool can't be import,
  * otherwise indicate error or the pool not exists.
@@ -3803,6 +3791,7 @@ cluster_check_pool_replicas(uint64_t pool_guid, char **search_disks, int nsearch
 	iargs.paths = nsearch;
 	iargs.no_blkid = 1;
 	iargs.cluster_ignore = 1;
+	iargs.scsi_only = 1;
 	pools = cluster_zpool_search(&iargs);
 	while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
 		verify(nvpair_value_nvlist(elem, &config) == 0);
@@ -4026,7 +4015,6 @@ cluster_check_pool_disks_common(nvlist_t *root,
 			}
 			pthread_mutex_init(&waitmutex, NULL);
 			pthread_cond_init(&waitcv, NULL);
-			syslog(LOG_ERR, "leaf dev path(%s)", path);
 			(*total)++;
 
             while( ((ret = lstat(path, &sb)) != 0) && (times<try_times) ) {
@@ -4500,9 +4488,9 @@ exit_thr:
  * then @failover_remote=1, otherwise @failover_remote=0
  */
 static int
-cluster_import_pools(int is_boot, int *failover_remote)
+cluster_import_pools(int *failover_remote)
 {
-	libzfs_handle_t *hdl;
+	importargs_t iargs;
 	nvlist_t *pools, *config;
 	nvpair_t *elem = NULL;
 	todo_import_pool_node_t *todo_node, *tmp_todo_node;
@@ -4516,23 +4504,13 @@ cluster_import_pools(int is_boot, int *failover_remote)
 
 	pthread_mutex_lock(&import_thr_conf.import_pools_handler_mtx);
 
-	/*cluster_task_pool_scan();*/
-
-	hdl = libzfs_init();
-	if (!hdl) {
-		syslog(LOG_ERR, "Failed to get libzfs handle");
-		pthread_mutex_unlock(&import_thr_conf.import_pools_handler_mtx);
-		return (-1);
-	}
-
 	*failover_remote = 0;
-	if (is_boot) {
-		pools = zpool_get_all_pools(hdl, 0);
-	} else /* failover */
-		pools = zpool_get_all_pools(hdl, 1);
+	bzero(&iargs, sizeof (iargs));
+	iargs.no_blkid = 1;
+	iargs.cluster_ignore = 1;
+	iargs.scsi_only = 1;
+	pools = cluster_zpool_search(&iargs);
 	if (!pools) {
-		syslog(LOG_WARNING, "Maybe there is no pools");
-		libzfs_fini(hdl);
 		pthread_mutex_unlock(&import_thr_conf.import_pools_handler_mtx);
 		return (-2);
 	}
@@ -4613,8 +4591,7 @@ exit_func:
 	pthread_mutex_unlock(&import_thr_conf.mtx);
 	pthread_join(import_thr_id, NULL);
 
-	nvlist_free(pools);
-	libzfs_fini(hdl);
+	cluster_zpool_search_free(pools);
 
 	if (!list_is_empty(&import_thr_conf.todo_import_pools)) {
 		syslog(LOG_WARNING, "WARN: todo_import_pools not empty!!");
@@ -4720,7 +4697,7 @@ cluster_task_setup(void *arg)
 	/* wait 2 sessions up at least */
 	cluster_check_sessions();
 
-	ret = cluster_import_pools(1, &failover_remote);
+	ret = cluster_import_pools(&failover_remote);
 	if (ret != 0 && ret != -2) {
 		syslog(LOG_ERR, "cluster_import_pools error: %d", ret);
  	} else
