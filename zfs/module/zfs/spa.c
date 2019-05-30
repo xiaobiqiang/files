@@ -4899,6 +4899,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
     boolean_t force, boolean_t hardforce)
 {
 	spa_t *spa;
+	int wait_refcount_times = 0;
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4938,6 +4939,13 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	if (spa->spa_sync_on) {
 		txg_wait_synced(spa->spa_dsl_pool, 0);
 		spa_evicting_os_wait(spa);
+	}
+
+	while (!spa_refcount_zero(spa) && wait_refcount_times < 3) {
+		wait_refcount_times++;
+		cmn_err(CE_WARN, "[SPA_BUSY] %p, ref=%llu",
+			spa, (u_longlong_t) refcount_count(&spa->spa_refcount));
+		delay(hz);
 	}
 
 	/*
