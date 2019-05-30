@@ -32,7 +32,10 @@ function stat_main()
 function stat_sys()
 {
 	rm -f ${SYS_FILE}
-    touch ${SYS_FILE}
+    	touch ${SYS_FILE}
+	if [ ! -f "$TARGET_FILE" ]; then
+		touch ${TARGET_FILE}
+	fi
 	local sum=(0 0 0 0 0 0 0 0)
 	local fc_name=`cat $TARGET_FILE |grep "wwn"|awk -F' ' '{print $1}'`
 	local nic_name=`cat $PROC_NETDEV |grep ":"|awk -F':' '{print $1}'`
