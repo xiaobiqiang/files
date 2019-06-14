@@ -641,6 +641,7 @@ raidz_aggre_map_open(spa_t *spa)
 {
 	dmu_object_info_t doi;
 	aggre_map_t *map;
+	aggre_map_t *map1;
 	uint64_t offset;
 	int err, i;
 	int loop;
@@ -681,6 +682,51 @@ raidz_aggre_map_open(spa_t *spa)
 				cmn_err(CE_WARN, "%s dmu_buf_hold i=%d err=%d", __func__, i, err);
 			}
 		}
+	}
+	
+	map = spa->spa_aggre_map_arr[0];
+	map1 = spa->spa_aggre_map_arr[1];
+	if (map->hdr->aggre_map_state == AGGRE_MAP_OBJ_RECLAIMING) {
+		map1->hdr->total_count = 0;
+		map1->hdr->avail_count = 0;
+		map1->hdr->process_index = 0;
+		map1->hdr->free_index = 0;
+		map1->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+		#ifdef _KERNEL
+		map1->hdr->aggre_map_filltime = ddi_get_time();;
+		#endif
+		spa->spa_map_manager.active_obj_index = 0;
+	}else if (map1->hdr->aggre_map_state == AGGRE_MAP_OBJ_RECLAIMING) {
+		map->hdr->total_count = 0;
+		map->hdr->avail_count = 0;
+		map->hdr->process_index = 0;
+		map->hdr->free_index = 0;
+		map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+		#ifdef _KERNEL
+		map->hdr->aggre_map_filltime = ddi_get_time();;
+		#endif
+		spa->spa_map_manager.active_obj_index = 1;
+	}else {
+		spa->spa_map_manager.active_obj_index = 0;
+		map->hdr->total_count = 0;
+		map->hdr->avail_count = 0;
+		map->hdr->process_index = 0;
+		map->hdr->free_index = 0;
+		map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+		#ifdef _KERNEL
+		map->hdr->aggre_map_filltime = ddi_get_time();;
+		#endif
+
+		map1->hdr->total_count = 0;
+		map1->hdr->avail_count = 0;
+		map1->hdr->process_index = 0;
+		map1->hdr->free_index = 0;
+		map1->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+		#ifdef _KERNEL
+		map1->hdr->aggre_map_filltime = ddi_get_time();;
+		#endif
+
+		spa->spa_map_manager.active_obj_index = 0;
 	}
 	
 	return (0);
