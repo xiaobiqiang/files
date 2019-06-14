@@ -1767,6 +1767,7 @@ dont_use_blkid:
 
 		dir = zpool_default_import_path;
 		dirs = DEFAULT_IMPORT_PATH_SIZE;
+		iarg->scsi_only = 1;
 	}
 
 	/*

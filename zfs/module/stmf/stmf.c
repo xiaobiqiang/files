@@ -7605,8 +7605,9 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s, uint32_t abort_typ
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 	do {
 		old = new = itask->itask_flags;
-		if ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
-		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0)) {
+		if ( (s!=STMF_TIMEOUT) && 
+		    ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
+		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0))) {
 		    mutex_exit(&w->worker_lock);
 			return;
 		}

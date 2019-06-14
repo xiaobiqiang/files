@@ -3372,7 +3372,8 @@ zio_done(zio_t *zio)
 
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
-	vdev_stat_update(zio, zio->io_size);
+	if (zio->io_aggre_io == NULL || zio->io_aggre_root)
+		vdev_stat_update(zio, zio->io_size);
 
 	/*
 	 * If this I/O is attached to a particular vdev is slow, exceeding
@@ -3600,7 +3601,7 @@ zio_done(zio_t *zio)
 	}
 
 #ifdef _KERNEL
-	if(ddi_get_time()-zio->io_stamp1 >1){
+	if(ddi_get_time()-zio->io_stamp1 >10){
 		cmn_err(CE_WARN, "%s , zio_timeout=%d nows=%ld %ld", __func__, 
 			ddi_get_time()-zio->io_stamp1,(long)ddi_get_time(),(long)zio->io_stamp1);
 		cmn_err(CE_WARN, "%s ,zio=%p type=%d txg=%ld size=%ld io_vd=%p ", __func__, 
