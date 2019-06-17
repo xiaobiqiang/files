@@ -408,6 +408,11 @@ void
 dsl_free_sync(zio_t *pio, dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp)
 {
 	ASSERT(dsl_pool_sync_context(dp));
+
+	if (BP_IS_TOGTHER(bpp)) {
+		cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
+		return ;
+	}
 	zio_nowait(zio_free_sync(pio, dp->dp_spa, txg, bpp, pio->io_flags));
 }
 

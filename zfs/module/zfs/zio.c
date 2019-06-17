@@ -599,6 +599,9 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	}
 
 	raidz_aggre_zio_create(pio, zio);
+#ifdef _KERNEL
+	zio->io_stamp1 = ddi_get_time();
+#endif
 	taskq_init_ent(&zio->io_tqent);
 
 	return (zio);
@@ -1867,6 +1870,12 @@ zio_rewrite_gang(zio_t *pio, blkptr_t *bp, zio_gang_node_t *gn, void *data)
 zio_t *
 zio_free_gang(zio_t *pio, blkptr_t *bp, zio_gang_node_t *gn, void *data)
 {
+	
+	if (BP_IS_TOGTHER(bp)) {
+			cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
+			return (zio_null(pio, pio->io_spa, NULL, NULL, NULL, 0));
+	}
+	
 	return (zio_free_sync(pio, pio->io_spa, pio->io_txg, bp,
 	    ZIO_GANG_CHILD_FLAGS(pio)));
 }
@@ -3363,7 +3372,8 @@ zio_done(zio_t *zio)
 
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
-	vdev_stat_update(zio, zio->io_size);
+	if (zio->io_aggre_io == NULL || zio->io_aggre_root)
+		vdev_stat_update(zio, zio->io_size);
 
 	/*
 	 * If this I/O is attached to a particular vdev is slow, exceeding
@@ -3590,6 +3600,14 @@ zio_done(zio_t *zio)
 		zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
 	}
 
+#ifdef _KERNEL
+	if(ddi_get_time()-zio->io_stamp1 >10){
+		cmn_err(CE_WARN, "%s , zio_timeout=%d nows=%ld %ld", __func__, 
+			ddi_get_time()-zio->io_stamp1,(long)ddi_get_time(),(long)zio->io_stamp1);
+		cmn_err(CE_WARN, "%s ,zio=%p type=%d txg=%ld size=%ld io_vd=%p ", __func__, 
+			zio ,zio->io_type, zio->io_txg,zio->io_spa->spa_name,zio->io_size ,zio->io_vd);
+	}
+#endif
 	raidz_aggre_zio_done(zio);
 	if (zio->io_waiter != NULL) {
 		mutex_enter(&zio->io_lock);

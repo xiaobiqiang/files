@@ -190,6 +190,8 @@ static struct workqueue_struct *qla_tgt_fct_shutdown_wq;
 static DEFINE_MUTEX(qla_tgt_mutex);
 static LIST_HEAD(qla_tgt_glist);
 unsigned int MMU_PAGESIZE = 4096;
+uint8_t qlt_reprocess_attempt_cnt = 5;
+uint32_t qlt_reprocess_delay = 75;	/* default 75 microseconds */
 
 /* This API intentionally takes dest as a parameter, rather than returning
  * int value to avoid caller forgetting to issue wmb() after the store */
@@ -3622,6 +3624,54 @@ qlt_host_reset_handler(struct qla_hw_data *ha)
 }
 
 
+static fct_status_t
+qlt_verify_resp_entry( uint8_t *rsp)
+{
+	uint32_t sig;
+	int i;
+	/*char info[160];*/
+
+	sig = ioread32( rsp+0x3c);
+	for (i = 0; ((sig == 0xdeadbeef) &&
+	    (i < qlt_reprocess_attempt_cnt)); i++) {
+		/*(void) ddi_dma_sync(
+		    qlt->mq_resp[qi].queue_mem_mq_dma_handle,
+		    (qlt->mq_resp[qi].mq_ndx_to_fw << 6),
+		    IOCB_SIZE, DDI_DMA_SYNC_FORCPU);*/
+
+		/*qlt->qlt_resp_reproc_cnt++;*/
+		udelay(qlt_reprocess_delay);
+		sig = ioread32( rsp+0x3c);
+	}
+
+	if (i) {
+		if (i >= qlt_reprocess_attempt_cnt) {
+			/*EL(qlt, "resp entry reprocess failed, %x\n",
+			    qlt->qlt_resp_reproc_cnt);
+			cmn_err(CE_WARN, "qlt%d: resp entry reprocess"
+			    " failed %x\n",
+			    qlt->instance, qlt->qlt_resp_reproc_cnt);
+			(void) snprintf(info, 160,
+			    "qlt_handle_ctio_completion: resp entry reprocess"
+			    " failed, %x rsp-%p",
+			    qlt->qlt_resp_reproc_cnt, (void *)rsp);
+			info[159] = 0;
+			(void) fct_port_shutdown(qlt->qlt_port,
+			    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET,
+			    info);*/
+			printk("wzy %s error_data",	__func__);
+			return (QLT_FAILURE);
+		} else {
+			/*EL(qlt, "resp entry reprocess succeeded, %x %x\n",
+			    i, qlt->qlt_resp_reproc_cnt);
+			    */
+		}
+	}
+
+	return (QLT_SUCCESS);
+}
+
+
 /*
  * ha->hardware_lock supposed to be held on entry. Might drop it, then reaquire
  */
@@ -3649,7 +3699,9 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
 
 	if (handle == skip_handle)
 		return;
-
+	if(qlt_verify_resp_entry(rsp) != QLT_SUCCESS)
+		return;
+	
 	/* write a deadbeef in the last 4 bytes of the IOCB */
 	iowrite32(0xdeadbeef, rsp+0x3c);
 

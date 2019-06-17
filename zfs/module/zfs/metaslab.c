@@ -884,7 +884,7 @@ metaslab_rt_vacate(range_tree_t *rt, void *arg)
 	    sizeof (range_seg_t), offsetof(range_seg_t, rs_pp_node));
 }
 
-static range_tree_ops_t metaslab_rt_ops = {
+range_tree_ops_t metaslab_rt_ops = {
 	metaslab_rt_create,
 	metaslab_rt_destroy,
 	metaslab_rt_add,

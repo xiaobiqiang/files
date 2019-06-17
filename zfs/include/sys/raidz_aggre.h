@@ -2,6 +2,7 @@
 #define _RAIDZ_AGGRE_H
 #define TG_MAX_DISK_NUM 16
 
+#define AGGRE_MAP_MAX_OBJ_NUM 2
 #define AGGRE_MAP_MAX_DBUF_NUM	8
 
 #define SPACE_RECLAIM_START		1
@@ -16,6 +17,12 @@ typedef enum {
 	ELEM_STATE_ERR
 } aggre_elem_state;
 
+#define AGGRE_MAP_OBJ_CLEAR  0
+#define AGGRE_MAP_OBJ_FILLING  1
+#define AGGRE_MAP_OBJ_FILLED  2
+#define AGGRE_MAP_OBJ_RECLAIMING  3
+#define AGGRE_MAP_OBJ_RECLAIMED  4
+
 typedef struct aggre_map_hdr {
 	int aggre_num;
 	int recsize;
@@ -23,7 +30,14 @@ typedef struct aggre_map_hdr {
 	uint64_t total_count;	/* always increment, provide map_index */
 	uint64_t avail_count;	/* current available count, start from process_index */
 	uint64_t process_index;	/* always increment, provide space recovery start index */
+	uint64_t free_index;
+	uint64_t aggre_map_filltime;
+	int aggre_map_state;
 } aggre_map_hdr_t;
+
+typedef struct aggre_map_manager {
+	int active_obj_index;
+} aggre_map_manager_t;
 
 typedef struct aggre_map_elem {
 	uint64_t txg;
@@ -44,6 +58,7 @@ typedef struct aggre_map {
 	int dbuf_size;
 	uint64_t dbuf_id;
 	kmutex_t aggre_lock;
+	int owner;
 } aggre_map_t;
 
 typedef struct map_pos {
@@ -183,8 +198,7 @@ void dbuf_aggre_leaf(void **drarray, uint8_t ntogether);
 
 int raidz_tgbp_compare(const void *a, const void *b);
 void raidz_tgbp_combine(tg_freebp_entry_t *a, tg_freebp_entry_t *b);
-
-void raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num);
+void raidz_aggre_create_map_obj(spa_t *spa , dmu_tx_t *tx, int aggre_num);
 int raidz_aggre_map_open(spa_t *spa);
 int raidz_aggre_elem_enqueue_cb(void *arg, void *data, dmu_tx_t *tx);
 void raidz_aggre_map_close(spa_t *spa);
@@ -201,9 +215,12 @@ void raidz_aggre_process_dirty_map(spa_t *spa, dmu_tx_t *tx);
 void set_aggre_map_process_pos(spa_t *spa, uint64_t pos, uint64_t txg);
 boolean_t get_and_clear_aggre_map_process_pos(spa_t *spa, uint64_t txg, uint64_t *ppos);
 void update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx);
-
+void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx);
 extern int raidz_aggre_init(void);
 extern void raidz_aggre_fini(void);
+aggre_map_t *raidz_aggre_map_current(spa_t *spa);
+void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx);
+
 
 #endif
 
