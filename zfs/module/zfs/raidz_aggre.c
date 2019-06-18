@@ -573,8 +573,9 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	uint64_t pos = 0;
 
 	int state = spa->spa_space_reclaim_state;
-	if (spa->spa_space_reclaim_state != 3) {
-		cmn_err(CE_WARN, "%s %s return not run \n",	__func__,spa->spa_name);
+	if (state != 3) {
+		cmn_err(CE_WARN, "%s %s return not run state=%x \n",	
+			__func__,spa->spa_name,state);
 		return;
 	}
  	
@@ -686,7 +687,9 @@ raidz_aggre_map_open(spa_t *spa)
 	
 	map = spa->spa_aggre_map_arr[0];
 	map1 = spa->spa_aggre_map_arr[1];
-	if (map->hdr->aggre_map_state == AGGRE_MAP_OBJ_RECLAIMING) {
+	cmn_err(CE_WARN, "%s map aggre_map_state=%d map1 aggre_map_state=%d", __func__, 
+		map->hdr->aggre_map_state, map1->hdr->aggre_map_state);
+	if (map->hdr->aggre_map_state == AGGRE_MAP_OBJ_FILLING) {
 		map1->hdr->total_count = 0;
 		map1->hdr->avail_count = 0;
 		map1->hdr->process_index = 0;
@@ -696,7 +699,7 @@ raidz_aggre_map_open(spa_t *spa)
 		map1->hdr->aggre_map_filltime = ddi_get_time();;
 		#endif
 		spa->spa_map_manager.active_obj_index = 0;
-	}else if (map1->hdr->aggre_map_state == AGGRE_MAP_OBJ_RECLAIMING) {
+	}else if (map1->hdr->aggre_map_state == AGGRE_MAP_OBJ_FILLING) {
 		map->hdr->total_count = 0;
 		map->hdr->avail_count = 0;
 		map->hdr->process_index = 0;
