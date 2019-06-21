@@ -2931,8 +2931,11 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
-	if (spa_dir_prop(spa, DMU_POOL_RAIDZ_AGGRE_MAP, &spa->spa_map_obj) != 0)
+	error =zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_RAIDZ_AGGRE_MAP, sizeof (uint64_t),AGGRE_MAP_MAX_OBJ_NUM,&spa->spa_map_obj_arr[0]);
+	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
+	
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4491,7 +4494,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	raidz_aggre_check(spa);
 	raidz_aggre_create_map_obj(spa, tx, spa->spa_raidz_aggre_num);
-
 	/*
 	 * Set pool properties.
 	 */
@@ -4526,9 +4528,10 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 */
 	spa_evicting_os_wait(spa);
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
-	raidz_aggre_map_open(spa);
 
 	mutex_exit(&spa_namespace_lock);
+	
+	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
 	return (0);
@@ -4896,6 +4899,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
     boolean_t force, boolean_t hardforce)
 {
 	spa_t *spa;
+	int wait_refcount_times = 0;
 
 	if (oldconfig)
 		*oldconfig = NULL;
@@ -4935,6 +4939,13 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	if (spa->spa_sync_on) {
 		txg_wait_synced(spa->spa_dsl_pool, 0);
 		spa_evicting_os_wait(spa);
+	}
+
+	while (!spa_refcount_zero(spa) && wait_refcount_times < 3) {
+		wait_refcount_times++;
+		cmn_err(CE_WARN, "[SPA_BUSY] %p, ref=%llu",
+			spa, (u_longlong_t) refcount_count(&spa->spa_refcount));
+		delay(hz);
 	}
 
 	/*
@@ -6911,6 +6922,11 @@ spa_free_sync_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 {
 	zio_t *zio = arg;
 
+	if (BP_IS_TOGTHER(bp)) {
+		cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
+		return (0);
+	}
+
 	zio_nowait(zio_free_sync(zio, zio->io_spa, dmu_tx_get_txg(tx), bp,
 	    zio->io_flags));
 	return (0);
@@ -7417,13 +7433,17 @@ spa_sync(spa_t *spa, uint64_t txg)
 		}
 
 		clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
-			spa->spa_aggre_map, tx);
+			raidz_aggre_map_current(spa), tx);
+		/*
 		pos_valid = get_and_clear_aggre_map_process_pos(spa, txg, &process_pos);
 		if (pos_valid) {
-			/* update map meta data */
 			update_aggre_map_process_pos(spa, process_pos, tx);
 		}
+		
+		update_aggre_map_free_range(spa, tx); */
 
+		raidz_aggre_map_free_range_all(spa, tx);
+		
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
 

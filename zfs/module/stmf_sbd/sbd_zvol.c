@@ -455,6 +455,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	int		flags = zvio->zvio_flags;
 	uint64_t	coffset, toffset, offset = zvio->zvio_offset;
 	uint64_t	resid, len = dbuf->db_data_size;
+	boolean_t waited = B_FALSE;
 
 	/* sbd_zvol_sgl_write_remote_mirror(sl, dbuf); */
 	write_direct = B_FALSE;
@@ -499,7 +500,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		zfs_range_unlock(rl);
 		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
 		return (error);
-	}
+	}	
 
 	toffset = offset;
 	resid = len;
@@ -614,6 +615,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	dmu_tx_t *tx;
     uint64_t write_flag;
     boolean_t write_meta;
+	boolean_t waited = B_FALSE;
 
     write_flag = 0;
     if (flags & DB_WRITE_META_DATA) {
@@ -662,9 +664,9 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	}
 
 	sync = !zvol_get_volume_wce(sl->sl_zvol_minor_hdl);
-    if (sync) {
+    	if (sync) {
 		write_flag |= WRITE_FLAG_APP_SYNC;
-    }
+    	}
 
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)uio->uio_resid);
@@ -672,15 +674,11 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	if (error) {
 		dmu_tx_abort(tx);
 	} else {
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx, write_flag);
-		/*
-		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ,
-		    uio, len, tx, write_flag, initiator_wwn);
-		*/
+		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len, tx, write_flag);
 		write_direct = dmu_tx_sync_log(tx);
 		dmu_tx_commit(tx);
 	}
+
 	zfs_range_unlock(rl);
 	if (sync && write_direct) {
 		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);

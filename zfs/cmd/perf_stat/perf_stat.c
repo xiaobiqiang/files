@@ -89,6 +89,8 @@ main(int argc, char *argv[])
 		perf_stat_nfs();
 		perf_stat_zpool2();
         perf_stat_fc();
+        perf_stat_disk();
+        perf_stat_sys();
 		clear_perf_stat_history();
 #if 0
 		sigsuspend(&suspendmask);

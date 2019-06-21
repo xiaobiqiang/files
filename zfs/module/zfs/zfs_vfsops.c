@@ -1905,8 +1905,15 @@ zfs_domount(struct super_block *sb, zfs_mntopts_t *zmo, int silent)
 	struct inode *root_inode;
 	uint64_t recordsize;
 	int error;
+	int retry = 0;
 
-	error = zfs_sb_create(osname, zmo, &zsb);
+	while ((error = zfs_sb_create(osname, zmo, &zsb)) == EBUSY) {
+		cmn_err(CE_WARN,"[DS_BUSY] zfs_sb_create(%s)", osname);
+		if (retry >= 3)
+			break;
+		retry++;
+		delay(hz);
+	}
 	if (error)
 		return (error);
 

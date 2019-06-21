@@ -318,7 +318,7 @@ int stmf_max_cur_task = 4096;
 int stmf_io_policy = 0;
 int stmf_io_delay_time_threshold = 20000; /* unit: ms */
 int stmf_lu_xfer_time_threshold = 15000; /* unit: ms */
-int stmf_waitq_time_threshold = 10000;	/* uint: ms */
+int stmf_waitq_time_threshold = 1000000;	/* uint: ms */
 int stmf_checker_time = 2000;	/* uint: ms */
 
 static clock_t stmf_wm_last = 0;
@@ -4294,15 +4294,15 @@ stmf_create_kstat_lport(stmf_i_local_port_t *ilport)
 	len = ilport->ilport_lport->lport_id->ident_length;
 	bcopy(ilport->ilport_lport->lport_id->ident,
 	    ilport->ilport_kstat_tgt_name, len);
-	ilport->ilport_kstat_tgt_name[len + 1] = '\0';
+	ilport->ilport_kstat_tgt_name[len] = '\0';
 	kstat_named_setstr(&ks_tgt->i_tgt_name,
 	    (const char *)ilport->ilport_kstat_tgt_name);
 	kstat_named_setstr(&ks_tgt->i_tgt_alias,
 	    (const char *)ilport->ilport_lport->lport_alias);
 	/* protocol */
-	if ((id = ilport->ilport_lport->lport_id->protocol_id) > PROTOCOL_ANY) {
+	if ((id = ilport->ilport_lport->lport_id->protocol_id) >= PROTOCOL_ANY) {
 		cmn_err(CE_WARN, "STMF: protocol_id out of bound");
-		id = PROTOCOL_ANY;
+		id = PROTOCOL_ANY - 1;
 	}
 	kstat_named_setstr(&ks_tgt->i_protocol, protocol_ident[id]);
 	kstat_install(ilport->ilport_kstat_info);
@@ -5648,8 +5648,8 @@ stmf_setup_itl_kstats(stmf_itl_data_t *itl)
 	kstat_named_setstr(&ks_itl->i_lport_alias, strbuf);
 	strbuf += len + 1;
 
-	id = (ss->ss_lport->lport_id->protocol_id > PROTOCOL_ANY) ?
-	    PROTOCOL_ANY : ss->ss_lport->lport_id->protocol_id;
+	id = (ss->ss_lport->lport_id->protocol_id >= PROTOCOL_ANY) ?
+	    (PROTOCOL_ANY - 1) : ss->ss_lport->lport_id->protocol_id;
 	kstat_named_setstr(&ks_itl->i_protocol, protocol_ident[id]);
 
 	/* LU */
@@ -6208,8 +6208,8 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 			ss->ss_rport_id->ident_length);
 		bcopy(lport->lport_id->ident, target_id,
 			lport->lport_id->ident_length);
-		cmn_err(CE_WARN,   "%s  luNbr=%d, initiator_id = %s, target_id = %s",
-			__func__, luNbr, initiator_id, target_id);
+	/*	cmn_err(CE_WARN,   "%s  luNbr=%d, initiator_id = %s, target_id = %s",
+			__func__, luNbr, initiator_id, target_id);*/
 		lu = dlun0;
 	} else {
 		lu = lun_map_ent->ent_lu;
@@ -6541,8 +6541,9 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			continue;
         }
 
-		cmn_err(CE_NOTE, "%s (task=%p itask_flags=%x) to abort, starttime=%ld, curtime=%ld, to=%d",
-			__func__, task, itask->itask_flags, itask->itask_start_time, l, to);
+		cmn_err(CE_NOTE, "%s (task=%p itask_flags=%x cdb=%02x%02x) to abort, starttime=%ld, curtime=%ld, to=%d",
+			__func__, task, itask->itask_flags, task->task_cdb[0], task->task_cdb[1],
+			itask->itask_start_time, l, to);
 		
 		if ((itask->itask_flags & ITASK_IN_TRANSITION) && (itask->itask_flags & ITASK_HOLD_INSTOP)) {
 			uint32_t new, old;
@@ -7604,8 +7605,9 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s, uint32_t abort_typ
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 	do {
 		old = new = itask->itask_flags;
-		if ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
-		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0)) {
+		if ( (s!=STMF_TIMEOUT) && 
+		    ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
+		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0))) {
 		    mutex_exit(&w->worker_lock);
 			return;
 		}
@@ -8475,9 +8477,11 @@ stmf_scsilib_send_status(scsi_task_t *task, uint8_t st, uint32_t saa)
 	
 	task->task_scsi_status = st;
 	if((st != STATUS_GOOD) &&
-		(st != STATUS_QFULL)) {
+		(st != STATUS_QFULL)&&(saa != 0x52000)) {
+#if	0
 		cmn_err(CE_WARN, "%s task=%p cdb=%02x lun=%s status=%x saa=%x ",
 		__func__,task,task->task_cdb[0],task->task_lu->lu_alias,st,saa);
+#endif
 	}
 
 	if (st == 2) {
@@ -9674,7 +9678,7 @@ stmf_proxy_task_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	if ((dbuf->db_flags & DB_DIRECTION_TO_RPORT) &&
 		(dbuf->db_flags & DB_SEND_STATUS_GOOD)) {
-		printk(KERN_INFO "zjn %s task=%p, free task\n", __func__, task);
+		// printk(KERN_INFO "zjn %s task=%p, free task\n", __func__, task);
 		free_it = B_TRUE;
 	}
 	
@@ -9703,7 +9707,7 @@ stmf_proxy_task_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	if (free_it) {
 		uint32_t new, old;
-		printk(KERN_INFO "zjn %s task=%p, itask_flags=%x\n", __func__, task, itask->itask_flags);
+		// printk(KERN_INFO "zjn %s task=%p, itask_flags=%x\n", __func__, task, itask->itask_flags);
 		
 		do {
 			new = old = itask->itask_flags;
@@ -11850,6 +11854,7 @@ EXPORT_SYMBOL(stmf_data_xfer_done);
 EXPORT_SYMBOL(stmf_register_local_port);
 EXPORT_SYMBOL(stmf_register_scsi_session);
 EXPORT_SYMBOL(stmf_task_alloc);
+EXPORT_SYMBOL(stmf_task_free);
 EXPORT_SYMBOL(stmf_set_lu_state);
 EXPORT_SYMBOL(stmf_find_and_hold_task);
 EXPORT_SYMBOL(stmf_reset_lport);

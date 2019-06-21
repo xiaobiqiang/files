@@ -2230,8 +2230,11 @@ void dbuf_clear_direct_bp(dmu_buf_impl_t *db) {
 		while(tmp_record= list_head(&db->db_blkptr_list[i])) {
 			uint64_t txg = tmp_record->addr.blk_birth;
 			list_remove(&db->db_blkptr_list[i], tmp_record);
-			zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
-	   		txg,  &tmp_record->addr, 0));
+			if (BP_IS_TOGTHER(&tmp_record->addr))
+				cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
+			else
+				zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
+	   				txg,  &tmp_record->addr, 0));
 			kmem_free(tmp_record, sizeof(dbuf_blkptr_record_t));
 		}
 	}
@@ -3585,9 +3588,13 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 			   (char *)db->db_blkptr, sizeof(blkptr_t));
 			while(tmp_record= list_head(&db->db_blkptr_list[txg_id])) {
 				list_remove(&db->db_blkptr_list[txg_id], tmp_record);
-				if (tmp_record != last_record)
-					zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
+				if (tmp_record != last_record){
+					if (BP_IS_TOGTHER(&tmp_record->addr))
+						cmn_err(CE_WARN, "%s BP_IS_TOGTHER 0 \n", __func__);
+					else
+						zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
 	   				    txg,  &tmp_record->addr, 0));
+				}
 				kmem_free(tmp_record, sizeof(dbuf_blkptr_record_t));
 			}
 			db->db_ctrl_data[txg_id] = B_FALSE;
@@ -3598,7 +3605,10 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 			dbuf_blkptr_record_t *tmp_record = NULL;
 			while(tmp_record= list_head(&db->db_blkptr_list[txg_id])) {
 				list_remove(&db->db_blkptr_list[txg_id], tmp_record);
-				zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
+				if (BP_IS_TOGTHER(&tmp_record->addr))
+					cmn_err(CE_WARN, "%s BP_IS_TOGTHER 1 \n", __func__);
+				else
+					zio_wait(zio_free_sync(NULL, db->db_objset->os_spa,
 	   				    txg,  &tmp_record->addr, 0));
 				kmem_free(tmp_record, sizeof(dbuf_blkptr_record_t));
 			}

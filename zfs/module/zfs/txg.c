@@ -558,7 +558,8 @@ txg_sync_thread(dsl_pool_t *dp)
 		start = ddi_get_lbolt();
 		spa_sync(spa, txg);
 		delta = ddi_get_lbolt() - start;
-
+		if(delta>1000)
+			cmn_err(CE_WARN, "%s %s spa_sync %lld take: %ld ", __func__, spa->spa_name, txg, (long)delta);
 		mutex_enter(&tx->tx_sync_lock);
 		tx->tx_synced_txg = txg;
 		tx->tx_syncing_txg = 0;

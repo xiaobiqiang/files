@@ -419,6 +419,8 @@ fct_status_t fct_handle_rcvd_flogi(fct_local_port_t *port,
 //    uint8_t *rp_pwwn, uint32_t rp_id);
 void fct_wwn_to_str(char *to_ptr, const uint8_t *from_ptr);
 void fct_cmd_free(fct_cmd_t *cmd);
+boolean_t fct_cmd_is_aborted(fct_cmd_t *cmd);
+
 
 #ifdef	__cplusplus
 }
