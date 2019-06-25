@@ -41,7 +41,7 @@ typedef enum {
 
 int raidz_reclaim_enable = 1;
 int raidz_reclaim_timeconsum = 10000;
-unsigned long raidz_space_reclaim_gap = 60*2;	/* unit: s */
+unsigned long raidz_space_reclaim_gap = 60*20;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
 int raidz_filledtime_count = 60*3;
@@ -82,7 +82,7 @@ raidz_aggre_check(spa_t *spa)
 			spa->spa_raidz_aggre_nparity = vdev->vdev_nparity;
 			spa->spa_raidz_ashift = vdev->vdev_ashift;
 			spa->spa_raidz_aggre = B_TRUE;
-			cmn_err(CE_NOTE, "%s %s is raidz aggre: aggre_num=%d parity=%d",
+			cmn_err(CE_WARN, "%s %s is raidz aggre: aggre_num=%d parity=%d",
 				__func__, spa->spa_name, spa->spa_raidz_aggre_num,
 				spa->spa_raidz_aggre_nparity);
 			break;
@@ -91,7 +91,7 @@ raidz_aggre_check(spa_t *spa)
 	spa->sap_map_pos_last = 0;
 
 	if (!spa->spa_raidz_aggre)
-		cmn_err(CE_NOTE, "%s %s isn't raidz aggre", __func__, spa->spa_name);
+		cmn_err(CE_WARN, "%s %s isn't raidz aggre", __func__, spa->spa_name);
 }
 
 int raidz_aggre_init(void)
@@ -503,60 +503,6 @@ get_and_clear_aggre_map_process_pos(spa_t *spa, uint64_t txg, uint64_t *ppos)
 	return (valid);
 }
 
-void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx)
-{
-	aggre_map_t *map = spa->spa_aggre_map_arr[0];
-	uint64_t processed = 0;
-	uint64_t pre_pos=0;
-	uint64_t elem_per_blk;
-	uint64_t blkid1, blkid2;
-	uint64_t pos=0;
-
-	int state = spa->spa_space_reclaim_state;
-	
-	if(spa->spa_space_reclaim_state != 3) {
-		cmn_err(CE_WARN, "%s %s return not run \n",	__func__,spa->spa_name);
-		return;
-	}
-	
-	mutex_enter(&map->aggre_lock);
-	if ( map->owner == 2 ) {
-		mutex_exit(&map->aggre_lock);
-		return;
-	}
-	map->owner = 1;
-	pre_pos = map->hdr->free_index;
-	pos = map->hdr->process_index;
-	mutex_exit(&map->aggre_lock);
-	processed = pos - pre_pos;
-	
-	if(processed <100 ){
-		mutex_enter(&map->aggre_lock);
-		map->owner = 0;
-		mutex_exit(&map->aggre_lock);
-		return;
-	}
-	
-	dmu_buf_will_dirty(map->dbuf_hdr, tx);
-
-	elem_per_blk = map->hdr->blksize / map->hdr->recsize;
-	blkid1 = pre_pos / elem_per_blk;
-	blkid2 = pos / elem_per_blk;
-
-	if (blkid2 > blkid1) {
-		uint64_t offset = blkid1 * map->hdr->blksize;
-		uint64_t size = (blkid2 - blkid1) * map->hdr->blksize;
-		dmu_free_range(map->os, map->object, offset, size, tx);
-	}
-
-	mutex_enter(&map->aggre_lock);
-	map->hdr->free_index = pos;
-	map->owner = 0;
-	mutex_exit(&map->aggre_lock);
-
-	cmn_err(CE_WARN, "%s %s pre=%ld pos=%ld \n", __func__,spa->spa_name, (long)pre_pos, (long)pos);
-}
-
 void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 {
 	int filling_obj;
@@ -566,25 +512,41 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	reclaimed_obj = filling_obj==0?1:0;
 
 	aggre_map_t *map ;
-	uint64_t processed = 0;
-	uint64_t pre_pos=0;
-	uint64_t elem_per_blk;
-	uint64_t blkid1, blkid2;
-	uint64_t pos = 0;
 
 	int state = spa->spa_space_reclaim_state;
 	if (state != 3) {
-		cmn_err(CE_WARN, "%s %s return not run state=%x \n",	
-			__func__,spa->spa_name,state);
+		cmn_err(CE_WARN, "%s %s return not run %x\n",	
+			__func__, spa->spa_name, state);
 		return;
 	}
  	
+	if (spa->spa_map_manager.active_obj_index == -1) {
+		cmn_err(CE_WARN, "%s %s clear all mapobj", __func__,spa->spa_name);
+		int i;
+		for (i=0; i<AGGRE_MAP_MAX_OBJ_NUM; i++)
+		{
+			map = spa->spa_aggre_map_arr[i];
+			dmu_buf_will_dirty(map->dbuf_hdr, tx);
+			map->hdr->free_index = 0;
+			map->hdr->total_count = 0;	
+			map->hdr->avail_count = 0;	
+			map->hdr->process_index = 0;
+			map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
+	#ifdef _KERNEL 
+			map->hdr->aggre_map_filltime = ddi_get_time();
+	#endif
+			cmn_err(CE_WARN, "%s %s dmu_free_range \n", __func__,spa->spa_name);
+			dmu_free_range(map->os, map->object, 0, DMU_OBJECT_END, tx);
+		}
+		spa->spa_map_manager.active_obj_index = 0;
+		return;
+	}
+
 	map = spa->spa_aggre_map_arr[reclaimed_obj];
 	if (map->hdr->aggre_map_state != AGGRE_MAP_OBJ_RECLAIMED){
 		return;
 	}
 	
-	cmn_err(CE_WARN, "%s %s dmu_buf_will_dirty \n", __func__,spa->spa_name);
  	dmu_buf_will_dirty(map->dbuf_hdr, tx);
 	map->hdr->free_index = 0;
 	map->hdr->total_count = 0;	
@@ -596,9 +558,7 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	#endif
 	cmn_err(CE_WARN, "%s %s dmu_free_range \n", __func__,spa->spa_name);
  	dmu_free_range(map->os, map->object, 0, DMU_OBJECT_END, tx);
-	
-	cmn_err(CE_WARN, "%s %s dmu_free_range end\n", __func__,spa->spa_name);
- }
+}
 
 void
 raidz_aggre_create_map_obj(spa_t *spa, dmu_tx_t *tx, int aggre_num)
@@ -642,7 +602,6 @@ raidz_aggre_map_open(spa_t *spa)
 {
 	dmu_object_info_t doi;
 	aggre_map_t *map;
-	aggre_map_t *map1;
 	uint64_t offset;
 	int err, i;
 	int loop;
@@ -683,53 +642,6 @@ raidz_aggre_map_open(spa_t *spa)
 				cmn_err(CE_WARN, "%s dmu_buf_hold i=%d err=%d", __func__, i, err);
 			}
 		}
-	}
-	
-	map = spa->spa_aggre_map_arr[0];
-	map1 = spa->spa_aggre_map_arr[1];
-	cmn_err(CE_WARN, "%s map aggre_map_state=%d map1 aggre_map_state=%d", __func__, 
-		map->hdr->aggre_map_state, map1->hdr->aggre_map_state);
-	if (map->hdr->aggre_map_state == AGGRE_MAP_OBJ_FILLING) {
-		map1->hdr->total_count = 0;
-		map1->hdr->avail_count = 0;
-		map1->hdr->process_index = 0;
-		map1->hdr->free_index = 0;
-		map1->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
-		#ifdef _KERNEL
-		map1->hdr->aggre_map_filltime = ddi_get_time();;
-		#endif
-		spa->spa_map_manager.active_obj_index = 0;
-	}else if (map1->hdr->aggre_map_state == AGGRE_MAP_OBJ_FILLING) {
-		map->hdr->total_count = 0;
-		map->hdr->avail_count = 0;
-		map->hdr->process_index = 0;
-		map->hdr->free_index = 0;
-		map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
-		#ifdef _KERNEL
-		map->hdr->aggre_map_filltime = ddi_get_time();;
-		#endif
-		spa->spa_map_manager.active_obj_index = 1;
-	}else {
-		spa->spa_map_manager.active_obj_index = 0;
-		map->hdr->total_count = 0;
-		map->hdr->avail_count = 0;
-		map->hdr->process_index = 0;
-		map->hdr->free_index = 0;
-		map->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
-		#ifdef _KERNEL
-		map->hdr->aggre_map_filltime = ddi_get_time();;
-		#endif
-
-		map1->hdr->total_count = 0;
-		map1->hdr->avail_count = 0;
-		map1->hdr->process_index = 0;
-		map1->hdr->free_index = 0;
-		map1->hdr->aggre_map_state = AGGRE_MAP_OBJ_CLEAR;
-		#ifdef _KERNEL
-		map1->hdr->aggre_map_filltime = ddi_get_time();;
-		#endif
-
-		spa->spa_map_manager.active_obj_index = 0;
 	}
 	
 	return (0);
@@ -1042,7 +954,7 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 	if (spa->spa_sync_pass>1) {
 		return mapfilling;
 	}
-	if ( ( mapfilling->hdr->avail_count>raidz_reclaim_count ||
+	if ( ( mapfilling->hdr->avail_count>raidz_reclaim_count &&
 				nows-mapfilling->hdr->aggre_map_filltime>raidz_filledtime_count)
 			&& mapreclaimed->hdr->aggre_map_state == AGGRE_MAP_OBJ_CLEAR
 			&& (nows-mapreclaimed->hdr->aggre_map_filltime>raidz_clearedtime_count))

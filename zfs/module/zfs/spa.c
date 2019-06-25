@@ -2936,6 +2936,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 	
+	spa->spa_map_manager.active_obj_index = -1;
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4557,6 +4558,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	/*
 	 * If a pool with this name exists, return failure.
 	 */
+	cmn_err(CE_WARN,"%s %s", __func__,pool);
 	mutex_enter(&spa_namespace_lock);
 	if (spa_lookup(pool) != NULL) {
 		mutex_exit(&spa_namespace_lock);
@@ -4776,9 +4778,13 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 * We kick off an async task to handle this for us.
 	 */
 	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
+	cmn_err(CE_WARN,"%s %s do raidz_aggre_check", __func__,pool);
 	raidz_aggre_check(spa);
+	
+	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa->spa_raidz_aggre);
 	start_space_reclaim_thread(spa);
 
+	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa->spa_raidz_aggre);
 	mutex_exit(&spa_namespace_lock);
 	spa_history_log_version(spa, "import");
 	zvol_create_minors(spa, pool, B_FALSE);
