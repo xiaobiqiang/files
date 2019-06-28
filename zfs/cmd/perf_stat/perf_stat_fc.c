@@ -239,28 +239,28 @@ perf_stat_fc(void)
 			free(stat);
 			goto failed;
 		}
-		stat->reads = ul;
+		stat->nread = ul;
 		if ((ul = str2ul(buf->bufv[2])) == INVAL_UL) {
 			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[2]);
 			log_write("invalid number bufv[2]");
 			free(stat);
 			goto failed;
 		}
-		stat->writes = ul;
+		stat->nwritten = ul;
 		if ((ul = str2ul(buf->bufv[3])) == INVAL_UL) {
 			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[3]);
 			log_write("invalid number bufv[3]");
 			free(stat);
 			goto failed;
 		}
-		stat->nread = ul;
+		stat->reads = ul;
         if ((ul = str2ul(buf->bufv[4])) == INVAL_UL) {
 			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[4]);
 			log_write("invalid number bufv[4]");
 			free(stat);
 			goto failed;
 		}
-		stat->nwritten= ul;
+		stat->writes = ul;
         
 		stat->next = snap->head;
 		snap->head = stat;

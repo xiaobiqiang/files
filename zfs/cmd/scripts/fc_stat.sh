@@ -70,7 +70,7 @@ function main()
 	local paramnum=$#
 	case $1 in 
 		fc_stat)
-stat_main
+		stat_main
 		;;
 		sys)
 		stat_sys
