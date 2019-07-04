@@ -44,7 +44,7 @@ int raidz_reclaim_timeconsum = 10000;
 unsigned long raidz_space_reclaim_gap = 60*20;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
-int raidz_filledtime_count = 60*3;
+int raidz_filledtime_count = 60*10;
 int raidz_clearedtime_count = 30;
 
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;

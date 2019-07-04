@@ -5340,6 +5340,8 @@ try_dereg_ss_again:
 	    ~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
 	if (iss->iss_flags & ISS_EVENT_ACTIVE) {
 		mutex_exit(&stmf_state.stmf_lock);
+		cmn_err(CE_NOTE, "%s initiator = %s, target = %s, ssflags=%x ss_session_id = 0x%"PRIx64"",
+		__func__, initiator_id, target_id, iss->iss_flags, ss->ss_session_id);
 		delay(1);
 		goto try_dereg_ss_again;
 	}
@@ -6896,16 +6898,18 @@ stmf_direct_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	stmf_worker_t *w, *w1;
 	uint8_t tm;
 	uint8_t io_policy=1;
-	uint8_t cdb0;
+	uint8_t cdb,cdb0;
 	uint32_t stmf_nworkers_accepting_cmds_rw;
-	
+
+	cdb = task->task_cdb[0];
 	cdb0 = task->task_cdb[0] & 0x1F;
 
 	/* Latest value of currently running tasks */
 	ct = stmf_cur_ntasks;
 	stmf_nworkers_accepting_cmds_rw = stmf_nworkers_accepting_cmds-1;
 
-	if ((cdb0 != SCMD_READ) && (cdb0 != SCMD_WRITE))
+	if (cdb0 != SCMD_READ && cdb0 != SCMD_WRITE 
+		&& cdb!=SCMD_SYNCHRONIZE_CACHE && cdb!=SCMD_UNMAP )
 	{
 		w = &stmf_workers[stmf_nworkers_accepting_cmds-1];
 		goto setworks;
@@ -6953,23 +6957,20 @@ stmf_direct_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	if(io_policy){/* write io is limited to 1 work task to prevent writing io bursting  */
 		w = &stmf_workers[task->task_ext_id%stmf_nworkers_cur];
 	} else {
-		if ((cdb0 == SCMD_READ) || (cdb0 == SCMD_WRITE))
-		{
-			w = &stmf_workers[nv];
-			/*
-			 * A worker can be pinned by interrupt. So select the next one
-			 * if it has lower load.
-			 */
-			if ((nv + 1) >= stmf_nworkers_accepting_cmds_rw) {
-				w1 = stmf_workers;
-			} else {
-				w1 = &stmf_workers[nv + 1];
-			}
-			if (w1->worker_queue_depth < w->worker_queue_depth)
-				w = w1;
+		
+		w = &stmf_workers[nv];
+		/*
+		 * A worker can be pinned by interrupt. So select the next one
+		 * if it has lower load.
+		 */
+		if ((nv + 1) >= stmf_nworkers_accepting_cmds_rw) {
+			w1 = stmf_workers;
 		} else {
-			
+			w1 = &stmf_workers[nv + 1];
 		}
+		if (w1->worker_queue_depth < w->worker_queue_depth)
+			w = w1;
+		
 	}
 
 setworks:
