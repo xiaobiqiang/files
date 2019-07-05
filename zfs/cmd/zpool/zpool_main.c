@@ -1745,11 +1745,11 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 {
 	export_cbdata_t *cb = data;
 
-	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
-	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	if (zpool_disable_datasets(zhp, cb->force) != 0)
 		return (1);
 
+	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
+	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	/* The history must be logged as part of the export */
 	log_history = B_FALSE;
 
@@ -7503,8 +7503,6 @@ release_callback(zpool_handle_t *zhp, void *data)
 	syslog(LOG_NOTICE, "wait 10s to standby all luns");
 	sleep(10);
 	syslog(LOG_NOTICE, "wait 10s end");
-	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
-	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 
 	if (zpool_disable_datasets(zhp, B_TRUE) != 0) {
 		/*zfs_restore_dirty_mem();*/
@@ -7512,6 +7510,8 @@ release_callback(zpool_handle_t *zhp, void *data)
 		return (1);
 	}
 	
+	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
+	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	if (zpool_export(zhp, B_TRUE, history_str) != 0) {
 		/*zfs_restore_dirty_mem();*/
 		syslog(LOG_ERR, "zpool export force failed, errno:%d", errno);

@@ -516,7 +516,14 @@ stmf_remove_lu_from_session(stmf_i_local_port_t *ilport,
 	    ((uint16_t)lu_nbr[1] | (((uint16_t)(lu_nbr[0] & 0x3F)) << 8));
 
 	ASSERT(mutex_owned(&stmf_state.stmf_lock));
+
+	cmn_err(CE_NOTE, " %s luNbr: %d", __func__, luNbr);
 	lun_map_ent = stmf_get_ent_from_map(sm, luNbr);
+	if (lun_map_ent==NULL){
+		cmn_err(CE_WARN, " %s lunmapent is null luNbr [%d]", __func__, luNbr);
+		return (STMF_SUCCESS);
+	}
+
 	ASSERT(lun_map_ent && lun_map_ent->ent_lu == lu);
 
 	ilu = (stmf_i_lu_t *)lu->lu_stmf_private;

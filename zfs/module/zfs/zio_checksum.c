@@ -299,13 +299,14 @@ zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info)
 		}
 
 		d = (unsigned char*)zio->io_data;
-		cmn_err(CE_WARN,"%s [%d] .obj=%lx.%lx blkid=%lx data=[%x %x %x %x] zio=%p iodata=%p",
+		if (zio->io_bookmark.zb_objset || zio->io_bookmark.zb_object){
+			cmn_err(CE_WARN,"%s [%d] .obj=%lx.%lx blkid=%lx data=[%x %x %x %x] zio=%p iodata=%p",
 			__func__, zio_checksum_errs, (long)zio->io_bookmark.zb_objset, (long)zio->io_bookmark.zb_object,
 			(long)zio->io_bookmark.zb_blkid, *d,*(d+1), *(d+2), *(d+3), zio, zio->io_data);
-		cmn_err(ce_type,"%s [%d] ..obj=%lx.%lx blkid=%lx [0x%016lx 0x%016lx 0x%016lx 0x%016lx] [0x%016lx 0x%016lx 0x%016lx 0x%016lx]",
+			cmn_err(ce_type,"%s [%d] ..obj=%lx.%lx blkid=%lx [0x%016lx 0x%016lx 0x%016lx 0x%016lx] [0x%016lx 0x%016lx 0x%016lx 0x%016lx]",
 			__func__, zio_checksum_errs, (long)zio->io_bookmark.zb_objset, (long)zio->io_bookmark.zb_object,
 			(long)zio->io_bookmark.zb_blkid, *p1, *(p1+1), *(p1+2), *(p1+3), *p2, *(p2+1), *(p2+2), *(p2+3));
-		
+		}	
 		return (SET_ERROR(ECKSUM));
 	}
 
