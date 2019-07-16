@@ -762,6 +762,33 @@ FINISH:
 }
 #endif
 
+#define DISK_LED_SCRIPT_PATH "/var/fm/sg_led_disk.sh"
+#define DISK_LED_CMD_SIZE 256
+#define DISK_LED_SCRIPT_FOMAT "%s %s %s"
+static int sg_led_disk_script(const char * name,const char * led_operation)
+{
+	FILE * fp = 0;
+	char cmd[DISK_LED_CMD_SIZE] = {0};
+	char retstr[DISK_LED_CMD_SIZE] = {0};
+	if(name == NULL || led_operation == 0)
+	{
+		return -1;
+	}
+	snprintf(name,DISK_LED_CMD_SIZE - 1,DISK_LED_SCRIPT_FOMAT,
+		DISK_LED_SCRIPT_PATH,name,led_operation);
+	fp = popen(cmd,'r');
+	if(fp <= stderr)
+	{
+		perror("popen cmd fail");
+		return -1;
+	}
+
+	fread(retstr,1,sizeof(retstr) - 1,fp);
+	retstr[DISK_LED_CMD_SIZE] = 0;
+	pclose(fp);
+	return 0;
+}
+
 static int led_disk(slice_req_t *req, int ledxy)
 {
 #if 0
@@ -833,6 +860,7 @@ static int led_disk(slice_req_t *req, int ledxy)
 	free(devctl_device);
 	return (0);
 #endif
+	sg_led_disk_script(req.disk_name,req.led_operation);
 }
 
 /************************************************************************
