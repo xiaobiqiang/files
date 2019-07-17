@@ -4322,10 +4322,7 @@ ready_import:
 		stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
 		stamp->para.company_name = COMPANY_NAME;
 
-		if (cluster_write_stamp(stamp, NULL, path) <= 0) {
-			syslog(LOG_ERR, "write stamp failed");
-			goto exit_thr;
-		}
+		(void) cluster_write_stamp(stamp, NULL, path);
 
 		pool_root = NULL;
 	} else {
@@ -4352,16 +4349,19 @@ ready_import:
 			syslog(LOG_ERR, "alloc zpool_stamp_t failed");
 			goto exit_thr;
 		}
-		if (cluster_read_stamp(stamp, pool_root, path) != 0) {
-			syslog(LOG_ERR, "read stamp failed");
-			goto exit_thr;
-		}
-		stamp->para.pool_current_owener = hostid;
-		stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
-		stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
-		if (cluster_write_stamp(stamp, pool_root, path) <= 0) {
-			syslog(LOG_ERR, "write stamp failed");
-			goto exit_thr;
+		if (cluster_read_stamp(stamp, pool_root, path) == 0) {
+			stamp->para.pool_current_owener = hostid;
+			stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
+			stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
+			(void) cluster_write_stamp(stamp, pool_root, path);
+		} else {
+			bzero(stamp, sizeof (zpool_stamp_t));
+			stamp->para.pool_magic = ZPOOL_MAGIC;
+			stamp->para.pool_real_owener = hostid;
+			stamp->para.pool_current_owener = hostid;
+			stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
+			stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
+			stamp->para.company_name = COMPANY_NAME;
 		}
 	}
 
@@ -4370,34 +4370,28 @@ ready_import:
 	while (counter--) {
 		usleep(UPDATE_STAMP_INTERVAL);
 
-		if (cluster_read_stamp(stamp, pool_root, path) != 0) {
-			syslog(LOG_ERR, "read stamp failed");
-			goto exit_thr;
-		}
-		if (stamp->para.pool_current_owener != hostid) {
-			conflict_cnt++;
-			if (conflict_cnt >= 3) {
-				syslog(LOG_ERR, "maybe there is a bug!!");
-				goto exit_thr;
-			}
-			
-			if (stamp->para.pool_progress[0] == ZPOOL_ON_PROGRESS) {
-				syslog(LOG_WARNING, "remote already start import the pool");
-				goto exit_thr;
-			}
-			if (stamp->para.pool_real_owener == hostid) {
-				/* you won */
-				stamp->para.pool_current_owener = hostid;
-				stamp->para.pool_progress[0] = ZPOOL_ON_PROGRESS;
-				stamp->para.pool_progress[1] = ZPOOL_ON_PROGRESS;
-				if (cluster_write_stamp(stamp, pool_root, path) <= 0) {
-					syslog(LOG_ERR, "write stamp failed");
+		if (cluster_read_stamp(stamp, pool_root, path) == 0) {
+			if (stamp->para.pool_current_owener != hostid) {
+				conflict_cnt++;
+				if (conflict_cnt >= 3) {
+					syslog(LOG_ERR, "maybe there is a bug!!");
 					goto exit_thr;
 				}
-				continue;
+				if (stamp->para.pool_progress[0] == ZPOOL_ON_PROGRESS) {
+					syslog(LOG_WARNING, "remote already start import the pool");
+					goto exit_thr;
+				}
+				if (stamp->para.pool_real_owener == hostid) {
+					/* you won */
+					stamp->para.pool_current_owener = hostid;
+					stamp->para.pool_progress[0] = ZPOOL_ON_PROGRESS;
+					stamp->para.pool_progress[1] = ZPOOL_ON_PROGRESS;
+					(void) cluster_write_stamp(stamp, pool_root, path);
+					continue;
+				}
+				syslog(LOG_WARNING, "remote won, exit");
+				goto exit_thr;
 			}
-			syslog(LOG_WARNING, "remote won, exit");
-			goto exit_thr;
 		}
 	}
 
@@ -4405,10 +4399,7 @@ ready_import:
 		stamp->para.pool_current_owener = hostid;
 		stamp->para.pool_progress[0] = ZPOOL_ON_PROGRESS;
 		stamp->para.pool_progress[1] = ZPOOL_ON_PROGRESS;
-		if (cluster_write_stamp(stamp, pool_root, path) <= 0) {
-			syslog(LOG_ERR, "write stamp failed");
-			goto exit_thr;
-		}
+		(void) cluster_write_stamp(stamp, pool_root, path);
 	}
 
 	if (param->import_state == NULL) {
@@ -4425,10 +4416,7 @@ ready_import:
 	for (counter = 0; counter < CONFLICT_DURATION;) {
 		usleep(UPDATE_STAMP_INTERVAL);
 
-		if (cluster_write_stamp(stamp, pool_root, path) <= 0) {
-			syslog(LOG_ERR, "write stamp failed");
-			goto exit_thr;
-		}
+		(void) cluster_write_stamp(stamp, pool_root, path);
 
 		if (param->import_state == NULL) {
 			if (todo_import_pool->imported)
@@ -4442,10 +4430,7 @@ ready_import:
 	stamp->para.pool_current_owener = hostid;
 	stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
 	stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
-	if (cluster_write_stamp(stamp, pool_root, path) <= 0) {
-		syslog(LOG_ERR, "write stamp failed");
-		goto exit_thr;
-	}
+	(void) cluster_write_stamp(stamp, pool_root, path);
 
 	ret = stamp->para.pool_real_owener == hostid ? (void *)1 : (void *)2;
 
