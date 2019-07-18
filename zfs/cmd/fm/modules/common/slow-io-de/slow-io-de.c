@@ -13,13 +13,13 @@
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#include <fm/fmd_api.h>
+#include <fmd_api.h>
 #include <sys/note.h>
-#include <fm/libtopo.h>
+#include <libtopo.h>
 #include <sys/fm/protocol.h>
 #include <strings.h>
-#include <fm/topo_hc.h>
-#include <fm/topo_list.h>
+#include <topo_hc.h>
+#include <topo_list.h>
 
 typedef struct slow_io_stat {
 	fmd_stat_t bad_fmri;

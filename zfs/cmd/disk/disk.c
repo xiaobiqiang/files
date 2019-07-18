@@ -860,7 +860,7 @@ static int led_disk(slice_req_t *req, int ledxy)
 	free(devctl_device);
 	return (0);
 #endif
-	sg_led_disk_script(req.disk_name,req.led_operation);
+	sg_led_disk_script(req->disk_name,req->led_operation);
 }
 
 /************************************************************************

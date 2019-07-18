@@ -25,19 +25,16 @@
  */
 
 #include <sys/fm/protocol.h>
-#include <fm/fmd_api.h>
+#include <fmd_api.h>
 #include <sys/fs/zfs.h>
 #include <libzfs.h>
 #include <umem.h>
 #include <strings.h>
 #include <libdevinfo.h>
-#include <sys/modctl.h>
-#include <sys/libdevid.h>
-#include <fm/topo_hc.h>
-#include <fm/topo_list.h>
-#include <fm/topo_fruhash.h>
-#include <fm/topo_mod.h>
-#include <ses_led.h>
+#include <topo_hc.h>
+#include <topo_list.h>
+#include <topo_fruhash.h>
+#include <topo_mod.h>
 #include <unistd.h>
 
 #define	SELFTESTFAIL	0x01
@@ -262,7 +259,7 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
     long hostid = 0;
     uint32_t enid = 0;
 	char buf[128];
-	char cmd_buf[CM_ALARM_CMD_LEN];
+	//char cmd_buf[CM_ALARM_CMD_LEN];
 	char hostname[64];
 
 	if ((strcmp(topo_node_name(node), "bay") == 0) &&
@@ -301,14 +298,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 					}
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, SLOWDISK);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_SLOW_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_SLOW_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, SLOWDISK, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_SLOW_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "slow-disk");
 					}
@@ -320,14 +317,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 					}
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, DERRDISK);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_DERR_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_DERR_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, DERRDISK, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_DERR_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "derr-disk");
 					}
@@ -339,14 +336,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 					}
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, MERRDISK);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_MERR_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_MERR_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, MERRDISK, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_MERR_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "merr-disk");
 					}
@@ -358,14 +355,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 					}
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, NORESPDISK);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_NORESPONSE_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_NORESPONSE_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, NORESPDISK, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_NORESPONSE_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "no-response-disk");
 					}
@@ -373,14 +370,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 				case EN_TOPO_IO_PREF:
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, PREDICTIVEFAIL);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_PREDICTURE_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_PREDICTURE_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, PREDICTIVEFAIL, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_PREDICTURE_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "predictive-failure");
 					}
@@ -388,14 +385,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 				case EN_TOPO_IO_SELF:
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, SELFTESTFAIL);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_SELFTEST_FAIL_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_SELFTEST_FAIL_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, SELFTESTFAIL, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_SELFTEST_FAIL_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "self-test-failure");
 					}
@@ -403,14 +400,14 @@ static int led_fault_node_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
 				case EN_TOPO_IO_TEMP:
 					if (is_repair) {
 						fru = topo_fru_cleartime(fmristr, OVERTEMPFAIL);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
-							"recovery", AMARM_ID_OVERTEMP_DISK, hostname, lpath);
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,-,-,-\"",
+							"recovery", AMARM_ID_OVERTEMP_DISK, hostname, lpath);*/
 					} else {
 						fru = topo_fru_setime(fmristr, OVERTEMPFAIL, lpath, slotid,
 							encid, productid);
-						cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
+						/*cm_alarm_cmd(cmd_buf, "%s %d \"%s,%s,%s,%u,%s\"", 
 							"report", AMARM_ID_OVERTEMP_DISK,
-							hostname, lpath, slotid, enid, productid);
+							hostname, lpath, slotid, enid, productid);*/
 						rio_send_snmptrap(irp->ir_fhdl, irp->ir_xprt, "ceresdata", "trapinfo",
 							ena, fmri, buf, "over-temperature");
 					}
@@ -681,7 +678,7 @@ rio_handle_ereport_event(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	io_retire_t *irp;
 	zpool_handle_t *zhp;
-	di_retire_t	drt = {0};
+	//di_retire_t	drt = {0};
 	char		*devid;
 	uint64_t	retire;
 	nvlist_t	*asru;
@@ -692,9 +689,9 @@ rio_handle_ereport_event(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 	irp = fmd_hdl_getspecific(hdl);
 
-	drt.rt_abort = (void (*)(void *, const char *, ...))fmd_hdl_abort;
-	drt.rt_debug = (void (*)(void *, const char *, ...))fmd_hdl_debug;
-	drt.rt_hdl = hdl;
+	//drt.rt_abort = (void (*)(void *, const char *, ...))fmd_hdl_abort;
+	//drt.rt_debug = (void (*)(void *, const char *, ...))fmd_hdl_debug;
+	//drt.rt_hdl = hdl;
 
 	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &asru) != 0 ||
 		nvlist_lookup_string(asru, FM_FMRI_DEV_ID, &devid) != 0 ||
@@ -704,20 +701,20 @@ rio_handle_ereport_event(fmd_hdl_t *hdl, nvlist_t *nvl)
 	if ((zhp = find_by_devid(irp->ir_zhdl, devid, &vdev)) == NULL)
 		return;
 	
-	if (nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_RETIRE, &retire) != 0) {
+	/*if (nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_RETIRE, &retire) != 0) {
 		zpool_close(zhp);
 		return;
-	}
+	}*/
 
-	if (retire == VDEV_EXTERNAL_FAULT_CANRETIRE &&
+	/*if (retire == VDEV_EXTERNAL_FAULT_CANRETIRE &&
 		fmd_nvl_fmri_has_fault(hdl, asru, FMD_HAS_FAULT_ASRU, NULL) == 1) {
-		error = di_retire_device(path, &drt, 0);
-		if (error != 0) {
+		//error = di_retire_device(path, &drt, 0);
+		//if (error != 0) {
 			fmd_hdl_debug(hdl, "rio_recv:"
 				" di_retire_device failed:"
 				" error: %d %s", error, path);
-		}
-	} 	
+		//}
+	}*/	
 	zpool_close(zhp);
 }
 
@@ -779,7 +776,7 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	char		*path;
 	char		*uuid;
 	char		*scheme;
-	di_retire_t	drt = {0};
+	//di_retire_t	drt = {0};
 	int		retire;
 	int		rval = 0;
 	int		valid_suspect = 0;
@@ -804,9 +801,9 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		return;
 	}
 
-	drt.rt_abort = (void (*)(void *, const char *, ...))fmd_hdl_abort;
-	drt.rt_debug = (void (*)(void *, const char *, ...))fmd_hdl_debug;
-	drt.rt_hdl = hdl;
+	//drt.rt_abort = (void (*)(void *, const char *, ...))fmd_hdl_abort;
+	//drt.rt_debug = (void (*)(void *, const char *, ...))fmd_hdl_debug;
+	//drt.rt_hdl = hdl;
 
 	if (strncmp(class, ereportclass1, strlen(ereportclass1)) == 0 ||
 		strncmp(class, ereportclass2, strlen(ereportclass2)) == 0 ||
@@ -892,13 +889,13 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			
 			if (fmd_nvl_fmri_has_fault(hdl, asru,
 			    FMD_HAS_FAULT_ASRU, NULL) == 1) {
-				error = di_retire_device(path, &drt, 0);
-				if (error != 0) {
+				//error = di_retire_device(path, &drt, 0);
+				//if (error != 0) {
 					fmd_hdl_debug(hdl, "rio_recv:"
 					    " di_retire_device failed:"
 					    " error: %d %s", error, path);
 					rval = -1;
-				}
+				//}
 			}
 		} else {
 			/*
@@ -911,13 +908,13 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			
 			if (fmd_nvl_fmri_has_fault(hdl, asru,
 			    FMD_HAS_FAULT_ASRU, NULL) == 0) {
-				error = di_unretire_device(path, &drt);
-				if (error != 0) {
+				//error = di_unretire_device(path, &drt);
+				//if (error != 0) {
 					fmd_hdl_debug(hdl, "rio_recv:"
 					    " di_unretire_device failed:"
 					    " error: %d %s", error, path);
 					rval = -1;
-				}
+				//}
 			}
 		}
 	}
@@ -957,12 +954,12 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		if (strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
 			if (fmd_nvl_fmri_has_fault(hdl, asru,
 			    FMD_HAS_FAULT_ASRU, NULL) == 1) {
-				error = di_retire_device(path, &drt, 0);
-				if (error != 0) {
+				//error = di_retire_device(path, &drt, 0);
+				//if (error != 0) {
 					fmd_hdl_debug(hdl, "rio_recv:"
 					    " di_retire_device failed:"
 					    " error: %d %s", error, path);
-				}
+				//}
 			}
 		}
 	}

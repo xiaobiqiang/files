@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 
-#include <fm/fmd_api.h>
+#include <fmd_api.h>
 #include <sys/note.h>
-#include <fm/libtopo.h>
+#include <libtopo.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/io/disk.h>
 #include <strings.h>
-#include <fm/topo_hc.h>
-#include <fm/topo_list.h>
+#include <topo_hc.h>
+#include <topo_list.h>
 
 typedef struct disk_sense_stat {
 	fmd_stat_t bad_fmri;
@@ -277,7 +276,7 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		fmd_hdl_debug(hdl, "Invalid ereport payload");
 		return;
 	}
-
+#if 0
 	if (key == 0x1 && asc == 0xb && ascq == 0x1) {
 		/* over temp reported by drive sense data */
 		fmd_case_t *c = fmd_case_open(hdl, NULL);
@@ -286,7 +285,7 @@ disk_sense_recv(fmd_hdl_t *hdl, fmd_event_t *event, nvlist_t *nvl,
 		    devid, detector);
 		return;
 	}
-
+#endif
 	if (key == 0x5 && asc == 0x26 &&
 	    (fmd_prop_get_int32(hdl, "ignore-illegal-request") == FMD_B_TRUE)) {
 		fmd_hdl_debug(hdl, "Illegal request for device, ignoring");
