@@ -425,13 +425,8 @@ typedef struct led_operation {
 }led_operation_t;
 
 led_operation_t disk_led_operation[] = {
-			{"normal", MPI2_SEP_REQ_SLOTSTATUS_NO_ERROR},
+			{"active", MPI2_SEP_REQ_SLOTSTATUS_NO_ERROR},
 			{"fault", MPI2_SEP_REQ_SLOTSTATUS_DEV_FAULTY},
-			{"rebuild", MPI2_SEP_REQ_SLOTSTATUS_DEV_REBUILDING},
-			{"unconfig", MPI2_SEP_REQ_SLOTSTATUS_UNCONFIGURED},
-			{"hotspare", MPI2_SEP_REQ_SLOTSTATUS_HOT_SPARE},
-			{"locate", MPI2_SEP_REQ_SLOTSTATUS_IDENTIFY_REQUEST},
-			{"remove", MPI2_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE},
 				{NULL, 0}
 };
 void usage(void)
@@ -445,7 +440,7 @@ void usage(void)
 	       "disk create <-d dev path | -i dev index> <-p slices index> <-s size | -g gap index>\n"
 	       "disk delete <-d dev path | -i dev index> <-p slices index> \n"
 	       "disk gaps <-d dev path | -i dev index>\n"
-	       "disk led <-d dev path >  < -o operation (fault, locate, hotspare, remove, unconfig, normal, rebuild)>\n"
+	       "disk led <-d dev path >  < -o operation (fault,active)>\n"
 	       "disk initialize <-d dev path >\n"
 	       "disk restore <-d dev path >\n");
 }
@@ -769,29 +764,24 @@ static int sg_led_disk_script(const char * name,const char * led_operation)
 {
 	FILE * fp = 0;
 	char cmd[DISK_LED_CMD_SIZE] = {0};
-	char retstr[DISK_LED_CMD_SIZE] = {0};
+	int ret = 0;
 	if(name == NULL || led_operation == 0)
 	{
 		return -1;
 	}
-	snprintf(name,DISK_LED_CMD_SIZE - 1,DISK_LED_SCRIPT_FOMAT,
+	snprintf(cmd,DISK_LED_CMD_SIZE - 1,DISK_LED_SCRIPT_FOMAT,
 		DISK_LED_SCRIPT_PATH,name,led_operation);
-	fp = popen(cmd,'r');
-	if(fp <= stderr)
+	ret = system(cmd);
+	if(ret)
 	{
-		perror("popen cmd fail");
-		return -1;
+		fprintf(stderr,"Led disk fail path:%s operation:%s",name,led_operation);
+		return ret;
 	}
-
-	fread(retstr,1,sizeof(retstr) - 1,fp);
-	retstr[DISK_LED_CMD_SIZE] = 0;
-	pclose(fp);
 	return 0;
 }
 
 static int led_disk(slice_req_t *req, int ledxy)
 {
-#if 0
 	int ret;
 	int en_no;
 	int en_count;
@@ -800,7 +790,7 @@ static int led_disk(slice_req_t *req, int ledxy)
 	static char *devctl_device = NULL;
 	struct stat stat_buf;
 	uint32_t pathlen;
-	devctl_hdl_t dcp = NULL;
+	//devctl_hdl_t dcp = NULL;
 	for (; ; index ++) {
 		if ( disk_led_operation[index].operation_name == NULL)
 			break;
@@ -832,6 +822,7 @@ static int led_disk(slice_req_t *req, int ledxy)
 		}
 	}
 	
+#if 0
 	/*
 	 * SBB or DotHill enclosure led process
 	 */
@@ -860,7 +851,7 @@ static int led_disk(slice_req_t *req, int ledxy)
 	free(devctl_device);
 	return (0);
 #endif
-	sg_led_disk_script(req->disk_name,req->led_operation);
+	return sg_led_disk_script(req->disk_name,req->led_operation);
 }
 
 /************************************************************************
