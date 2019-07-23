@@ -30,9 +30,9 @@
 #include <sys/cpuvar.h>
 #include <sys/sdt.h>
 
-#include <sys/socket.h>
+#include <linux/socket.h>
 //#include <sys/strsubr.h>
-#include <sys/socketvar.h>
+//#include <sys/socketvar.h>
 #include <sys/sysmacros.h>
 
 #include <sys/idm/idm.h>

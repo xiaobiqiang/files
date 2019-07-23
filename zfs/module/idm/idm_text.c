@@ -29,7 +29,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sysmacros.h>
-#include <sys/socket.h>
+#include <linux/socket.h>
 
 #include <sys/iscsi_protocol.h>
 #include <sys/idm/idm.h>

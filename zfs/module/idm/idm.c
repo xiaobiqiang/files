@@ -29,12 +29,12 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 
-#include <sys/socket.h>
+#include <linux/socket.h>
 //#include <sys/strsubr.h>
 #include <sys/sysmacros.h>
 
-#include <sys/socketvar.h>
-#include <netinet/in.h>
+//#include <sys/socketvar.h>
+#include <linux/in.h>
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>

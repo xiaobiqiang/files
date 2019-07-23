@@ -28,21 +28,20 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
-#include <sys/priv.h>
+//#include <sys/priv.h>
 #include <sys/cpuvar.h>
-#include <sys/socket.h>
+#include <linux/socket.h>
 //#include <sys/strsubr.h>
 #include <sys/sysmacros.h>
 #include <sys/sdt.h>
-#include <netinet/tcp.h>
-#include <inet/tcp.h>
-#include <sys/socketvar.h>
+#include <linux/tcp.h>
+//#include <sys/socketvar.h>
 #include <sys/pathname.h>
 //#include <sys/fs/snode.h>
 //#include <sys/fs/dv_node.h>
 #include <sys/vnode.h>
-#include <netinet/in.h>
-#include <net/if.h>
+#include <linux/in.h>
+#include <uapi/linux/if.h>
 //#include <sys/sockio.h>
 //#include <sys/ksocket.h>
 //#include <sys/filio.h>		/* FIONBIO */

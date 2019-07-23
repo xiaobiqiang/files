@@ -30,7 +30,7 @@ extern "C" {
 #endif
 
 #include <sys/idm/idm_transport.h>
-#include <sys/socket.h>
+#include <linux/socket.h>
 
 /*
  * Define TCP window size (send and receive buffer sizes)

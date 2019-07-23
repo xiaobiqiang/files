@@ -27,7 +27,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
-#include <sys/socket.h>
+#include <linux/socket.h>
 //#include <sys/strsubr.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
