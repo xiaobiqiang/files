@@ -1,0 +1,15 @@
+src = @abs_top_srcdir@/module/idm
+obj = @abs_builddir@
+
+MODULE := zidm
+
+EXTRA_CFLAGS = $(ZFS_MODULE_CFLAGS) @KERNELCPPFLAGS@
+
+obj-$(CONFIG_ZFS) := $(MODULE).o
+
+$(MODULE)-objs += idm.o
+$(MODULE)-objs += idm_conn_sm.o
+$(MODULE)-objs += idm_impl.o
+$(MODULE)-objs += idm_so.o
+$(MODULE)-objs += idm_text.o
+

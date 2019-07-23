@@ -108,6 +108,7 @@ DIST_COMMON = $(srcdir)/config/rpm.am $(srcdir)/config/deb.am \
 	$(top_srcdir)/module/stmf/Makefile.in \
 	$(top_srcdir)/module/stmf_sbd/Makefile.in \
 	$(top_srcdir)/module/pppt/Makefile.in \
+	$(top_srcdir)/module/idm/Makefile.in \
 	$(srcdir)/zfs-script-config.sh.in $(srcdir)/zfs.release.in \
 	$(am__extra_HEADERS_DIST) AUTHORS config/compile \
 	config/config.guess config/config.sub config/depcomp \
@@ -225,6 +226,7 @@ CONFIG_CLEAN_FILES = module/Makefile module/avl/Makefile \
 	module/fct/Makefile module/qlt/Makefile module/qlf/Makefile \
 	module/qlf_hengwei/Makefile module/stmf/Makefile \
 	module/stmf_sbd/Makefile module/pppt/Makefile \
+	module/idm/Makefile \
 	zfs-script-config.sh zfs.release
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
@@ -650,6 +652,8 @@ module/stmf_sbd/Makefile: $(top_builddir)/config.status $(top_srcdir)/module/stm
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 module/pppt/Makefile: $(top_builddir)/config.status $(top_srcdir)/module/pppt/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
+module/idm/Makefile: $(top_builddir)/config.status $(top_srcdir)/module/idm/Makefile.in
+        cd $(top_builddir) && $(SHELL) ./config.status $@
 zfs-script-config.sh: $(top_builddir)/config.status $(srcdir)/zfs-script-config.sh.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 zfs.release: $(top_builddir)/config.status $(srcdir)/zfs.release.in

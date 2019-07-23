@@ -209,12 +209,14 @@ AC_CONFIG_FILES([
 	module/stmf/Makefile
 	module/stmf_sbd/Makefile
 	module/pppt/Makefile
+	module/idm/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
 	include/sys/fs/Makefile
 	include/sys/fm/Makefile
 	include/sys/fm/fs/Makefile
+	include/sys/idm/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

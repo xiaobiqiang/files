@@ -1,4 +1,4 @@
-SUBDIRS = fm fs
+SUBDIRS = fm fs idm
 
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \
@@ -112,7 +112,8 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/zfs_mirror.h \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
 	${top_srcdir}/include/sys/zpl.h \
-	$(top_srcdir)/include/sys/zvol.h
+	$(top_srcdir)/include/sys/zvol.h \
+	$(top_srcdir)/include/sys/iscsi_protocol.h
 
 USER_H =
 
