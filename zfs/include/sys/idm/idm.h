@@ -85,7 +85,7 @@ typedef enum {
 } idm_abort_type_t;
 
 typedef enum {
-	TASK_IDLE,
+	TASK_IDL,
 	TASK_ACTIVE,
 	TASK_SUSPENDING,
 	TASK_SUSPENDED,
@@ -97,7 +97,7 @@ typedef enum {
 
 #ifdef IDM_TASK_SM_STRINGS
 static const char *idm_ts_name[TASK_MAX_STATE+1] = {
-	"TASK_IDLE",
+	"TASK_IDL",
 	"TASK_ACTIVE",
 	"TASK_SUSPENDING",
 	"TASK_SUSPENDED",

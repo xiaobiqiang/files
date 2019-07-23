@@ -2878,7 +2878,7 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 
 	while (remainder) {
 		if (idt->idt_state != TASK_ACTIVE) {
-			ASSERT((idt->idt_state != TASK_IDLE) &&
+			ASSERT((idt->idt_state != TASK_IDL) &&
 			    (idt->idt_state != TASK_COMPLETE));
 			return (IDM_STATUS_ABORTED);
 		}

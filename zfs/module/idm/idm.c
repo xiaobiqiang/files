@@ -1274,7 +1274,7 @@ idm_task_alloc(idm_conn_t *ic)
 	idm_conn_hold(ic);
 	mutex_exit(&ic->ic_state_mutex);
 
-	idt->idt_state		= TASK_IDLE;
+	idt->idt_state		= TASK_IDL;
 	idt->idt_ic		= ic;
 	idt->idt_private 	= NULL;
 	idt->idt_exp_datasn	= 0;
@@ -1316,7 +1316,7 @@ idm_task_done(idm_task_t *idt)
 	ASSERT(idt != NULL);
 
 	mutex_enter(&idt->idt_mutex);
-	idt->idt_state = TASK_IDLE;
+	idt->idt_state = TASK_IDL;
 	mutex_exit(&idt->idt_mutex);
 
 	/*
@@ -1346,7 +1346,7 @@ idm_task_free(idm_task_t *idt)
 
 	ASSERT(idt != NULL);
 	ASSERT(idt->idt_refcnt.ir_refcnt == 0);
-	ASSERT(idt->idt_state == TASK_IDLE);
+	ASSERT(idt->idt_state == TASK_IDL);
 
 	ic = idt->idt_ic;
 
@@ -1550,7 +1550,7 @@ idm_task_abort(idm_conn_t *ic, idm_task_t *idt, idm_abort_type_t abort_type)
 			if (task == NULL)
 				continue;
 			mutex_enter(&task->idt_mutex);
-			if ((task->idt_state != TASK_IDLE) &&
+			if ((task->idt_state != TASK_IDL) &&
 			    (task->idt_state != TASK_COMPLETE) &&
 			    (task->idt_ic == ic)) {
 				rw_exit(&idm.idm_taskid_table_lock);
