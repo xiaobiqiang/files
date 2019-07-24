@@ -702,7 +702,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 udevdir = @udevdir@
 udevruledir = @udevruledir@
-SUBDIRS = fm fs idm
+SUBDIRS = fm fs idm iscsit
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/arc_impl.h \

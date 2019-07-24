@@ -133,6 +133,7 @@ AC_CONFIG_FILES([
 	lib/fm/topo/maps/Makefile
 	lib/fm/topo/maps/i86pc/Makefile
 	lib/libipmi/Makefile
+	lib/libiscsit/Makefile
 	cmd/Makefile
 	cmd/zdb/Makefile
 	cmd/zhack/Makefile

@@ -24,7 +24,7 @@
 
 #include <sys/random.h>
 #include <sys/ddi.h>
-#include <sys/md5.h>
+//#include <sys/md5.h>
 
 #include <sys/iscsit/iscsi_if.h>
 #include <sys/idm/idm.h>
@@ -70,7 +70,7 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	void *socket;
 	radius_packet_data_t req;
 	radius_packet_data_t resp;
-	MD5_CTX context;
+	//MD5_CTX context;
 	uint8_t	md5_digest[16];		/* MD5 digest length 16 */
 	uint8_t random_number[16];
 
@@ -92,18 +92,18 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	    challenge_length);
 
 	/* Prepare the request authenticator */
-	MD5Init(&context);
+//	MD5Init(&context);
 	bzero(&md5_digest, 16);
 	/* First, the shared secret */
-	MD5Update(&context, rad_svr_shared_secret, rad_svr_shared_secret_len);
+//	MD5Update(&context, rad_svr_shared_secret, rad_svr_shared_secret_len);
 	/* Then a unique number - use lbolt plus a random number */
 	bzero(&lbolt, sizeof (lbolt));
 	(void) snprintf(lbolt, sizeof (lbolt), "%lx", ddi_get_lbolt());
-	MD5Update(&context, (uint8_t *)lbolt, strlen(lbolt));
+//	MD5Update(&context, (uint8_t *)lbolt, strlen(lbolt));
 	bzero(&random_number, sizeof (random_number));
 	(void) random_get_pseudo_bytes(random_number, sizeof (random_number));
-	MD5Update(&context, random_number, sizeof (random_number));
-	MD5Final(md5_digest, &context);
+//	MD5Update(&context, random_number, sizeof (random_number));
+//	MD5Final(md5_digest, &context);
 	bcopy(md5_digest, &req.authenticator, RAD_AUTHENTICATOR_LEN);
 
 	socket = idm_socreate(PF_INET, SOCK_DGRAM, 0);

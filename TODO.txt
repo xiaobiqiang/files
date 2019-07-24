@@ -125,3 +125,5 @@ cleanup:
 2.anotate untimeout and timeout in idm_conn_sm.c
 
 3.del getpcstack of REFCNT_AUDIT micro in idm_impl.h
+
+4.transplate prodigy common/cpyto/md5 for iscsit_radiusauth.c

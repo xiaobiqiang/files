@@ -15,7 +15,7 @@ USER_C =
 KERNEL_C = \
 	iscsit_common.c
 
-nodist_libavl_la_SOURCES = \
+nodist_libiscsit_la_SOURCES = \
 	$(USER_C) \
 	$(KERNEL_C)
 

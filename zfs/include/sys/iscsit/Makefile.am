@@ -4,7 +4,6 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/iscsit/chap.h \
 	$(top_srcdir)/include/sys/iscsit/iscsi_if.h \
 	$(top_srcdir)/include/sys/iscsit/isns_protocol.h \
-	$(top_srcdir)/include/sys/iscsit/idm_so.h \
 	$(top_srcdir)/include/sys/iscsit/radius_packet.h \
 	$(top_srcdir)/include/sys/iscsit/radius_protocol.h
 
