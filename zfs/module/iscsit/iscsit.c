@@ -44,71 +44,32 @@
 #include "iscsit_isns.h"
 #include "iscsit.h"
 
-#define	ISCSIT_VERSION		BUILD_DATE "-1.18dev"
+#define	ISCSIT_VERSION		"1.18dev"
 #define	ISCSIT_NAME_VERSION	"COMSTAR ISCSIT v" ISCSIT_VERSION
-
+#define ISCSIT_MISC			"iscsit"
 /*
  * DDI entry points.
  */
-static int iscsit_drv_attach(dev_info_t *, ddi_attach_cmd_t);
-static int iscsit_drv_detach(dev_info_t *, ddi_detach_cmd_t);
-static int iscsit_drv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static int iscsit_drv_open(dev_t *, int, int, cred_t *);
-static int iscsit_drv_close(dev_t, int, int, cred_t *);
+static int iscsit_drv_open(struct inode *, struct file *);
+static int iscsit_drv_close(struct inode *, struct file *);
+static long iscsit_drv_ioctl(struct file *, unsigned int, unsigned long);
+
+static int iscsit_drv_attach(void);
+static int iscsit_drv_detach(void);
 static boolean_t iscsit_drv_busy(void);
-static int iscsit_drv_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
-extern struct mod_ops mod_miscops;
-
-
-static struct cb_ops iscsit_cb_ops = {
-	iscsit_drv_open,	/* cb_open */
-	iscsit_drv_close,	/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	iscsit_drv_ioctl,	/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	NULL,			/* cb_streamtab */
-	D_MP,			/* cb_flag */
-	CB_REV,			/* cb_rev */
-	nodev,			/* cb_aread */
-	nodev,			/* cb_awrite */
+struct file_operations iscsit_misc_fops = {
+	.owner 				= THIS_MODULE,
+	.open				= iscsit_drv_open,
+	.unlocked_ioctl		= iscsit_drv_ioctl,
+	.release			= iscsit_drv_close,
 };
 
-static struct dev_ops iscsit_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	iscsit_drv_getinfo,	/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	iscsit_drv_attach,	/* devo_attach */
-	iscsit_drv_detach,	/* devo_detach */
-	nodev,			/* devo_reset */
-	&iscsit_cb_ops,		/* devo_cb_ops */
-	NULL,			/* devo_bus_ops */
-	NULL,			/* devo_power */
-	ddi_quiesce_not_needed,	/* quiesce */
+static struct miscdevice iscsit_misc = {
+	.minor		= MISC_DYNAMIC_MINOR,
+	.name		= ISCSIT_MISC,
+	.fops		= &iscsit_misc_fops,
 };
-
-static struct modldrv modldrv = {
-	&mod_driverops,
-	"iSCSI Target",
-	&iscsit_dev_ops,
-};
-
-static struct modlinkage modlinkage = {
-	MODREV_1,
-	&modldrv,
-	NULL,
-};
-
 
 iscsit_global_t iscsit_global;
 
@@ -118,7 +79,7 @@ boolean_t	iscsit_sm_logging = B_FALSE;
 
 kmutex_t	login_sm_session_mutex;
 
-static idm_status_t iscsit_init(dev_info_t *dip);
+static idm_status_t iscsit_init(void);
 static idm_status_t iscsit_enable_svc(iscsit_hostinfo_t *hostinfo);
 static void iscsit_disable_svc(void);
 
@@ -270,123 +231,44 @@ static kt_did_t		iscsit_rxpdu_queue_monitor_thr_did;
 static boolean_t	iscsit_rxpdu_queue_monitor_thr_running;	/* B_FALSE in _init */
 static kcondvar_t	iscsit_rxpdu_queue_monitor_cv;
 
-int
-_init(void)
-{
-	int rc;
-
-	rw_init(&iscsit_global.global_rwlock, NULL, RW_DRIVER, NULL);
-	mutex_init(&iscsit_global.global_state_mutex, NULL,
-	    MUTEX_DRIVER, NULL);
-	iscsit_global.global_svc_state = ISE_DETACHED;
-
-	mutex_init(&iscsit_rxpdu_queue_monitor_mutex, NULL,
-	    MUTEX_DRIVER, NULL);
-	mutex_init(&login_sm_session_mutex, NULL, MUTEX_DRIVER, NULL);
-	iscsit_rxpdu_queue_monitor_thr_id = NULL;
-	iscsit_rxpdu_queue_monitor_thr_running = B_FALSE;
-	cv_init(&iscsit_rxpdu_queue_monitor_cv, NULL, CV_DEFAULT, NULL);
-
-	if ((rc = mod_install(&modlinkage)) != 0) {
-		mutex_destroy(&iscsit_global.global_state_mutex);
-		rw_destroy(&iscsit_global.global_rwlock);
-		return (rc);
-	}
-
-	return (rc);
-}
-
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
-
-int
-_fini(void)
-{
-	int rc;
-
-	rc = mod_remove(&modlinkage);
-
-	if (rc == 0) {
-		mutex_destroy(&iscsit_rxpdu_queue_monitor_mutex);
-		mutex_destroy(&login_sm_session_mutex);
-		cv_destroy(&iscsit_rxpdu_queue_monitor_cv);
-		mutex_destroy(&iscsit_global.global_state_mutex);
-		rw_destroy(&iscsit_global.global_rwlock);
-	}
-
-	return (rc);
-}
-
 /*
  * DDI entry points.
  */
-
-/* ARGSUSED */
 static int
-iscsit_drv_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
-    void **result)
+iscsit_drv_attach(void)
 {
-	ulong_t instance = getminor((dev_t)arg);
-
-	switch (cmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		*result = iscsit_global.global_dip;
-		return (DDI_SUCCESS);
-
-	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
-		return (DDI_SUCCESS);
-
-	default:
-		break;
-	}
-
-	return (DDI_FAILURE);
-}
-
-static int
-iscsit_drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
-{
-	if (cmd != DDI_ATTACH) {
+/*	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_get_instance(dip) != 0) {
-		/* we only allow instance 0 to attach */
 		return (DDI_FAILURE);
 	}
 
-	/* create the minor node */
 	if (ddi_create_minor_node(dip, ISCSIT_MODNAME, S_IFCHR, 0,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "iscsit_drv_attach: "
 		    "failed creating minor node");
 		return (DDI_FAILURE);
-	}
+	} */
 
-	if (iscsit_init(dip) != IDM_STATUS_SUCCESS) {
+	if (iscsit_init() != IDM_STATUS_SUCCESS) {
 		cmn_err(CE_WARN, "iscsit_drv_attach: "
 		    "failed to initialize");
-		ddi_remove_minor_node(dip, NULL);
+//		ddi_remove_minor_node(dip, NULL);
 		return (DDI_FAILURE);
 	}
 
 	iscsit_global.global_svc_state = ISE_DISABLED;
-	iscsit_global.global_dip = dip;
+	iscsit_global.global_dip = NULL;
 
 	return (DDI_SUCCESS);
 }
 
 /*ARGSUSED*/
 static int
-iscsit_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+iscsit_drv_detach(void)
 {
-	if (cmd != DDI_DETACH)
-		return (DDI_FAILURE);
-
 	/*
 	 * drv_detach is called in a context that owns the
 	 * device node for the /dev/pseudo device.  If this thread blocks
@@ -402,9 +284,9 @@ iscsit_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	iscsit_global.global_dip = NULL;
-	ddi_remove_minor_node(dip, NULL);
+//	ddi_remove_minor_node(dip, NULL);
 
-	ldi_ident_release(iscsit_global.global_li);
+//	ldi_ident_release(iscsit_global.global_li);
 	iscsit_global.global_svc_state = ISE_DETACHED;
 
 	mutex_exit(&iscsit_global.global_state_mutex);
@@ -414,14 +296,14 @@ iscsit_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*ARGSUSED*/
 static int
-iscsit_drv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+iscsit_drv_open(struct inode *ind, struct file *fl);
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static int
-iscsit_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
+iscsit_drv_close(struct inode *ind, struct file *fl);
 {
 	return (0);
 }
@@ -443,20 +325,14 @@ iscsit_drv_busy(void)
 
 /* ARGSUSED */
 static int
-iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
-    int *retval)
+iscsit_drv_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	iscsit_ioc_set_config_t		setcfg;
-	iscsit_ioc_set_config32_t	setcfg32;
 	char				*cfg_pnvlist = NULL;
 	nvlist_t			*cfg_nvlist = NULL;
 	it_config_t			*cfg = NULL;
 	idm_status_t			idmrc;
 	int				rc = 0;
-
-	if (drv_priv(cred) != 0) {
-		return (EPERM);
-	}
 
 	mutex_enter(&iscsit_global.global_state_mutex);
 
@@ -505,28 +381,8 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 	switch (cmd) {
 	case ISCSIT_IOC_SET_CONFIG:
 		/* Any errors must set state back to ISE_ENABLED */
-		switch (ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-			if (ddi_copyin((void *)argp, &setcfg32,
-			    sizeof (iscsit_ioc_set_config32_t), flag) != 0) {
-				rc = EFAULT;
-				goto cleanup;
-			}
-
-			setcfg.set_cfg_pnvlist =
-			    (char *)((uintptr_t)setcfg32.set_cfg_pnvlist);
-			setcfg.set_cfg_vers = setcfg32.set_cfg_vers;
-			setcfg.set_cfg_pnvlist_len =
-			    setcfg32.set_cfg_pnvlist_len;
-			break;
-		case DDI_MODEL_NONE:
-			if (ddi_copyin((void *)argp, &setcfg,
-			    sizeof (iscsit_ioc_set_config_t), flag) != 0) {
-				rc = EFAULT;
-				goto cleanup;
-			}
-			break;
-		default:
+		if (ddi_copyin((void *)argp, &setcfg,
+		    sizeof (iscsit_ioc_set_config_t), 0) != 0) {
 			rc = EFAULT;
 			goto cleanup;
 		}
@@ -543,7 +399,7 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		ASSERT(cfg_pnvlist != NULL);
 
 		if (ddi_copyin(setcfg.set_cfg_pnvlist, cfg_pnvlist,
-		    setcfg.set_cfg_pnvlist_len, flag) != 0) {
+		    setcfg.set_cfg_pnvlist_len, 0) != 0) {
 			rc = EFAULT;
 			goto cleanup;
 		}
@@ -633,11 +489,11 @@ cleanup:
 }
 
 static idm_status_t
-iscsit_init(dev_info_t *dip)
+iscsit_init(void)
 {
-	int			rc;
+	int			rc = 0;
 
-	rc = ldi_ident_from_dip(dip, &iscsit_global.global_li);
+//	rc = ldi_ident_from_dip(dip, &iscsit_global.global_li);
 	ASSERT(rc == 0);  /* Failure indicates invalid argument */
 
 	iscsit_global.global_svc_state = ISE_DISABLED;
@@ -3519,3 +3375,64 @@ iscsit_rxpdu_queue_monitor_session(iscsit_sess_t *ist)
 	 * is never reached.
 	 */
 }
+
+static int __init 
+_iscsit_init(void)
+{
+	int rc;
+
+	pr_info("iSCSI Target: "ISCSIT_NAME_VERSION);
+	
+	rw_init(&iscsit_global.global_rwlock, NULL, RW_DRIVER, NULL);
+	mutex_init(&iscsit_global.global_state_mutex, NULL,
+	    MUTEX_DRIVER, NULL);
+	iscsit_global.global_svc_state = ISE_DETACHED;
+
+	mutex_init(&iscsit_rxpdu_queue_monitor_mutex, NULL,
+	    MUTEX_DRIVER, NULL);
+	mutex_init(&login_sm_session_mutex, NULL, MUTEX_DRIVER, NULL);
+	iscsit_rxpdu_queue_monitor_thr_id = NULL;
+	iscsit_rxpdu_queue_monitor_thr_running = B_FALSE;
+	cv_init(&iscsit_rxpdu_queue_monitor_cv, NULL, CV_DEFAULT, NULL);
+
+	if ((rc = iscsit_drv_attach()) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "iscsit_drv_attach failed,rc:%d", rc);
+		goto failed_out;
+	}
+
+	if ((rc = misc_register(&iscsit_misc)) != 0) {
+		cmn_err(CE_NOTE, 
+			"misc_register iscsit_misc failed,rc:%d", rc);
+		goto failed_out;
+	}
+
+	return rc;
+	
+failed_out:
+	mutex_destroy(&iscsit_global.global_state_mutex);
+	rw_destroy(&iscsit_global.global_rwlock);
+	return (rc);
+}
+
+static void __exit 
+_iscsit_fini(void)
+{
+	int rc;
+	
+	if ((rc = iscsit_drv_detach()) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "iscsit svc is busy,can't detach.");
+		return ;
+	}
+	
+	misc_deregister(&iscsit_misc);
+	mutex_destroy(&iscsit_rxpdu_queue_monitor_mutex);
+	mutex_destroy(&login_sm_session_mutex);
+	cv_destroy(&iscsit_rxpdu_queue_monitor_cv);
+	mutex_destroy(&iscsit_global.global_state_mutex);
+	rw_destroy(&iscsit_global.global_rwlock);
+}
+
+module_init(_iscsit_init);
+module_exit(_iscsit_fini);
+MODULE_LICENSE("GPL");
+

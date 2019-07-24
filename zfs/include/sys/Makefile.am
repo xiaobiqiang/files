@@ -1,4 +1,4 @@
-SUBDIRS = fm fs idm
+SUBDIRS = fm fs idm iscsit
 
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \

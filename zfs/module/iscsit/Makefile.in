@@ -1,0 +1,20 @@
+src = @abs_top_srcdir@/module/iscsit
+obj = @abs_builddir@
+
+MODULE := ziscsit
+
+EXTRA_CFLAGS = $(ZFS_MODULE_CFLAGS) @KERNELCPPFLAGS@
+
+obj-$(CONFIG_ZFS) := $(MODULE).o
+
+$(MODULE)-objs += iscsit.o
+$(MODULE)-objs += iscsit_auth.o
+$(MODULE)-objs += iscsit_authclient.o
+$(MODULE)-objs += iscsit_common.o
+$(MODULE)-objs += iscsit_isns.o
+$(MODULE)-objs += iscsit_login.o
+$(MODULE)-objs += iscsit_radiusauth.o
+$(MODULE)-objs += iscsit_radiuspacket.o
+$(MODULE)-objs += iscsit_sess.o
+$(MODULE)-objs += iscsit_text.o
+$(MODULE)-objs += iscsit_tgt.o

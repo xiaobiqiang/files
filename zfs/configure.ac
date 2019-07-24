@@ -148,7 +148,7 @@ AC_CONFIG_FILES([
 	cmd/vdev_id/Makefile
 	cmd/arcstat/Makefile
 	cmd/dbufstat/Makefile
-    	cmd/iostat/Makefile
+	cmd/iostat/Makefile
 	cmd/arc_summary/Makefile
 	cmd/zed/Makefile
 	cmd/sas3show/Makefile
@@ -210,6 +210,7 @@ AC_CONFIG_FILES([
 	module/stmf_sbd/Makefile
 	module/pppt/Makefile
 	module/idm/Makefile
+	module/iscsit/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
@@ -217,6 +218,7 @@ AC_CONFIG_FILES([
 	include/sys/fm/Makefile
 	include/sys/fm/fs/Makefile
 	include/sys/idm/Makefile
+	include/sys/iscsit/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

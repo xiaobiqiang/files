@@ -597,8 +597,8 @@ typedef enum {
 
 typedef struct {
 	iscsit_service_enabled_t	global_svc_state;	/* ISE_DETACHED in _init,ISE_DISABLED in attach. */
-	dev_info_t			*global_dip;
-	ldi_ident_t			global_li;
+	dev_info_t			*global_dip;	/* unused on sw */
+	ldi_ident_t			global_li;		/* unused on sw */
 	nvlist_t			*global_props;
 	stmf_port_provider_t		*global_pp;
 	stmf_dbuf_store_t		*global_dbuf_store;
