@@ -53,6 +53,7 @@ static int iscsi_crc32_pcl = -1;
 #endif
 
 extern idm_transport_t  idm_transport_list[];
+idm_global_t     idm;
 
 void
 idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
@@ -1100,7 +1101,7 @@ idm_wd_thread(void *arg)
 	clock_t		idle_time;
 
 	/* Record the thread id for thread_join() */
-	idm.idm_wd_thread_did = curthread->t_did;
+	//idm.idm_wd_thread_did = curthread->t_did;
 	mutex_enter(&idm.idm_global_mutex);
 	idm.idm_wd_thread_running = B_TRUE;
 	cv_signal(&idm.idm_wd_cv);

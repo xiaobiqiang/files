@@ -40,6 +40,7 @@ extern "C" {
 #define	IDM_SNDBUF_SIZE		(256 * 1024)
 
 /* sockets-specific portion of idm_svc_t */
+typedef void *kt_did_t;
 typedef struct idm_so_svc_s {
 	struct socket	*is_so;
 	kthread_t		*is_thread;
@@ -64,7 +65,7 @@ typedef struct idm_so_conn_s {
 } idm_so_conn_t;
 
 void idm_so_init(idm_transport_t *it);
-void idm_so_fini();
+void idm_so_fini(void);
 
 /* used by idm_so_timed_socket_connect */
 typedef struct idm_so_timed_socket_s {

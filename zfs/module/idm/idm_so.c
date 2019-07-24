@@ -42,6 +42,7 @@
 #include <sys/vnode.h>
 #include <linux/in.h>
 #include <uapi/linux/if.h>
+#include <linux/inet.h>
 //#include <sys/sockio.h>
 //#include <sys/ksocket.h>
 //#include <sys/filio.h>		/* FIONBIO */
@@ -134,26 +135,26 @@
 #define	IN6_V4MAPPED_TO_INADDR(v6, v4) \
 	((v4)->s_addr = (v6)->s6_addr32[3])
 
-
+typedef uint32_t in_addr_t;
 /*
  * in6addr_any is currently all zeroes, but use the macro in case this
  * ever changes.
  */
-static const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
+//static const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 static unsigned int MMU_PAGESIZE = 4096;
 
 static void idm_sorx_cache_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 static void idm_sorx_addl_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 static void idm_sotx_cache_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 
-static idm_status_t idm_so_conn_create_common(idm_conn_t *ic, ksocket_t new_so);
+static idm_status_t idm_so_conn_create_common(idm_conn_t *ic, struct socket *new_so);
 static void idm_so_conn_destroy_common(idm_conn_t *ic);
 static void idm_so_conn_connect_common(idm_conn_t *ic);
 
 static void idm_set_ini_preconnect_options(idm_so_conn_t *sc,
     boolean_t boot_conn);
 static void idm_set_ini_postconnect_options(idm_so_conn_t *sc);
-static void idm_set_tgt_connect_options(ksocket_t so);
+static void idm_set_tgt_connect_options(struct socket *so);
 static idm_status_t idm_i_so_tx(idm_pdu_t *pdu);
 
 static idm_status_t idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu);
@@ -793,7 +794,7 @@ idm_set_ini_postconnect_options(idm_so_conn_t *sc)
 }
 
 static void
-idm_set_tgt_connect_options(ksocket_t ks)
+idm_set_tgt_connect_options(struct socket *ks)
 {
 	int32_t		rcvbuf = IDM_RCVBUF_SIZE;
 	int32_t		sndbuf = IDM_SNDBUF_SIZE;
@@ -965,7 +966,7 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 	idm_so_conn_t	*so_conn;
 //	struct sonode	*node = NULL;
 	int 		rc;
-	clock_t		lbolt, conn_login_max, conn_login_interval;
+	clock_t		lb, conn_login_max, conn_login_interval;
 	boolean_t	nonblock;
 
 	so_conn = ic->ic_transport_private;
@@ -993,21 +994,21 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 				/* socket connection timeout or refuse */
 				break;
 			}
-			lbolt = ddi_get_lbolt();
-			if (lbolt > conn_login_max) {
+			lb = ddi_get_lbolt();
+			if (lb > conn_login_max) {
 				/*
 				 * Connection retry timeout,
 				 * failed connect to target.
 				 */
 				break;
 			}
-			if (lbolt < conn_login_interval) {
+			if (lb < conn_login_interval) {
 				if ((rc == -EINPROGRESS) || (rc == -EALREADY)) {
 					/* TCP connect still in progress */
 					delay(SEC_TO_TICK(IN_PROGRESS_DELAY));
 					continue;
 				} else {
-					delay(conn_login_interval - lbolt);
+					delay(conn_login_interval - lb);
 				}
 			}
 			conn_login_interval = ddi_get_lbolt() +
@@ -2199,7 +2200,7 @@ idm_sorx_thread(void *arg)
 
 	so_conn = ic->ic_transport_private;
 	so_conn->ic_rx_thread_running = B_TRUE;
-	so_conn->ic_rx_thread_did = so_conn->ic_rx_thread->t_did;
+	//so_conn->ic_rx_thread_did = so_conn->ic_rx_thread->t_did;
 	cv_signal(&ic->ic_cv);
 
 	while (so_conn->ic_rx_thread_running) {
@@ -3070,7 +3071,7 @@ idm_sotx_thread(void *arg)
 	mutex_enter(&ic->ic_mutex);
 	so_conn = ic->ic_transport_private;
 	so_conn->ic_tx_thread_running = B_TRUE;
-	so_conn->ic_tx_thread_did = so_conn->ic_tx_thread->t_did;
+	//so_conn->ic_tx_thread_did = so_conn->ic_tx_thread->t_did;
 	cv_signal(&ic->ic_cv);
 	mutex_exit(&ic->ic_mutex);
 
@@ -3078,9 +3079,7 @@ idm_sotx_thread(void *arg)
 
 	while (so_conn->ic_tx_thread_running) {
 		while (list_is_empty(&so_conn->ic_tx_list)) {
-			DTRACE_PROBE1(soconn__tx__sleep, idm_conn_t *, ic);
 			cv_wait(&so_conn->ic_tx_cv, &so_conn->ic_tx_mutex);
-			DTRACE_PROBE1(soconn__tx__wakeup, idm_conn_t *, ic);
 
 			if (!so_conn->ic_tx_thread_running) {
 				goto tx_bail;
@@ -3094,8 +3093,6 @@ idm_sotx_thread(void *arg)
 		switch (object->idm_tx_obj_magic) {
 		case IDM_PDU_MAGIC: {
 			idm_pdu_t *pdu = (idm_pdu_t *)object;
-			DTRACE_PROBE2(soconn__tx__pdu, idm_conn_t *, ic,
-			    idm_pdu_t *, (idm_pdu_t *)object);
 
 			if (pdu->isp_flags & IDM_PDU_SET_STATSN) {
 				/* No IDM task */
@@ -3107,9 +3104,6 @@ idm_sotx_thread(void *arg)
 		case IDM_BUF_MAGIC: {
 			idm_buf_t *idb = (idm_buf_t *)object;
 			idm_task_t *idt = idb->idb_task_binding;
-
-			DTRACE_PROBE2(soconn__tx__buf, idm_conn_t *, ic,
-			    idm_buf_t *, idb);
 
 			mutex_enter(&idt->idt_mutex);
 			status = idm_so_send_buf_region(idt,
@@ -3233,130 +3227,6 @@ idm_so_socket_set_block(struct sonode *node)
 	    (node->so_state & (~FNONBLOCK)), CRED(), NULL);
 }
 */
-
-/*
- * Called by kernel sockets when the connection has been accepted or
- * rejected. In early volo, a "disconnect" callback was sent instead of
- * "connectfailed", so we check for both.
- */
-/* ARGSUSED */
-void
-idm_so_timed_socket_connect_cb(ksocket_t ks,
-    ksocket_callback_event_t ev, void *arg, uintptr_t info)
-{
-	idm_so_timed_socket_t	*itp = arg;
-	ASSERT(itp != NULL);
-	ASSERT(ev == KSOCKET_EV_CONNECTED ||
-	    ev == KSOCKET_EV_CONNECTFAILED ||
-	    ev == KSOCKET_EV_DISCONNECTED);
-
-	mutex_enter(&idm_so_timed_socket_mutex);
-	itp->it_callback_called = B_TRUE;
-	if (ev == KSOCKET_EV_CONNECTED) {
-		itp->it_socket_error_code = 0;
-	} else {
-		/* Make sure the error code is non-zero on error */
-		if (info == 0)
-			info = ECONNRESET;
-		itp->it_socket_error_code = (int)info;
-	}
-	cv_signal(&itp->it_cv);
-	mutex_exit(&idm_so_timed_socket_mutex);
-}
-
-int
-idm_so_timed_socket_connect(ksocket_t ks,
-    struct sockaddr_storage *sa, int sa_sz, int login_max_usec)
-{
-	clock_t			conn_login_max;
-	int			rc, nonblocking, rval;
-	idm_so_timed_socket_t	it;
-	ksocket_callbacks_t	ks_cb;
-
-	conn_login_max = ddi_get_lbolt() + drv_usectohz(login_max_usec);
-
-	/*
-	 * Set to non-block socket mode, with callback on connect
-	 * Early volo used "disconnected" instead of "connectfailed",
-	 * so set callback to look for both.
-	 */
-	bzero(&it, sizeof (it));
-	ks_cb.ksock_cb_flags = KSOCKET_CB_CONNECTED |
-	    KSOCKET_CB_CONNECTFAILED | KSOCKET_CB_DISCONNECTED;
-	ks_cb.ksock_cb_connected = idm_so_timed_socket_connect_cb;
-	ks_cb.ksock_cb_connectfailed = idm_so_timed_socket_connect_cb;
-	ks_cb.ksock_cb_disconnected = idm_so_timed_socket_connect_cb;
-	cv_init(&it.it_cv, NULL, CV_DEFAULT, NULL);
-	rc = ksocket_setcallbacks(ks, &ks_cb, &it, CRED());
-	if (rc != 0)
-		return (rc);
-
-	/* Set to non-blocking mode */
-	nonblocking = 1;
-	rc = ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
-	    CRED());
-	if (rc != 0)
-		goto cleanup;
-
-	bzero(&it, sizeof (it));
-	for (;;) {
-		/*
-		 * Warning -- in a loopback scenario, the call to
-		 * the connect_cb can occur inside the call to
-		 * ksocket_connect. Do not hold the mutex around the
-		 * call to ksocket_connect.
-		 */
-		rc = ksocket_connect(ks, (struct sockaddr *)sa, sa_sz, CRED());
-		if (rc == 0 || rc == EISCONN) {
-			/* socket success or already success */
-			rc = 0;
-			break;
-		}
-		if ((rc != EINPROGRESS) && (rc != EALREADY)) {
-			break;
-		}
-
-		/* TCP connect still in progress. See if out of time. */
-		if (ddi_get_lbolt() > conn_login_max) {
-			/*
-			 * Connection retry timeout,
-			 * failed connect to target.
-			 */
-			rc = ETIMEDOUT;
-			break;
-		}
-
-		/*
-		 * TCP connect still in progress.  Sleep until callback.
-		 * Do NOT go to sleep if the callback already occurred!
-		 */
-		mutex_enter(&idm_so_timed_socket_mutex);
-		if (!it.it_callback_called) {
-			(void) cv_timedwait(&it.it_cv,
-			    &idm_so_timed_socket_mutex, conn_login_max);
-		}
-		if (it.it_callback_called) {
-			rc = it.it_socket_error_code;
-			mutex_exit(&idm_so_timed_socket_mutex);
-			break;
-		}
-		/* If timer expires, go call ksocket_connect one last time. */
-		mutex_exit(&idm_so_timed_socket_mutex);
-	}
-
-	/* resume blocking mode */
-	nonblocking = 0;
-	(void) ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
-	    CRED());
-cleanup:
-	(void) ksocket_setcallbacks(ks, NULL, NULL, CRED());
-	cv_destroy(&it.it_cv);
-	if (rc != 0) {
-		idm_soshutdown(ks);
-	}
-	return (rc);
-}
-
 
 void
 idm_addr_to_sa(idm_addr_t *dportal, struct sockaddr_storage *sa)
@@ -3490,7 +3360,7 @@ inet_ntop(int af, const void *addr, char *buf, int addrlen)
 	buf[0] = '\0';
 
 	/* Let user know politely not to send NULL or unaligned addr */
-	if (addr == NULL)) {
+	if (addr == NULL) {
 #ifdef DEBUG
 		cmn_err(CE_WARN, "inet_ntop: addr is <null> or unaligned");
 #endif

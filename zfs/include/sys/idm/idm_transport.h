@@ -225,7 +225,7 @@ void
 idm_transport_setup(ldi_ident_t li, boolean_t boot_conn);
 
 void
-idm_transport_teardown();
+idm_transport_teardown(void);
 
 #ifdef	__cplusplus
 }

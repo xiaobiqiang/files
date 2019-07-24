@@ -1227,8 +1227,6 @@ idm_bufpat_check(idm_buf_t *idb, int check_len, idm_bufpat_check_type_t type)
 			    "bufpat_idb=%p bufmagic=%08x offset=%08x",
 			    (void *)idb, (void *)bufpat, bufpat->bufpat_idb,
 			    bufpat->bufpat_bufmagic, bufpat->bufpat_offset);
-			DTRACE_PROBE2(bufpat__pattern__found,
-			    idm_buf_t *, idb, idm_bufpat_t *, bufpat);
 			if (type == BP_CHECK_ASSERT) {
 				ASSERT(0);
 			}
@@ -1748,44 +1746,26 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		switch (IDM_PDU_OPCODE(pdu)) {
 		case ISCSI_OP_SCSI_RSP:
 			/* Target only */
-			DTRACE_ISCSI_2(scsi__response, idm_conn_t *, ic,
-			    iscsi_scsi_rsp_hdr_t *,
-			    (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_SCSI_TASK_MGT_RSP:
 			/* Target only */
-			DTRACE_ISCSI_2(task__response, idm_conn_t *, ic,
-			    iscsi_text_rsp_hdr_t *,
-			    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_SCSI_DATA_RSP:
 			/* Target only */
-			DTRACE_ISCSI_2(data__send, idm_conn_t *, ic,
-			    iscsi_data_rsp_hdr_t *,
-			    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_RTT_RSP:
 			/* Target only */
-			DTRACE_ISCSI_2(data__request, idm_conn_t *, ic,
-			    iscsi_rtt_hdr_t *,
-			    (iscsi_rtt_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_NOOP_IN:
 			/* Target only */
-			DTRACE_ISCSI_2(nop__send, idm_conn_t *, ic,
-			    iscsi_nop_in_hdr_t *,
-			    (iscsi_nop_in_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_TEXT_RSP:
 			/* Target only */
-			DTRACE_ISCSI_2(text__response, idm_conn_t *, ic,
-			    iscsi_text_rsp_hdr_t *,
-			    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_TEXT_CMD:
@@ -1820,24 +1800,15 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		idm_conn_tx_pdu_event(ic, CE_LOGIN_SND, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_LOGIN_RSP:
-		DTRACE_ISCSI_2(login__response, idm_conn_t *, ic,
-		    iscsi_login_rsp_hdr_t *,
-		    (iscsi_login_rsp_hdr_t *)pdu->isp_hdr);
 		idm_parse_login_rsp(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_LOGOUT_CMD:
 		idm_parse_logout_req(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_LOGOUT_RSP:
-		DTRACE_ISCSI_2(logout__response, idm_conn_t *, ic,
-		    iscsi_logout_rsp_hdr_t *,
-		    (iscsi_logout_rsp_hdr_t *)pdu->isp_hdr);
 		idm_parse_logout_rsp(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_ASYNC_EVENT:
-		DTRACE_ISCSI_2(async__send, idm_conn_t *, ic,
-		    iscsi_async_evt_hdr_t *,
-		    (iscsi_async_evt_hdr_t *)pdu->isp_hdr);
 		async_evt = (iscsi_async_evt_hdr_t *)pdu->isp_hdr;
 		switch (async_evt->async_event) {
 		case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
@@ -1862,44 +1833,26 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		break;
 	case ISCSI_OP_SCSI_RSP:
 		/* Target only */
-		DTRACE_ISCSI_2(scsi__response, idm_conn_t *, ic,
-		    iscsi_scsi_rsp_hdr_t *,
-		    (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_TASK_MGT_RSP:
 		/* Target only */
-		DTRACE_ISCSI_2(task__response, idm_conn_t *, ic,
-		    iscsi_scsi_task_mgt_rsp_hdr_t *,
-		    (iscsi_scsi_task_mgt_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_DATA_RSP:
 		/* Target only */
-		DTRACE_ISCSI_2(data__send, idm_conn_t *, ic,
-		    iscsi_data_rsp_hdr_t *,
-		    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_RTT_RSP:
 		/* Target only */
-		DTRACE_ISCSI_2(data__request, idm_conn_t *, ic,
-		    iscsi_rtt_hdr_t *,
-		    (iscsi_rtt_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_NOOP_IN:
 		/* Target only */
-		DTRACE_ISCSI_2(nop__send, idm_conn_t *, ic,
-		    iscsi_nop_in_hdr_t *,
-		    (iscsi_nop_in_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_TEXT_RSP:
 		/* Target only */
-		DTRACE_ISCSI_2(text__response, idm_conn_t *, ic,
-		    iscsi_text_rsp_hdr_t *,
-		    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 		/* Initiator only */

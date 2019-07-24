@@ -6,6 +6,7 @@
 #ifndef	_SYS_ZFS_MULTICLUS_H
 #define	_SYS_ZFS_MULTICLUS_H
 
+#include <sys/dmu.h>
 #include <sys/cluster_san.h>
 #include <sys/callb.h>
 

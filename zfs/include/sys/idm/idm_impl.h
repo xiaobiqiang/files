@@ -30,6 +30,14 @@ extern "C" {
 
 #include <sys/avl.h>
 //#include <sys/socket_impl.h>
+#include <sys/systm.h>
+#include <sys/mutex.h>
+#include <sys/condvar.h>
+#include <sys/list.h>
+#include <sys/zfs_multiclus.h>
+#include <sys/taskq.h>
+#include <sys/kmem_cache.h>
+#include <sys/cluster_san.h>
 
 /*
  * IDM lock order:
@@ -92,9 +100,11 @@ typedef struct {
 	(_rf_)->ir_audit_buf.anb_index &=		\
 	    (_rf_)->ir_audit_buf.anb_max_index;		\
 	anr->anr_refcnt = (_rf_)->ir_refcnt;		\
-	anr->anr_depth = getpcstack(anr->anr_stack,	\
-	    REFCNT_AUDIT_STACK_DEPTH);			\
 }
+
+//anr->anr_depth = getpcstack(anr->anr_stack,     \
+//            REFCNT_AUDIT_STACK_DEPTH);                  \
+
 
 struct idm_refcnt_s;
 
@@ -457,6 +467,7 @@ typedef struct idm_idpool {
 /*
  * Global IDM state structure
  */
+typedef void *kt_did_t;
 typedef struct {
 	kmutex_t	idm_global_mutex;
 	taskq_t		*idm_global_taskq;
@@ -479,7 +490,7 @@ typedef struct {
 	kmem_cache_t	*idm_sorx_pdu_cache;
 } idm_global_t;
 
-idm_global_t	idm; /* Global state */
+extern idm_global_t	idm; /* Global state */
 
 int
 idm_idpool_create(idm_idpool_t	*pool);

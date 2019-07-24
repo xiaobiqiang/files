@@ -30,6 +30,10 @@
 extern "C" {
 #endif
 
+#include <linux/socket.h>
+#include <uapi/linux/in.h>
+#include <uapi/linux/in6.h>
+
 typedef enum {
 	IDM_STATUS_SUCCESS = 0,
 	IDM_STATUS_FAIL,
