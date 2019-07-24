@@ -32,9 +32,9 @@ extern "C" {
 
 #ifdef _KERNEL
 #include <sys/types.h>
-#include <sys/strsubr.h>	/* for prototype of kstrgetmsg */
-#include <sys/socket.h>
-#include <sys/socketvar.h>	/* for struct sonode */
+//#include <sys/strsubr.h>	/* for prototype of kstrgetmsg */
+#include <linux/socket.h>
+//#include <sys/socketvar.h>	/* for struct sonode */
 #endif
 #include <netinet/in.h>
 #include <sys/scsi/impl/uscsi.h>

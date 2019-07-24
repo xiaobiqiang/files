@@ -32,8 +32,8 @@
 #include <sys/sysmacros.h>
 #include <sys/scsi/generic/persist.h>
 
-#include <sys/socket.h>
-#include <sys/strsubr.h>
+#include <linux/socket.h>
+//#include <sys/strsubr.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
 

@@ -30,8 +30,8 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
-#include <sys/socket.h>
-#include <sys/strsubr.h>
+#include <linux/socket.h>
+//#include <sys/strsubr.h>
 #include <inet/tcp.h>
 #include <sys/nvpair.h>
 

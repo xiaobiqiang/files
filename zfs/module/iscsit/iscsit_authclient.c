@@ -28,8 +28,8 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/socket.h>
-#include <inet/tcp.h>
+#include <linux/socket.h>
+#include <linux/tcp.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>

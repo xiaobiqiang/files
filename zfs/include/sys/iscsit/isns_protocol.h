@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 #include <netinet/in.h>
-#include <sys/socket.h>
+#include <linux/socket.h>
 #include <sys/types.h>
 
 #define	ISNSP_VERSION			(0x01)

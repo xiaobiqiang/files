@@ -32,8 +32,8 @@
 #include <sys/sysmacros.h>
 #include <sys/sdt.h>
 
-#include <sys/socket.h>
-#include <sys/strsubr.h>
+#include <linux/socket.h>
+//#include <sys/strsubr.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
