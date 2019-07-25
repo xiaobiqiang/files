@@ -34,12 +34,16 @@ extern "C" {
 #include <sys/types.h>
 //#include <sys/strsubr.h>	/* for prototype of kstrgetmsg */
 #include <linux/socket.h>
+#include <uapi/linux/in6.h>
 //#include <sys/socketvar.h>	/* for struct sonode */
 #endif
-#include <netinet/in.h>
+#include <uapi/linux/in.h>
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/iscsi_protocol.h>
 
+typedef uint32_t in_addr_t;
+typedef struct in6_addr in6_addr_t;
+typedef uint16_t in_port_t;
 /*
  * Each of the top level structures have a version field as
  * the first member. That version value will be set by the
@@ -628,7 +632,7 @@ extern int		iscsid_rename(char *oldname, char *newname);
 extern ssize_t		iscsid_write(int, void *, ssize_t);
 extern ssize_t		iscsid_read(int, void *, ssize_t);
 extern ssize_t		iscsid_sendto(struct sonode *, void *, size_t,
-    struct sockaddr *, socklen_t);
+    struct sockaddr *, size_t);
 extern ssize_t		iscsid_recvfrom(struct sonode *, void *buffer,
     size_t len);
 extern int		iscsid_errno;

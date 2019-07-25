@@ -65,7 +65,7 @@ typedef enum {
 typedef struct {
 	kthread_t			*esi_thread;
 	kt_did_t			esi_thread_did;
-	ksocket_t			esi_so;
+	struct socket                	*esi_so;
 	kmutex_t			esi_mutex;
 	kcondvar_t			esi_cv;
 	uint16_t			esi_port;
@@ -142,7 +142,7 @@ it_cfg_status_t
 isnst_config_merge(it_config_t *cfg);
 
 int iscsit_isns_init(iscsit_hostinfo_t *hostinfo);
-void iscsit_isns_fini();
+void iscsit_isns_fini(void);
 int iscsit_isns_register(iscsit_tgt_t *target);
 int iscsit_isns_deregister(iscsit_tgt_t *target);
 void iscsit_isns_target_update(iscsit_tgt_t *target);

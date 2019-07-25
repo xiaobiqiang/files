@@ -26,25 +26,25 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/iscsit/iscsi_if.h>
-#include <sys/md5.h>
+//#include <sys/md5.h>
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
-#include <sys/ksocket.h>
+//#include <sys/ksocket.h>
 
 static void encode_chap_password(int identifier, int chap_passwd_len,
     uint8_t *chap_passwd, uint8_t *result);
 
-static size_t iscsit_net_recvmsg(ksocket_t socket, struct msghdr *msg,
+static size_t iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg,
     int timeout);
 
 /*
  * See radius_packet.h.
  */
 int
-iscsit_snd_radius_request(ksocket_t socket, iscsi_ipaddr_t rsvr_ip_addr,
+iscsit_snd_radius_request(struct socket *socket, iscsi_ipaddr_t rsvr_ip_addr,
     uint32_t rsvr_port, radius_packet_data_t *req_data)
 {
 	int		i;		/* Loop counter. */
@@ -165,12 +165,12 @@ iscsit_snd_radius_request(ksocket_t socket, iscsi_ipaddr_t rsvr_ip_addr,
  * See radius_packet.h.
  */
 int
-iscsit_rcv_radius_response(ksocket_t socket, uint8_t *shared_secret,
+iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
     uint32_t shared_secret_len, uint8_t *req_authenticator,
     radius_packet_data_t *resp_data)
 {
 	radius_packet_t		*packet;
-	MD5_CTX			context;
+//	MD5_CTX			context;
 	uint8_t			*tmp_data;
 	uint8_t			md5_digest[16]; /* MD5 Digest Length 16 */
 	uint16_t		declared_len = 0;
@@ -249,12 +249,12 @@ iscsit_rcv_radius_response(ksocket_t socket, uint8_t *shared_secret,
 	 * Attributes = The response attributes
 	 * Secret = The shared secret
 	 */
-	MD5Init(&context);
+//	MD5Init(&context);
 	bzero(&md5_digest, 16);
-	MD5Update(&context, &packet->code, 1);
-	MD5Update(&context, &packet->identifier, 1);
-	MD5Update(&context, packet->length, 2);
-	MD5Update(&context, req_authenticator, RAD_AUTHENTICATOR_LEN);
+//	MD5Update(&context, &packet->code, 1);
+//	MD5Update(&context, &packet->identifier, 1);
+//	MD5Update(&context, packet->length, 2);
+//	MD5Update(&context, req_authenticator, RAD_AUTHENTICATOR_LEN);
 
 	/*
 	 * Include response attributes only if there is a payload
@@ -265,11 +265,11 @@ iscsit_rcv_radius_response(ksocket_t socket, uint8_t *shared_secret,
 	 */
 	if (declared_len > RAD_PACKET_HDR_LEN) {
 		/* Response Attributes */
-		MD5Update(&context, packet->data,
-		    declared_len - RAD_PACKET_HDR_LEN);
+//		MD5Update(&context, packet->data,
+//		    declared_len - RAD_PACKET_HDR_LEN);
 	}
-	MD5Update(&context, shared_secret, shared_secret_len);
-	MD5Final(md5_digest, &context);
+//	MD5Update(&context, shared_secret, shared_secret_len);
+//	MD5Final(md5_digest, &context);
 
 	if (bcmp(md5_digest, packet->authenticator, RAD_AUTHENTICATOR_LEN)
 	    != 0) {
@@ -307,7 +307,7 @@ encode_chap_password(int identifier, int chap_passwd_len,
  */
 /* ARGSUSED */
 static size_t
-iscsit_net_recvmsg(ksocket_t socket, struct msghdr *msg, int timeout)
+iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, int timeout)
 {
 	int		prflag	= msg->msg_flags;
 	size_t		recv	= 0;

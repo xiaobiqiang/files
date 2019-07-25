@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#include <netinet/in.h>
+#include <uapi/linux/in.h>
 #include <sys/int_types.h>
 
 #include <sys/iscsit/iscsi_if.h>

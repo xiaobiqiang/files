@@ -39,7 +39,7 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/iscsit_common.h>
 #include <sys/iscsit/isns_protocol.h>
-#include <sys/ksocket.h>
+//#include <sys/ksocket.h>
 
 #include "iscsit.h"
 #include "iscsit_isns.h"

@@ -143,27 +143,27 @@ client_compute_chap_resp(uchar_t *resp,
     uint8_t *password, int password_len,
     uchar_t *chap_c, unsigned int challenge_len)
 {
-	MD5_CTX		context;
+//	MD5_CTX		context;
 
-	MD5Init(&context);
+//	MD5Init(&context);
 
 	/*
 	 * id byte
 	 */
 	resp[0] = (uchar_t)chap_i;
-	MD5Update(&context, resp, 1);
+//	MD5Update(&context, resp, 1);
 
 	/*
 	 * shared secret
 	 */
-	MD5Update(&context, (uchar_t *)password, password_len);
+//	MD5Update(&context, (uchar_t *)password, password_len);
 
 	/*
 	 * challenge value
 	 */
-	MD5Update(&context, chap_c, challenge_len);
+//	MD5Update(&context, chap_c, challenge_len);
 
-	MD5Final(resp, &context);
+//	MD5Final(resp, &context);
 }
 
 int

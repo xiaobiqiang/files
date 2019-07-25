@@ -515,9 +515,6 @@ sess_sm_event_dispatch(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 {
 	iscsit_conn_t	*ict;
 
-	DTRACE_PROBE2(session__event, iscsit_sess_t *, ist,
-	    sess_event_ctx_t *, ctx);
-
 	IDM_SM_LOG(CE_NOTE, "sess_sm_event_dispatch: sess %p event %s(%d)",
 	    (void *)ist, iscsit_se_name[ctx->se_ctx_event], ctx->se_ctx_event);
 
@@ -816,10 +813,6 @@ sess_sm_new_state(iscsit_sess_t *ist, sess_event_ctx_t *ctx,
 	    iscsit_se_name[ctx->se_ctx_event], ctx->se_ctx_event,
 	    iscsit_ss_name[ist->ist_state], ist->ist_state,
 	    iscsit_ss_name[new_state], new_state);
-
-	DTRACE_PROBE3(sess__state__change,
-	    iscsit_sess_t *, ist, sess_event_ctx_t *, ctx,
-	    iscsit_session_state_t, new_state);
 
 	mutex_enter(&ist->ist_mutex);
 	idm_sm_audit_state_change(&ist->ist_state_audit, SAS_ISCSIT_SESS,

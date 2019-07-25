@@ -126,4 +126,5 @@ cleanup:
 
 3.del getpcstack of REFCNT_AUDIT micro in idm_impl.h
 
-4.transplate prodigy common/cpyto/md5 for iscsit_radiusauth.c
+4.transplate prodigy common/cpyto/md5 for iscsit_radiusauth.c,iscsit_radiuspacket.c,iscsit_authclient.c
+

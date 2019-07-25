@@ -32,7 +32,7 @@
 #include <sys/sysmacros.h>
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
-#include <inet/tcp.h>
+#include <linux/tcp.h>
 #include <sys/nvpair.h>
 
 #include <sys/stmf.h>

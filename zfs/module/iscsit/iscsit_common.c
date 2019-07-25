@@ -28,8 +28,8 @@
 #include <sys/ddi.h>
 #include <sys/types.h>
 #include <sys/sunddi.h>
-#include <sys/socket.h>
-#include <inet/tcp.h>
+//#include <sys/socket.h>
+#include <linux/tcp.h>
 #else
 #include <stdio.h>
 #include <strings.h>

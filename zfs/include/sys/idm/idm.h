@@ -33,6 +33,7 @@ extern "C" {
 #include <linux/socket.h>
 #include <uapi/linux/in.h>
 #include <uapi/linux/in6.h>
+#include <sys/sunldi.h>
 
 typedef enum {
 	IDM_STATUS_SUCCESS = 0,
@@ -145,38 +146,38 @@ typedef union idm_sockaddr {
 	((so)->sa_family == AF_INET ?	\
 	sizeof (struct sockaddr_in) : sizeof (struct sockaddr_in6))
 
-typedef idm_status_t (*idm_client_notify_cb_t)(
+typedef idm_status_t (idm_client_notify_cb_t)(
     struct idm_conn_s *ic, idm_client_notify_t cn, uintptr_t data);
 
-typedef void (*idm_rx_pdu_cb_t)(struct idm_conn_s *ic, struct idm_pdu_s *pdu);
+typedef void (idm_rx_pdu_cb_t)(struct idm_conn_s *ic, struct idm_pdu_s *pdu);
 
-typedef void (*idm_rx_pdu_error_cb_t)(struct idm_conn_s *ic,
+typedef void (idm_rx_pdu_error_cb_t)(struct idm_conn_s *ic,
     struct idm_pdu_s *pdu, idm_status_t status);
 
-typedef void (*idm_buf_cb_t)(struct idm_buf_s *idb, idm_status_t status);
+typedef void (idm_buf_cb_t)(struct idm_buf_s *idb, idm_status_t status);
 
-typedef void (*idm_pdu_cb_t)(struct idm_pdu_s *pdu, idm_status_t status);
+typedef void (idm_pdu_cb_t)(struct idm_pdu_s *pdu, idm_status_t status);
 
-typedef void (*idm_task_cb_t)(struct idm_task_s *task, idm_status_t status);
+typedef void (idm_task_cb_t)(struct idm_task_s *task, idm_status_t status);
 
-typedef void (*idm_build_hdr_cb_t)(
+typedef void (idm_build_hdr_cb_t)(
     struct idm_task_s *task, struct idm_pdu_s *pdu, uint8_t opcode);
 
-typedef void (*idm_update_statsn_cb_t)(
+typedef void (idm_update_statsn_cb_t)(
     struct idm_task_s *task, struct idm_pdu_s *pdu);
 
-typedef void (*idm_keepalive_cb_t)(struct idm_conn_s *ic);
+typedef void (idm_keepalive_cb_t)(struct idm_conn_s *ic);
 
 typedef struct {
-	idm_rx_pdu_cb_t		icb_rx_scsi_cmd;
-	idm_rx_pdu_cb_t		icb_rx_scsi_rsp;
-	idm_rx_pdu_cb_t		icb_rx_misc;
-	idm_rx_pdu_error_cb_t	icb_rx_error;
-	idm_task_cb_t		icb_task_aborted;
-	idm_client_notify_cb_t	icb_client_notify;
-	idm_build_hdr_cb_t	icb_build_hdr;
-	idm_update_statsn_cb_t	icb_update_statsn; /* advance statsn */
-	idm_keepalive_cb_t	icb_keepalive;
+	idm_rx_pdu_cb_t		*icb_rx_scsi_cmd;
+	idm_rx_pdu_cb_t		*icb_rx_scsi_rsp;
+	idm_rx_pdu_cb_t		*icb_rx_misc;
+	idm_rx_pdu_error_cb_t	*icb_rx_error;
+	idm_task_cb_t		*icb_task_aborted;
+	idm_client_notify_cb_t	*icb_client_notify;
+	idm_build_hdr_cb_t	*icb_build_hdr;
+	idm_update_statsn_cb_t	*icb_update_statsn; /* advance statsn */
+	idm_keepalive_cb_t	*icb_keepalive;
 } idm_conn_ops_t;
 
 typedef struct {

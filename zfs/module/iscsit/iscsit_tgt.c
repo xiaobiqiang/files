@@ -135,7 +135,7 @@ static iscsit_tpgt_t *
 iscsit_tpgt_create(it_tpgt_t *cfg_tpgt);
 
 static iscsit_tpgt_t *
-iscsit_tpgt_create_default();
+iscsit_tpgt_create_default(void);
 
 static void
 iscsit_tpgt_destroy(iscsit_tpgt_t *tpgt);
@@ -215,9 +215,6 @@ tgt_sm_event_locked(iscsit_tgt_t *tgt, iscsit_tgt_event_t event)
 static void
 tgt_sm_event_dispatch(iscsit_tgt_t *tgt, tgt_event_ctx_t *ctx)
 {
-	DTRACE_PROBE2(tgt__event, iscsit_tgt_t *, tgt,
-	    tgt_event_ctx_t *, ctx);
-
 	IDM_SM_LOG(CE_NOTE, "tgt_sm_event_dispatch: tgt %p event %s(%d)",
 	    (void *)tgt, iscsit_te_name[ctx->te_ctx_event], ctx->te_ctx_event);
 
@@ -689,9 +686,6 @@ tgt_sm_new_state(iscsit_tgt_t *tgt, tgt_event_ctx_t *ctx,
 	IDM_SM_LOG(CE_NOTE, "tgt_sm_new_state: tgt %p, %s(%d) --> %s(%d)\n",
 	    (void *) tgt, iscsit_ts_name[tgt->target_state], tgt->target_state,
 	    iscsit_ts_name[new_state], new_state);
-	DTRACE_PROBE3(target__state__change,
-	    iscsit_tgt_t *, tgt, tgt_event_ctx_t *, ctx,
-	    iscsit_tgt_state_t, new_state);
 
 	mutex_enter(&tgt->target_mutex);
 	idm_sm_audit_state_change(&tgt->target_state_audit, SAS_ISCSIT_TGT,
@@ -1351,7 +1345,7 @@ iscsit_tpgt_create(it_tpgt_t *cfg_tpgt)
 }
 
 iscsit_tpgt_t *
-iscsit_tpgt_create_default()
+iscsit_tpgt_create_default(void)
 {
 	iscsit_tpgt_t	*result;
 

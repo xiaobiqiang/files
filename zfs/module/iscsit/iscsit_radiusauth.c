@@ -31,6 +31,7 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
+#include <linux/net.h>
 
 #include "radius_auth.h"
 
@@ -65,7 +66,7 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	uint32_t rad_svr_shared_secret_len)
 {
 	chap_validation_status_type validation_status;
-	char lbolt[64];
+	char lb[64];
 	int rcv_status;
 	void *socket;
 	radius_packet_data_t req;
@@ -97,9 +98,9 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	/* First, the shared secret */
 //	MD5Update(&context, rad_svr_shared_secret, rad_svr_shared_secret_len);
 	/* Then a unique number - use lbolt plus a random number */
-	bzero(&lbolt, sizeof (lbolt));
-	(void) snprintf(lbolt, sizeof (lbolt), "%lx", ddi_get_lbolt());
-//	MD5Update(&context, (uint8_t *)lbolt, strlen(lbolt));
+	bzero(&lb, sizeof (lb));
+	(void) snprintf(lb, sizeof (lb), "%lx", ddi_get_lbolt());
+//	MD5Update(&context, (uint8_t *)lb, strlen(lb));
 	bzero(&random_number, sizeof (random_number));
 	(void) random_get_pseudo_bytes(random_number, sizeof (random_number));
 //	MD5Update(&context, random_number, sizeof (random_number));

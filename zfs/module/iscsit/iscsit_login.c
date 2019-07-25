@@ -406,9 +406,6 @@ login_sm_event_dispatch(iscsit_conn_login_t *lsm, iscsit_conn_t *ict,
 {
 	idm_pdu_t *pdu = ctx->le_pdu; /* Only valid for some events */
 
-	DTRACE_PROBE2(login__event, iscsit_conn_t *, ict,
-	    login_event_ctx_t *, ctx);
-
 	IDM_SM_LOG(CE_NOTE, "login_sm_event_dispatch: ict %p event %s(%d)",
 	    (void *)ict,
 	    iscsit_ile_name[ctx->le_ctx_event], ctx->le_ctx_event);
@@ -719,10 +716,6 @@ login_sm_new_state(iscsit_conn_t *ict, login_event_ctx_t *ctx,
 	    "%s (%d) --> %s (%d)\n", (void *)ict->ict_ic,
 	    iscsit_ils_name[lsm->icl_login_state], lsm->icl_login_state,
 	    iscsit_ils_name[new_state], new_state);
-
-	DTRACE_PROBE3(login__state__change,
-	    iscsit_conn_t *, ict, login_event_ctx_t *, ctx,
-	    iscsit_login_state_t, new_state);
 
 	mutex_enter(&lsm->icl_mutex);
 	idm_sm_audit_state_change(&lsm->icl_state_audit, SAS_ISCSIT_LOGIN,

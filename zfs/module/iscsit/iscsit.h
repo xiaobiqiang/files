@@ -594,7 +594,7 @@ typedef enum {
 	ISE_DISABLING
 } iscsit_service_enabled_t;
 
-
+typedef void *dev_info_t;
 typedef struct {
 	iscsit_service_enabled_t	global_svc_state;	/* ISE_DETACHED in _init,ISE_DISABLED in attach. */
 	dev_info_t			*global_dip;	/* unused on sw */
@@ -620,13 +620,13 @@ typedef struct {
 extern iscsit_global_t iscsit_global;
 
 void
-iscsit_global_hold();
+iscsit_global_hold(void);
 
 void
-iscsit_global_rele();
+iscsit_global_rele(void);
 
 void
-iscsit_global_wait_ref();
+iscsit_global_wait_ref(void);
 
 idm_status_t
 iscsit_login_sm_init(iscsit_conn_t *ict);
@@ -831,7 +831,7 @@ void
 iscsit_tpg_rele(iscsit_tpg_t *tpg);
 
 iscsit_tpg_t *
-iscsit_tpg_createdefault();
+iscsit_tpg_createdefault(void);
 
 void
 iscsit_tpg_destroydefault(iscsit_tpg_t *tpg);

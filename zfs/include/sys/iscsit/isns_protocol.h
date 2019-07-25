@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-#include <netinet/in.h>
+#include <uapi/linux/in.h>
 #include <linux/socket.h>
 #include <sys/types.h>
 

@@ -32,7 +32,7 @@
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
 #include <linux/socket.h>
-#include <sys/strsubr.h>
+//#include <sys/strsubr.h>
 #include <sys/nvpair.h>
 
 #include <sys/stmf.h>
@@ -40,6 +40,8 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_conn_sm.h>
+
+#include <linux/miscdevice.h>
 
 #include "iscsit_isns.h"
 #include "iscsit.h"
@@ -122,7 +124,7 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu);
 static void
 iscsit_pdu_op_logout_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu);
 
-int iscsit_cmd_window();
+int iscsit_cmd_window(void);
 
 static  int
 iscsit_sna_lt(uint32_t sn1, uint32_t sn2);
@@ -296,14 +298,14 @@ iscsit_drv_detach(void)
 
 /*ARGSUSED*/
 static int
-iscsit_drv_open(struct inode *ind, struct file *fl);
+iscsit_drv_open(struct inode *ind, struct file *fl)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static int
-iscsit_drv_close(struct inode *ind, struct file *fl);
+iscsit_drv_close(struct inode *ind, struct file *fl)
 {
 	return (0);
 }
@@ -324,8 +326,8 @@ iscsit_drv_busy(void)
 }
 
 /* ARGSUSED */
-static int
-iscsit_drv_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+static long
+iscsit_drv_ioctl(struct file *f, unsigned int cmd, unsigned long argp)
 {
 	iscsit_ioc_set_config_t		setcfg;
 	char				*cfg_pnvlist = NULL;
@@ -441,7 +443,7 @@ cleanup:
 		iscsit_hostinfo_t hostinfo;
 
 		if (ddi_copyin((void *)argp, &hostinfo.length,
-		    sizeof (hostinfo.length), flag) != 0) {
+		    sizeof (hostinfo.length), 0) != 0) {
 			mutex_enter(&iscsit_global.global_state_mutex);
 			iscsit_global.global_svc_state = ISE_DISABLED;
 			mutex_exit(&iscsit_global.global_state_mutex);
@@ -453,7 +455,7 @@ cleanup:
 
 		if (ddi_copyin((void *)((caddr_t)argp +
 		    sizeof (hostinfo.length)), &hostinfo.fqhn,
-		    hostinfo.length, flag) != 0) {
+		    hostinfo.length, 0) != 0) {
 			mutex_enter(&iscsit_global.global_state_mutex);
 			iscsit_global.global_svc_state = ISE_DISABLED;
 			mutex_exit(&iscsit_global.global_state_mutex);
@@ -1211,9 +1213,6 @@ iscsit_conn_lost(idm_conn_t *ic)
 			if (((rx_pdu = cbuf->cb_buffer[i]) != NULL) &&
 			    (rx_pdu->isp_ic == ic)) {
 				/* conn is lost, drop the pdu */
-				DTRACE_PROBE3(scrubbing__staging__queue,
-				    iscsit_sess_t *, ist, idm_conn_t *, ic,
-				    idm_pdu_t *, rx_pdu);
 				idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
 				cbuf->cb_buffer[i] = NULL;
 				cbuf->cb_num_elems--;
@@ -1692,13 +1691,6 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 			hton24(rsp->dlength, resp_datalen);
 		}
 
-		DTRACE_PROBE5(iscsi__scsi__response,
-		    iscsit_conn_t *, itask->it_ict,
-		    uint8_t, rsp->response,
-		    uint8_t, rsp->cmd_status,
-		    idm_pdu_t *, pdu,
-		    scsi_task_t *, task);
-
 		iscsit_pdu_tx(pdu);
 
 		return (STMF_SUCCESS);
@@ -2061,10 +2053,6 @@ iscsit_post_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		bcopy(ahs_hdr->ahs_extscb, task->task_cdb + 16, addl_cdb_len);
 	}
 
-	DTRACE_ISCSI_3(scsi__command, idm_conn_t *, ic,
-	    iscsi_scsi_cmd_hdr_t *, (iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr,
-	    scsi_task_t *, task);
-
 	/*
 	 * Copy the transport header into the task handle from the PDU
 	 * handle. The transport header describes this task's remote tagged
@@ -2095,12 +2083,6 @@ iscsit_post_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		    rx_pdu->isp_datalen;
 		ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr = rx_pdu->isp_data;
 
-		DTRACE_ISCSI_8(xfer__start, idm_conn_t *, ic,
-		    uintptr_t, ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr,
-		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
-		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
-		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
-
 		/*
 		 * For immediate data transfer, there is no callback from
 		 * stmf to indicate that the initial burst of data is
@@ -2110,11 +2092,6 @@ iscsit_post_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		 * the size of the transfer, it does only provide a best
 		 * effort on the timing of the transfer.
 		 */
-		DTRACE_ISCSI_8(xfer__done, idm_conn_t *, ic,
-		    uintptr_t, ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr,
-		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
-		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
-		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
 		stmf_post_task(task, ibuf->ibuf_stmf_buf);
 	} else {
 
@@ -2251,12 +2228,6 @@ iscsit_send_direct_scsi_resp(iscsit_conn_t *ict, idm_pdu_t *rx_pdu,
 		resp->residual_count = req->data_length;
 	}
 
-	DTRACE_PROBE4(iscsi__scsi__direct__response,
-	    iscsit_conn_t *, ict,
-	    uint8_t, resp->response,
-	    uint8_t, resp->cmd_status,
-	    idm_pdu_t *, rsp_pdu);
-
 	iscsit_pdu_tx(rsp_pdu);
 }
 
@@ -2275,10 +2246,6 @@ iscsit_send_task_mgmt_resp(idm_pdu_t *tm_resp_pdu, uint8_t tm_status)
 	tm_resp = (iscsi_scsi_task_mgt_rsp_hdr_t *)tm_resp_pdu->isp_hdr;
 	tm_resp->response = tm_status;
 
-	DTRACE_PROBE3(iscsi__scsi__tm__response,
-	    iscsit_conn_t *, tm_resp_pdu->isp_ic->ic_handle,
-	    uint8_t, tm_resp->response,
-	    idm_pdu_t *, tm_resp_pdu);
 	iscsit_pdu_tx(tm_resp_pdu);
 }
 
@@ -2315,11 +2282,6 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	/*
 	 * Figure out what we're being asked to do.
 	 */
-	DTRACE_PROBE4(iscsi__scsi__tm__request,
-	    iscsit_conn_t *, ict,
-	    uint8_t, (iscsi_tm->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK),
-	    uint32_t, iscsi_tm->rtt,
-	    idm_pdu_t *, rx_pdu);
 	switch (iscsi_tm->function & ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK) {
 	case ISCSI_TM_FUNC_ABORT_TASK:
 		/*
@@ -3069,8 +3031,6 @@ iscsit_check_cmdsn_and_queue(idm_pdu_t *rx_pdu)
 	mutex_enter(&ist->ist_sn_mutex);
 	if (hdr->opcode & ISCSI_OP_IMMEDIATE) {
 		/* do not queue, handle it immediately */
-		DTRACE_PROBE2(immediate__cmd, iscsit_sess_t *, ist,
-		    idm_pdu_t *, rx_pdu);
 		mutex_exit(&ist->ist_sn_mutex);
 		return (ISCSIT_CMDSN_EQ_EXPCMDSN);
 	}
@@ -3088,8 +3048,6 @@ iscsit_check_cmdsn_and_queue(idm_pdu_t *rx_pdu)
 		mutex_exit(&ist->ist_sn_mutex);
 		return (ISCSIT_CMDSN_GT_EXPCMDSN);
 	} else if (iscsit_sna_lt(ntohl(hdr->cmdsn), ist->ist_expcmdsn)) {
-		DTRACE_PROBE3(cmdsn__lt__expcmdsn, iscsit_sess_t *, ist,
-		    iscsit_conn_t *, ict, idm_pdu_t *, rx_pdu);
 		mutex_exit(&ist->ist_sn_mutex);
 		return (ISCSIT_CMDSN_LT_EXPCMDSN);
 	} else {
@@ -3354,9 +3312,6 @@ iscsit_rxpdu_queue_monitor_session(iscsit_sess_t *ist)
 			 */
 			(void) iscsit_remove_pdu_from_queue(ist, next_cmdsn);
 			mutex_exit(&ist->ist_sn_mutex);
-			DTRACE_PROBE3(advanced__to__blocked__cmdsn,
-			    iscsit_sess_t *, ist, idm_pdu_t *, next_pdu,
-			    uint32_t, next_cmdsn);
 			iscsit_post_staged_pdu(next_pdu);
 			/* Deliver any subsequent PDUs immediately */
 			iscsit_process_pdu_in_queue(ist);
@@ -3367,8 +3322,6 @@ iscsit_rxpdu_queue_monitor_session(iscsit_sess_t *ist)
 		 * 1002 are lost in the network, skip over both and post 1003
 		 * expcmdsn then becomes 1004 at the end of the scan.
 		 */
-		DTRACE_PROBE2(skipping__over__cmdsn, iscsit_sess_t *, ist,
-		    uint32_t, next_cmdsn);
 	}
 	/*
 	 * following the assumption, staged cmdsn >= expcmdsn, this statement

@@ -29,7 +29,7 @@
 extern "C" {
 #endif
 
-#include <netinet/in.h>
+#include <uapi/linux/in.h>
 #include <sys/iscsit/chap.h>
 
 /*
