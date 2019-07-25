@@ -40,10 +40,8 @@ extern "C" {
 #include <uapi/linux/in.h>
 #include <sys/scsi/impl/uscsi.h>
 #include <sys/iscsi_protocol.h>
+#include <sys/in.h>
 
-typedef uint32_t in_addr_t;
-typedef struct in6_addr in6_addr_t;
-typedef uint16_t in_port_t;
 /*
  * Each of the top level structures have a version field as
  * the first member. That version value will be set by the

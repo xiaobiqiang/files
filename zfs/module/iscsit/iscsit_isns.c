@@ -134,7 +134,7 @@ static boolean_t	isns_monitor_thr_running;
 static kcondvar_t	isns_idle_cv;
 
 static uint16_t		xid;
-#define	GET_XID()	atomic_inc_16(&xid)
+#define	GET_XID()	atomic_add_16_nv(&xid, 1)
 
 static clock_t		monitor_idle_interval; /* 60s */
 
@@ -2800,13 +2800,10 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 		iov[1].iov_base = (void *)payload;
 		iov[1].iov_len = payload_len;
 
-		DTRACE_PROBE3(isnst__pdu__send, uint16_t, ntohs(pdu->func_id),
-		    uint16_t, ntohs(pdu->payload_len), caddr_t, pdu);
-
 		/* send the pdu */
 		send_len = ISNSP_HEADER_SIZE + payload_len;
-		send_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(isns_timeout_usec));
+/*		send_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(isns_timeout_usec)); */
 		rc = idm_iov_sosend(so, &iov[0], 2, send_len);
 //		(void) untimeout(send_timer);
 
@@ -2909,9 +2906,6 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 		seq ++;
 	} while ((flags & ISNS_FLAG_LAST_PDU) == 0);
 
-	DTRACE_PROBE3(isnst__pdu__recv, uint16_t, ntohs((*pdu)->func_id),
-	    size_t, total_payload_len, caddr_t, *pdu);
-
 	return (total_pdu_len);
 
 rcv_error:
@@ -2964,8 +2958,6 @@ isnst_open_so(struct sockaddr_storage *sa)
 		ISNST_LOG(CE_WARN, "open iSNS Server %s failed",
 		    idm_sa_ntop(sa, server_buf,
 		    sizeof (server_buf)));
-		DTRACE_PROBE1(isnst__connect__fail,
-		    struct sockaddr_storage *, sa);
 	}
 
 	return (so);
@@ -3057,7 +3049,7 @@ isnst_esi_thread(void *arg)
 	bzero(&sin6, sizeof (struct sockaddr_in6));
 	sin_addrlen = sizeof (struct sockaddr_in6);
 
-	esi.esi_thread_did = curthread->t_did;
+//	esi.esi_thread_did = curthread->t_did;
 
 	mutex_enter(&esi.esi_mutex);
 
@@ -3089,11 +3081,11 @@ isnst_esi_thread(void *arg)
 		sin6.sin6_port = htons(0);
 		sin6.sin6_addr = in6addr_any;
 
-		(void) ksocket_setsockopt(esi.esi_so, SOL_SOCKET,
-		    SO_REUSEADDR, (char *)&on, sizeof (on), CRED());
+		(void) kernel_setsockopt(esi.esi_so, SOL_SOCKET,
+		    SO_REUSEADDR, (char *)&on, sizeof (on));
 
-		if (ksocket_bind(esi.esi_so, (struct sockaddr *)&sin6,
-		    sizeof (sin6), CRED()) != 0) {
+		if (kernel_bind(esi.esi_so, (struct sockaddr *)&sin6,
+		    sizeof (sin6)) != 0) {
 			ISNST_LOG(CE_WARN, "Unable to bind socket for ESI");
 			idm_sodestroy(esi.esi_so);
 			mutex_exit(&esi.esi_mutex);
@@ -3105,12 +3097,12 @@ isnst_esi_thread(void *arg)
 		/*
 		 * Get the port (sin6 is meaningless at this point)
 		 */
-		(void) ksocket_getsockname(esi.esi_so,
-		    (struct sockaddr *)(&sin6), &sin_addrlen, CRED());
+		(void) kernel_getsockname(esi.esi_so,
+		    (struct sockaddr *)(&sin6), &sin_addrlen);
 		esi.esi_port =
 		    ntohs(((struct sockaddr_in6 *)(&sin6))->sin6_port);
 
-		if ((rc = ksocket_listen(esi.esi_so, 5, CRED())) != 0) {
+		if ((rc = kernel_listen(esi.esi_so, 5)) != 0) {
 			ISNST_LOG(CE_WARN, "isnst_esi_thread: listen "
 			    "failure 0x%x", rc);
 			idm_sodestroy(esi.esi_so);
@@ -3120,16 +3112,12 @@ isnst_esi_thread(void *arg)
 			continue;
 		}
 
-		ksocket_hold(esi.esi_so);
 		esi.esi_valid = B_TRUE;
 		while (esi.esi_enabled) {
 			mutex_exit(&esi.esi_mutex);
 			
-			if ((rc = ksocket_accept(esi.esi_so, NULL, NULL,
-			    &newso, CRED())) != 0) {
+			if ((rc = kernel_accept(esi.esi_so, &newso, 0)) != 0) {
 				mutex_enter(&esi.esi_mutex);
-				DTRACE_PROBE2(iscsit__isns__esi__accept__fail,
-				    int, rc, boolean_t, esi.esi_enabled);
 				/*
 				 * If we were interrupted with EINTR
 				 * it's not really a failure.
@@ -3137,7 +3125,7 @@ isnst_esi_thread(void *arg)
 				ISNST_LOG(CE_WARN, "isnst_esi_thread: "
 				    "accept failure (0x%x)", rc);
 
-				if (rc == EINTR) {
+				if (rc == -ECONNABORTED) {
 					continue;
 				} else {
 					break;
@@ -3164,7 +3152,6 @@ isnst_esi_thread(void *arg)
 		}
 
 		idm_soshutdown(esi.esi_so);
-		ksocket_rele(esi.esi_so);
 		esi.esi_valid = B_FALSE;
 
 		/*
@@ -3202,7 +3189,7 @@ isnst_handle_esi_req(struct socket *ks, isns_pdu_t *pdu, size_t pdu_size)
 	boolean_t		portal_port_valid = B_FALSE;
 	uint32_t		esi_response = ISNS_RSP_SUCCESSFUL;
 	isns_portal_t		*iportal;
-	socklen_t		sa_len;
+	int			sa_len;
 
 
 	if (ntohs(pdu->func_id) != ISNS_ESI) {
@@ -3318,8 +3305,7 @@ isnst_handle_esi_req(struct socket *ks, isns_pdu_t *pdu, size_t pdu_size)
 	/* Get the remote peer's IP address */
 	bzero(&server_ss, sizeof (server_ss));
 	sa_len = sizeof (server_ss);
-	if (ksocket_getpeername(ks, (struct sockaddr *)&server_ss, &sa_len,
-	    CRED())) {
+	if (kernel_getpeername(ks, (struct sockaddr *)&server_ss, &sa_len)) {
 		return;
 	}
 

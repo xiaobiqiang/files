@@ -33,12 +33,13 @@
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
 //#include <sys/ksocket.h>
+#include <linux/net.h>
 
 static void encode_chap_password(int identifier, int chap_passwd_len,
     uint8_t *chap_passwd, uint8_t *result);
 
 static size_t iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg,
-    int timeout);
+    struct kvec *pvec, size_t count, size_t total, int timeout);
 
 /*
  * See radius_packet.h.
@@ -176,7 +177,7 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 	uint16_t		declared_len = 0;
 	size_t			received_len = 0;
 
-	struct iovec		iov[1];
+	struct kvec		iov[1];
 	struct msghdr		msg = {.msg_flags = MSG_WAITALL};
 
 	tmp_data = kmem_zalloc(MAX_RAD_PACKET_LEN, KM_SLEEP);

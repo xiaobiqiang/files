@@ -32,6 +32,7 @@
 extern "C" {
 #endif
 
+#include <sys/scsi/generic/commands.h>
 /*
  * Implementation dependent command definitions.
  * This file is included by <sys/scsi/generic/commands.h>

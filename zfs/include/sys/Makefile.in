@@ -317,7 +317,8 @@ am__kernel_HEADERS_DIST = $(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
 	${top_srcdir}/include/sys/zpl.h \
 	$(top_srcdir)/include/sys/zvol.h \
-	$(top_srcdir)/include/sys/iscsi_protocol.h
+	$(top_srcdir)/include/sys/iscsi_protocol.h \
+	$(top_srcdir)/include/sys/in.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -816,7 +817,8 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
 	${top_srcdir}/include/sys/zpl.h \
 	$(top_srcdir)/include/sys/zvol.h \
-	$(top_srcdir)/include/sys/iscsi_protocol.h
+	$(top_srcdir)/include/sys/iscsi_protocol.h \
+	$(top_srcdir)/include/sys/in.h
 
 USER_H = 
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)

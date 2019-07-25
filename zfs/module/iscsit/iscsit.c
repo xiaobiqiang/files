@@ -40,7 +40,7 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_conn_sm.h>
-#include <sys/iscsi/generic/status.h>
+#include <sys/scsi/generic/status.h>
 #include <linux/miscdevice.h>
 
 #include "iscsit_isns.h"
@@ -2128,7 +2128,7 @@ iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 	    iscsit_deferred, rx_pdu, 0, &rx_pdu->isp_tqent);
 #else
 	if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
-	    iscsit_deferred, rx_pdu, DDI_NOSLEEP) == NULL) {
+	    iscsit_deferred, rx_pdu, TQ_NOSLEEP) == NULL) {
 		/*
 		 * In the unlikely scenario that we couldn't get the resources
 		 * to dispatch the PDU then just drop it.
