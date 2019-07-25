@@ -31,7 +31,7 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-#include <sys/scsi/generic/sense.h>
+
 /*
  * SCSI status completion block
  *
@@ -43,7 +43,7 @@ extern "C" {
  */
 
 struct scsi_status {
-#if defined(__LITTLE_ENDIAN)
+#if defined(_BIT_FIELDS_LTOH)
 	uchar_t	sts_vu0		: 1,	/* vendor unique 		*/
 		sts_chk		: 1,	/* check condition 		*/
 		sts_cm		: 1,	/* condition met 		*/
@@ -52,7 +52,7 @@ struct scsi_status {
 		sts_vu6		: 1,	/* vendor unique 		*/
 		sts_vu7		: 1,	/* vendor unique 		*/
 		sts_resvd	: 1;	/* reserved 			*/
-#elif defined(__BIG_ENDIAN)
+#elif defined(_BIT_FIELDS_HTOL)
 	uchar_t	sts_resvd	: 1,	/* reserved */
 		sts_vu7		: 1,	/* vendor unique */
 		sts_vu6		: 1,	/* vendor unique */
@@ -62,8 +62,8 @@ struct scsi_status {
 		sts_chk		: 1,	/* check condition */
 		sts_vu0		: 1;	/* vendor unique */
 #else
-#error	One of __LITTLE_ENDIAN or __BIG_ENDIAN must be defined
-#endif	/* __LITTLE_ENDIAN */
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
 };
 #define	sts_scsi2	sts_vu6		/* SCSI modifier bit */
 

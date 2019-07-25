@@ -708,7 +708,7 @@ sess_sm_q4_failed(iscsit_sess_t *ist, sess_event_ctx_t *ctx)
 		break;
 	case SE_SESSION_REINSTATE:
 		/* N6 */
-		(void) untimeout(ist->ist_state_timeout);
+//		(void) untimeout(ist->ist_state_timeout);
 		/*FALLTHROUGH*/
 	case SE_SESSION_TIMEOUT:
 		/* N6 */
@@ -832,8 +832,8 @@ sess_sm_new_state(iscsit_sess_t *ist, sess_event_ctx_t *ctx,
 	case SS_Q4_FAILED:
 		t2r_secs =
 		    ist->ist_failed_conn->ict_op.op_default_time_2_retain;
-		ist->ist_state_timeout = timeout(sess_sm_timeout, ist,
-		    drv_usectohz(t2r_secs*1000000));
+/*		ist->ist_state_timeout = timeout(sess_sm_timeout, ist,
+		    drv_usectohz(t2r_secs*1000000)); */
 		break;
 	case SS_Q5_CONTINUE:
 		break;

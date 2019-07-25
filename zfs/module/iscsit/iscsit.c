@@ -40,7 +40,7 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_conn_sm.h>
-
+#include <sys/iscsi/generic/status.h>
 #include <linux/miscdevice.h>
 
 #include "iscsit_isns.h"
@@ -3226,7 +3226,7 @@ iscsit_rxpdu_queue_monitor(void *arg)
 	iscsit_sess_t	*ist;
 
 	mutex_enter(&iscsit_rxpdu_queue_monitor_mutex);
-	iscsit_rxpdu_queue_monitor_thr_did = curthread->t_did;
+//	iscsit_rxpdu_queue_monitor_thr_did = curthread->t_did;
 	iscsit_rxpdu_queue_monitor_thr_running = B_TRUE;
 	cv_signal(&iscsit_rxpdu_queue_monitor_cv);
 
@@ -3248,10 +3248,10 @@ iscsit_rxpdu_queue_monitor(void *arg)
 		if (iscsit_rxpdu_queue_monitor_thr_running == B_FALSE) {
 			break;
 		}
-		(void) cv_reltimedwait(&iscsit_rxpdu_queue_monitor_cv,
+		(void) cv_timedwait(&iscsit_rxpdu_queue_monitor_cv,
 		    &iscsit_rxpdu_queue_monitor_mutex,
-		    ISCSIT_RXPDU_QUEUE_MONITOR_INTERVAL * drv_usectohz(1000000),
-		    TR_CLOCK_TICK);
+		    ddi_get_lbolt() + 
+		    ISCSIT_RXPDU_QUEUE_MONITOR_INTERVAL * drv_usectohz(1000000));
 	}
 	mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
 	thread_exit();

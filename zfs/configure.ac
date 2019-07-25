@@ -210,6 +210,7 @@ AC_CONFIG_FILES([
 	module/stmf/Makefile
 	module/stmf_sbd/Makefile
 	module/pppt/Makefile
+	module/inet/Makefile
 	module/idm/Makefile
 	module/iscsit/Makefile
 	include/Makefile

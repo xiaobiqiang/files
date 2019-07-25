@@ -30,6 +30,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/scsi/generic/persist.h>
+#include <sys/scsi/impl/commands.h>
 
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
@@ -42,6 +43,7 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_text.h>
+#include <sys/in.h>
 
 #define	ISCSIT_LOGIN_SM_STRINGS
 #include "iscsit.h"
@@ -380,7 +382,7 @@ iscsit_login_sm_event_locked(iscsit_conn_t *ict, iscsit_login_event_t event,
 		if (lsm->icl_login_complete) {
 			lsm->icl_busy = B_TRUE;
 			if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
-			    login_sm_complete, ict, DDI_SLEEP) == NULL) {
+			    login_sm_complete, ict, TQ_SLEEP) == NULL) {
 				cmn_err(CE_WARN, "iscsit_login_sm_event_locked:"
 				    " Failed to dispatch task");
 			}

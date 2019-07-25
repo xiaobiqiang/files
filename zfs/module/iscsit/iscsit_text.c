@@ -33,6 +33,7 @@
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
 #include <linux/tcp.h>
+#include <linux/inet.h>
 #include <sys/nvpair.h>
 
 #include <sys/stmf.h>
@@ -42,6 +43,7 @@
 #include <sys/idm/idm_conn_sm.h>
 #include <sys/idm/idm_text.h>
 #include <sys/idm/idm_so.h>
+#include <sys/in.h>
 
 #include "iscsit_isns.h"
 #include "iscsit.h"

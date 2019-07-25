@@ -177,22 +177,16 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 	size_t			received_len = 0;
 
 	struct iovec		iov[1];
-	struct nmsghdr		msg;
+	struct msghdr		msg = {.msg_flags = MSG_WAITALL};
 
 	tmp_data = kmem_zalloc(MAX_RAD_PACKET_LEN, KM_SLEEP);
 	iov[0].iov_base = (char *)tmp_data;
 	iov[0].iov_len	= MAX_RAD_PACKET_LEN;
 
 	bzero(&msg, sizeof (msg));
-	msg.msg_name		= NULL;
-	msg.msg_namelen		= 0;
-	msg.msg_control		= NULL;
-	msg.msg_controllen	= 0;
-	msg.msg_flags		= MSG_WAITALL;
-	msg.msg_iov		= iov;
-	msg.msg_iovlen		= 1;
 
-	received_len = iscsit_net_recvmsg(socket, &msg, RAD_RCV_TIMEOUT);
+	received_len = iscsit_net_recvmsg(socket, &msg, 
+		&iov[0], 1, MAX_RAD_PACKET_LEN, RAD_RCV_TIMEOUT);
 
 	if (received_len <= (size_t)0) {
 		kmem_free(tmp_data, MAX_RAD_PACKET_LEN);
@@ -304,17 +298,19 @@ encode_chap_password(int identifier, int chap_passwd_len,
 }
 /*
  * iscsi_net_recvmsg - receive message on socket
+ * kvec is placed at msg->msg_iter.kvec.
  */
 /* ARGSUSED */
 static size_t
-iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, int timeout)
+iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, 
+	struct kvec *pvec, size_t count, size_t total, int timeout)
 {
 	int		prflag	= msg->msg_flags;
 	size_t		recv	= 0;
 	struct sockaddr_in6 	l_addr, f_addr;
-	socklen_t	l_addrlen;
-	socklen_t	f_addrlen;
-
+	int	l_addrlen;
+	int	f_addrlen;
+	
 	bzero(&l_addr, sizeof (struct sockaddr_in6));
 	bzero(&f_addr, sizeof (struct sockaddr_in6));
 	l_addrlen = sizeof (struct sockaddr_in6);
@@ -322,10 +318,10 @@ iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, int timeout)
 	/* If timeout requested on receive */
 	if (timeout > 0) {
 		boolean_t   loopback = B_FALSE;
-		(void) ksocket_getsockname(socket, (struct sockaddr *)(&l_addr),
-		    &l_addrlen, CRED());
-		(void) ksocket_getpeername(socket, (struct sockaddr *)(&f_addr),
-		    &f_addrlen, CRED());
+		(void) kernel_getsockname(socket, (struct sockaddr *)(&l_addr),
+		    &l_addrlen);
+		(void) kernel_getpeername(socket, (struct sockaddr *)(&f_addr),
+		    &f_addrlen);
 
 		/* And this isn't a loopback connection */
 		if (((struct sockaddr *)(&l_addr))->sa_family == AF_INET) {
@@ -356,8 +352,8 @@ iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, int timeout)
 			tl.tv_sec = timeout;
 			tl.tv_usec = 0;
 			/* Set recv timeout */
-			if (ksocket_setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
-			    &tl, sizeof (struct timeval), CRED()))
+			if (kernel_setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
+			    &tl, sizeof (struct timeval)))
 				return (0);
 		}
 	}
@@ -372,6 +368,6 @@ iscsit_net_recvmsg(struct socket *socket, struct msghdr *msg, int timeout)
 	 * In general this is the total amount we
 	 * requested.
 	 */
-	(void) ksocket_recvmsg(socket, msg, prflag, &recv, CRED());
-	return (recv);
+	recv = kernel_recvmsg(socket, msg, pvec, count, total, prflag);
+	return (recv <= 0 ? 0 : recv); 
 }

@@ -122,7 +122,7 @@ cleanup:
 	return (rc);
 }
 
-2.anotate untimeout and timeout in idm_conn_sm.c
+2.anotate untimeout and timeout in idm_conn_sm.c iscsit_sess.c iscsit_tgt.c
 
 3.del getpcstack of REFCNT_AUDIT micro in idm_impl.h
 

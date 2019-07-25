@@ -30,6 +30,7 @@
 #include <sys/sunddi.h>
 //#include <sys/socket.h>
 #include <linux/tcp.h>
+#include <sys/in.h>
 #else
 #include <stdio.h>
 #include <strings.h>

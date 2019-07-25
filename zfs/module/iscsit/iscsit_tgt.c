@@ -646,10 +646,10 @@ iscsit_tgt_dereg_retry(void *arg)
 	 * If it fails we'll setup another timeout and try again later.
 	 */
 	if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
-	    iscsit_tgt_dereg_task, tgt, DDI_NOSLEEP) == NULL) {
+	    iscsit_tgt_dereg_task, tgt, TQ_NOSLEEP) == NULL) {
 		/* Dispatch failed, try again later */
-		(void) timeout(iscsit_tgt_dereg_retry, tgt,
-		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000));
+/*		(void) timeout(iscsit_tgt_dereg_retry, tgt,
+		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000)); */
 	}
 }
 

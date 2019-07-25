@@ -30,8 +30,10 @@
 #include <sys/sunddi.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
+#include <linux/in6.h>
 #include <sys/sdt.h>
 
+#include <sys/atomic.h>
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
@@ -132,7 +134,7 @@ static boolean_t	isns_monitor_thr_running;
 static kcondvar_t	isns_idle_cv;
 
 static uint16_t		xid;
-#define	GET_XID()	atomic_inc_16_nv(&xid)
+#define	GET_XID()	atomic_inc_16(&xid)
 
 static clock_t		monitor_idle_interval; /* 60s */
 
@@ -246,17 +248,11 @@ static int		num_tpg_portals;
  */
 static char		*isns_eid = NULL;
 
-/*
- * in6addr_any is currently all zeroes, but use the macro in case this
- * ever changes.
- */
-static const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
+static void
+isnst_start(void);
 
 static void
-isnst_start();
-
-static void
-isnst_stop();
+isnst_stop(void);
 
 static void
 iscsit_set_isns(boolean_t state);
@@ -375,7 +371,7 @@ static void
 isnst_esi_thread(void *arg);
 
 static void
-isnst_handle_esi_req(ksocket_t so, isns_pdu_t *pdu, size_t pl_size);
+isnst_handle_esi_req(struct socket *so, isns_pdu_t *pdu, size_t pl_size);
 
 static void isnst_esi_start(void);
 static void isnst_esi_stop(void);
@@ -875,7 +871,7 @@ iscsit_isns_target_update(iscsit_tgt_t *target)
 }
 
 static void
-isnst_start()
+isnst_start(void)
 {
 	ISNST_LOG(CE_NOTE, "**** isnst_start");
 
@@ -893,7 +889,7 @@ isnst_start()
 }
 
 static void
-isnst_stop()
+isnst_stop(void)
 {
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 	ISNST_LOG(CE_NOTE, "**** isnst_stop");
@@ -992,7 +988,7 @@ isnst_update_server_timestamp(struct sockaddr_storage *ss)
 
 
 static void
-isnst_monitor_all_servers()
+isnst_monitor_all_servers(void)
 {
 	iscsit_isns_svr_t	*svr, *next_svr;
 	boolean_t		enabled;
@@ -1053,7 +1049,6 @@ isnst_monitor_awaken(void)
 {
 	mutex_enter(&isns_monitor_mutex);
 	if (isns_monitor_thr_running) {
-		DTRACE_PROBE(iscsit__isns__monitor__awaken);
 		cv_signal(&isns_idle_cv);
 	}
 	mutex_exit(&isns_monitor_mutex);
@@ -1067,7 +1062,7 @@ static void
 isnst_monitor(void *arg)
 {
 	mutex_enter(&isns_monitor_mutex);
-	isns_monitor_thr_did = curthread->t_did;
+//	isns_monitor_thr_did = curthread->t_did;
 	isns_monitor_thr_running = B_TRUE;
 	cv_signal(&isns_idle_cv);
 
@@ -1096,7 +1091,6 @@ isnst_monitor(void *arg)
 		/* If something needs attention, go right to the top */
 		mutex_enter(&iscsit_isns_mutex);
 		if (isns_targets_changed || isns_portals_changed) {
-			DTRACE_PROBE(iscsit__isns__monitor__reenter);
 			mutex_exit(&iscsit_isns_mutex);
 			/* isns_monitor_mutex still held */
 			continue;
@@ -1110,11 +1104,8 @@ isnst_monitor(void *arg)
 		if (! isns_monitor_thr_running)
 			break;
 
-		DTRACE_PROBE(iscsit__isns__monitor__sleep);
-		(void) cv_reltimedwait(&isns_idle_cv, &isns_monitor_mutex,
-		    monitor_idle_interval, TR_CLOCK_TICK);
-		DTRACE_PROBE1(iscsit__isns__monitor__wakeup,
-		    boolean_t, isns_monitor_thr_running);
+		(void) cv_timedwait(&isns_idle_cv, &isns_monitor_mutex,
+		    ddi_get_lbolt() + monitor_idle_interval);
 	}
 
 	mutex_exit(&isns_monitor_mutex);
@@ -2817,7 +2808,7 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 		send_timer = timeout(isnst_so_timeout, so,
 		    drv_usectohz(isns_timeout_usec));
 		rc = idm_iov_sosend(so, &iov[0], 2, send_len);
-		(void) untimeout(send_timer);
+//		(void) untimeout(send_timer);
 
 		flags &= ~ISNS_FLAG_FIRST_PDU;
 		payload += payload_len;
@@ -2855,14 +2846,14 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 
 	do {
 		/* receive the pdu header */
-		rcv_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(isns_timeout_usec));
+/*		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(isns_timeout_usec)); */
 		if (idm_sorecv(so, &tmp_pdu_hdr, ISNSP_HEADER_SIZE) != 0 ||
 		    ntohs(tmp_pdu_hdr.seq) != seq) {
-			(void) untimeout(rcv_timer);
+//			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
-		(void) untimeout(rcv_timer);
+//		(void) untimeout(rcv_timer);
 
 		/* receive the payload */
 		payload_len = ntohs(tmp_pdu_hdr.payload_len);
@@ -2873,13 +2864,13 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 		if (payload == NULL) {
 			goto rcv_error;
 		}
-		rcv_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
+/*		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000)); */
 		if (idm_sorecv(so, payload, payload_len) != 0) {
-			(void) untimeout(rcv_timer);
+//			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
-		(void) untimeout(rcv_timer);
+//		(void) untimeout(rcv_timer);
 
 		/* combine the pdu if it is not the first one */
 		if (total_pdu_len > 0) {
@@ -2938,7 +2929,7 @@ static void *
 isnst_open_so(struct sockaddr_storage *sa)
 {
 	int sa_sz;
-	ksocket_t so;
+	struct socket *so;
 
 	ASSERT(! ISNS_GLOBAL_LOCK_HELD());
 
@@ -3055,7 +3046,7 @@ isnst_esi_stop()
 static void
 isnst_esi_thread(void *arg)
 {
-	ksocket_t		newso;
+	struct socket *newso;
 	struct sockaddr_in6	sin6;
 	socklen_t		sin_addrlen;
 	uint32_t		on = 1;
@@ -3133,11 +3124,7 @@ isnst_esi_thread(void *arg)
 		esi.esi_valid = B_TRUE;
 		while (esi.esi_enabled) {
 			mutex_exit(&esi.esi_mutex);
-
-			DTRACE_PROBE3(iscsit__isns__esi__accept__wait,
-			    boolean_t, esi.esi_enabled,
-			    ksocket_t, esi.esi_so,
-			    struct sockaddr_in6, &sin6);
+			
 			if ((rc = ksocket_accept(esi.esi_so, NULL, NULL,
 			    &newso, CRED())) != 0) {
 				mutex_enter(&esi.esi_mutex);
@@ -3156,9 +3143,6 @@ isnst_esi_thread(void *arg)
 					break;
 				}
 			}
-			DTRACE_PROBE2(iscsit__isns__esi__accept,
-			    boolean_t, esi.esi_enabled,
-			    ksocket_t, newso);
 
 			pl_size = isnst_rcv_pdu(newso, &pdu);
 			if (pl_size == 0) {
@@ -3204,7 +3188,7 @@ esi_thread_exit:
  */
 
 static void
-isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
+isnst_handle_esi_req(struct socket *ks, isns_pdu_t *pdu, size_t pdu_size)
 {
 	isns_pdu_t		*rsp_pdu;
 	isns_resp_t		*rsp;
