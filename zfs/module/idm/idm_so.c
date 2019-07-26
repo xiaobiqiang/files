@@ -214,19 +214,6 @@ idm_so_fini(void)
 	mutex_destroy(&idm_so_timed_socket_mutex);
 }
 
-/*
-ksocket_t
-idm_socreate(int domain, int type, int protocol)
-{
-	ksocket_t ks;
-
-	if (!ksocket_socket(&ks, domain, type, protocol, KSOCKET_NOSLEEP,
-	    CRED())) {
-		return (ks);
-	} else {
-		return (NULL);
-	}
-} */
 
 struct socket *
 idm_socreate(int domain, int type, int protocol)
@@ -239,6 +226,7 @@ idm_socreate(int domain, int type, int protocol)
 		return (NULL);
 	}
 }
+EXPORT_SYMBOL(idm_socreate);
 
 
 /*
@@ -248,18 +236,13 @@ idm_socreate(int domain, int type, int protocol)
  * idm_sorecv/idm_iov_sorecv will return so idm_soshutdown can be used
  * regain control of a thread stuck in idm_sorecv.
  */
-/*
-void
-idm_soshutdown(ksocket_t so)
-{
-	(void) ksocket_shutdown(so, SHUT_RDWR, CRED());
-} */
 
 void
 idm_soshutdown(struct socket *so)
 {
 	(void) kernel_sock_shutdown(so, SHUT_RDWR);
 }
+EXPORT_SYMBOL(idm_soshutdown);
 
 /*
  * idm_sodestroy releases all resources associated with a socket previously
@@ -267,18 +250,12 @@ idm_soshutdown(struct socket *so)
  * idm_soshutdown before the socket is destroyed with idm_sodestroy,
  * otherwise undefined behavior will result.
  */
-/*
-void
-idm_sodestroy(ksocket_t ks)
-{
-	(void) ksocket_close(ks, CRED());
-} */
-
 void
 idm_sodestroy(struct socket *so)
 {
 	sock_release(so);
 }
+EXPORT_SYMBOL(idm_sodestroy);
 
 
 /*
@@ -380,6 +357,7 @@ idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
 
 	return (1);
 }
+EXPORT_SYMBOL(idm_ss_compare);
 
 /*
  * IP address filter functions to flag addresses that should not
@@ -472,6 +450,7 @@ retry:
 	*ipaddr_p = rv;
 	return alloc_size;
 }
+EXPORT_SYMBOL(idm_get_ipaddr);
 
 int
 idm_sorecv(struct socket *so, void *msg, size_t len)
@@ -489,6 +468,7 @@ idm_sorecv(struct socket *so, void *msg, size_t len)
 
 	return (idm_iov_sorecv(so, &iov, 1, len));
 }
+EXPORT_SYMBOL(idm_sorecv);
 
 /*
  * idm_sosendto - Sends a buffered data on a non-connected socket.
@@ -520,6 +500,7 @@ idm_sosendto(struct socket *so, void *buff, size_t len,
 
 	return 0;
 }
+EXPORT_SYMBOL(idm_sosendto);
 
 /*
  * idm_iov_sosend - Sends an iovec on a connection.
@@ -549,6 +530,7 @@ idm_iov_sosend(struct socket *so, iovec_t *iop, int iovlen, size_t total_len)
 
 	return 0;
 }
+EXPORT_SYMBOL(idm_iov_sosend);
 
 /*
  * idm_iov_sorecv - Receives an iovec from a connection
@@ -3089,6 +3071,7 @@ idm_addr_to_sa(idm_addr_t *dportal, struct sockaddr_storage *sa)
 		ASSERT(0);
 	}
 }
+EXPORT_SYMBOL(idm_addr_to_sa);
 
 /*
  * return a human-readable form of a sockaddr_storage, in the form
@@ -3144,3 +3127,5 @@ err:
 	(void) snprintf(buf, size, "%s", bogus_ip);
 	return (buf);
 }
+EXPORT_SYMBOL(idm_sa_ntop);
+

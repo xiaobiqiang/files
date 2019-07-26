@@ -159,6 +159,8 @@ inet_ntop(int af, const void *addr, char *buf, int addrlen)
 	}
 #undef UC
 }
+EXPORT_SYMBOL(inet_ntop);
+
 
 /*
  * search for char c, terminate on trailing white space
@@ -341,4 +343,5 @@ inet_pton(int af, char *inp, void *outp)
 	}	/* switch */
 	return (-1);	/* return -1 for default case */
 }
+EXPORT_SYMBOL(inet_pton);
 

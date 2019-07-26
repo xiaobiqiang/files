@@ -384,6 +384,7 @@ idm_lookup_kv_xlate(const char *key, int keylen)
 
 	return (ikvx);
 }
+EXPORT_SYMBOL(idm_lookup_kv_xlate);
 
 static int
 idm_nvlist_add_kv(nvlist_t *nvl,  const idm_kv_xlate_t *ikvx, char *value)
@@ -763,6 +764,7 @@ idm_nvlist_to_textbuf(nvlist_t *nvl, char **textbuf, int *textbuflen,
 
 	return (rc);
 }
+EXPORT_SYMBOL(idm_nvlist_to_textbuf);
 
 static int
 idm_itextbuf_add_nvpair(nvpair_t *nvp,
@@ -1193,6 +1195,7 @@ idm_get_next_listvalue(nvpair_t *value_list, nvpair_t *curr_nvp)
 
 	return (result);
 }
+EXPORT_SYMBOL(idm_get_next_listvalue);
 
 kv_status_t
 idm_nvstat_to_kvstat(int nvrc)
@@ -1217,6 +1220,7 @@ idm_nvstat_to_kvstat(int nvrc)
 
 	return (result);
 }
+EXPORT_SYMBOL(idm_nvstat_to_kvstat);
 
 void
 idm_kvstat_to_error(kv_status_t kvrc, uint8_t *class, uint8_t *detail)
@@ -1260,6 +1264,7 @@ idm_kvstat_to_error(kv_status_t kvrc, uint8_t *class, uint8_t *detail)
 		break;
 	}
 }
+EXPORT_SYMBOL(idm_kvstat_to_error);
 
 int
 idm_nvlist_add_keyvalue(nvlist_t *nvl,
@@ -1362,6 +1367,7 @@ idm_nvlist_to_itextbuf(nvlist_t *nvl)
 	itb->itb_offset = validlen;
 	return ((void *)itb);
 }
+EXPORT_SYMBOL(idm_nvlist_to_itextbuf);
 
 /*
  * Copy as much of the text buffer as will fit in the pdu.
@@ -1437,6 +1443,7 @@ idm_pdu_init_text_data(idm_pdu_t *pdu, void *arg,
 	*transit = 0;
 	return (++ptr);
 }
+EXPORT_SYMBOL(idm_pdu_init_text_data);
 
 void
 idm_itextbuf_free(void *arg)
@@ -1446,6 +1453,7 @@ idm_itextbuf_free(void *arg)
 	kmem_free(itb->itb_mem, itb->itb_mem_len);
 	kmem_free(itb, sizeof (idm_textbuf_t));
 }
+EXPORT_SYMBOL(idm_itextbuf_free);
 
 /*
  * Allocate an nvlist and poputlate with key=value from the pdu list.
@@ -1626,3 +1634,5 @@ cleanup:
 	 */
 	return (ret);
 }
+EXPORT_SYMBOL(idm_pdu_list_to_nvlist);
+

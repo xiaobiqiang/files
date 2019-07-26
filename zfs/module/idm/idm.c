@@ -366,6 +366,7 @@ idm_tgt_svc_port_up(idm_svc_req_t *sr, idm_svc_t **new_svc)
 
 	return (IDM_STATUS_SUCCESS);
 }
+EXPORT_SYMBOL(idm_tgt_svc_port_up);
 
 void
 idm_tgt_svc_port_down(idm_svc_t *svc)
@@ -383,6 +384,7 @@ idm_tgt_svc_port_down(idm_svc_t *svc)
 
 	mutex_exit(&idm.idm_global_mutex);
 }
+EXPORT_SYMBOL(idm_tgt_svc_port_down);
 
 /*
  * idm_tgt_svc_create
@@ -599,6 +601,7 @@ idm_negotiate_key_values(idm_conn_t *ic, nvlist_t *request_nvl,
 	return (ic->ic_transport_ops->it_negotiate_key_values(ic,
 	    request_nvl, response_nvl, negotiated_nvl));
 }
+EXPORT_SYMBOL(idm_negotiate_key_values);
 
 /*
  * idm_notice_key_values()
@@ -612,6 +615,7 @@ idm_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 	ASSERT(ic->ic_transport_ops != NULL);
 	ic->ic_transport_ops->it_notice_key_values(ic, negotiated_nvl);
 }
+EXPORT_SYMBOL(idm_notice_key_values);
 
 /*
  * idm_declare_key_values()
@@ -626,6 +630,7 @@ idm_declare_key_values(idm_conn_t *ic, nvlist_t *config_nvl,
 	return (ic->ic_transport_ops->it_declare_key_values(ic, config_nvl,
 	    outgoing_nvl));
 }
+EXPORT_SYMBOL(idm_declare_key_values);
 
 /*
  * idm_buf_tx_to_ini
@@ -707,6 +712,7 @@ idm_buf_tx_to_ini(idm_task_t *idt, idm_buf_t *idb,
 
 	return (IDM_STATUS_FAIL);
 }
+EXPORT_SYMBOL(idm_buf_tx_to_ini);
 
 /*
  * idm_buf_rx_from_ini
@@ -776,6 +782,7 @@ idm_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb,
 
 	return (IDM_STATUS_FAIL);
 }
+EXPORT_SYMBOL(idm_buf_rx_from_ini);
 
 /*
  * idm_buf_tx_to_ini_done
@@ -932,6 +939,7 @@ idm_buf_alloc(idm_conn_t *ic, void *bufptr, uint64_t buflen)
 
 	return (idm_buf_alloc_int(ic, bufptr, buflen, NULL, 0, 0));
 }
+EXPORT_SYMBOL(idm_buf_alloc);
 
 idm_buf_t *
 idm_buf_alloc_sgl(idm_conn_t *ic, struct stmf_sglist_ent *sglp,
@@ -939,6 +947,7 @@ idm_buf_alloc_sgl(idm_conn_t *ic, struct stmf_sglist_ent *sglp,
 {
 	return (idm_buf_alloc_int(ic, NULL, buflen, sglp, numbufs, flags));
 }
+EXPORT_SYMBOL(idm_buf_alloc_sgl);
 
 static idm_buf_t *
 idm_buf_alloc_int(idm_conn_t *ic, void *bufptr, uint64_t buflen,
@@ -1069,6 +1078,7 @@ idm_buf_free(idm_buf_t *buf)
 	kmem_cache_free(idm.idm_buf_cache, buf);
 	idm_conn_rele(ic);
 }
+EXPORT_SYMBOL(idm_buf_free);
 
 /*
  * idm_buf_bind_in
@@ -1280,6 +1290,7 @@ idm_task_alloc(idm_conn_t *ic)
 	idt->idt_flags		= 0;
 	return (idt);
 }
+EXPORT_SYMBOL(idm_task_alloc);
 
 /*
  * idm_task_start
@@ -1302,6 +1313,7 @@ idm_task_start(idm_task_t *idt, uintptr_t handle)
 	    idt->idt_rx_from_ini_start = idt->idt_rx_from_ini_done =
 	    idt->idt_tx_bytes = idt->idt_rx_bytes = 0;
 }
+EXPORT_SYMBOL(idm_task_start);
 
 /*
  * idm_task_done
@@ -1330,6 +1342,7 @@ idm_task_done(idm_task_t *idt)
 	idm_refcnt_wait_ref(&idt->idt_refcnt);
 	idm_refcnt_reset(&idt->idt_refcnt);
 }
+EXPORT_SYMBOL(idm_task_done);
 
 /*
  * idm_task_free
@@ -1365,6 +1378,7 @@ idm_task_free(idm_task_t *idt)
 
 	idm_conn_rele(ic);
 }
+EXPORT_SYMBOL(idm_task_free);
 
 /*
  * idm_task_find_common
@@ -1513,18 +1527,21 @@ idm_task_find_by_handle(idm_conn_t *ic, uintptr_t handle)
 
 	return (idt->idt_private);
 }
+EXPORT_SYMBOL(idm_task_find_by_handle);
 
 void
 idm_task_hold(idm_task_t *idt)
 {
 	idm_refcnt_hold(&idt->idt_refcnt);
 }
+EXPORT_SYMBOL(idm_task_hold);
 
 void
 idm_task_rele(idm_task_t *idt)
 {
 	idm_refcnt_rele(&idt->idt_refcnt);
 }
+EXPORT_SYMBOL(idm_task_rele);
 
 void
 idm_task_abort(idm_conn_t *ic, idm_task_t *idt, idm_abort_type_t abort_type)
@@ -1563,6 +1580,7 @@ idm_task_abort(idm_conn_t *ic, idm_task_t *idt, idm_abort_type_t abort_type)
 		idm_task_abort_one(ic, idt, abort_type);
 	}
 }
+EXPORT_SYMBOL(idm_task_abort);
 
 static void
 idm_task_abort_unref_cb(void *ref)
@@ -1874,6 +1892,7 @@ idm_pdu_tx(idm_pdu_t *pdu)
 	}
 	mutex_exit(&ic->ic_state_mutex);
 }
+EXPORT_SYMBOL(idm_pdu_tx);
 
 /*
  * Common allocation of a PDU along with memory for header and data.
@@ -1919,6 +1938,7 @@ idm_pdu_alloc(uint_t hdrlen, uint_t datalen)
 {
 	return (idm_pdu_alloc_common(hdrlen, datalen, KM_SLEEP));
 }
+EXPORT_SYMBOL(idm_pdu_alloc);
 
 /*
  * Non-blocking idm_pdu_alloc implementation, returns NULL if resources
@@ -1945,6 +1965,7 @@ idm_pdu_free(idm_pdu_t *pdu)
 	kmem_free(pdu,
 	    sizeof (idm_pdu_t) + pdu->isp_hdrbuflen + pdu->isp_databuflen);
 }
+EXPORT_SYMBOL(idm_pdu_free);
 
 /*
  * Initialize the connection, private and callback fields in a PDU.
@@ -1964,6 +1985,7 @@ idm_pdu_init(idm_pdu_t *pdu, idm_conn_t *ic, void *private, idm_pdu_cb_t *cb)
 	pdu->isp_private = private;
 	pdu->isp_callback = cb;
 }
+EXPORT_SYMBOL(idm_pdu_init);
 
 /*
  * Initialize the header and header length field.  This function should
@@ -1999,6 +2021,7 @@ idm_pdu_complete(idm_pdu_t *pdu, idm_status_t status)
 		idm_pdu_free(pdu);
 	}
 }
+EXPORT_SYMBOL(idm_pdu_complete);
 
 /*
  * State machine auditing
@@ -2010,6 +2033,7 @@ idm_sm_audit_init(sm_audit_buf_t *audit_buf)
 	bzero(audit_buf, sizeof (sm_audit_buf_t));
 	audit_buf->sab_max_index = SM_AUDIT_BUF_MAX_REC - 1;
 }
+EXPORT_SYMBOL(idm_sm_audit_init);
 
 static
 sm_audit_record_t *
@@ -2045,6 +2069,7 @@ idm_sm_audit_event(sm_audit_buf_t *audit_buf,
 	sar->sar_event = event;
 	sar->sar_event_info = event_info;
 }
+EXPORT_SYMBOL(idm_sm_audit_event);
 
 void
 idm_sm_audit_state_change(sm_audit_buf_t *audit_buf,
@@ -2056,6 +2081,7 @@ idm_sm_audit_state_change(sm_audit_buf_t *audit_buf,
 	    sm_type, current_state);
 	sar->sar_new_state = new_state;
 }
+EXPORT_SYMBOL(idm_sm_audit_state_change);
 
 
 /*
@@ -2073,6 +2099,7 @@ idm_refcnt_init(idm_refcnt_t *refcnt, void *referenced_obj)
 	mutex_init(&refcnt->ir_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&refcnt->ir_cv, NULL, CV_DEFAULT, NULL);
 }
+EXPORT_SYMBOL(idm_refcnt_init);
 
 void
 idm_refcnt_destroy(idm_refcnt_t *refcnt)
@@ -2087,6 +2114,7 @@ idm_refcnt_destroy(idm_refcnt_t *refcnt)
 	cv_destroy(&refcnt->ir_cv);
 	mutex_destroy(&refcnt->ir_mutex);
 }
+EXPORT_SYMBOL(idm_refcnt_destroy);
 
 void
 idm_refcnt_reset(idm_refcnt_t *refcnt)
@@ -2094,6 +2122,7 @@ idm_refcnt_reset(idm_refcnt_t *refcnt)
 	refcnt->ir_waiting = REF_NOWAIT;
 	refcnt->ir_refcnt = 0;
 }
+EXPORT_SYMBOL(idm_refcnt_reset);
 
 void
 idm_refcnt_hold(idm_refcnt_t *refcnt)
@@ -2109,6 +2138,8 @@ idm_refcnt_hold(idm_refcnt_t *refcnt)
 	REFCNT_AUDIT(refcnt);
 	mutex_exit(&refcnt->ir_mutex);
 }
+EXPORT_SYMBOL(idm_refcnt_hold);
+
 
 static void
 idm_refcnt_unref_task(void *refcnt_void)
@@ -2150,6 +2181,7 @@ idm_refcnt_rele(idm_refcnt_t *refcnt)
 	}
 	mutex_exit(&refcnt->ir_mutex);
 }
+EXPORT_SYMBOL(idm_refcnt_rele);
 
 void
 idm_refcnt_rele_and_destroy(idm_refcnt_t *refcnt, idm_refcnt_cb_t *cb_func)
@@ -2186,6 +2218,7 @@ idm_refcnt_wait_ref(idm_refcnt_t *refcnt)
 		cv_wait(&refcnt->ir_cv, &refcnt->ir_mutex);
 	mutex_exit(&refcnt->ir_mutex);
 }
+EXPORT_SYMBOL(idm_refcnt_wait_ref);
 
 void
 idm_refcnt_async_wait_ref(idm_refcnt_t *refcnt, idm_refcnt_cb_t *cb_func)
@@ -2209,6 +2242,7 @@ idm_refcnt_async_wait_ref(idm_refcnt_t *refcnt, idm_refcnt_cb_t *cb_func)
 	}
 	mutex_exit(&refcnt->ir_mutex);
 }
+EXPORT_SYMBOL(idm_refcnt_async_wait_ref);
 
 void
 idm_refcnt_destroy_unref_obj(idm_refcnt_t *refcnt,
@@ -2228,18 +2262,21 @@ idm_conn_hold(idm_conn_t *ic)
 {
 	idm_refcnt_hold(&ic->ic_refcnt);
 }
+EXPORT_SYMBOL(idm_conn_hold);
 
 void
 idm_conn_rele(idm_conn_t *ic)
 {
 	idm_refcnt_rele(&ic->ic_refcnt);
 }
+EXPORT_SYMBOL(idm_conn_rele);
 
 void
 idm_conn_set_target_name(idm_conn_t *ic, char *target_name)
 {
 	(void) strlcpy(ic->ic_target_name, target_name, ISCSI_MAX_NAME_LEN + 1);
 }
+EXPORT_SYMBOL(idm_conn_set_target_name);
 
 void
 idm_conn_set_initiator_name(idm_conn_t *ic, char *initiator_name)
@@ -2247,6 +2284,7 @@ idm_conn_set_initiator_name(idm_conn_t *ic, char *initiator_name)
 	(void) strlcpy(ic->ic_initiator_name, initiator_name,
 	    ISCSI_MAX_NAME_LEN + 1);
 }
+EXPORT_SYMBOL(idm_conn_set_initiator_name);
 
 void
 idm_conn_set_isid(idm_conn_t *ic, uint8_t isid[ISCSI_ISID_LEN])
@@ -2255,6 +2293,7 @@ idm_conn_set_isid(idm_conn_t *ic, uint8_t isid[ISCSI_ISID_LEN])
 	    "%02x%02x%02x%02x%02x%02x",
 	    isid[0], isid[1], isid[2], isid[3], isid[4], isid[5]);
 }
+EXPORT_SYMBOL(idm_conn_set_isid);
 
 static int
 _idm_init(void)

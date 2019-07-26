@@ -38,8 +38,10 @@
 
 #ifdef DEBUG
 boolean_t	idm_sm_logging = B_TRUE;
+EXPORT_SYMBOL(idm_sm_logging);
 #else
 boolean_t	idm_sm_logging = B_FALSE;
+EXPORT_SYMBOL(idm_sm_logging);
 #endif
 
 extern idm_global_t	idm; /* Global state */
@@ -183,6 +185,7 @@ idm_conn_event(idm_conn_t *ic, idm_conn_event_t event, uintptr_t event_info)
 	idm_conn_event_locked(ic, event, event_info, CT_NONE);
 	mutex_exit(&ic->ic_state_mutex);
 }
+EXPORT_SYMBOL(idm_conn_event);
 
 
 idm_status_t
@@ -206,6 +209,7 @@ idm_conn_reinstate_event(idm_conn_t *old_ic, idm_conn_t *new_ic)
 
 	return (result);
 }
+EXPORT_SYMBOL(idm_conn_reinstate_event);
 
 void
 idm_conn_tx_pdu_event(idm_conn_t *ic, idm_conn_event_t event,
