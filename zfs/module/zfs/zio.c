@@ -3180,7 +3180,8 @@ zio_checksum_verify(zio_t *zio)
 	}
 
 	if ((error = zio_checksum_error(zio, &info)) != 0) {
-		cmn_err(CE_WARN,"%s checksum error obj=%lx.%lx blkid=%lx",
+		if (zio->io_bookmark.zb_objset || zio->io_bookmark.zb_object)
+			cmn_err(CE_WARN,"%s checksum error obj=%lx.%lx blkid=%lx",
 			__func__, (long)zio->io_bookmark.zb_objset, (long)zio->io_bookmark.zb_object,
 			(long)zio->io_bookmark.zb_blkid);
 		zio->io_error = error;

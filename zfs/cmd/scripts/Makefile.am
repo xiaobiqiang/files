@@ -5,3 +5,4 @@ dist_scripts_SCRIPTS = 		\
 
 install: 
 	@cp -rvf $(dist_scripts_SCRIPTS) $(scriptsdir)
+	@chmod 755 $(scriptsdir)/fc_stat.sh
