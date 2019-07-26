@@ -44,6 +44,7 @@
 #include <uapi/linux/if.h>
 #include <linux/inet.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 //#include <sys/sockio.h>
 //#include <sys/ksocket.h>
 //#include <sys/filio.h>		/* FIONBIO */
@@ -423,7 +424,7 @@ idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 	size_t org_ipnum, ipnum = 64;	
 	struct net_device *netdev = NULL;
 	struct in_device *indev = NULL;
-	struct in_ifaddr ip;
+	struct in_ifaddr *ip;
 	uint32_t if_flg = 0;
 	idm_addr_list_t *rv = NULL;
 	idm_addr_t *addr_p = NULL;
