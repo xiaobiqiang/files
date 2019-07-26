@@ -339,6 +339,18 @@ do_unmount(const char *mntpt, int flags)
 }
 
 static int
+zfs_clean_mountpoint(const char *mntpt)
+{
+	char *argv[3] = {"/usr/bin/rm", "-rf", NULL};
+	int rc, count = 2;
+
+	argv[count] = (char *)mntpt;
+	rc = libzfs_run_process(argv[0], argv, STDOUT_VERBOSE|STDERR_VERBOSE);
+
+	return (rc ? EINVAL : 0);
+}
+
+static int
 zfs_add_option(zfs_handle_t *zhp, char *options, int len,
     zfs_prop_t prop, char *on, char *off)
 {
@@ -499,6 +511,10 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 	 * Append zfsutil option so the mount helper allow the mount
 	 */
 	strlcat(mntopts, "," MNTOPT_ZFSUTIL, sizeof (mntopts));
+
+	if (!remount && lstat(mountpoint, &buf) == 0) {
+		(void) zfs_clean_mountpoint(mountpoint);
+	}
 
 	/* Create the directory if it doesn't already exist */
 	if (lstat(mountpoint, &buf) != 0) {
