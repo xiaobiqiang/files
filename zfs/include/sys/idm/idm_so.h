@@ -101,7 +101,7 @@ int idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
     boolean_t v4_mapped_as_v4,
     boolean_t compare_ports);
 
-//int idm_get_ipaddr(idm_addr_list_t **);
+int idm_get_ipaddr(idm_addr_list_t **);
 
 void idm_addr_to_sa(idm_addr_t *dportal,
     struct sockaddr_storage *sa);

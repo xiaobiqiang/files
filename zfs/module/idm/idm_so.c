@@ -43,6 +43,7 @@
 #include <linux/in.h>
 #include <uapi/linux/if.h>
 #include <linux/inet.h>
+#include <linux/netdevice.h>
 //#include <sys/sockio.h>
 //#include <sys/ksocket.h>
 //#include <sys/filio.h>		/* FIONBIO */
@@ -414,149 +415,62 @@ idm_v6_addr_okay(struct in6_addr *addr6)
 
 /*
  * idm_get_ipaddr will retrieve a list of IP Addresses which the host is
- * configured with by sending down a sequence of kernel ioctl to IP STREAMS.
+ * configured with by iterate net_device.
  */
-/*
 int
 idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 {
-	ksocket_t 		so4, so6;
-	struct lifnum		lifn;
-	struct lifconf		lifc;
-	struct lifreq		*lp;
-	int			rval;
-	int			numifs;
-	int			bufsize;
-	void			*buf;
-	int			i, j, n, rc;
-	struct sockaddr_storage	ss;
-	struct sockaddr_in	*sin;
-	struct sockaddr_in6	*sin6;
-	idm_addr_t		*ip;
-	idm_addr_list_t		*ipaddr = NULL;
-	int			size_ipaddr;
+	size_t org_ipnum, ipnum = 64;	
+	struct net_device *netdev = NULL;
+	struct in_device *indev = NULL;
+	struct in_ifaddr ip;
+	uint32_t if_flg = 0;
+	idm_addr_list_t *rv = NULL;
+	idm_addr_t *addr_p = NULL;
+	boolean_t need_retry = B_FALSE;
+	int alloc_size = 0;
+	
+retry:
+	org_ipnum = ipnum;
+	alloc_size = sizeof(idm_addr_list_t) + 
+		(ipnum - 1) * sizeof(idm_addr_t);
+	rv = kmem_zalloc(alloc_size, KM_SLEEP);
+	if (!rv)
+		return -ENOMEM;
 
-	*ipaddr_p = NULL;
-	size_ipaddr = 0;
-	buf = NULL;
+	ipnum = 0;
+	addr_p = &rv->al_addrs[0];
 
-	if ((so6 = idm_socreate(PF_INET6, SOCK_DGRAM, 0)) == NULL)
-		return (0);
-	if ((so4 = idm_socreate(PF_INET, SOCK_DGRAM, 0)) == NULL) {
-		idm_sodestroy(so6);
-		return (0);
+	rtnl_lock();
+	for_each_netdev(&init_net, netdev) {
+		if_flg = dev_get_flags(netdev);
+		if (!(if_flg & IFF_UP) || 
+			!(if_flg & IFF_RUNNING))
+			continue;
+
+		indev = in_dev_get(netdev);
+		
+		for (ip = indev->ifa_list; ip; ip = ip->ifa_next) {
+			if (++ipnum > org_ipnum)
+				need_retry = B_TRUE;
+			if (!need_retry) {
+				addr_p[ipnum-1].a_addr.addr_in4.s_addr = ip->ifa_local;
+				addr_p[ipnum-1].a_addr.i_insize = sizeof(__be32);
+			}
+		}
+
+		in_dev_put(indev);
 	}
+	rtnl_unlock();
 
-
-retry_count:
-	lifn.lifn_family = PF_UNSPEC;
-	lifn.lifn_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
-	lifn.lifn_count = 0;
-	if (ksocket_ioctl(so6, SIOCGLIFNUM, (intptr_t)&lifn, &rval, CRED())
-	    != 0) {
-		goto cleanup;
-	}
-
-	numifs = lifn.lifn_count;
-	if (numifs <= 0) {
-		goto cleanup;
-	}
-
-	numifs += 10;
-
-	bufsize = numifs * sizeof (struct lifreq);
-	buf = kmem_alloc(bufsize, KM_SLEEP);
-
-	lifc.lifc_family = AF_UNSPEC;
-	lifc.lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
-	lifc.lifc_len = bufsize;
-	lifc.lifc_buf = buf;
-	rc = ksocket_ioctl(so6, SIOCGLIFCONF, (intptr_t)&lifc, &rval, CRED());
-	if (rc != 0) {
-		goto cleanup;
+	if (need_retry) {
+		need_retry = B_FALSE;
+		goto retry;
 	}
 	
-	if (bufsize <= lifc.lifc_len) {
-		kmem_free(buf, bufsize);
-		buf = NULL;
-		goto retry_count;
-	}
-
-	n = lifc.lifc_len / sizeof (struct lifreq);
-
-
-	if (n > 0) {
-		size_ipaddr = sizeof (idm_addr_list_t) +
-		    (n - 1) * sizeof (idm_addr_t);
-		ipaddr = kmem_zalloc(size_ipaddr, KM_SLEEP);
-	} else {
-		goto cleanup;
-	}
-
-	for (i = 0, j = 0, lp = lifc.lifc_req; i < n; i++, lp++) {
-		ss = lp->lifr_addr;
-
-		switch (ss.ss_family) {
-		case AF_INET:
-			rc = ksocket_ioctl(so4, SIOCGLIFFLAGS, (intptr_t)lp,
-			    &rval, CRED());
-			break;
-		case AF_INET6:
-			rc = ksocket_ioctl(so6, SIOCGLIFFLAGS, (intptr_t)lp,
-			    &rval, CRED());
-			break;
-		default:
-			continue;
-		}
-		if (rc == 0) {
-			if ((lp->lifr_flags & IFF_UP) != IFF_UP)
-				continue;
-			if (lp->lifr_flags &
-			    (IFF_ANYCAST|IFF_NOLOCAL|IFF_DEPRECATED))
-				continue;
-		}
-
-		ip = &ipaddr->al_addrs[j];
-		switch (ss.ss_family) {
-		case AF_INET:
-			sin = (struct sockaddr_in *)&ss;
-			if (!idm_v4_addr_okay(&sin->sin_addr))
-				continue;
-			ip->a_addr.i_addr.in4 = sin->sin_addr;
-			ip->a_addr.i_insize = sizeof (struct in_addr);
-			break;
-		case AF_INET6:
-			sin6 = (struct sockaddr_in6 *)&ss;
-			if (!idm_v6_addr_okay(&sin6->sin6_addr))
-				continue;
-			ip->a_addr.i_addr.in6 = sin6->sin6_addr;
-			ip->a_addr.i_insize = sizeof (struct in6_addr);
-			break;
-		default:
-			continue;
-		}
-		j++;
-	}
-
-	if (j == 0) {
-		kmem_free(ipaddr, size_ipaddr);
-		size_ipaddr = 0;
-		ipaddr = NULL;
-	} else {
-		ipaddr->al_out_cnt = j;
-	}
-
-
-cleanup:
-	idm_sodestroy(so6);
-	idm_sodestroy(so4);
-
-	if (buf != NULL)
-		kmem_free(buf, bufsize);
-
-	*ipaddr_p = ipaddr;
-	return (size_ipaddr);
-} */
+	*ipaddr_p = rv;
+	return alloc_size;
+}
 
 int
 idm_sorecv(struct socket *so, void *msg, size_t len)

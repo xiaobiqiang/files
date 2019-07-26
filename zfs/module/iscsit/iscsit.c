@@ -657,7 +657,7 @@ tear_down_and_return:
 	}
 
 	if (iscsit_global.global_tsih_pool) {
-		vmem_destroy(iscsit_global.global_tsih_pool);
+//		vmem_destroy(iscsit_global.global_tsih_pool);
 		iscsit_global.global_tsih_pool = NULL;
 	}
 

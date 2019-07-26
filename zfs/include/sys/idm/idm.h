@@ -207,6 +207,8 @@ typedef struct {
 	} i_addr;
 	/* i_insize determines which is valid in the union above */
 	int			i_insize;
+#define addr_in4 i_addr.in4
+#define addr_in6 i_addr.in6
 } idm_ipaddr_t;
 
 typedef struct {
