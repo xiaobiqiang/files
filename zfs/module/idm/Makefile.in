@@ -12,4 +12,4 @@ $(MODULE)-objs += idm_conn_sm.o
 $(MODULE)-objs += idm_impl.o
 $(MODULE)-objs += idm_so.o
 $(MODULE)-objs += idm_text.o
-
+$(MODULE)-objs += base64.o
