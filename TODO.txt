@@ -128,3 +128,5 @@ cleanup:
 
 4.transplate prodigy common/cpyto/md5 for iscsit_radiusauth.c,iscsit_radiuspacket.c,iscsit_authclient.c
 
+5.iscsit_global.global_tsih_pool: vmem_create,vmem_alloc,vmem_destroy,vmem_free
+

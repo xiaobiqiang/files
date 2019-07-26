@@ -610,7 +610,7 @@ typedef struct {
 	avl_tree_t			global_tpg_list;
 	avl_tree_t			global_ini_list;
 	iscsit_tpg_t			*global_default_tpg;
-	vmem_t				*global_tsih_pool;
+	vmem_t				*global_tsih_pool;		/* unused on sw */
 	iscsit_isns_cfg_t		global_isns_cfg;
 	iscsi_radius_props_t		global_radius_server;
 	krwlock_t			global_rwlock;
