@@ -4929,6 +4929,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	
 	spa_async_suspend(spa);
 	if (spa->spa_zvol_taskq) {
+		cmn_err(CE_WARN, "%s to do zvol_remove_minors %s", __func__, spa_name(spa));
 		zvol_remove_minors(spa, spa_name(spa), B_TRUE);
 		taskq_wait(spa->spa_zvol_taskq);
 	}

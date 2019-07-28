@@ -7512,12 +7512,13 @@ release_callback(zpool_handle_t *zhp, void *data)
 	
 	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
 	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
+	syslog(LOG_NOTICE, "to do zpool_export %s",zpool_get_name(zhp));
 	if (zpool_export(zhp, B_TRUE, history_str) != 0) {
 		/*zfs_restore_dirty_mem();*/
 		syslog(LOG_ERR, "zpool export force failed, errno:%d", errno);
 		return (1);
 	}
-
+	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
 	/*zfs_restore_dirty_mem();*/

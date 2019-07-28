@@ -477,7 +477,8 @@ zvol_get_volsize(const char *name, uint64_t *volsize)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		/*printk(KERN_WARNING "%s can't find %s", __func__, name);*/
+		printk(KERN_WARNING"%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -580,7 +581,9 @@ zvol_get_volblocksize(const char *name, uint64_t *volblocksize)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		/*printk(KERN_WARNING "%s can't find %s", __func__, name);*/
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
+		
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -743,7 +746,7 @@ zvol_write_lun_copy(lun_copy_t *lct, char *buf, offset_t off, size_t size)
 	zv = zvol_find_by_name(lct->lun_zfs);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, lct->lun_zfs);
+		printk(KERN_WARNING "%s can't find %s", __func__, lct->lun_zfs);
 		mutex_exit(&zvol_state_lock);
 		return (-1);
 	}
@@ -1209,7 +1212,7 @@ zvol_open(struct block_device *bdev, fmode_t flag)
 	if (zv->zv_open_count == 0) {
 		error = zvol_first_open(zv);
 		if (error) {
-			cmn_err(CE_WARN, "%s first open %s failed error = %d",
+			printk(KERN_WARNING "%s first open %s failed error = %d",
 				__func__, zv->zv_name, error);
 			goto out_mutex;
 		}
@@ -1248,6 +1251,17 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 	zvol_state_t *zv = disk->private_data;
 	int drop_mutex = 0;
 
+	printk(KERN_WARNING "%s ", __func__);
+
+	if (zv!=NULL) {
+		printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);
+		dump_stack();
+	}
+	else{
+		printk(KERN_WARNING "%s data_opened zv is null \n", __func__);
+		dump_stack();
+		return;
+	}
 	ASSERT(zv && zv->zv_open_count > 0);
 
 	if (!mutex_owned(&zvol_state_lock)) {
@@ -1307,7 +1321,7 @@ zvol_get_disk_name(const char *name, char *disk_name, int len)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -1330,7 +1344,7 @@ zvol_flush_write_cache(const char *name, void *arg)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -1354,7 +1368,7 @@ zvol_get_wce(const char *name, int *wce)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -1375,7 +1389,7 @@ zvol_set_wce(const char *name, int wce)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -1400,7 +1414,7 @@ zvol_dkio_free(const char *name, void *arg)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -1676,7 +1690,8 @@ zvol_alloc(dev_t dev, const char *name)
 	zv->zv_disk->queue = zv->zv_queue;
 	snprintf(zv->zv_disk->disk_name, DISK_NAME_LEN, "%s%d",
 	    ZVOL_DEV_NAME, (dev & MINORMASK));
-
+	
+	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
 	return (zv);
 
 out_queue:
@@ -1693,6 +1708,10 @@ out_kmem:
 static void
 zvol_free(zvol_state_t *zv)
 {
+
+	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
+	dump_stack();
+
 	ASSERT(MUTEX_HELD(&zvol_state_lock));
 	ASSERT(zv->zv_open_count == 0);
 
@@ -1994,8 +2013,11 @@ zvol_remove_minors_impl(const char *name)
 	if (zvol_inhibit_dev)
 		return;
 
-	mutex_enter(&zvol_state_lock);
+	
+	printk(KERN_WARNING "%s %s begin", __func__, name);
 
+	mutex_enter(&zvol_state_lock);
+	
 	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
 		zv_next = list_next(&zvol_state_list, zv);
 
@@ -2008,6 +2030,7 @@ zvol_remove_minors_impl(const char *name)
 			if (zv->zv_open_count > 0)
 				continue;
 #endif
+			printk(KERN_WARNING "%s %s", __func__, zv->zv_name);
 			while (zv->zv_open_count && count > 0) {
 				cv_timedwait(&zv->zv_rele_cv, &zvol_state_lock, 
 					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 1000));
@@ -2020,6 +2043,8 @@ zvol_remove_minors_impl(const char *name)
 	}
 
 	mutex_exit(&zvol_state_lock);
+	
+	printk(KERN_WARNING "%s %s end", __func__, name);
 }
 
 /* Remove minor for this specific snapshot only */
@@ -2341,7 +2366,7 @@ zvol_get_dev_by_name(const char *name, dev_t *devno)
 	zv = zvol_find_by_name(name);
 
 	if (!zv) {
-		cmn_err(CE_WARN, "%s can't find %s", __func__, name);
+		printk(KERN_WARNING "%s can't find %s", __func__, name);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
@@ -2437,7 +2462,7 @@ zvol_mirror_replay_wait(void *minor_hdl)
 	zvol_state_t *zv = (zvol_state_t *)minor_hdl;
 
 	if (zv == NULL) {
-		cmn_err(CE_WARN, "%s: zv mustn't NULL", __func__);
+		printk(KERN_WARNING "%s: zv mustn't NULL", __func__);
 		return;
 	}
 
@@ -2519,7 +2544,7 @@ zvol_obj_rewrite(objset_t *os, uint64_t object,
         dbuf_rele(db, (void *)dbuf_rewrite_tag);
         kmem_free(seg_node, sizeof(dbuf_segs_data_t));
 #if 0
-        cmn_err(CE_WARN, "data has been removed");
+        printk(KERN_WARNING "data has been removed");
 #endif
         zfs_range_unlock(rl);
         return (0);
