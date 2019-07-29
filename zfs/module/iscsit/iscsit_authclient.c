@@ -36,6 +36,7 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/iscsit/chap.h>
+#include <crypto/hash.h>
 
 #include "iscsit.h"
 #include "radius_auth.h"
@@ -140,30 +141,28 @@ client_auth_key_present(auth_key_block_t *keyBlock,
 void
 client_compute_chap_resp(uchar_t *resp,
     unsigned int chap_i,
-    uint8_t *password, int password_len,
+    uint8_t *passwrd, int pass_len,
     uchar_t *chap_c, unsigned int challenge_len)
 {
-//	MD5_CTX		context;
+	int rc;
+	struct shash_desc md5_desc;
 
-//	MD5Init(&context);
-
-	/*
-	 * id byte
-	 */
 	resp[0] = (uchar_t)chap_i;
-//	MD5Update(&context, resp, 1);
+	md5_desc.flags = 0;
+	md5_desc.tfm = crypto_alloc_shash(
+		"md5", 0, 0);
 
-	/*
-	 * shared secret
-	 */
-//	MD5Update(&context, (uchar_t *)password, password_len);
+	if (!md5_desc.tfm ||
+		crypto_shash_init(&md5_desc) ||
+		crypto_shash_update(&md5_desc, resp, 1) ||
+		crypto_shash_update(&md5_desc, passwrd, pass_len) ||
+		crypto_shash_update(&md5_desc, chap_c, challenge_len) ||
+		crypto_shash_final(&md5_desc, resp))
+		goto out;
 
-	/*
-	 * challenge value
-	 */
-//	MD5Update(&context, chap_c, challenge_len);
-
-//	MD5Final(resp, &context);
+out:
+	if (md5_desc.tfm)
+		crypto_free_shash(md5_desc.tfm);
 }
 
 int

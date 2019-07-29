@@ -32,6 +32,7 @@
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
 #include <linux/net.h>
+#include <crypto/hash.h>
 
 #include "radius_auth.h"
 
@@ -71,7 +72,7 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	void *socket;
 	radius_packet_data_t req;
 	radius_packet_data_t resp;
-	//MD5_CTX context;
+	struct shash_desc  md5desc;
 	uint8_t	md5_digest[16];		/* MD5 digest length 16 */
 	uint8_t random_number[16];
 
@@ -93,24 +94,32 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	    challenge_length);
 
 	/* Prepare the request authenticator */
-//	MD5Init(&context);
 	bzero(&md5_digest, 16);
+	md5desc.flags = 0;
+	md5desc.tfm = crypto_alloc_shash("md5", 0, 0);
+	
+	(void) crypto_shash_init(&md5desc);
+
 	/* First, the shared secret */
-//	MD5Update(&context, rad_svr_shared_secret, rad_svr_shared_secret_len);
+	(void) crypto_shash_update(&md5desc, 
+		rad_svr_shared_secret, rad_svr_shared_secret_len);
 	/* Then a unique number - use lbolt plus a random number */
 	bzero(&lb, sizeof (lb));
 	(void) snprintf(lb, sizeof (lb), "%lx", ddi_get_lbolt());
-//	MD5Update(&context, (uint8_t *)lb, strlen(lb));
+	(void) crypto_shash_update(&md5desc, (uint8_t *)lb, strlen(lb));
+		
 	bzero(&random_number, sizeof (random_number));
 	(void) random_get_pseudo_bytes(random_number, sizeof (random_number));
-//	MD5Update(&context, random_number, sizeof (random_number));
-//	MD5Final(md5_digest, &context);
+	(void) crypto_shash_update(&md5desc, random_number, sizeof (random_number));
+	
+	(void) crypto_shash_final(&md5desc, md5_digest);
 	bcopy(md5_digest, &req.authenticator, RAD_AUTHENTICATOR_LEN);
 
 	socket = idm_socreate(PF_INET, SOCK_DGRAM, 0);
 	if (socket == NULL) {
 		/* Error obtaining socket for RADIUS use */
-		return (CHAP_VALIDATION_RADIUS_ACCESS_ERROR);
+		validation_status = CHAP_VALIDATION_RADIUS_ACCESS_ERROR;
+		goto out;
 	}
 
 	/* Send the authentication access request to the RADIUS server */
@@ -118,9 +127,8 @@ iscsit_radius_chap_validate(char *target_chap_name,
 	    rad_svr_ip_addr,
 	    rad_svr_port,
 	    &req) != 0) {
-		idm_soshutdown(socket);
-		idm_sodestroy(socket);
-		return (CHAP_VALIDATION_RADIUS_ACCESS_ERROR);
+		validation_status = CHAP_VALIDATION_RADIUS_ACCESS_ERROR;
+		goto out;
 	}
 
 	bzero(&resp, sizeof (radius_packet_data_t));
@@ -144,10 +152,15 @@ iscsit_radius_chap_validate(char *target_chap_name,
 		validation_status = CHAP_VALIDATION_RADIUS_ACCESS_ERROR;
 	}
 
+out:
 	/* Done! Close the socket. */
-	idm_soshutdown(socket);
-	idm_sodestroy(socket);
-
+	if (socket) {
+		idm_soshutdown(socket);
+		idm_sodestroy(socket);
+	}
+	if (md5desc.tfm)
+		crypto_free_shash(md5desc.tfm);
+	
 	return (validation_status);
 }
 

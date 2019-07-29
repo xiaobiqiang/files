@@ -34,6 +34,8 @@
 #include <sys/iscsit/radius_protocol.h>
 //#include <sys/ksocket.h>
 #include <linux/net.h>
+#include <crypto/hash.h>
+
 
 static void encode_chap_password(int identifier, int chap_passwd_len,
     uint8_t *chap_passwd, uint8_t *result);
@@ -171,7 +173,7 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
     radius_packet_data_t *resp_data)
 {
 	radius_packet_t		*packet;
-//	MD5_CTX			context;
+	struct shash_desc 	md5desc;
 	uint8_t			*tmp_data;
 	uint8_t			md5_digest[16]; /* MD5 Digest Length 16 */
 	uint16_t		declared_len = 0;
@@ -244,12 +246,17 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 	 * Attributes = The response attributes
 	 * Secret = The shared secret
 	 */
-//	MD5Init(&context);
 	bzero(&md5_digest, 16);
-//	MD5Update(&context, &packet->code, 1);
-//	MD5Update(&context, &packet->identifier, 1);
-//	MD5Update(&context, packet->length, 2);
-//	MD5Update(&context, req_authenticator, RAD_AUTHENTICATOR_LEN);
+	md5desc.flags = 0;
+	md5desc.tfm = crypto_alloc_shash(
+		"md5", 0, 0);
+	
+	(void) crypto_shash_init(&md5desc);
+	(void) crypto_shash_update(&md5desc, &packet->code, 1);
+	(void) crypto_shash_update(&md5desc, &packet->identifier, 1);
+	(void) crypto_shash_update(&md5desc, packet->length, 2);
+	(void) crypto_shash_update(&md5desc, 
+		req_authenticator, RAD_AUTHENTICATOR_LEN);
 
 	/*
 	 * Include response attributes only if there is a payload
@@ -260,11 +267,11 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 	 */
 	if (declared_len > RAD_PACKET_HDR_LEN) {
 		/* Response Attributes */
-//		MD5Update(&context, packet->data,
-//		    declared_len - RAD_PACKET_HDR_LEN);
+		(void) crypto_shash_update(&md5desc, packet->data,
+		    declared_len - RAD_PACKET_HDR_LEN);
 	}
-//	MD5Update(&context, shared_secret, shared_secret_len);
-//	MD5Final(md5_digest, &context);
+	(void) crypto_shash_update(&context, shared_secret, shared_secret_len);
+	crypto_shash_final(&md5desc, md5_digest);
 
 	if (bcmp(md5_digest, packet->authenticator, RAD_AUTHENTICATOR_LEN)
 	    != 0) {
@@ -279,6 +286,8 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 	resp_data->code = packet->code;
 	resp_data->identifier = packet->identifier;
 
+	if (md5desc.tfm)
+		crypto_free_shash(md5desc.tfm);
 	kmem_free(tmp_data, MAX_RAD_PACKET_LEN);
 	return (RAD_RSP_RCVD_SUCCESS);
 }
