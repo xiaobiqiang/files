@@ -648,8 +648,8 @@ iscsit_tgt_dereg_retry(void *arg)
 	if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
 	    iscsit_tgt_dereg_task, tgt, TQ_NOSLEEP) == NULL) {
 		/* Dispatch failed, try again later */
-/*		(void) timeout(iscsit_tgt_dereg_retry, tgt,
-		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000)); */
+		(void) timeout(iscsit_tgt_dereg_retry, tgt,
+		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000)); 
 	}
 }
 
@@ -737,8 +737,8 @@ tgt_sm_new_state(iscsit_tgt_t *tgt, tgt_event_ctx_t *ctx,
 		break;
 	case TS_DELETING_STMF_DEREG_FAIL:
 		/* Retry dereg in 1 second */
-/*		(void) timeout(iscsit_tgt_dereg_retry, tgt,
-		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000));*/
+		(void) timeout(iscsit_tgt_dereg_retry, tgt,
+		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000));
 		break;
 	case TS_DELETING:
 		iscsit_tgt_async_wait_ref(tgt, iscsit_tgt_unref);

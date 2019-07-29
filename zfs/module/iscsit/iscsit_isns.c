@@ -2802,10 +2802,10 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 
 		/* send the pdu */
 		send_len = ISNSP_HEADER_SIZE + payload_len;
-/*		send_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(isns_timeout_usec)); */
+		send_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(isns_timeout_usec)); 
 		rc = idm_iov_sosend(so, &iov[0], 2, send_len);
-//		(void) untimeout(send_timer);
+		(void) untimeout(send_timer);
 
 		flags &= ~ISNS_FLAG_FIRST_PDU;
 		payload += payload_len;
@@ -2843,14 +2843,14 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 
 	do {
 		/* receive the pdu header */
-/*		rcv_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(isns_timeout_usec)); */
+		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(isns_timeout_usec)); 
 		if (idm_sorecv(so, &tmp_pdu_hdr, ISNSP_HEADER_SIZE) != 0 ||
 		    ntohs(tmp_pdu_hdr.seq) != seq) {
-//			(void) untimeout(rcv_timer);
+			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
-//		(void) untimeout(rcv_timer);
+		(void) untimeout(rcv_timer);
 
 		/* receive the payload */
 		payload_len = ntohs(tmp_pdu_hdr.payload_len);
@@ -2861,13 +2861,13 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 		if (payload == NULL) {
 			goto rcv_error;
 		}
-/*		rcv_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000)); */
+		rcv_timer = timeout(isnst_so_timeout, so,
+		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000)); 
 		if (idm_sorecv(so, payload, payload_len) != 0) {
-//			(void) untimeout(rcv_timer);
+			(void) untimeout(rcv_timer);
 			goto rcv_error;
 		}
-//		(void) untimeout(rcv_timer);
+		(void) untimeout(rcv_timer);
 
 		/* combine the pdu if it is not the first one */
 		if (total_pdu_len > 0) {

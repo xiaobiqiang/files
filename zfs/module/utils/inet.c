@@ -345,3 +345,14 @@ inet_pton(int af, char *inp, void *outp)
 }
 EXPORT_SYMBOL(inet_pton);
 
+//TODO
+int inet_init(void)
+{
+	
+}
+
+//TODO
+void inet_fini(void)
+{
+
+}

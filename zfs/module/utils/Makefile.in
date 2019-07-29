@@ -1,11 +1,12 @@
-src = @abs_top_srcdir@/module/inet
+src = @abs_top_srcdir@/module/utils
 obj = @abs_builddir@
 
-MODULE := zinet
+MODULE := zutils
 
 EXTRA_CFLAGS = $(ZFS_MODULE_CFLAGS) @KERNELCPPFLAGS@
 
 obj-$(CONFIG_ZFS) := $(MODULE).o
 
 $(MODULE)-objs += inet.o
-
+$(MODULE)-objs += callout.o
+$(MODULE)-objs += utils.o

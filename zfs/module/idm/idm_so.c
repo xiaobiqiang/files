@@ -3020,7 +3020,7 @@ int
 idm_so_timed_socket_connect(struct socket *ks,
     struct sockaddr_storage *sa, int sa_sz, int login_max_usec)
 {
-	int			expire = login_max_usec/1000000;	/* us->s */
+	unsigned	expire = login_max_usec/1000000;	/* us->s */
 	int			rc;
 	struct sock *sk = ks->sk;
 	
