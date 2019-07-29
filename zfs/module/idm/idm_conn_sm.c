@@ -496,7 +496,7 @@ idm_login_timeout(void *arg)
 {
 	idm_conn_t *ic = arg;
 
-	idm_conn_event(ic, CE_LOGIN_TIMEOUT, NULL);
+	idm_conn_event(ic, CE_LOGIN_TIMEOUT, (uintptr_t)NULL);
 }
 
 static void

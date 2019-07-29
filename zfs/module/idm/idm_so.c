@@ -484,7 +484,7 @@ idm_sosendto(struct socket *so, void *buff, size_t len,
     struct sockaddr *name, int namelen)
 {
 	struct msghdr		msg;
-	struct iovec		iov[1];
+	struct kvec		iov[1];
 	int			error;
 	int			sent = 0;
 

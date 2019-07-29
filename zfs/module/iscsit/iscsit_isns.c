@@ -1609,7 +1609,7 @@ static int
 isnst_register(iscsit_isns_svr_t *svr, isns_target_t *itarget,
     isns_reg_type_t regtype)
 {
-	struct sonode	*so;
+	struct socket *so;
 	int		rc = 0;
 	isns_pdu_t	*pdu, *rsp;
 	size_t		pdu_size, rsp_size;
@@ -2157,7 +2157,7 @@ isnst_deregister(iscsit_isns_svr_t *svr, isns_target_t *itarget)
 	int		rc;
 	isns_pdu_t	*pdu, *rsp;
 	size_t		pdu_size, rsp_size;
-	struct sonode	*so;
+	struct socket	*so;
 
 	so = isnst_open_so(&svr->svr_sa);
 
@@ -2200,7 +2200,7 @@ isnst_keepalive(iscsit_isns_svr_t *svr)
 	int		rc;
 	isns_pdu_t	*pdu, *rsp;
 	size_t		pdu_size, rsp_size;
-	struct sonode	*so;
+	struct socket	*so;
 
 	so = isnst_open_so(&svr->svr_sa);
 

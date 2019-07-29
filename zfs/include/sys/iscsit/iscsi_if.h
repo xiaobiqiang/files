@@ -629,9 +629,9 @@ extern int		iscsid_remove(char *filename);
 extern int		iscsid_rename(char *oldname, char *newname);
 extern ssize_t		iscsid_write(int, void *, ssize_t);
 extern ssize_t		iscsid_read(int, void *, ssize_t);
-extern ssize_t		iscsid_sendto(struct sonode *, void *, size_t,
+extern ssize_t		iscsid_sendto(struct socket *, void *, size_t,
     struct sockaddr *, size_t);
-extern ssize_t		iscsid_recvfrom(struct sonode *, void *buffer,
+extern ssize_t		iscsid_recvfrom(struct socket *, void *buffer,
     size_t len);
 extern int		iscsid_errno;
 #endif
