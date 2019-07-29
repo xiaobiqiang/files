@@ -34,7 +34,7 @@ extern "C" {
 #include <sys/mutex.h>
 #include <sys/condvar.h>
 #include <sys/list.h>
-#include <sys/zfs_multiclus.h>
+#include <sys/callout.h>
 #include <sys/taskq.h>
 #include <sys/kmem_cache.h>
 #include <sys/cluster_san.h>

@@ -2,6 +2,7 @@
 #include <sys/callout.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <sys/cmn_err.h>
 
 extern int callout_init(void);
 extern int inet_init(void);

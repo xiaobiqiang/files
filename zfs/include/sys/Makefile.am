@@ -114,7 +114,8 @@ KERNEL_H = \
 	${top_srcdir}/include/sys/zpl.h \
 	$(top_srcdir)/include/sys/zvol.h \
 	$(top_srcdir)/include/sys/iscsi_protocol.h \
-	$(top_srcdir)/include/sys/in.h
+	$(top_srcdir)/include/sys/in.h \
+	$(top_srcdir)/include/sys/callout.h
 
 USER_H =
 

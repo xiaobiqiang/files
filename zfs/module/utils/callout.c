@@ -1,5 +1,9 @@
 #include <sys/callout.h>
 #include <linux/types.h>
+#include <linux/timer.h>
+#include <linux/slab.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 
 static struct kmem_cache *callout_timer_cache = NULL;
 
@@ -23,7 +27,7 @@ timeout(void (*func)(void *), void *arg, clock_t delta)
 {
 	int rc;
 	void *timer = 
-		kmem_cache_alloc(callout_timer_cache, KM_SLEEP);
+		kmem_cache_alloc(callout_timer_cache, GFP_KERNEL);
 	timeout_id_t tmid = &timer;
 	if (!timer)
 		goto failed;
