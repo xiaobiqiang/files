@@ -115,7 +115,20 @@ typedef struct stmf_task_kstat
 
 #define STMF_TASK_KSTAT_UPDATE_DONE_OVER_THRES(stmf_state) \
 	atomic_inc_64(&((stmf_state_t *)stmf_state)->stmf_task_done_over_thres);
-	
+
+typedef struct port_node {
+	list_node_t node;
+	int port_id;
+} port_node_t;
+
+typedef struct group_node {
+	list_node_t	node;
+	int gropu_id;
+	int nports;
+	int standby;
+	list_t port_list;
+} group_node_t;
+
 static int get_target_id(scsi_task_t *task,uint8_t *buf,uint8_t buf_len);
 static int get_initiator_id(scsi_task_t *task,uint8_t *buf,uint8_t buf_len);
 static uint8_t get_scsi_cmd_code(scsi_task_t *task);
@@ -2979,10 +2992,7 @@ stmf_set_alua_state(struct stmf_alua_state_desc *alua_state)
 			    ilport->ilport_alua == 0) {
 				continue;
 			}
-			if (alua_state->alua_node != 0) {
-				ilport->ilport_rtpid = ((hostid & 0xff) << 8) |
-				    (atomic_add_16_nv(&stmf_rtpid_counter, 1) & 0xff);
-			}
+
 			lport = ilport->ilport_lport;
 
 			for(loop=0;loop<300;loop++){
@@ -8261,37 +8271,118 @@ stmf_wwn_to_devid_desc(scsi_devid_desc_t *sdid, uint8_t *wwn,
 	bcopy(wwn_str, (char *)sdid->ident, 20);
 }
 EXPORT_SYMBOL(stmf_wwn_to_devid_desc);
+
+uint8_t *
+stmf_prepare_one_tpgs(group_node_t *group, uint8_t *p)
+{
+	port_node_t *port;
+
+	if (group->standby) {
+		p[0] = 0x02;	/* Non PREF, Standby */
+		if (stmf_client_is_vm)
+			p[0] = 0x01;
+
+		if (avs_local_host) {
+			if (stmf_avs_enable_flag)
+				p[0] = 0x82;
+			else
+				p[0] = 0x03;
+		}
+	} else {
+		p[0] = 0x80;	/* PREF */
+		
+		if (avs_remote_host) {
+			p[0] = 0x00;
+		} else if (avs_local_host) {
+			if (stmf_avs_enable_flag)
+				p[0] = 0x80;
+			else
+				p[0] = 0x03;
+		}
+	}
+
+	if (stmf_client_is_vm) {
+		p[1] = 3;	/* AO_SUP, AN_SUP */
+	} else {
+		p[1] = 5;	/* AO_SUP, S_SUP */
+	}
+	
+	p[3] = group->gropu_id;		/* Group */
+	p[7] = group->nports & 0xff;
+	p += 8;
+	
+	for (port = list_head(&group->port_list); port;
+		port = list_next(&group->port_list, port)) {
+		((uint16_t *)p)[1] = BE_16(port->port_id);
+		p += 4;
+	}
+
+	return (p);	
+}
+
 stmf_xfer_data_t *
 stmf_prepare_tpgs_data(uint8_t ilu_alua)
 {
 	stmf_xfer_data_t *xd;
 	stmf_i_local_port_t *ilport;
 	uint8_t *p;
-	uint32_t sz, asz, nports = 0, nports_standby = 0;
+	uint32_t asz, nports, sz = 0;
+	list_t group_list;
+	group_node_t *group;
+	port_node_t *port;
 
 	mutex_enter(&stmf_state.stmf_lock);
-	/* check if any ports are standby and create second group */
+	list_create(&group_list, sizeof(group_node_t),
+		offsetof(group_node_t, node));
+
 	for (ilport = stmf_state.stmf_ilportlist; ilport;
 	    ilport = ilport->ilport_next) {
-		if (ilport->ilport_standby == 1) {
-			nports_standby++;
-		} else {
-			nports++;
+		for (group = list_head(&group_list); group;
+			group = list_next(&group_list, group)) {
+			if (group->gropu_id == (ilport->ilport_local_hostid - 1))
+				break;
+		}
+
+		if (!group) {
+			group = kmem_zalloc(sizeof(group_node_t), KM_NOSLEEP);
+			if (!group) {
+				cmn_err(CE_WARN, "%s group alloc failed", __func__);
+				goto tpgs_end;
+			}
+			
+			group->gropu_id = ilport->ilport_local_hostid - 1;
+			group->standby = ilport->ilport_standby;
+			list_create(&group->port_list, sizeof(port_node_t),
+				offsetof(port_node_t, node));
+			list_insert_tail(&group_list, group);
+		}
+
+		port = kmem_zalloc(sizeof(port_node_t), KM_NOSLEEP);
+		if (!port) {
+			cmn_err(CE_WARN, "%s port alloc failed", __func__);
+			goto tpgs_end;
+		}
+		port->port_id = ilport->ilport_rtpid;
+		list_insert_tail(&group->port_list, port);
+		group->nports++;
+	}
+
+	for (group = list_head(&group_list); group;
+		group = list_next(&group_list, group)) {
+		if (!group->standby || 
+			(group->standby && ilu_alua)) {
+			nports = group->nports;
+			nports = min(nports, 255);
+			sz += ((nports * 4) + 8);
 		}
 	}
 
-	/* The spec only allows for 255 ports to be reported per group */
-	nports = min(nports, (uint32_t)255);
-	nports_standby = min(nports_standby, (uint32_t)255);
-	sz = (nports * 4) + 12;
-	if (nports_standby && ilu_alua) {
-		sz += (nports_standby * 4) + 8;
-	}
+	sz += 4;
 	asz = sz + sizeof (*xd) - 4;
 	xd = (stmf_xfer_data_t *)kmem_zalloc(asz, KM_NOSLEEP);
 	if (xd == NULL) {
-		mutex_exit(&stmf_state.stmf_lock);
-		return (NULL);
+		cmn_err(CE_WARN, "%s xd alloc failed", __func__);
+		goto tpgs_end;
 	}
 	xd->alloc_size = asz;
 	xd->size_left = sz;
@@ -8300,66 +8391,27 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 
 	*((uint32_t *)p) = BE_32(sz - 4);
 	p += 4;
-	p[0] = 0x80;	/* PREF */
 
-	if(avs_remote_host){
-		p[0] = 0x00;
-	}else if(avs_local_host){
-		if(stmf_avs_enable_flag){
-			p[0] = 0x80;
-		}else{
-			p[0] = 0x03;
+	for (group = list_head(&group_list); group;
+		group = list_next(&group_list, group)) {
+		if (!group->standby ||
+			(group->standby && ilu_alua))
+			p = stmf_prepare_one_tpgs(group, p);
+	}
+
+tpgs_end:
+	while (group = list_head(&group_list)) {
+		while (port = list_head(&group->port_list)) {
+			list_remove(&group->port_list, port);
+			kmem_free(port, sizeof(port_node_t));
 		}
+		list_destroy(&group->port_list);
+		list_remove(&group_list, group);
+		kmem_free(group, sizeof(group_node_t));
 	}
 	
-	p[1] = 5;	/* AO_SUP, S_SUP */
-	if (stmf_state.stmf_alua_node == 1) {
-		p[3] = 1;	/* Group 1 */
-	} else {
-		p[3] = 0;	/* Group 0 */
-	}
-	p[7] = nports & 0xff;
-	p += 8;
-	for (ilport = stmf_state.stmf_ilportlist; ilport;
-	    ilport = ilport->ilport_next) {
-		if (ilport->ilport_standby == 1) {
-			continue;
-		}
-		((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
-		p += 4;
-	}
-	if (nports_standby && ilu_alua) {
-		p[0] = 0x02;	/* Non PREF, Standby */
-		if (stmf_client_is_vm)
-			p[0] = 0x01;
-
-		if(avs_local_host){
-			if(stmf_avs_enable_flag){
-				p[0] = 0x82;
-			}else{
-				p[0] = 0x03;
-			}
-		}
-		p[1] = 5;	/* AO_SUP, S_SUP */
-		if (stmf_state.stmf_alua_node == 1) {
-			p[3] = 0;	/* Group 0 */
-		} else {
-			p[3] = 1;	/* Group 1 */
-		}
-		p[7] = nports_standby & 0xff;
-		p += 8;
-		for (ilport = stmf_state.stmf_ilportlist; ilport;
-		    ilport = ilport->ilport_next) {
-			if (ilport->ilport_standby == 0) {
-				continue;
-			}
-			((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
-			p += 4;
-		}
-	}
-
+	list_destroy(&group_list);
 	mutex_exit(&stmf_state.stmf_lock);
-
 	return (xd);
 }
 
@@ -8575,25 +8627,7 @@ stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 				p[7] = 1;	/* Group 1 */
 			}
 #endif
-			/*
-			 * If we're in alua mode, group 1 contains all alua
-			 * participating ports and all standby ports
-			 * if the alua node is 0.
-			 * Otherwise, if we're in alua mode, any local
-			 * ports (non standby/pppt) are also in group 1 if the
-			 * alua node is 1. Otherwise the group is 0.
-			 */
-			if (stmf_state.stmf_alua_node == 1) {
-				if (ilport->ilport_standby != 1) {
-					p[7] = 1;	/* Group 1 */
-				}
-			} else {
-				if ((stmf_state.stmf_alua_state != 0) &&
-			    	(ilport->ilport_alua || ilport->ilport_standby) &&
-			    	(((ilport->ilport_rtpid >> 8) & 0xff) != (hostid & 0xff))) {
-			    	p[7] = 1;	/* Group 1 */
-				}
-			}
+			p[7] = ilport->ilport_local_hostid - 1;		/* Group */
 			sz = 8;
 			continue;
 		} else if (vpd_mask & STMF_VPD_RELATIVE_TP_ID) {
