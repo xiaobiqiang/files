@@ -2935,7 +2935,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	    DMU_POOL_RAIDZ_AGGRE_MAP, sizeof (uint64_t),AGGRE_MAP_MAX_OBJ_NUM,&spa->spa_map_obj_arr[0]);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
-	
+
+	cmn_err(CE_WARN, "%s raidz_aggre_map_open %s  ",__func__,spa->spa_name );
 	spa->spa_map_manager.active_obj_index = -1;
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
@@ -4511,6 +4512,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	dmu_tx_commit(tx);
 
 	spa->spa_sync_on = B_TRUE;
+	spa->spa_map_manager.active_obj_index = 0;
 	txg_sync_start(spa->spa_dsl_pool);
 
 	/*
@@ -4532,6 +4534,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mutex_exit(&spa_namespace_lock);
 	
+	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
 	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
@@ -4929,6 +4932,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	
 	spa_async_suspend(spa);
 	if (spa->spa_zvol_taskq) {
+		cmn_err(CE_WARN, "%s to do zvol_remove_minors %s", __func__, spa_name(spa));
 		zvol_remove_minors(spa, spa_name(spa), B_TRUE);
 		taskq_wait(spa->spa_zvol_taskq);
 	}
@@ -7438,18 +7442,16 @@ spa_sync(spa_t *spa, uint64_t txg)
 			    &spa->spa_deferred_bpobj, tx);
 		}
 
-		clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
-			raidz_aggre_map_current(spa), tx);
-		/*
-		pos_valid = get_and_clear_aggre_map_process_pos(spa, txg, &process_pos);
-		if (pos_valid) {
-			update_aggre_map_process_pos(spa, process_pos, tx);
+		if (spa->spa_space_reclaim_state == (SPACE_RECLAIM_START|SPACE_RECLAIM_RUN))
+		{
+			aggre_map_t *amap;
+			raidz_aggre_map_free_range_all(spa, tx);
+			amap = raidz_aggre_map_current(spa);
+			if(amap!=NULL){
+				clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
+					amap, tx);
+			}
 		}
-		
-		update_aggre_map_free_range(spa, tx); */
-
-		raidz_aggre_map_free_range_all(spa, tx);
-		
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
 

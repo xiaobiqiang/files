@@ -827,8 +827,6 @@ uninstall-am: uninstall-libsnmp_trapgen_laLTLIBRARIES
 	tags tags-am uninstall uninstall-am \
 	uninstall-libsnmp_trapgen_laLTLIBRARIES
 
-$(ROOTNETSNMPDIR)/%: %
-        $(INS.file)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

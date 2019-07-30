@@ -7283,6 +7283,11 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		return;
 	}
 
+	if (w==NULL){
+		cmn_err(CE_WARN, "WNULL Unexpected xfer completion task %p dbuf %p",
+		    (void *)task, (void *)dbuf);
+		return;
+	}
 
 	mutex_enter(&w->worker_lock);
 	do {

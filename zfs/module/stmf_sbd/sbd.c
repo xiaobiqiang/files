@@ -2614,6 +2614,8 @@ odf_over_open:
 		kmem_free(zvol_name, strlen(zvol_name) + 1);
 	
 	mutex_exit(&sl->sl_lock);
+
+	cmn_err(CE_WARN, "%s  %s %d %d", __func__, sl->sl_name, sl->sl_data_vp->v_count,vp_valid);
 	return (0);
 
 odf_close_data_and_exit:
@@ -2645,6 +2647,7 @@ sbd_close_lu(sbd_lu_t *sl)
 			}
 		} else {
 			flag = FREAD | FWRITE | FOFFMAX | FEXCL;
+			cmn_err(CE_WARN, "%s 1 %s %d", __func__, sl->sl_name, sl->sl_data_vp->v_count);
 			(void) VOP_CLOSE(sl->sl_meta_vp, flag, 1, 0,
 			    CRED(), NULL);
 		}
@@ -2656,7 +2659,12 @@ sbd_close_lu(sbd_lu_t *sl)
 		} else {
 			flag = FREAD | FWRITE | FOFFMAX | FEXCL;
 		}
-		(void) VOP_CLOSE(sl->sl_data_vp, flag, 1, 0, CRED(), NULL);
+		
+		cmn_err(CE_WARN, "%s 2 %s %d", __func__, sl->sl_name, sl->sl_data_vp->v_count);
+		if	(sl->sl_data_vp->v_count>=0){
+			(void) VOP_CLOSE(sl->sl_data_vp, flag, 1, 0, CRED(), NULL);
+		}
+		
 		sl->sl_flags &= ~SL_MEDIA_LOADED;
 		lu = sl->sl_lu;
 		lu->lu_have_minor = 0;
@@ -3896,6 +3904,7 @@ sim_sli_loaded:
 	if ((sl->sl_flags & SL_SHARED_META) == 0) {
 		data_opened = 0;
 	} else {
+		cmn_err(CE_WARN, "%s data_opened %s %d", __func__, sl->sl_name, sl->sl_data_vp->v_count);
 		data_opened = 1;
 		sl->sl_data_filename = sl->sl_meta_filename;
 		sl->sl_data_vp = sl->sl_meta_vp;
