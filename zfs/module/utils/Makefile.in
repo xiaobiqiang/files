@@ -9,4 +9,5 @@ obj-$(CONFIG_ZFS) := $(MODULE).o
 
 $(MODULE)-objs += inet.o
 $(MODULE)-objs += callout.o
+$(MODULE)-objs += utils_vmem.o
 $(MODULE)-objs += utils.o
