@@ -270,7 +270,7 @@ iscsit_rcv_radius_response(struct socket *socket, uint8_t *shared_secret,
 		(void) crypto_shash_update(&md5desc, packet->data,
 		    declared_len - RAD_PACKET_HDR_LEN);
 	}
-	(void) crypto_shash_update(&context, shared_secret, shared_secret_len);
+	(void) crypto_shash_update(&md5desc, shared_secret, shared_secret_len);
 	crypto_shash_final(&md5desc, md5_digest);
 
 	if (bcmp(md5_digest, packet->authenticator, RAD_AUTHENTICATOR_LEN)
