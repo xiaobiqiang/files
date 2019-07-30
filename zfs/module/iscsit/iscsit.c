@@ -561,7 +561,9 @@ iscsit_enable_svc(iscsit_hostinfo_t *hostinfo)
 	    iscsit_ini_avl_compare, sizeof (iscsit_ini_t),
 	    offsetof(iscsit_ini_t, ini_global_ln));
 
-	iscsit_global.global_tsih_pool = NULL;
+	iscsit_global.global_tsih_pool = vmem_create("iscsit_tsih_pool",
+	    (void *)1, ISCSI_MAX_TSIH, 1, NULL, NULL, NULL, 0,
+	    VM_IDENTIFIER);
 
 	/*
 	 * Setup STMF dbuf store.  Our buffers are bound to a specific
@@ -657,7 +659,7 @@ tear_down_and_return:
 	}
 
 	if (iscsit_global.global_tsih_pool) {
-//		vmem_destroy(iscsit_global.global_tsih_pool);
+		vmem_destroy(iscsit_global.global_tsih_pool);
 		iscsit_global.global_tsih_pool = NULL;
 	}
 
@@ -729,7 +731,7 @@ iscsit_disable_svc(void)
 	kmem_cache_destroy(iscsit_status_pdu_cache);
 	iscsit_status_pdu_cache = NULL;
 
-//	vmem_destroy(iscsit_global.global_tsih_pool);
+	vmem_destroy(iscsit_global.global_tsih_pool);
 	iscsit_global.global_tsih_pool = NULL;
 }
 

@@ -28,8 +28,7 @@
 #include <sys/iscsit/iscsit_common.h>
 
 #include "iscsit_authclient.h"
-
-/*
+#include <sys/utils_vmem.h>/*
  * For some reason iscsi_protocol.h lists the max version as "0x02" and the
  * min version as "0x00".  RFC3720 clearly states that the current version
  * number is 0x00 so that is what we will use.
@@ -610,7 +609,7 @@ typedef struct {
 	avl_tree_t			global_tpg_list;
 	avl_tree_t			global_ini_list;
 	iscsit_tpg_t			*global_default_tpg;
-	vmem_t				*global_tsih_pool;		/* unused on sw */
+	vmem_t				*global_tsih_pool;		
 	iscsit_isns_cfg_t		global_isns_cfg;
 	iscsi_radius_props_t		global_radius_server;
 	krwlock_t			global_rwlock;

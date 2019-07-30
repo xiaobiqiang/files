@@ -91,14 +91,14 @@ iscsit_tsih_alloc(void)
 {
 	uintptr_t result;
 
-/*	result = (uintptr_t)vmem_alloc(iscsit_global.global_tsih_pool,
-	    1, VM_NOSLEEP | VM_NEXTFIT);
+	result = (uintptr_t)vmem_alloc(iscsit_global.global_tsih_pool,
+	    1, VM_NOSLEEP);
 
 	// ISCSI_UNSPEC_TSIH (0) indicates failure 
 	if (result > ISCSI_MAX_TSIH) {
-		vmem_free(iscsit_global.global_tsih_pool, (void *)result, 1);
+//		vmem_free(iscsit_global.global_tsih_pool, (void *)result, 1);
 		result = ISCSI_UNSPEC_TSIH;
-	} */
+	} 
 
 	return ((uint16_t)result);
 }
@@ -106,7 +106,7 @@ iscsit_tsih_alloc(void)
 static void
 iscsit_tsih_free(uint16_t tsih)
 {
-//	vmem_free(iscsit_global.global_tsih_pool, (void *)(uintptr_t)tsih, 1);
+	vmem_free(iscsit_global.global_tsih_pool, (void *)(uintptr_t)tsih, 1);
 }
 
 //kmem_zalloc a iscsit_sess_t and initialize it.
