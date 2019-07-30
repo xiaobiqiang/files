@@ -309,8 +309,6 @@ fmd_msg_handle(void *arg)
 	if (NULL == msg){
 		return -1;	
 	}else{
-		syslog(LOG_ERR,"FMD_TEST:type = %d,len = %d,buf = %s\n",
-			msg->fm_type,msg->fm_len,msg->fm_buf);
 		if (FMD_HOTPLUG == msg->fm_type){
 			fmd_device_event(msg);
 			return 0;
