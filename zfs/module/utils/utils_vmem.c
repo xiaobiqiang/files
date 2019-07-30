@@ -191,9 +191,16 @@ __vmem_find_next_zero(struct page *pg, ulong_t off)
 {
 	ulong_t rv;
 	void *pg_addr = NULL;
+	uint_t 		pg_ulong_off;
+	int 		ulong_bit_off;
 	
 	pg_addr = kmap_atomic(pg);
 	rv = find_next_zero_bit_le(pg_addr, BITS_PER_PAGE, off);
+	if (rv < BITS_PER_PAGE) {
+		pg_ulong_off = rv / (sizeof(ulong_t) * 8);
+		ulong_bit_off = rv & (sizeof(ulong_t) * 8 - 1);
+		test_and_set_bit_le(ulong_bit_off, pg_addr+pg_ulong_off);
+	}
 	kunmap_atomic(pg_addr);
 
 	return (rv >= BITS_PER_PAGE ? VM_END_BITS : rv);
@@ -212,7 +219,7 @@ __vmem_alloc_unlocked(vmem_t *vmp, uint_t bits, uint_t flags)
 		if (vmp->bitmp[i]) {
 			zero_idx = __vmem_find_next_zero(
 				vmp->bitmp[i], 0);
-			if (zero_idx == VM_END_BITS);
+			if (zero_idx == VM_END_BITS)
 				continue;
 
 			if ((i < vmp->mpcnt-1) ||
@@ -261,16 +268,16 @@ __vmem_set_n_zero_bit(vmem_t *vmp, ulong_t n)
 	uint_t 		pg_idx = n >> (PAGE_SHIFT + 3);
 	struct page *pg = vmp->bitmp[pg_idx];
 	uint_t 		pg_off = n & BITS_PER_PAGE_MASK;
-	uint_t 		pg_uchar_off = pg_off / (sizeof(uchar_t) * 8);
-	int 		uchar_bit_off = pg_off & (sizeof(uchar_t) * 8 - 1);
-	uchar_t 	*pg_addr, uchar_off_addr;
+	uint_t 		pg_ulong_off = pg_off / (sizeof(ulong_t) * 8);
+	int 		ulong_bit_off = pg_off & (sizeof(ulong_t) * 8 - 1);
+	ulong_t 	*pg_addr, ulong_off_addr;
 	
 	if (!pg)
 		return -EINVAL;
 
 	pg_addr = kmap_atomic(pg);
-	uchar_off_addr = pg_addr + pg_uchar_off;
-	test_and_clear_bit_le(uchar_bit_off, uchar_off_addr);
+	ulong_off_addr = pg_addr + pg_ulong_off;
+	test_and_clear_bit_le(ulong_bit_off, ulong_off_addr);
 	kunmap_atomic(pg_addr);
 	return 0;
 }

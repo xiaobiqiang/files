@@ -348,7 +348,7 @@ EXPORT_SYMBOL(inet_pton);
 //TODO
 int inet_init(void)
 {
-	
+	return(0);
 }
 
 //TODO
