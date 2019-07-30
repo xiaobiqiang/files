@@ -204,7 +204,7 @@ __vmem_alloc_unlocked(vmem_t *vmp, uint_t bits, uint_t flags)
 {
 	uint_t i;
 	ulong_t zero_idx;
-	void *rv = NULL;
+	void *rv = (void *)(-1UL);
 	
 	VERIFY(bits == 1);
 

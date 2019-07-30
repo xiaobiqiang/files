@@ -93,11 +93,6 @@ extern size_t vmem_size(vmem_t *vmp, int typemask);
  * allocations (8MB in size or smaller) and map vmem_{alloc,zalloc,free}()
  * to them.
  */
-
-#define vmem_create(nm, base, size, quantum, 	\
-	afunc, ffunc, source, qcache_max, vmflag)	\
-	((void *)(uintptr_t)1)
-#define vmem_destroy(vm)	((void)0)
 	
 #define	vmem_alloc(sz, fl)	spl_vmem_alloc((sz), (fl), __func__, __LINE__)
 #define	vmem_zalloc(sz, fl)	spl_vmem_zalloc((sz), (fl), __func__, __LINE__)
