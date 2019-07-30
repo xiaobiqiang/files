@@ -37,17 +37,21 @@ typedef struct vmem vmem_t;
 typedef void *(vmem_alloc_t)(vmem_t *, size_t, int);
 typedef void (vmem_free_t)(vmem_t *, void *, size_t);
 
+#undef vmem_create
 extern vmem_t *
 vmem_create(const char *name, void *base, size_t size, size_t quantum,
     vmem_alloc_t *afunc, vmem_free_t *ffunc, vmem_t *source,
     size_t qcache_max, int vmflag);
 
+#undef vmem_destroy
 extern void
 vmem_destroy(vmem_t *vmp);
 
+#undef vmem_alloc
 extern void *
 vmem_alloc(vmem_t *vmp, size_t size, int vmflag);
 
+#undef vmem_free
 extern void
 vmem_free(vmem_t *vmp, void *vaddr, size_t size);
 
