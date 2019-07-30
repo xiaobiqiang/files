@@ -46,7 +46,7 @@ unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
 int raidz_filledtime_count = 60*1;
 int raidz_clearedtime_count = 30;
-
+int raidz_print_active_current =0;
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
 extern void vdev_raidz_generate_parity(raidz_map_t *rm);
 static int aggre_io_cons(void *vdb, void *unused, int kmflag)
@@ -606,7 +606,6 @@ raidz_aggre_map_open(spa_t *spa)
 	uint64_t offset;
 	int err, i;
 	int loop;
-	spa->spa_map_manager.active_obj_index = 0;
 	for (loop = 0; loop < AGGRE_MAP_MAX_OBJ_NUM; loop++) {
 		err = dmu_object_info(spa->spa_meta_objset, spa->spa_map_obj_arr[loop], &doi);
 		if (err) {
@@ -955,8 +954,7 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 	}
 	if ( ( mapfilling->hdr->avail_count>raidz_reclaim_count ||
 				nows-mapfilling->hdr->aggre_map_filltime>raidz_filledtime_count)
-			&& mapreclaimed->hdr->aggre_map_state == AGGRE_MAP_OBJ_CLEAR
-			&& (nows-mapreclaimed->hdr->aggre_map_filltime>raidz_clearedtime_count))
+			&& mapreclaimed->hdr->aggre_map_state == AGGRE_MAP_OBJ_CLEAR)
 	{
 		map_manager->active_obj_index = reclaimed_obj;
 		mapreclaimed->hdr->aggre_map_filltime = nows;
@@ -1140,6 +1138,9 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 #if defined(_KERNEL) && defined(HAVE_SPL)
 module_param(raidz_reclaim_enable, int, 0644);
 MODULE_PARM_DESC(raidz_reclaim_enable, "raidz reclaim switch");
+
+module_param(raidz_print_active_current, int, 0644);
+MODULE_PARM_DESC(raidz_print_active_current, "raidz print active current ");
 
 module_param(raidz_space_reclaim_gap, ulong, 0644);
 MODULE_PARM_DESC(raidz_space_reclaim_gap, "raidz reclaim time gap");

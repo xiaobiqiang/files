@@ -1224,7 +1224,8 @@ zvol_open(struct block_device *bdev, fmode_t flag)
 	}
 
 	zv->zv_open_count++;
-
+	
+	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);
 	check_disk_change(bdev);
 
 out_open_count:
@@ -1251,15 +1252,11 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 	zvol_state_t *zv = disk->private_data;
 	int drop_mutex = 0;
 
-	printk(KERN_WARNING "%s ", __func__);
-
 	if (zv!=NULL) {
 		printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);
-		dump_stack();
 	}
 	else{
 		printk(KERN_WARNING "%s data_opened zv is null \n", __func__);
-		dump_stack();
 		return;
 	}
 	ASSERT(zv && zv->zv_open_count > 0);
