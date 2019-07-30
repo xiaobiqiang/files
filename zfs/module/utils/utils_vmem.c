@@ -1,8 +1,11 @@
-#include <sys/iscsit_vmem.h>
+#include <sys/utils_vmem.h>
 #include <sys/mutex.h>
 #include <sys/condvar.h>
 #include <linux/gfp.h>
 #include <sys/atomic.h>
+#include <linux/bitops.h>
+#include <linux/vmalloc.h>
+#include <linux/highmem.h>
 
 #define BITS_PER_PAGE		(1UL << (PAGE_SHIFT + 3))
 #define BITS_PER_PAGE_MASK	(BITS_PER_PAGE - 1)
@@ -39,7 +42,7 @@ vmem_alloc_bm_pages(vmem_t *vm, uint want, struct page ***pgpp)
 	pages = kzalloc(want * sizeof(struct page *),
 		GFP_NOIO | __GFP_NOWARN);
 	if (!pages) {
-		pages = __vmalloc(bytes,
+		pages = __vmalloc(want * sizeof(struct page *),
 				GFP_NOIO | __GFP_HIGHMEM | __GFP_ZERO,
 				PAGE_KERNEL);
 		if (!pages)
@@ -69,6 +72,10 @@ free_pg:
 		if (pages[j])
 			__free_page(pages[j]);
 	}
+	if (vmalloced)
+                vfree(pages);
+        else
+                kfree(pages);
 failed:
 	return rc;
 }
