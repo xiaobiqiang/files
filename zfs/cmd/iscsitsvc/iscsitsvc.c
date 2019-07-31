@@ -41,7 +41,6 @@
 #include <fcntl.h>
 #include <locale.h>
 
-#include <libiscsit.h>
 #include <sys/iscsit/iscsit_common.h>
 
 static int it_enable(int, char **, cmdOptions_t *, void *);
