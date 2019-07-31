@@ -10,7 +10,7 @@ DEFAULT_INCLUDES += \
 
 noinst_LTLIBRARIES = libiscsit.la
 
-USER_C =
+USER_C = \
 	libiscsit.c
 
 KERNEL_C = \

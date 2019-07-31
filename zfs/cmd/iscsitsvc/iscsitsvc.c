@@ -40,6 +40,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <locale.h>
+#include <cmdparse.h>
 
 #include <sys/iscsit/iscsit_common.h>
 

@@ -32,8 +32,8 @@
 #include <unistd.h>
 #include <strings.h>
 #include <libintl.h>
-#include <libscf.h>
 
+#include <sys/uuid.h>
 #include <libstmf.h>
 #include <libiscsit.h>
 #include <sys/iscsi_protocol.h>
@@ -1954,14 +1954,15 @@ is_iscsit_enabled(void)
 {
 	char		*state;
 
-	state = smf_get_state(ISCSIT_FMRI);
+/*	state = smf_get_state(ISCSIT_FMRI);
 	if (state != NULL) {
 		if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
 			return (B_TRUE);
 		}
 	}
 
-	return (B_FALSE);
+	return (B_FALSE); */
+	return B_TRUE;
 }
 
 /*

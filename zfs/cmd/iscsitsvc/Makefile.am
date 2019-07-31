@@ -10,7 +10,8 @@ DEFAULT_INCLUDES += \
 sbin_PROGRAMS = iscsitsvc
 
 iscsitsvc_SOURCES = \
-	iscsitsvc.c
+	iscsitsvc.c \
+	cmdparse.c
 
 iscsitsvc_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la

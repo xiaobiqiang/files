@@ -130,3 +130,4 @@ cleanup:
 
 5.iscsit_global.global_tsih_pool: vmem_create,vmem_alloc,vmem_destroy,vmem_free
 
+6.is_iscsit_enabled in libiscsit.c
