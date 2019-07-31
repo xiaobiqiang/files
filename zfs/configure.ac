@@ -189,6 +189,7 @@ AC_CONFIG_FILES([
 	cmd/sethostid/Makefile
 	cmd/scripts/Makefile
 	cmd/iscsitsvc/Makefile
+	cmd/itadm/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

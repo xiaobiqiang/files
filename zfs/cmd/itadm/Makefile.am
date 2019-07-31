@@ -15,9 +15,7 @@ itadm_SOURCES = \
 
 itadm_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \
-	$(top_builddir)/lib/libuutil/libuutil.la \
-	$(top_builddir)/lib/libstmf/libstmf.la \
-	$(top_builddir)/lib/libzpool/libzpool.la \
-	$(top_builddir)/lib/libzfs/libzfs.la 
+	$(top_builddir)/lib/libiscsit/libiscsit.la \
+	$(top_builddir)/lib/libstmf/libstmf.la 
 
 itadm_LDADD += $(ZLIB)

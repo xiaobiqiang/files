@@ -39,7 +39,6 @@
 #include <pwd.h>
 #include <auth_attr.h>
 #include <secdb.h>
-#include <libscf.h>
 #include <limits.h>
 #include <locale.h>
 
@@ -61,8 +60,11 @@
 	}\
 }
 
+/*
+ * @ARGS_UNUSED
+ */
 #define	ITADM_CHKAUTH(sec) {\
-	if (!chkauthattr(sec, itadm_uname)) {\
+	if (itadm_uid) {\
 		(void) fprintf(stderr,\
 		    gettext("Error, operation requires authorization %s"),\
 		    sec);\
@@ -171,7 +173,7 @@ static itadm_subcmds_t	subcmds[] = {
 };
 
 /* used for checking if user is authorized */
-static char *itadm_uname = NULL;
+static uid_t itadm_uid = 0;
 
 /* prototypes */
 static int
@@ -260,15 +262,8 @@ main(int argc, char *argv[])
 	}
 
 
-	/* get the caller's user name for subsequent chkauthattr() calls */
-	pwd = getpwuid(getuid());
-	if (pwd == NULL) {
-		(void) fprintf(stderr, "%s\n",
-		    gettext("Could not determine callers user name."));
-		return (1);
-	}
-
-	itadm_uname = strdup(pwd->pw_name);
+	/* get the caller's user id for auth calls */
+	itadm_uid = getuid();
 
 	/* increment past command & subcommand */
 	newargc--;
@@ -494,7 +489,7 @@ main(int argc, char *argv[])
 	 * Make sure iSCSI target service is enabled before
 	 * proceeding.
 	 */
-	smfstate = smf_get_state(ISCSIT_SVC);
+/*	smfstate = smf_get_state(ISCSIT_SVC);
 	if (!smfstate ||
 	    (strcmp(smfstate, SCF_STATE_STRING_ONLINE) != 0)) {
 		(void) fprintf(stderr, "%s\n",
@@ -512,7 +507,7 @@ main(int argc, char *argv[])
 		(void) fprintf(stderr, "\n");
 
 		return (1);
-	}
+	} */
 
 	switch ((itadm_sub_t)idx) {
 		case CREATE_TGT:

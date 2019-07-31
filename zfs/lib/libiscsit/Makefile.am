@@ -11,6 +11,7 @@ DEFAULT_INCLUDES += \
 noinst_LTLIBRARIES = libiscsit.la
 
 USER_C =
+	libiscsit.c
 
 KERNEL_C = \
 	iscsit_common.c
@@ -18,5 +19,10 @@ KERNEL_C = \
 nodist_libiscsit_la_SOURCES = \
 	$(USER_C) \
 	$(KERNEL_C)
+	
+libiscsit_la_LIBADD = \
+	$(top_builddir)/lib/libshare/libshare.la \
+	$(top_builddir)/lib/libnvpair/libnvpair.la \
+	$(top_builddir)/lib/libcomm/libcomm.la 
 
 EXTRA_DIST = $(USER_C)
