@@ -41,10 +41,10 @@ typedef enum {
 
 int raidz_reclaim_enable = 1;
 int raidz_reclaim_timeconsum = 10000;
-unsigned long raidz_space_reclaim_gap = 10*2;	/* unit: s */
+unsigned long raidz_space_reclaim_gap = 60*2;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
-int raidz_filledtime_count = 60*1;
+int raidz_filledtime_count = 60*2;
 int raidz_clearedtime_count = 30;
 int raidz_print_active_current =0;
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
@@ -938,8 +938,11 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 
 	if(!(spa->spa_space_reclaim_state & SPACE_RECLAIM_START))
 		return NULL;
-
 	map_manager = &spa->spa_map_manager;
+
+	if(map_manager->active_obj_index== -1)
+		return NULL;
+	
 	filling_obj = map_manager->active_obj_index;
 	reclaimed_obj = filling_obj==0?1:0;
 	
@@ -952,9 +955,10 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 	if (spa->spa_sync_pass>1) {
 		return mapfilling;
 	}
-	if ( ( mapfilling->hdr->avail_count>raidz_reclaim_count ||
+	if ( ( mapfilling->hdr->avail_count>raidz_reclaim_count &&
 				nows-mapfilling->hdr->aggre_map_filltime>raidz_filledtime_count)
-			&& mapreclaimed->hdr->aggre_map_state == AGGRE_MAP_OBJ_CLEAR)
+			&& mapreclaimed->hdr->aggre_map_state == AGGRE_MAP_OBJ_CLEAR
+			 && (nows-mapreclaimed->hdr->aggre_map_filltime>raidz_clearedtime_count))
 	{
 		map_manager->active_obj_index = reclaimed_obj;
 		mapreclaimed->hdr->aggre_map_filltime = nows;
