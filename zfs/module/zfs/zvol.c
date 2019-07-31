@@ -1440,11 +1440,22 @@ zvol_dkio_free(const char *name, void *arg)
 	if (error != 0) {
 		dmu_tx_abort(tx);
 	} else {
+		hrtime_t timestampbegin;
+		hrtime_t timestampnow;
+		uint32_t elapsed_ms = 0;
+		
 		zvol_log_truncate(zv, tx, df.df_start,
 			df.df_length, B_TRUE);
 		dmu_tx_commit(tx);
+
+		timestampbegin = gethrtime();
+		cmn_err(CE_WARN, "%s dmu_free_long_range start:%lx len%lx begin",__func__,df.df_start, df.df_length );
 		error = dmu_free_long_range(zv->zv_objset, ZVOL_OBJ,
 			df.df_start, df.df_length);
+		timestampnow = gethrtime();
+		elapsed_ms =  (timestampnow - timestampbegin) / 1000000;
+	
+		cmn_err(CE_WARN, "%s dmu_free_long_range start:%lx len%lx end elapsed:%d",__func__,df.df_start, df.df_length,elapsed_ms );
 	}
 	
 	zfs_range_unlock(rl);

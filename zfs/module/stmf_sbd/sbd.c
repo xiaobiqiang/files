@@ -5190,6 +5190,10 @@ sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
 	char *name = NULL;
 	int ret;
 
+	hrtime_t timestampbegin;
+	hrtime_t timestampnow;
+	uint32_t elapsed_ms = 0;
+
 	if (!(sl->sl_flags & SL_ZFS_META))
 		return (EIO);
 
@@ -5205,7 +5209,15 @@ sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
 	}
 
 	name = sbd_get_zvol_name(sl);
+	
+	timestampbegin = gethrtime();
+	cmn_err(CE_WARN, "%s zvol_dkio_free start:%lx len%lx begin",__func__,df.df_start, df.df_length );
 	ret = zvol_dkio_free(name, &df);
+	
+	timestampnow = gethrtime();
+	elapsed_ms =  (timestampnow - timestampbegin) / 1000000;
+	cmn_err(CE_WARN, "%s zvol_dkio_free end:%lx len%lx end elapsed:%d",__func__,df.df_start, df.df_length,elapsed_ms );
+	
 	if (name)
 		kmem_free(name, strlen(name) + 1);
 	return (ret);
