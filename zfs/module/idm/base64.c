@@ -171,8 +171,10 @@ iscsi_base64_str_to_binary(char *hstr, int hstr_len,
 
 	return (0);
 }
-EXPORT_SYMBOL(iscsi_base64_str_to_binary);
 
+#ifdef _KERNEL
+EXPORT_SYMBOL(iscsi_base64_str_to_binary);
+#endif
 
 static char base64_encode_tab[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -254,5 +256,8 @@ iscsi_binary_to_base64_str(uint8_t *in_buf, int in_buf_len,
 
 	return (0);
 }
+
+#ifdef _KERNEL
 EXPORT_SYMBOL(iscsi_binary_to_base64_str);
+#endif
 
