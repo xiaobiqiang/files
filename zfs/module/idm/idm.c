@@ -35,6 +35,7 @@
 
 //#include <sys/socketvar.h>
 #include <linux/in.h>
+#include <linux/vmalloc.h>
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
@@ -2342,8 +2343,10 @@ _idm_init(void)
 	 */
 
 	idm.idm_taskid_max = idm_max_taskids;
-	idm.idm_taskid_table = (idm_task_t **)
-	    kmem_zalloc(idm.idm_taskid_max * sizeof (idm_task_t *), KM_SLEEP);
+	idm.idm_taskid_table = (idm_task_t **)__vmalloc(
+		idm.idm_taskid_max * sizeof (idm_task_t *), 
+	    GFP_NOIO | __GFP_HIGHMEM | __GFP_ZERO,
+		PAGE_KERNEL);
 	idm.idm_taskid_next = 0;
 
 	/* Create the global buffer and task kmem caches */
@@ -2407,8 +2410,7 @@ _idm_fini(void)
 	list_destroy(&idm.idm_tgt_svc_list);
 	kmem_cache_destroy(idm.idm_task_cache);
 	kmem_cache_destroy(idm.idm_buf_cache);
-	kmem_free(idm.idm_taskid_table,
-	    idm.idm_taskid_max * sizeof (idm_task_t *));
+	vfree(idm.idm_taskid_table);
 	mutex_destroy(&idm.idm_global_mutex);
 	cv_destroy(&idm.idm_wd_cv);
 	rw_destroy(&idm.idm_taskid_table_lock);
