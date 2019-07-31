@@ -31,7 +31,6 @@
 extern "C" {
 #endif
 
-#include <uapi/linux/in.h>
 #include <linux/socket.h>
 #include <sys/types.h>
 
