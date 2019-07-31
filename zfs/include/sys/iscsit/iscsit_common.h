@@ -39,7 +39,7 @@ extern "C" {
 #define	ISCSIT_API_VERS0		0
 
 #define	ISCSIT_MODNAME		"iscsit"
-#define	ISCSIT_NODE		"/devices/pseudo/iscsit@0:iscsit"
+#define	ISCSIT_NODE		"/dev/ziscsit"
 
 typedef enum {
 	ITCFG_SUCCESS = 0,

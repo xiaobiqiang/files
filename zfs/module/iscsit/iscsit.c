@@ -48,7 +48,7 @@
 
 #define	ISCSIT_VERSION		"1.18dev"
 #define	ISCSIT_NAME_VERSION	"COMSTAR ISCSIT v" ISCSIT_VERSION
-#define ISCSIT_MISC			"iscsit"
+#define ISCSIT_MISC			"ziscsit"
 /*
  * DDI entry points.
  */
