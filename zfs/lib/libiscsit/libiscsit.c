@@ -834,7 +834,7 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 	if ((tagid_used = malloc(MAXTAG + 1)) == NULL)
 		return ENOMEM;
 
-	(void) memset(&(tagid_used[0]), 0, sizeof (tagid_used));
+	(void) memset(&(tagid_used[0]), 0, MAXTAG + 1);
 
 	/*
 	 * Make sure this name and/or tag isn't already on the list
