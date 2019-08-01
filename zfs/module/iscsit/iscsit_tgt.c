@@ -1340,6 +1340,7 @@ iscsit_tpgt_create(it_tpgt_t *cfg_tpgt)
 
 	result->tpgt_tpg = tpg;
 	result->tpgt_tag = cfg_tpgt->tpgt_tag;
+	idm_refcnt_init(&result->tpgt_refcnt, result);
 
 	return (result);
 }
@@ -1354,6 +1355,7 @@ iscsit_tpgt_create_default(void)
 	result->tpgt_tpg = iscsit_global.global_default_tpg;
 	iscsit_tpg_hold(result->tpgt_tpg);
 	result->tpgt_tag = ISCSIT_DEFAULT_TPGT;
+	idm_refcnt_init(&result->tpgt_refcnt, result);
 
 	return (result);
 }
