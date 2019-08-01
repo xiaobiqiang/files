@@ -30,9 +30,8 @@
 #include <sys/nvpair.h>
 #else
 #include <libnvpair.h>
-#endif
-
 #include <sys/socket.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
