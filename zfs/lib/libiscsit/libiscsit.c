@@ -824,12 +824,15 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 {
 	it_tpgt_t	*ptr = NULL;
 	it_tpgt_t	*cfgt;
-	char		tagid_used[MAXTAG + 1];
 	uint16_t	tagid = ISCSIT_DEFAULT_TPGT;
-
+	char		*tagid_used;
+	
 	if (!cfg || !tgt || !tpgt || !tpg_name) {
 		return (EINVAL);
 	}
+
+	if ((tagid_used = malloc(MAXTAG + 1)) == NULL)
+		return ENOMEM;
 
 	(void) memset(&(tagid_used[0]), 0, sizeof (tagid_used));
 
@@ -848,6 +851,7 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 		tagid_used[cfgt->tpgt_tag] = 1;
 
 		if (strcmp(tpg_name, cfgt->tpgt_tpg_name) == 0) {
+			free(tagid_used);
 			return (EEXIST);
 		}
 
@@ -873,6 +877,7 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 			}
 		}
 		if (tagid >= MAXTAG) {
+			free(tagid_used);
 			return (E2BIG);
 		}
 	} else {
@@ -882,6 +887,7 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 
 	ptr = calloc(1, sizeof (it_tpgt_t));
 	if (!ptr) {
+		free(tagid_used);
 		return (ENOMEM);
 	}
 
@@ -897,6 +903,7 @@ it_tpgt_create(it_config_t *cfg, it_tgt_t *tgt, it_tpgt_t **tpgt,
 
 	*tpgt = ptr;
 
+	free(tagid_used);
 	return (0);
 }
 
