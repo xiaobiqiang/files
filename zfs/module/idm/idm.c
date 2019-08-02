@@ -57,15 +57,9 @@ static idm_buf_t *idm_buf_alloc_int(idm_conn_t *ic, void *bufptr,
     uint64_t buflen, struct stmf_sglist_ent *sglp, uint32_t numbufs,
     uint32_t flags);
 
-#ifdef DEBUG
 boolean_t idm_conn_logging = 1;	
 boolean_t idm_svc_logging = 1;
-boolean_t idm_pattern_checking = 1;
-#else
-boolean_t idm_conn_logging = 0;	
-boolean_t idm_svc_logging = 0;
 boolean_t idm_pattern_checking = 0;
-#endif
 
 /*
  * Potential tuneable for the maximum number of tasks.  Default to
@@ -2113,6 +2107,7 @@ idm_refcnt_destroy(idm_refcnt_t *refcnt)
 	mutex_enter(&refcnt->ir_mutex);
 	ASSERT(refcnt->ir_refcnt == 0);
 	cv_destroy(&refcnt->ir_cv);
+	mutex_exit(&refcnt->ir_mutex);
 	mutex_destroy(&refcnt->ir_mutex);
 }
 EXPORT_SYMBOL(idm_refcnt_destroy);
@@ -2393,7 +2388,7 @@ _idm_fini(void)
 	cv_signal(&idm.idm_wd_cv);
 	mutex_exit(&idm.idm_global_mutex);
 
-	thread_join(idm.idm_wd_thread_did);
+//	thread_join(idm.idm_wd_thread_did);
 
 	idm_idpool_destroy(&idm.idm_conn_id_pool);
 

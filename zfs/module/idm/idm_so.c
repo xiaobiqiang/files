@@ -711,6 +711,8 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	if (ic->ic_conn_flags & IDM_CONN_HEADER_DIGEST) {
 		crc_calculated = idm_crc32c(pdu->isp_hdr,
 		    sizeof (iscsi_hdr_t) + ahslen);
+		printk(KERN_WARNING "%s:crc_calculated:%u hdr_digest_crc:%u",
+			__func__, crc_calculated, hdr_digest_crc);
 		if (crc_calculated != hdr_digest_crc) {
 			/* Invalid Header Digest */
 			return (IDM_STATUS_HEADER_DIGEST);
@@ -960,8 +962,8 @@ idm_so_conn_connect_common(idm_conn_t *ic)
 	so_conn->ic_rx_thread = thread_create(NULL, 0, idm_sorx_thread, ic, 0,
 	    &p0, TS_RUN, minclsyspri);
 
-	while (so_conn->ic_rx_thread_did == 0 ||
-	    so_conn->ic_tx_thread_did == 0)
+	while (!so_conn->ic_tx_thread_running ||
+	    !so_conn->ic_tx_thread_running)
 		cv_wait(&ic->ic_cv, &ic->ic_mutex);
 	mutex_exit(&ic->ic_mutex);
 }
@@ -989,8 +991,8 @@ idm_so_conn_disconnect(idm_conn_t *ic)
 	/* This should wakeup the RX thread if it is sleeping */
 	idm_soshutdown(so_conn->ic_so);
 
-	thread_join(so_conn->ic_tx_thread_did);
-	thread_join(so_conn->ic_rx_thread_did);
+//	thread_join(so_conn->ic_tx_thread_did);
+//	thread_join(so_conn->ic_rx_thread_did);
 }
 
 /*
@@ -1122,7 +1124,7 @@ idm_so_tgt_svc_offline(idm_svc_t *is)
 	/*
 	 * Now we expect the port watcher thread to terminate
 	 */
-	thread_join(so_svc->is_thread_did);
+//	thread_join(so_svc->is_thread_did);
 }
 
 /*
@@ -1794,7 +1796,8 @@ idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu)
 			iov++;
 		}
 		kmem_free(data_iov, data_iovsize);
-
+		printk(KERN_WARNING "%s:crc_calculated:%u data_digest_crc:%u",
+			__func__, crc_calculated, data_digest_crc);
 		if (crc_calculated != data_digest_crc) {
 			IDM_CONN_LOG(CE_WARN,
 			    "idm_sorecvdata: "
@@ -2093,7 +2096,8 @@ idm_sorx_thread(void *arg)
 				continue;
 			}
 		}
-
+		
+		printk(KERN_WARNING "%s going into idm_pdu_rx", __func__);
 		/*
 		 * Process RX PDU
 		 */

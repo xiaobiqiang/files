@@ -1083,6 +1083,7 @@ iscsit_conn_accept(idm_conn_t *ic)
 	mutex_init(&ict->ict_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ict->ict_statsn_mutex, NULL, MUTEX_DRIVER, NULL);
 	idm_refcnt_init(&ict->ict_refcnt, ict);
+	idm_refcnt_init(&ict->ict_dispatch_refcnt, ict);
 
 	/*
 	 * Initialize login state machine
@@ -3204,7 +3205,7 @@ iscsit_rxpdu_queue_monitor_stop(void)
 		cv_signal(&iscsit_rxpdu_queue_monitor_cv);
 		mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);
 
-		thread_join(iscsit_rxpdu_queue_monitor_thr_did);
+//		thread_join(iscsit_rxpdu_queue_monitor_thr_did);
 		return;
 	}
 	mutex_exit(&iscsit_rxpdu_queue_monitor_mutex);

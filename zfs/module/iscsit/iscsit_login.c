@@ -300,6 +300,7 @@ iscsit_login_sm_fini(iscsit_conn_t *ict)
 	}
 
 	nvlist_free(lsm->icl_negotiated_values);
+	mutex_exit(&lsm->icl_mutex);
 	mutex_destroy(&lsm->icl_mutex);
 }
 

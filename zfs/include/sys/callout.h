@@ -3,7 +3,8 @@
 
 #include <linux/types.h>
 
-typedef void **timeout_id_t;
+#define TIMEOUT_ID_INVALID		(NULL)
+typedef void  					*timeout_id_t;
 
 extern timeout_id_t
 timeout(void (*func)(void *), void *arg, clock_t delta);

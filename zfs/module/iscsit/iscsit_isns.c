@@ -927,7 +927,7 @@ isnst_monitor_stop(void)
 		cv_signal(&isns_idle_cv);
 		mutex_exit(&isns_monitor_mutex);
 
-		thread_join(isns_monitor_thr_did);
+//		thread_join(isns_monitor_thr_did);
 		return;
 	}
 	mutex_exit(&isns_monitor_mutex);
@@ -3021,7 +3021,7 @@ isnst_esi_stop()
 			idm_soshutdown(esi.esi_so);
 			idm_sodestroy(esi.esi_so);
 		}
-		thread_join(esi.esi_thread_did);
+//		thread_join(esi.esi_thread_did);
 	} else {
 		mutex_exit(&esi.esi_mutex);
 	}
