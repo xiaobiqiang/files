@@ -239,11 +239,8 @@ idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
 
 	ASSERT(mutex_owned(&ic->ic_state_mutex));
 
-	printk(KERN_WARNING "%s event:%02x, pdu_event_type:%02x ic_state:%d",
-		__func__, event, pdu_event_type, (int)ic->ic_state);
 	idm_sm_audit_event(&ic->ic_state_audit, SAS_IDM_CONN,
 	    (int)ic->ic_state, (int)event, event_info);
-	printk(KERN_WARNING "%s idm_sm_audit_event finished\n", __func__);
 	/*
 	 * It's very difficult to prevent a few straggling events
 	 * at the end.  For example idm_sorx_thread will generate
@@ -274,20 +271,16 @@ idm_conn_event_locked(idm_conn_t *ic, idm_conn_event_t event,
 	/*
 	 * Normal event handling
 	 */
-	printk(KERN_WARNING "%s going to idm_conn_hold", __func__);
 	idm_conn_hold(ic);
 
-	printk(KERN_WARNING "%s going to kmem_zalloc", __func__);
 	event_ctx = kmem_zalloc(sizeof (*event_ctx), KM_SLEEP);
 	event_ctx->iec_ic = ic;
 	event_ctx->iec_event = event;
 	event_ctx->iec_info = event_info;
 	event_ctx->iec_pdu_event_type = pdu_event_type;
 
-	printk(KERN_WARNING "%s going to idm_conn_event_handler\n", __func__);
 	qid = taskq_dispatch(ic->ic_state_taskq, &idm_conn_event_handler,
 	    event_ctx, TQ_SLEEP);
-	printk(KERN_WARNING "%s taskqid_t:%lu\n", __func__, qid);
 }
 
 static void
@@ -298,7 +291,6 @@ idm_conn_event_handler(void *event_ctx_opaque)
 	idm_pdu_t *pdu = (idm_pdu_t *)event_ctx->iec_info;
 	idm_pdu_event_action_t action;
 	
-	printk(KERN_WARNING "comming into %s\n", __func__);
 
 	IDM_SM_LOG(CE_NOTE, "idm_conn_event_handler: conn %p event %s(%d)",
 	    (void *)ic, idm_ce_name[event_ctx->iec_event],
@@ -415,8 +407,6 @@ idm_conn_event_handler(void *event_ctx_opaque)
 	 * (transmit it, forward it to the clients RX callback, drop
 	 * it, etc).
 	 */
-	printk(KERN_WARNING "%02x %02x %02x", event_ctx->iec_pdu_event_type,
-		action, event_ctx->iec_pdu_forwarded);
 	if (event_ctx->iec_pdu_event_type != CT_NONE) {
 		switch (action) {
 		case CA_TX_PROTOCOL_ERROR:
@@ -452,11 +442,8 @@ idm_conn_event_handler(void *event_ctx_opaque)
 		mutex_exit(&ic->ic_state_mutex);
 	}
 
-	printk(KERN_WARNING "%s going to idm_conn_rele", __func__);
 	idm_conn_rele(ic);
-	printk(KERN_WARNING "%s idm_conn_rele finished", __func__);
 	kmem_free(event_ctx, sizeof (*event_ctx));
-	printk(KERN_WARNING "out of %s", __func__);
 }
 
 static void
@@ -480,7 +467,6 @@ idm_state_s1_free(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		ASSERT(0);
 		/*NOTREACHED*/
 	}
-	printk(KERN_WARNING "out of %s", __func__);
 }
 
 
@@ -635,7 +621,6 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		 * event sent from the session to the IDM layer.
 		 */
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -698,7 +683,6 @@ idm_state_s5_logged_in(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection */
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -768,7 +752,6 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		ASSERT(IDM_CONN_ISTGT(ic));
-		printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 		ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 
 		/* restore client callback */
@@ -818,7 +801,6 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -910,7 +892,6 @@ idm_state_s7_logout_req(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -1220,10 +1201,8 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		 * CS_S4_IN_LOGIN.  Start login timer.
 		 */
 
-		printk(KERN_WARNING "%s going to timeout", __func__);
 		ic->ic_state_timeout = timeout(idm_login_timeout, ic,
 		    drv_usectohz(IDM_LOGIN_SECONDS*1000000));
-		printk(KERN_WARNING "%s timeout finished", __func__);
 		break;
 	case CS_S4_IN_LOGIN:
 		if (ic->ic_conn_type == CONN_TYPE_INI) {
@@ -1243,7 +1222,6 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		 */
 		idm_status = idm_ffp_enable(ic);
 		if (idm_status != IDM_STATUS_SUCCESS) {
-			printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 			idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 		}
 
@@ -1265,7 +1243,6 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 	case CS_S8_CLEANUP:
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s CS_S8_CLEANUP going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -1293,7 +1270,6 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		break;
 	case CS_S9_INIT_ERROR:
 		if (IDM_CONN_ISTGT(ic)) {
-			printk(KERN_WARNING "%s CS_S9_INIT_ERROR going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			mutex_enter(&ic->ic_state_mutex);
@@ -1361,7 +1337,6 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		break;
 
 	}
-	printk(KERN_WARNING "out of %s", __func__);
 }
 
 

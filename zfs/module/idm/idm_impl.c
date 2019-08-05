@@ -60,7 +60,6 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 {
 	iscsi_async_evt_hdr_t *async_evt;
 	uint8_t opcode;
-	printk(KERN_WARNING "coming into %s", __func__);
 	/*
 	 * If we are in full-featured mode then route SCSI-related
 	 * commands to the appropriate function vector
@@ -72,7 +71,6 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 
 		if (idm_pdu_rx_forward_ffp(ic, pdu) == B_TRUE) {
 			/* Forwarded SCSI-related commands */
-			printk(KERN_WARNING "out of %s after idm_pdu_rx_forward_ffp", __func__);
 			return;
 		}
 		mutex_enter(&ic->ic_state_mutex);
@@ -96,23 +94,18 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 	printk(KERN_WARNING "%s:opcode:%02x", __func__, opcode);
 	switch (IDM_PDU_OPCODE(pdu)) {
 	case ISCSI_OP_LOGIN_CMD:
-		printk(KERN_WARNING "%s 1-------1", __func__);
 		idm_conn_rx_pdu_event(ic, CE_LOGIN_RCV, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_LOGIN_RSP:
-		printk(KERN_WARNING "%s 2-------2", __func__);
 		idm_parse_login_rsp(ic, pdu, /* RX */ B_TRUE);
 		break;
 	case ISCSI_OP_LOGOUT_CMD:
-		printk(KERN_WARNING "%s 3-------3", __func__);
 		idm_parse_logout_req(ic, pdu, /* RX */ B_TRUE);
 		break;
 	case ISCSI_OP_LOGOUT_RSP:
-		printk(KERN_WARNING "%s 4-------4", __func__);
 		idm_parse_logout_rsp(ic, pdu, /* RX */ B_TRUE);
 		break;
 	case ISCSI_OP_ASYNC_EVENT:
-		printk(KERN_WARNING "%s 5-------5", __func__);
 		async_evt = (iscsi_async_evt_hdr_t *)pdu->isp_hdr;
 		switch (async_evt->async_event) {
 		case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
@@ -155,23 +148,18 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * Handle dtrace probe in iscsit so we can find all the
 		 * pieces of the CDB
 		 */
-		printk(KERN_WARNING "%s 6-------6", __func__);
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_DATA:
-		printk(KERN_WARNING "%s 7-------7", __func__);
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_TASK_MGT_MSG:
-		printk(KERN_WARNING "%s 8-------8", __func__);
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_NOOP_OUT:
-		printk(KERN_WARNING "%s 9-------9", __func__);
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_TEXT_CMD:
-		printk(KERN_WARNING "%s 10-------10", __func__);
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
 		break;
 	/* Initiator PDU's */
@@ -182,14 +170,12 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 	case ISCSI_OP_TEXT_RSP:
 	case ISCSI_OP_REJECT_MSG:
 	case ISCSI_OP_SCSI_TASK_MGT_RSP:
-		printk(KERN_WARNING "%s 11-------11", __func__);
 		/* Validate received PDU against current state */
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX,
 		    (uintptr_t)pdu);
 		break;
 	}
 	mutex_exit(&ic->ic_state_mutex);
-	printk(KERN_WARNING "out of %s after handle out", __func__);
 }
 
 void
@@ -1189,7 +1175,6 @@ idm_wd_thread(void *arg)
 				    "conn %p idle for %d seconds, "
 				    "sending CE_TRANSPORT_FAIL",
 				    (void *)ic, (int)idle_time);
-				printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 				idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 				mutex_enter(&idm.idm_global_mutex);
 				mutex_enter(&ic->ic_state_mutex);
