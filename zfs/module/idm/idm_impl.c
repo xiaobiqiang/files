@@ -1081,6 +1081,7 @@ idm_task_destructor(void *hdl, void *arg)
 	 * Stall here until the task mutex owner lets go.
 	 */
 	mutex_enter(&idt->idt_mutex);
+	mutex_exit(&idt->idt_mutex);
 	mutex_destroy(&idt->idt_mutex);
 }
 
@@ -1188,6 +1189,7 @@ idm_wd_thread(void *arg)
 				    "conn %p idle for %d seconds, "
 				    "sending CE_TRANSPORT_FAIL",
 				    (void *)ic, (int)idle_time);
+				printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 				idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 				mutex_enter(&idm.idm_global_mutex);
 				mutex_enter(&ic->ic_state_mutex);

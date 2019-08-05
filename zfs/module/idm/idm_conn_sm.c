@@ -635,6 +635,7 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		 * event sent from the session to the IDM layer.
 		 */
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -697,6 +698,7 @@ idm_state_s5_logged_in(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection */
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -766,6 +768,7 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		ASSERT(IDM_CONN_ISTGT(ic));
+		printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 		ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 
 		/* restore client callback */
@@ -815,6 +818,7 @@ idm_state_s6_in_logout(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -906,6 +910,7 @@ idm_state_s7_logout_req(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -1238,6 +1243,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		 */
 		idm_status = idm_ffp_enable(ic);
 		if (idm_status != IDM_STATUS_SUCCESS) {
+			printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 			idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
 		}
 
@@ -1259,6 +1265,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 	case CS_S8_CLEANUP:
 		/* Close connection (if it's not already closed) */
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s CS_S8_CLEANUP going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			ic->ic_transport_ops->it_ini_conn_disconnect(ic);
@@ -1286,6 +1293,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		break;
 	case CS_S9_INIT_ERROR:
 		if (IDM_CONN_ISTGT(ic)) {
+			printk(KERN_WARNING "%s CS_S9_INIT_ERROR going to it_tgt_conn_disconnect", __func__);
 			ic->ic_transport_ops->it_tgt_conn_disconnect(ic);
 		} else {
 			mutex_enter(&ic->ic_state_mutex);

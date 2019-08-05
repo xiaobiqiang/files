@@ -774,6 +774,9 @@ void
 iscsit_rx_pdu(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 {
 	iscsit_conn_t *ict = ic->ic_handle;
+	
+	printk(KERN_WARNING "%s:opcode:0x%02x",
+		__func__, IDM_PDU_OPCODE(rx_pdu));
 	switch (IDM_PDU_OPCODE(rx_pdu)) {
 	case ISCSI_OP_SCSI_CMD:
 		ASSERT(0); /* Shouldn't happen */
@@ -2134,6 +2137,7 @@ iscsit_deferred_dispatch(idm_pdu_t *rx_pdu)
 		 * In the unlikely scenario that we couldn't get the resources
 		 * to dispatch the PDU then just drop it.
 		 */
+		printk(KERN_WARNING "%s:taskq_dispatch failed.", __func__);
 		idm_pdu_complete(rx_pdu, IDM_STATUS_FAIL);
 		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
 		iscsit_conn_dispatch_rele(ict);
@@ -2169,6 +2173,7 @@ iscsit_deferred(void *rx_pdu_void)
 	case ISCSI_OP_TEXT_CMD:
 		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
 			iscsit_set_cmdsn(ict, rx_pdu);
+			printk(KERN_WARNING "%s going to iscsit_pdu_op_text_cmd", __func__);
 			iscsit_pdu_op_text_cmd(ict, rx_pdu);
 		}
 		break;
@@ -2614,6 +2619,7 @@ iscsit_send_async_event(iscsit_conn_t *ict, uint8_t event)
 	 */
 	abt = idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
 	if (abt == NULL) {
+		printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
 		return;
 	}
@@ -2664,6 +2670,8 @@ iscsit_send_reject(iscsit_conn_t *ict, idm_pdu_t *rejected_pdu, uint8_t reason)
 	reject_pdu = idm_pdu_alloc(sizeof (iscsi_hdr_t),
 	    rejected_pdu->isp_hdrlen);
 	if (reject_pdu == NULL) {
+		printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL reason:0x%02x",
+			 __func__, reason);
 		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
 		return;
 	}

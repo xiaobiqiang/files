@@ -653,6 +653,7 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	bhs = pdu->isp_hdr;
 	rc = idm_sorecv(so_conn->ic_so, pdu->isp_hdr, sizeof (iscsi_hdr_t));
 	if (rc != IDM_STATUS_SUCCESS) {
+		printk(KERN_WARNING "%s:1:idm_sorecv:rc %d", __func__, rc);
 		return (IDM_STATUS_FAIL);
 	}
 
@@ -665,6 +666,7 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	if (pdu->isp_datalen > ic->ic_conn_params.max_recv_dataseglen) {
 		IDM_CONN_LOG(CE_WARN,
 		    "idm_sorecvhdr: exceeded the max data segment length");
+		printk(KERN_WARNING "%s:exceeded the max data segment length", __func__);
 		return (IDM_STATUS_FAIL);
 	}
 	if (bhs->hlength > IDM_SORX_CACHE_AHSLEN) {
@@ -702,6 +704,7 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	if ((iovlen != 0) &&
 	    (idm_iov_sorecv(so_conn->ic_so, &iov[0], iovlen,
 	    total_len) != 0)) {
+		printk(KERN_WARNING "%s:1:idm_sorecv:rc %d", __func__, rc);
 		return (IDM_STATUS_FAIL);
 	}
 
@@ -2038,6 +2041,8 @@ idm_sorx_thread(void *arg)
 			 */
 			mutex_enter(&ic->ic_mutex);
 			if (so_conn->ic_rx_thread_running) {
+				printk(KERN_WARNING "%s:idm_sorecvhdr failed, rc:%d",
+					__func__, rc);
 				conn_failure = B_TRUE;
 				so_conn->ic_rx_thread_running = B_FALSE;
 			}
@@ -2055,6 +2060,8 @@ idm_sorx_thread(void *arg)
 			if ((IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA) ||
 			    (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA_RSP)) {
 				rc = idm_sorecv_scsidata(ic, pdu);
+				printk(KERN_WARNING "%s:idm_sorecv_scsidata rc:%d",
+					__func__, rc);
 				/*
 				 * All SCSI errors are fatal to the
 				 * connection right now since we have no
@@ -2070,6 +2077,8 @@ idm_sorx_thread(void *arg)
 				 * data segment and read the remaining data.
 				 */
 				rc = idm_sorecv_nonscsidata(ic, pdu);
+				printk(KERN_WARNING "%s:idm_sorecv_nonscsidata rc:%d",
+                                        __func__, rc);
 			}
 			if (rc != 0) {
 				/*
@@ -2090,6 +2099,8 @@ idm_sorx_thread(void *arg)
 				 */
 				mutex_enter(&ic->ic_mutex);
 				if (so_conn->ic_rx_thread_running) {
+					printk(KERN_WARNING "%s:idm_sorecv_nonscsidata failed, rc:%d",
+                                        	__func__, rc);
 					conn_failure = B_TRUE;
 					so_conn->ic_rx_thread_running = B_FALSE;
 				}
@@ -2125,6 +2136,7 @@ idm_sorx_thread(void *arg)
 			mutex_exit(&so_conn->ic_tx_mutex);
 		}
 
+		printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 		idm_conn_event(ic, CE_TRANSPORT_FAIL, rc);
 	}
 
@@ -2582,9 +2594,11 @@ idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
 		 * so we won't bother to send an event.
 		 */
 		mutex_enter(&ic->ic_state_mutex);
-		if (ic->ic_ffp)
+		if (ic->ic_ffp) {
+			printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 			idm_conn_event_locked(ic, CE_TRANSPORT_FAIL,
 			    NULL, CT_NONE);
+		}
 		mutex_exit(&ic->ic_state_mutex);
 		mutex_exit(&idt->idt_mutex);
 		return;
@@ -2924,6 +2938,7 @@ idm_sotx_thread(void *arg)
 
 		if (status != IDM_STATUS_SUCCESS) {
 			so_conn->ic_tx_thread_running = B_FALSE;
+			printk(KERN_WARNING "%s going to CE_TRANSPORT_FAIL", __func__);
 			idm_conn_event(ic, CE_TRANSPORT_FAIL, status);
 		}
 	}

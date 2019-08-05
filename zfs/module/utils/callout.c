@@ -184,6 +184,7 @@ callout_worker_fn(void *arg)
 		spin_unlock(&wk->cw_spin);
 
 		while (!list_empty(wk->cw_doing)) {
+			atomic64_dec(&wk->cw_task_num);
 			task = list_first_entry(wk->cw_doing, 
 				struct timeout_id, ti_entry);
 			list_del_init(&task->ti_entry);	
