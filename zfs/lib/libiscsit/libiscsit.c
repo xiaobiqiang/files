@@ -66,6 +66,20 @@
 	} \
 }
 
+/*
+ * State values for the iscsit service
+ */
+typedef enum {
+	ISE_UNDEFINED = 0,
+	ISE_DETACHED,
+	ISE_DISABLED,
+	ISE_ENABLING,
+	ISE_ENABLED,
+	ISE_BUSY,
+	ISE_DISABLING
+} iscsit_service_enabled_t;
+
+
 /* helper function declarations */
 static int
 it_iqn_generate(char *iqn_buf, int iqn_buf_len, char *opt_iqn_suffix);
@@ -1956,21 +1970,57 @@ validate_iscsi_name(char *in_name)
 	return (B_TRUE);
 }
 
+#ifndef _KERNEL
 static boolean_t
 is_iscsit_enabled(void)
 {
-	char		*state;
+	int fd = -1, rt;
+	boolean_t rc = B_FALSE;
+	nvlist_t *out_nvl = NULL;
+	iscsit_ioc_getstate_t *getstate = NULL;
+	int	out_nvl_size = 1024;
+	uint32_t svc_state = 0;
+	
+	getstate = malloc(sizeof(iscsit_ioc_getstate_t) +
+		out_nvl_size);
+	if (!getstate || ((fd = open(ISCSIT_NODE, O_RDONLY)) < 0))
+		goto out;
 
-/*	state = smf_get_state(ISCSIT_FMRI);
-	if (state != NULL) {
-		if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
-			return (B_TRUE);
-		}
+	getstate.getst_out_nvlist_len = out_nvl_size;
+	getstate.getst_out_nvlist = getstate + 1;
+
+	rt = ioctl(fd, ISCSIT_IOC_GET_STATE, getstate);
+	if (rt || nvlist_unpack(getstate.getst_out_nvlist, 
+		getstate.getst_out_valid_len, &out_nvl, KM_SLEEP))
+		goto out;
+
+	if (nvlist_lookup_uint32(out_nvl, 
+		ISCSIT_GETSTATE_OUTNVL_STATE, &svc_state) != 0)
+		goto out;
+	switch ((iscsit_service_enabled_t)svc_state) {
+		case ISE_UNDEFINED:
+		case ISE_DETACHED:
+		case ISE_DISABLED:
+		case ISE_ENABLING:
+	 	case ISE_DISABLING:
+			rc = B_FALSE;
+			break;
+		case ISE_BUSY:
+		case ISE_ENABLED:
+			rc = B_TRUE;
+			break;
 	}
-
-	return (B_FALSE); */
-	return B_TRUE;
+	
+out:
+	if (getstate)
+		free(getstate);
+	if (fd > 0)
+		close(fd);
+	if (out_nvl)
+		nvlist_free(out_nvl);
+	return (rc);
 }
+#endif
 
 /*
  * Function:  canonical_iscsi_name()

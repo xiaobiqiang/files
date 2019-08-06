@@ -84,7 +84,8 @@ kmutex_t	login_sm_session_mutex;
 static idm_status_t iscsit_init(void);
 static idm_status_t iscsit_enable_svc(iscsit_hostinfo_t *hostinfo);
 static void iscsit_disable_svc(void);
-
+static int iscsit_get_svc_state(iscsit_ioc_getstate_t *, nvlist_t *);
+	
 static int
 iscsit_check_cmdsn_and_queue(idm_pdu_t *rx_pdu);
 
@@ -360,6 +361,8 @@ iscsit_drv_ioctl(struct file *f, unsigned int cmd, unsigned long argp)
 			/* Already disabled */
 			mutex_exit(&iscsit_global.global_state_mutex);
 			return (0);
+		} else if (cmd == ISCSIT_IOC_GET_STATE) {
+			/* @break */
 		} else {
 			rc = EFAULT;
 		}
@@ -479,7 +482,51 @@ cleanup:
 		iscsit_global.global_svc_state = ISE_DISABLED;
 		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
+	case ISCSIT_IOC_GET_STATE:
+		iscsit_ioc_getstate_t getstate;
+		nvlist_t 	*out_nvl = NULL;
+		char 		*out_packed = NULL;
+		size_t		packed_len = 0;
+		if ((ddi_copyin((void *)argp, &getstate,
+		    sizeof(getstate), 0) != 0) ||
+		    (getstate.getst_vers != ISCSIT_API_VERS0) ||
+		    (getstate.getst_pnvlist != NULL) ||
+		    (getstate.getst_pnvlist_len != 0) ||
+		    !getstate.getst_out_nvlist ||
+		    !getstate.getst_out_nvlist_len) {
+			rc = EINVAL;
+			goto break_get_state;
+		}
 
+		out_nvl= nvlist_alloc(&out_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+		if (!out_nvl) {
+			rc = ENOMEM;
+			goto break_get_state;
+		}
+
+		rc = iscsit_get_svc_state(getstate, out_nvl);
+		if (rc || ((rc = nvlist_pack(out_nvl, &out_packed,
+			&packed_len, NV_ENCODE_NATIVE, KM_SLEEP)) != 0))
+			goto break_get_state;
+		
+		getstate.getst_out_valid_len = packed_len;
+		if ((getstate.getst_out_nvlist_len < packed_len) ||
+			(ddi_copyout(&getstate, argp, sizeof(getstate), 0) != 0) ||
+			(ddi_copyout(out_packed, getstate.getst_out_nvlist, 
+			packed_len, 0) != 0)) {
+			rc = EINVAL;
+			goto break_get_state;
+		}
+break_get_state:
+		if (out_nvl)
+			nvlist_free(out_nvl);
+		if (out_packed && packed_len)
+			kmem_free(out_packed, packed_len);
+		mutex_enter(&iscsit_global.global_state_mutex);
+		if (iscsit_global.global_svc_state == ISE_BUSY)
+			iscsit_global.global_svc_state = ISE_ENABLED;
+		mutex_exit(&iscsit_global.global_state_mutex);
+		break;
 	default:
 		rc = EINVAL;
 		mutex_enter(&iscsit_global.global_state_mutex);
@@ -734,6 +781,24 @@ iscsit_disable_svc(void)
 	vmem_destroy(iscsit_global.global_tsih_pool);
 	iscsit_global.global_tsih_pool = NULL;
 }
+
+/*
+ *@ARG_UNUNSED
+ */
+static int 
+iscsit_get_svc_state(iscsit_ioc_getstate_t *get, nvlist_t *out)
+{
+	int rc;
+	uint32_t svc_state;
+	
+	mutex_enter(&iscsit_global.global_state_mutex);
+	svc_state = iscsit_global.global_svc_state;
+	rc = nvlist_add_uint32(out, 
+		ISCSIT_GETSTATE_OUTNVL_STATE, svc_state);
+	mutex_exit(&iscsit_global.global_state_mutex);
+	return rc;
+}
+
 
 void
 iscsit_global_hold()

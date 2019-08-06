@@ -98,10 +98,18 @@ typedef struct {
 	caddr_t		set_cfg_pnvlist;
 } iscsit_ioc_set_config_t;
 
+#define ISCSIT_GETSTATE_OUTNVL_STATE	"svc_state"
 typedef struct {
 	int		getst_vers;
 	int		getst_pnvlist_len;
 	char		*getst_pnvlist;
+	int		getst_out_nvlist_len;
+	int		getst_out_valid_len;
+#ifdef _KERNEL
+	char __user	*getst_out_nvlist;
+#else
+	char 		*getst_out_nvlist;
+#endif	/* _KERNEL */
 } iscsit_ioc_getstate_t;
 
 #ifdef _SYSCALL32

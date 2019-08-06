@@ -180,6 +180,10 @@ typedef struct idm_transport_ops_s {
 	transport_tgt_svc_offline_op_t		*it_tgt_svc_offline;
 	transport_tgt_conn_destroy_op_t		*it_tgt_conn_destroy;
 	transport_tgt_conn_connect_op_t		*it_tgt_conn_connect;
+	/*
+	 * stop so_conn->ic_tx_thread and ic_rxx_thread.
+	 * at the same time shutdown so_conn->ic_so, too.
+	 */
 	transport_tgt_conn_disconnect_op_t	*it_tgt_conn_disconnect;
 	transport_ini_conn_create_op_t		*it_ini_conn_create;
 	transport_ini_conn_destroy_op_t		*it_ini_conn_destroy;

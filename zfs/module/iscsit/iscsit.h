@@ -507,6 +507,10 @@ typedef struct {
 	void			*icl_login_resp_itb; /* mult-pdu idm buf */
 	int			icl_login_resp_len; /* For kmem_free */
 	int			icl_login_resp_valid_len;
+	/*
+	 * corresponding to iscsi_login_rsp_hdr_t's 
+	 * status_class and status_detail.
+	 */
 	uint8_t			icl_login_resp_err_class;
 	uint8_t			icl_login_resp_err_detail;
 	iscsi_login_rsp_hdr_t	*icl_login_resp_tmpl;
