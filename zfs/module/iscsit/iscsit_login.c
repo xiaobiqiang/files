@@ -2243,8 +2243,8 @@ iscsit_handle_operational_key(iscsit_conn_t *ict, nvpair_t *nvp,
     const idm_kv_xlate_t *ikvx)
 {
 	kv_status_t		kvrc = KV_UNHANDLED;
-	boolean_t		bool_val;
-	uint64_t		num_val;
+	boolean_t		bool_val = B_FALSE;
+	uint64_t		num_val = 0;
 	int			nvrc;
 
 	/*
