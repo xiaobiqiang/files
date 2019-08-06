@@ -482,7 +482,7 @@ cleanup:
 		iscsit_global.global_svc_state = ISE_DISABLED;
 		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
-	case ISCSIT_IOC_GET_STATE:
+	case ISCSIT_IOC_GET_STATE: {
 		iscsit_ioc_getstate_t getstate;
 		nvlist_t 	*out_nvl = NULL;
 		char 		*out_packed = NULL;
@@ -498,13 +498,13 @@ cleanup:
 			goto break_get_state;
 		}
 
-		out_nvl= nvlist_alloc(&out_nvl, NV_UNIQUE_NAME, KM_SLEEP);
-		if (!out_nvl) {
+		if (nvlist_alloc(&out_nvl, NV_UNIQUE_NAME, KM_SLEEP) || 
+			!out_nvl) {
 			rc = ENOMEM;
 			goto break_get_state;
 		}
 
-		rc = iscsit_get_svc_state(getstate, out_nvl);
+		rc = iscsit_get_svc_state(&getstate, out_nvl);
 		if (rc || ((rc = nvlist_pack(out_nvl, &out_packed,
 			&packed_len, NV_ENCODE_NATIVE, KM_SLEEP)) != 0))
 			goto break_get_state;
@@ -527,6 +527,7 @@ break_get_state:
 			iscsit_global.global_svc_state = ISE_ENABLED;
 		mutex_exit(&iscsit_global.global_state_mutex);
 		break;
+	}
 	default:
 		rc = EINVAL;
 		mutex_enter(&iscsit_global.global_state_mutex);

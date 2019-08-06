@@ -38,6 +38,8 @@
 #include <libiscsit.h>
 #include <sys/iscsi_protocol.h>
 #include <sys/iscsit/isns_protocol.h>
+#include <sys/iscsit/iscsit_common.h>
+#include <sys/kmem.h>
 
 /* From iscsitgtd */
 #define	TARGET_NAME_VERS	2
@@ -1986,12 +1988,12 @@ is_iscsit_enabled(void)
 	if (!getstate || ((fd = open(ISCSIT_NODE, O_RDONLY)) < 0))
 		goto out;
 
-	getstate.getst_out_nvlist_len = out_nvl_size;
-	getstate.getst_out_nvlist = getstate + 1;
+	getstate->getst_out_nvlist_len = out_nvl_size;
+	getstate->getst_out_nvlist = getstate + 1;
 
 	rt = ioctl(fd, ISCSIT_IOC_GET_STATE, getstate);
-	if (rt || nvlist_unpack(getstate.getst_out_nvlist, 
-		getstate.getst_out_valid_len, &out_nvl, KM_SLEEP))
+	if (rt || nvlist_unpack(getstate->getst_out_nvlist, 
+		getstate->getst_out_valid_len, &out_nvl, KM_SLEEP))
 		goto out;
 
 	if (nvlist_lookup_uint32(out_nvl, 
