@@ -841,8 +841,8 @@ iscsit_rx_pdu(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 {
 	iscsit_conn_t *ict = ic->ic_handle;
 	
-	printk(KERN_WARNING "%s:opcode:0x%02x",
-		__func__, IDM_PDU_OPCODE(rx_pdu));
+/*	printk(KERN_WARNING "%s:opcode:0x%02x",
+		__func__, IDM_PDU_OPCODE(rx_pdu)); */
 	switch (IDM_PDU_OPCODE(rx_pdu)) {
 	case ISCSI_OP_SCSI_CMD:
 		ASSERT(0); /* Shouldn't happen */

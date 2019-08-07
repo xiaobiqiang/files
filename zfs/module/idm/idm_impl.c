@@ -59,7 +59,7 @@ void
 idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 {
 	iscsi_async_evt_hdr_t *async_evt;
-	uint8_t opcode;
+//	uint8_t opcode;
 	/*
 	 * If we are in full-featured mode then route SCSI-related
 	 * commands to the appropriate function vector
@@ -90,8 +90,8 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 	 * the PDU will be submitted to the IDM client for processing,
 	 * otherwise the PDU will be dropped.
 	 */
-	opcode = IDM_PDU_OPCODE(pdu);
-	printk(KERN_WARNING "%s:opcode:%02x", __func__, opcode);
+//	opcode = IDM_PDU_OPCODE(pdu);
+//	printk(KERN_WARNING "%s:opcode:%02x", __func__, opcode);
 	switch (IDM_PDU_OPCODE(pdu)) {
 	case ISCSI_OP_LOGIN_CMD:
 		idm_conn_rx_pdu_event(ic, CE_LOGIN_RCV, (uintptr_t)pdu);

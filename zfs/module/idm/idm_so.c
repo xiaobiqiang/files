@@ -711,8 +711,8 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	if (ic->ic_conn_flags & IDM_CONN_HEADER_DIGEST) {
 		crc_calculated = idm_crc32c(pdu->isp_hdr,
 		    sizeof (iscsi_hdr_t) + ahslen);
-		printk(KERN_WARNING "%s:crc_calculated:%u hdr_digest_crc:%u",
-			__func__, crc_calculated, hdr_digest_crc);
+/*		printk(KERN_WARNING "%s:crc_calculated:%u hdr_digest_crc:%u",
+			__func__, crc_calculated, hdr_digest_crc); */
 		if (crc_calculated != hdr_digest_crc) {
 			/* Invalid Header Digest */
 			return (IDM_STATUS_HEADER_DIGEST);
@@ -1796,8 +1796,8 @@ idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu)
 			iov++;
 		}
 		kmem_free(data_iov, data_iovsize);
-		printk(KERN_WARNING "%s:crc_calculated:%u data_digest_crc:%u",
-			__func__, crc_calculated, data_digest_crc);
+/*		printk(KERN_WARNING "%s:crc_calculated:%u data_digest_crc:%u",
+			__func__, crc_calculated, data_digest_crc); */
 		if (crc_calculated != data_digest_crc) {
 			IDM_CONN_LOG(CE_WARN,
 			    "idm_sorecvdata: "
