@@ -7474,7 +7474,12 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
 	uint8_t free_it, queue_it;
-
+	
+	if(w==NULL){
+		cmn_err(CE_WARN, " task %p null itask_worker",itask);
+		return;
+	}
+	
 	stmf_task_audit(itask, TE_SEND_STATUS_DONE, iof, NULL);
 
 	mutex_enter(&w->worker_lock);

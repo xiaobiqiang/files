@@ -4535,9 +4535,12 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	mutex_exit(&spa_namespace_lock);
 	
 	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
+	
+	spa->spa_map_manager.active_obj_index = -1;
 	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
+	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 	return (0);
 }
 
@@ -7442,14 +7445,17 @@ spa_sync(spa_t *spa, uint64_t txg)
 			    &spa->spa_deferred_bpobj, tx);
 		}
 		
-		if (spa->spa_raidz_aggre && spa->spa_space_reclaim_state == (SPACE_RECLAIM_START|SPACE_RECLAIM_RUN))
+		if (spa->spa_raidz_aggre && (spa->spa_space_reclaim_state & SPACE_RECLAIM_START))
 		{
-			aggre_map_t *amap;
 			raidz_aggre_map_free_range_all(spa, tx);
-			amap = raidz_aggre_map_current(spa);
-			if(amap!=NULL){
-				clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
-					amap, tx);
+
+			if(spa->spa_space_reclaim_state &SPACE_RECLAIM_RUN){
+				aggre_map_t *amap;
+				amap = raidz_aggre_map_current(spa);
+				if(amap!=NULL){
+					clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
+						amap, tx);
+				}
 			}
 		}
 		ddt_sync(spa, txg);

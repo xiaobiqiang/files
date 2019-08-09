@@ -40,13 +40,11 @@ typedef enum {
 } reclaim_mode;
 
 int raidz_reclaim_enable = 1;
-int raidz_reclaim_timeconsum = 10000;
 unsigned long raidz_space_reclaim_gap = 60*2;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
-int raidz_filledtime_count = 60*2;
-int raidz_clearedtime_count = 30;
-int raidz_print_active_current =0;
+int raidz_filledtime_count = 60*5;
+int raidz_clearedtime_count = 60*2;
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
 extern void vdev_raidz_generate_parity(raidz_map_t *rm);
 static int aggre_io_cons(void *vdb, void *unused, int kmflag)
@@ -513,10 +511,11 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 
 	aggre_map_t *map ;
 	int state;
-
+	int offset;
+	
 	if (spa->spa_map_manager.active_obj_index == -1) {
 		cmn_err(CE_WARN, "%s %s clear all mapobj", __func__,spa->spa_name);
-		int i;
+		int i,j,err;
 		for (i=0; i<AGGRE_MAP_MAX_OBJ_NUM; i++)
 		{
 			map = spa->spa_aggre_map_arr[i];
@@ -529,10 +528,27 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	#ifdef _KERNEL 
 			map->hdr->aggre_map_filltime = ddi_get_time();
 	#endif
-			cmn_err(CE_WARN, "%s %s dmu_free_range \n", __func__,spa->spa_name);
 			dmu_free_range(map->os, map->object, 0, DMU_OBJECT_END, tx);
+
+			map->dbuf_id = 0; 
+			
+			cmn_err(CE_WARN, "%s %s dbuf_num[%d] dbuf_size[%d] dmu_free_range \n", 
+				__func__,spa->spa_name,map->dbuf_num,map->dbuf_size);
+
+			for (j = 0; j < map->dbuf_num; j++) {
+				offset = (map->dbuf_id + j) * map->dbuf_size;
+				err = dmu_buf_hold(spa->spa_meta_objset, spa->spa_map_obj_arr[i], offset, spa->spa_aggre_map_arr[i], 
+					&map->dbuf_array[j], 0);
+				if (err) {
+					cmn_err(CE_WARN, "%s dmu_buf_hold i=%d err=%d", __func__, i, err);
+				}
+			}
 		}
+		
 		spa->spa_map_manager.active_obj_index = 0;
+		spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
+
+		cmn_err(CE_WARN, "%s %s %x\n",__func__, spa->spa_name, spa->spa_space_reclaim_state);
 		return;
 	}
 	
@@ -547,7 +563,7 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	if (map->hdr->aggre_map_state != AGGRE_MAP_OBJ_RECLAIMED){
 		return;
 	}
-	if(ddi_get_time()-map->hdr->aggre_map_filltime <30)
+	if(ddi_get_time()-map->hdr->aggre_map_filltime <raidz_clearedtime_count)
 	{
 		return;
 	}
@@ -636,6 +652,8 @@ raidz_aggre_map_open(spa_t *spa)
 		map->os = spa->spa_meta_objset;
 		map->object = spa->spa_map_obj_arr[loop];
 		map->dbuf_size = doi.doi_data_block_size;
+		
+		/*
 		map->dbuf_id = map->hdr->total_count / (map->hdr->blksize / map->hdr->recsize);
 
 		for (i = 0; i < map->dbuf_num; i++) {
@@ -646,6 +664,8 @@ raidz_aggre_map_open(spa_t *spa)
 				cmn_err(CE_WARN, "%s dmu_buf_hold i=%d err=%d", __func__, i, err);
 			}
 		}
+		*/
+		
 	}
 	
 	return (0);
@@ -667,7 +687,8 @@ raidz_aggre_elem_enqueue_cb(void *arg, void *data, dmu_tx_t *tx)
 	/* read more block */
 	if (dbuf_id >= map->dbuf_id + map->dbuf_num) {
 		for (i = 0; i < map->dbuf_num; i++) {
-			dmu_buf_rele(map->dbuf_array[i], map);
+			if (map->dbuf_array[i]!=NULL)
+				dmu_buf_rele(map->dbuf_array[i], map);
 		}
 
 		map->dbuf_id = dbuf_id;
@@ -790,7 +811,6 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 				__func__, err, spa->spa_dsl_pool, elem->objsetid);
 			if (err == ENOENT)
 				*state = ELEM_STATE_FREE;
-			
 			break;
 		}
 
@@ -1064,7 +1084,6 @@ raidz_aggre_space_reclaim(void *arg)
 {
 	spa_t *spa = (spa_t *)arg;
 	mutex_enter(&spa->spa_space_reclaim_lock);
-	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 	cmn_err(CE_WARN, "%s %s reclaim_state %x\n",__func__, spa->spa_name, spa->spa_space_reclaim_state);
 	while (!(spa->spa_space_reclaim_state & SPACE_RECLAIM_STOP)) {		
 		cv_timedwait(&spa->spa_space_reclaim_cv, &spa->spa_space_reclaim_lock,
@@ -1073,9 +1092,9 @@ raidz_aggre_space_reclaim(void *arg)
 		cmn_err(CE_WARN, "%s %s %x\n",__func__, spa->spa_name, spa->spa_space_reclaim_state);
 		if (spa->spa_space_reclaim_state & SPACE_RECLAIM_STOP)
 			break;
-		
+	
 		mutex_exit(&spa->spa_space_reclaim_lock);
-		if (raidz_reclaim_enable)
+		if (raidz_reclaim_enable && (spa->spa_space_reclaim_state & SPACE_RECLAIM_RUN))
 			check_and_reclaim_space(spa);
 		
 		mutex_enter(&spa->spa_space_reclaim_lock);
@@ -1149,19 +1168,19 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 module_param(raidz_reclaim_enable, int, 0644);
 MODULE_PARM_DESC(raidz_reclaim_enable, "raidz reclaim switch");
 
-module_param(raidz_print_active_current, int, 0644);
-MODULE_PARM_DESC(raidz_print_active_current, "raidz print active current ");
-
 module_param(raidz_space_reclaim_gap, ulong, 0644);
 MODULE_PARM_DESC(raidz_space_reclaim_gap, "raidz reclaim time gap");
 
 module_param(raidz_avail_map_thresh, ulong, 0644);
 MODULE_PARM_DESC(raidz_avail_map_thresh, "raidz avail map threshold");
 
-module_param(raidz_reclaim_timeconsum, int, 0644);
-MODULE_PARM_DESC(raidz_reclaim_timeconsum, "raidz timeconsumimg");
-
 module_param(raidz_reclaim_count, int, 0644);
 MODULE_PARM_DESC(raidz_reclaim_count, "raidz reclaim count");
+
+module_param(raidz_filledtime_count, int, 0644);
+MODULE_PARM_DESC(raidz_filledtime_count, "raidz filledtime count");
+
+module_param(raidz_clearedtime_count, int, 0644);
+MODULE_PARM_DESC(raidz_clearedtime_count, "raidz clearedtime count");
 
 #endif
