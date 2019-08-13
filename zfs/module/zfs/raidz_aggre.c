@@ -980,7 +980,7 @@ aggre_map_t *raidz_aggre_map_current(spa_t *spa)
 }
 
 void
-check_and_reclaim_space(spa_t *spa)
+raidz_check_and_reclaim_space(spa_t *spa)
 {
 	aggre_map_t *map ;
 	uint64_t pos, count, offset, i, avail_count;
@@ -1079,7 +1079,7 @@ raidz_aggre_space_reclaim(void *arg)
 	
 		mutex_exit(&spa->spa_space_reclaim_lock);
 		if (raidz_reclaim_enable && (spa->spa_space_reclaim_state & SPACE_RECLAIM_RUN))
-			check_and_reclaim_space(spa);
+			raidz_check_and_reclaim_space(spa);
 		
 		mutex_enter(&spa->spa_space_reclaim_lock);
 	}

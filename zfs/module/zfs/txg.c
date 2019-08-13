@@ -111,7 +111,7 @@ static void txg_sync_thread(dsl_pool_t *dp);
 static void txg_quiesce_thread(dsl_pool_t *dp);
 
 int zfs_txg_timeout = 5;	/* max seconds worth of delta per txg */
-
+int zfs_sync_txg_print = 0;
 /*
  * Prepare the txg subsystem.
  */
@@ -556,10 +556,17 @@ txg_sync_thread(dsl_pool_t *dp)
 		ndirty = dp->dp_dirty_pertxg[txg & TXG_MASK];
 
 		start = ddi_get_lbolt();
+		if(zfs_sync_txg_print)
+			cmn_err(CE_WARN, "%s %s spa_sync %lld start: %ld ", 
+				__func__, spa->spa_name, txg, (long)delta);
+		
 		spa_sync(spa, txg);
 		delta = ddi_get_lbolt() - start;
 		if(delta>1000)
 			cmn_err(CE_WARN, "%s %s spa_sync %lld take: %ld ", __func__, spa->spa_name, txg, (long)delta);
+		if(zfs_sync_txg_print)
+			cmn_err(CE_WARN, "%s %s spa_sync %lld take: %ld ", 
+				__func__, spa->spa_name, txg, (long)delta);
 		mutex_enter(&tx->tx_sync_lock);
 		tx->tx_synced_txg = txg;
 		tx->tx_syncing_txg = 0;
@@ -947,6 +954,9 @@ EXPORT_SYMBOL(txg_wait_open);
 EXPORT_SYMBOL(txg_wait_callbacks);
 EXPORT_SYMBOL(txg_stalled);
 EXPORT_SYMBOL(txg_sync_waiting);
+
+module_param(zfs_sync_txg_print, int, 0644);
+MODULE_PARM_DESC(zfs_sync_txg_print, "sync_txg_flag");
 
 module_param(zfs_txg_timeout, int, 0644);
 MODULE_PARM_DESC(zfs_txg_timeout, "Max seconds worth of delta per txg");
