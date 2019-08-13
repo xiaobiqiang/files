@@ -2937,7 +2937,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
 	cmn_err(CE_WARN, "%s raidz_aggre_map_open %s  ",__func__,spa->spa_name );
-	spa->spa_map_manager.active_obj_index = -1;
+	spa->spa_map_manager.mm_active_obj_index = -1;
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4512,7 +4512,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	dmu_tx_commit(tx);
 
 	spa->spa_sync_on = B_TRUE;
-	spa->spa_map_manager.active_obj_index = 0;
+	spa->spa_map_manager.mm_active_obj_index = 0;
 	txg_sync_start(spa->spa_dsl_pool);
 
 	/*
@@ -4536,7 +4536,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	
 	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
 	
-	spa->spa_map_manager.active_obj_index = -1;
+	spa->spa_map_manager.mm_active_obj_index = 0;
 	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
@@ -4789,6 +4789,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	
 	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa->spa_raidz_aggre);
 	start_space_reclaim_thread(spa);
+	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 
 	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa->spa_raidz_aggre);
 	mutex_exit(&spa_namespace_lock);
@@ -7447,16 +7448,25 @@ spa_sync(spa_t *spa, uint64_t txg)
 		
 		if (spa->spa_raidz_aggre && (spa->spa_space_reclaim_state & SPACE_RECLAIM_START))
 		{
-			raidz_aggre_map_free_range_all(spa, tx);
+			clock_t start, delta;
+			start = ddi_get_lbolt();
+			
+			if(spa->spa_map_manager.mm_active_obj_index == -1) {
+			 	raidz_aggre_map_free_1open(spa, tx);
+				spa->spa_map_manager.mm_active_obj_index = 0;
+			}else {
+				raidz_aggre_map_free_range_all(spa, tx);
 
-			if(spa->spa_space_reclaim_state &SPACE_RECLAIM_RUN){
-				aggre_map_t *amap;
-				amap = raidz_aggre_map_current(spa);
-				if(amap!=NULL){
-					clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, 
-						amap, tx);
+				if(spa->spa_space_reclaim_state & SPACE_RECLAIM_RUN){
+					aggre_map_t *amap = raidz_aggre_map_current(spa);
+					if(amap!=NULL)
+						clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, amap, tx);
 				}
 			}
+			
+			delta = ddi_get_lbolt() - start;
+			if(delta>1000)
+				cmn_err(CE_WARN, "%s %s spa_sync %lld take: %ld ", __func__, spa->spa_name, txg,delta );
 		}
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
