@@ -1984,6 +1984,11 @@ fct_scsi_data_xfer_done(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 
 	if (icmd->icmd_flags & ICMD_BEING_ABORTED)
 		return;
+	if (!(dbuf->db_flags & DB_LPORT_XFER_ACTIVE) ) {
+		cmn_err(CE_WARN, "repeat done task %p dbuf %p",
+		    cmd->cmd_specific, (void *)dbuf);
+		return;
+	}
 	stmf_data_xfer_done((scsi_task_t *)cmd->cmd_specific, dbuf, iof);
 }
 EXPORT_SYMBOL(fct_scsi_data_xfer_done);

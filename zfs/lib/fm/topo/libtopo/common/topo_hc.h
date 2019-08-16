@@ -119,6 +119,8 @@ extern "C" {
 #define	TOPO_IO_DERR		"is_derr"
 #define	TOPO_IO_MERR		"is_merr"
 
+#define	TOPO_IO_NORESP		"no_resp"
+
 
 #define	TOPO_PGROUP_PCI		"pci"
 #define	TOPO_PCI_VENDID		"vendor-id"
@@ -127,6 +129,14 @@ extern "C" {
 #define	TOPO_PCI_BDF		"BDF"
 #define	TOPO_PCI_CLASS		"class-code"
 #define	TOPO_PCI_AADDR		"assigned-addresses"
+
+#define	EN_TOPO_IO_SLOW		0
+#define	EN_TOPO_IO_NORESP	1
+#define	EN_TOPO_IO_DERR		2
+#define	EN_TOPO_IO_MERR		3
+#define	EN_TOPO_IO_PREF		4
+#define	EN_TOPO_IO_SELF		5
+#define	EN_TOPO_IO_TEMP		6
 
 #ifdef	__cplusplus
 }

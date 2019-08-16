@@ -414,7 +414,8 @@ get_usage(zfs_help_t idx)
 			"\trmfiles dir_fullpath\n"));
 	case HELP_MIGRATE:
 		return (gettext("\tstart/stop <filesystem>\n"));
-		
+	default:
+		return "";
 	}
 
 	/* NOTREACHED */

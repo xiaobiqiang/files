@@ -972,6 +972,7 @@ clu_cmd_shell_fork(char *args[])
 	/* get numbers of child process*/
 	fork_num = 1;
 	p = args;
+	#if 0
 	while(*p != NULL){
 		q = *p;
 		while(*q != '\0'){
@@ -982,6 +983,7 @@ clu_cmd_shell_fork(char *args[])
 		}
 		p++;
 	}
+	#endif
 
 	/* case: child process number is one */
 	if(fork_num < 2){
@@ -1242,7 +1244,8 @@ clu_cmd_is_allowed(char *cmd)
 	char *cmd_p, *tmp_p;
 	char cmd_buf[BUFSIZE] = {0};
 	
-	if(0 == strcmp("", cmd))
+	if(0 == strcmp("", cmd)
+		|| 0 == strncmp(cmd, "zfs send", strlen("zfs send")))
 		return (B_TRUE);
 
 	if(!strncmp(cmd, "/gui", 4)){

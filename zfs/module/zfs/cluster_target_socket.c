@@ -378,6 +378,7 @@ static void cts_socket_set_client_socket(void *arg)
             if (bcmp(&(addr.sa_data[2]), &(sess_socket->s_addr.sin_addr.s_addr), 4) == 0) {
                 break;
             }
+			cts = list_next(&ctp->ctp_sesslist, cts);
 	    }
         mutex_exit(&ctp->ctp_lock);
         
