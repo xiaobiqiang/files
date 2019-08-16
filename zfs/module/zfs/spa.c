@@ -7441,8 +7441,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 			bplist_iterate(free_bpl, bpobj_enqueue_cb,
 			    &spa->spa_deferred_bpobj, tx);
 		}
-
-		if (spa->spa_space_reclaim_state == (SPACE_RECLAIM_START|SPACE_RECLAIM_RUN))
+		
+		if (spa->spa_raidz_aggre && spa->spa_space_reclaim_state == (SPACE_RECLAIM_START|SPACE_RECLAIM_RUN))
 		{
 			aggre_map_t *amap;
 			raidz_aggre_map_free_range_all(spa, tx);

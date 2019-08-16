@@ -1662,7 +1662,11 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	ASSERT(db->db_dirtycnt > 0);
 	db->db_dirtycnt -= 1;
 
-	refcount_dbg_remove(&db->db_holds_dbg, (void *)(uintptr_t)txg);
+	if(refcount_dbg_remove(&db->db_holds_dbg, (void *)(uintptr_t)txg)==-1)
+	{
+		dump_stack();
+		cmn_err(CE_PANIC, "refcount_dbg db:%p txg:%lx",db,txg );
+	}
 	if (refcount_remove(&db->db_holds, (void *)(uintptr_t)txg) == 0) {
 		arc_buf_t *buf = db->db_buf;
 
@@ -2596,7 +2600,12 @@ dbuf_rele_and_unlock(dmu_buf_impl_t *db, void *tag)
 	 * buffer has a corresponding dnode hold.
 	 */
 	holds = refcount_remove(&db->db_holds, tag);
-	refcount_dbg_remove(&db->db_holds_dbg, tag);
+	if(refcount_dbg_remove(&db->db_holds_dbg, tag)==-1)
+	{
+		dump_stack();
+		cmn_err(CE_PANIC, "refcount_dbg db:%p tag:%p",db,tag );
+	}
+	
 	ASSERT(holds >= 0);
 
 	/*

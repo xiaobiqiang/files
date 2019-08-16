@@ -547,6 +547,10 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	if (map->hdr->aggre_map_state != AGGRE_MAP_OBJ_RECLAIMED){
 		return;
 	}
+	if(ddi_get_time()-map->hdr->aggre_map_filltime <30)
+	{
+		return;
+	}
 	
  	dmu_buf_will_dirty(map->dbuf_hdr, tx);
 	map->hdr->free_index = 0;
@@ -1042,11 +1046,13 @@ check_and_reclaim_space(spa_t *spa)
 		map->hdr->process_index++;
 		
 	}
-
-	map->hdr->aggre_map_state = AGGRE_MAP_OBJ_RECLAIMED;	
 	if (dbuf)
 		dmu_buf_rele(dbuf, FTAG);
-		
+	
+	map->hdr->aggre_map_state = AGGRE_MAP_OBJ_RECLAIMED;	
+	#ifdef _KERNEL	
+		map->hdr->aggre_map_filltime = ddi_get_time();
+	#endif
 	timestampnow = gethrtime();
 	elapsed_ms =  (timestampnow - timestampbegin) / 1000000;
   	

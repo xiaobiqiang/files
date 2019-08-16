@@ -378,8 +378,9 @@ refcount_dbg_remove_many(refcount_dbg_t *rc, uint64_t number, void *holder)
 			return (count);
 		}
 	}
-	panic("No such hold %p on refcount_dbg %llx", holder,
-	    (u_longlong_t)(uintptr_t)rc);
+		
+	cmn_err(CE_WARN,"No such hold %p on refcount_dbg %llx %p", holder,
+	    (u_longlong_t)(uintptr_t)rc, rc);
 	return (-1);
 }
 
