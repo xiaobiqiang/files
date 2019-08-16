@@ -43,7 +43,7 @@ int raidz_reclaim_enable = 1;
 unsigned long raidz_space_reclaim_gap = 60*2;	/* unit: s */
 unsigned long raidz_avail_map_thresh = 0x40000000;
 int raidz_reclaim_count = 3000;
-int raidz_filledtime_count = 60*5;
+int raidz_filledtime_count = 60*60*24;
 int raidz_clearedtime_count = 60*2;
 extern const zio_vsd_ops_t vdev_raidz_vsd_ops;
 extern void vdev_raidz_generate_parity(raidz_map_t *rm);
