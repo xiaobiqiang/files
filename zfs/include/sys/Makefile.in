@@ -316,7 +316,11 @@ am__kernel_HEADERS_DIST = $(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/zfs_mirror.h \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
 	${top_srcdir}/include/sys/zpl.h \
-	$(top_srcdir)/include/sys/zvol.h
+	$(top_srcdir)/include/sys/zvol.h \
+	$(top_srcdir)/include/sys/iscsi_protocol.h \
+	$(top_srcdir)/include/sys/in.h \
+	$(top_srcdir)/include/sys/callout.h \
+	$(top_srcdir)/include/sys/utils_vmem.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -701,7 +705,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 udevdir = @udevdir@
 udevruledir = @udevruledir@
-SUBDIRS = fm fs
+SUBDIRS = fm fs idm iscsit
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/arc_impl.h \
@@ -814,7 +818,11 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/zfs_mirror.h \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
 	${top_srcdir}/include/sys/zpl.h \
-	$(top_srcdir)/include/sys/zvol.h
+	$(top_srcdir)/include/sys/zvol.h \
+	$(top_srcdir)/include/sys/iscsi_protocol.h \
+	$(top_srcdir)/include/sys/in.h \
+	$(top_srcdir)/include/sys/callout.h \
+	$(top_srcdir)/include/sys/utils_vmem.h
 
 USER_H = 
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)

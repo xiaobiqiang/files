@@ -1,0 +1,15 @@
+[Unit]
+Description=iSCSI Target Service Daemon
+After=syslog.target
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/sbin/modprobe ziscsit
+ExecStart=@sbindir@/iscsitsvc start
+Restart=on-failure
+#ExecStop=/path/to/scrip delete-me if not necessary
+
+[Install]
+WantedBy=sysinit.target

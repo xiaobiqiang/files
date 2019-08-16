@@ -462,8 +462,8 @@ udevruledir = @udevruledir@
 # These four libraries, which are installed as the final build product,
 # incorporate the five convenience libraries given above.
 SUBDIRS = libspl libavl libefi libshare libunicode libcomm libdiskmgt \
-	libfmd libuutil libnvpair libzpool libzfs_core libzfs libstmf \
-	libclumgt libipmi fm
+	libfmd libiscsit libuutil libnvpair libzpool libzfs_core \
+	libzfs libstmf libclumgt libipmi fm
 all: all-recursive
 
 .SUFFIXES:

@@ -1,0 +1,133 @@
+1.del: idm_so.c
+/*
+ * Called by kernel sockets when the connection has been accepted or
+ * rejected. In early volo, a "disconnect" callback was sent instead of
+ * "connectfailed", so we check for both.
+ */
+/* ARGSUSED */
+void
+idm_so_timed_socket_connect_cb(ksocket_t ks,
+    ksocket_callback_event_t ev, void *arg, uintptr_t info)
+{
+	idm_so_timed_socket_t	*itp = arg;
+	ASSERT(itp != NULL);
+	ASSERT(ev == KSOCKET_EV_CONNECTED ||
+	    ev == KSOCKET_EV_CONNECTFAILED ||
+	    ev == KSOCKET_EV_DISCONNECTED);
+
+	mutex_enter(&idm_so_timed_socket_mutex);
+	itp->it_callback_called = B_TRUE;
+	if (ev == KSOCKET_EV_CONNECTED) {
+		itp->it_socket_error_code = 0;
+	} else {
+		/* Make sure the error code is non-zero on error */
+		if (info == 0)
+			info = ECONNRESET;
+		itp->it_socket_error_code = (int)info;
+	}
+	cv_signal(&itp->it_cv);
+	mutex_exit(&idm_so_timed_socket_mutex);
+}
+
+int
+idm_so_timed_socket_connect(ksocket_t ks,
+    struct sockaddr_storage *sa, int sa_sz, int login_max_usec)
+{
+	clock_t			conn_login_max;
+	int			rc, nonblocking, rval;
+	idm_so_timed_socket_t	it;
+	ksocket_callbacks_t	ks_cb;
+
+	conn_login_max = ddi_get_lbolt() + drv_usectohz(login_max_usec);
+
+	/*
+	 * Set to non-block socket mode, with callback on connect
+	 * Early volo used "disconnected" instead of "connectfailed",
+	 * so set callback to look for both.
+	 */
+	bzero(&it, sizeof (it));
+	ks_cb.ksock_cb_flags = KSOCKET_CB_CONNECTED |
+	    KSOCKET_CB_CONNECTFAILED | KSOCKET_CB_DISCONNECTED;
+	ks_cb.ksock_cb_connected = idm_so_timed_socket_connect_cb;
+	ks_cb.ksock_cb_connectfailed = idm_so_timed_socket_connect_cb;
+	ks_cb.ksock_cb_disconnected = idm_so_timed_socket_connect_cb;
+	cv_init(&it.it_cv, NULL, CV_DEFAULT, NULL);
+	rc = ksocket_setcallbacks(ks, &ks_cb, &it, CRED());
+	if (rc != 0)
+		return (rc);
+
+	/* Set to non-blocking mode */
+	nonblocking = 1;
+	rc = ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
+	    CRED());
+	if (rc != 0)
+		goto cleanup;
+
+	bzero(&it, sizeof (it));
+	for (;;) {
+		/*
+		 * Warning -- in a loopback scenario, the call to
+		 * the connect_cb can occur inside the call to
+		 * ksocket_connect. Do not hold the mutex around the
+		 * call to ksocket_connect.
+		 */
+		rc = ksocket_connect(ks, (struct sockaddr *)sa, sa_sz, CRED());
+		if (rc == 0 || rc == EISCONN) {
+			/* socket success or already success */
+			rc = 0;
+			break;
+		}
+		if ((rc != EINPROGRESS) && (rc != EALREADY)) {
+			break;
+		}
+
+		/* TCP connect still in progress. See if out of time. */
+		if (ddi_get_lbolt() > conn_login_max) {
+			/*
+			 * Connection retry timeout,
+			 * failed connect to target.
+			 */
+			rc = ETIMEDOUT;
+			break;
+		}
+
+		/*
+		 * TCP connect still in progress.  Sleep until callback.
+		 * Do NOT go to sleep if the callback already occurred!
+		 */
+		mutex_enter(&idm_so_timed_socket_mutex);
+		if (!it.it_callback_called) {
+			(void) cv_timedwait(&it.it_cv,
+			    &idm_so_timed_socket_mutex, conn_login_max);
+		}
+		if (it.it_callback_called) {
+			rc = it.it_socket_error_code;
+			mutex_exit(&idm_so_timed_socket_mutex);
+			break;
+		}
+		/* If timer expires, go call ksocket_connect one last time. */
+		mutex_exit(&idm_so_timed_socket_mutex);
+	}
+
+	/* resume blocking mode */
+	nonblocking = 0;
+	(void) ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
+	    CRED());
+cleanup:
+	(void) ksocket_setcallbacks(ks, NULL, NULL, CRED());
+	cv_destroy(&it.it_cv);
+	if (rc != 0) {
+		idm_soshutdown(ks);
+	}
+	return (rc);
+}
+
+2.anotate untimeout and timeout in idm_conn_sm.c iscsit_sess.c iscsit_tgt.c
+
+3.del getpcstack of REFCNT_AUDIT micro in idm_impl.h
+
+4.transplate prodigy common/cpyto/md5 for iscsit_radiusauth.c,iscsit_radiuspacket.c,iscsit_authclient.c
+
+5.iscsit_global.global_tsih_pool: vmem_create,vmem_alloc,vmem_destroy,vmem_free
+
+6.is_iscsit_enabled in libiscsit.c

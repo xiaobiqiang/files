@@ -133,6 +133,7 @@ AC_CONFIG_FILES([
 	lib/fm/topo/maps/Makefile
 	lib/fm/topo/maps/i86pc/Makefile
 	lib/libipmi/Makefile
+	lib/libiscsit/Makefile
 	cmd/Makefile
 	cmd/zdb/Makefile
 	cmd/zhack/Makefile
@@ -148,7 +149,7 @@ AC_CONFIG_FILES([
 	cmd/vdev_id/Makefile
 	cmd/arcstat/Makefile
 	cmd/dbufstat/Makefile
-    	cmd/iostat/Makefile
+	cmd/iostat/Makefile
 	cmd/arc_summary/Makefile
 	cmd/zed/Makefile
 	cmd/sas3show/Makefile
@@ -191,6 +192,8 @@ AC_CONFIG_FILES([
 	cmd/lunadm/Makefile
 	cmd/sethostid/Makefile
 	cmd/scripts/Makefile
+	cmd/iscsitsvc/Makefile
+	cmd/itadm/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile
@@ -213,12 +216,17 @@ AC_CONFIG_FILES([
 	module/stmf/Makefile
 	module/stmf_sbd/Makefile
 	module/pppt/Makefile
+	module/utils/Makefile
+	module/idm/Makefile
+	module/iscsit/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
 	include/sys/fs/Makefile
 	include/sys/fm/Makefile
 	include/sys/fm/fs/Makefile
+	include/sys/idm/Makefile
+	include/sys/iscsit/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

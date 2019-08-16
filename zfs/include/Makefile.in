@@ -257,7 +257,8 @@ am__libzfs_HEADERS_DIST = $(top_srcdir)/include/zfeature_common.h \
 	$(top_srcdir)/include/libuutil_impl.h \
 	$(top_srcdir)/include/libzfs.h \
 	$(top_srcdir)/include/libzfs_core.h \
-	$(top_srcdir)/include/libzfs_impl.h
+	$(top_srcdir)/include/libzfs_impl.h \
+	$(top_srcdir)/include/libiscsit.h
 HEADERS = $(kernel_HEADERS) $(libzfs_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
@@ -530,7 +531,8 @@ USER_H = \
 	$(top_srcdir)/include/libuutil_impl.h \
 	$(top_srcdir)/include/libzfs.h \
 	$(top_srcdir)/include/libzfs_core.h \
-	$(top_srcdir)/include/libzfs_impl.h
+	$(top_srcdir)/include/libzfs_impl.h \
+	$(top_srcdir)/include/libiscsit.h
 
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)
 @CONFIG_USER_TRUE@libzfsdir = $(includedir)/libzfs
