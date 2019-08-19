@@ -1662,11 +1662,11 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	ASSERT(db->db_dirtycnt > 0);
 	db->db_dirtycnt -= 1;
 
-	if(refcount_dbg_remove(&db->db_holds_dbg, (void *)(uintptr_t)txg)==-1)
-	{
+	/*if(refcount_dbg_remove(&db->db_holds_dbg, (void *)(uintptr_t)txg)==-1)*/
+	/*{
 		dump_stack();
 		cmn_err(CE_PANIC, "refcount_dbg db:%p txg:%lx",db,txg );
-	}
+	}*/
 	if (refcount_remove(&db->db_holds, (void *)(uintptr_t)txg) == 0) {
 		arc_buf_t *buf = db->db_buf;
 
@@ -2420,7 +2420,7 @@ top:
 	}
 
 	(void) refcount_add(&dh->dh_db->db_holds, dh->dh_tag);
-	(void) refcount_dbg_add(&dh->dh_db->db_holds_dbg, dh->dh_tag);
+	/*(void) refcount_dbg_add(&dh->dh_db->db_holds_dbg, dh->dh_tag);*/
 	DBUF_VERIFY(dh->dh_db);
 	mutex_exit(&dh->dh_db->db_mtx);
 
@@ -2534,7 +2534,7 @@ void
 dbuf_add_ref(dmu_buf_impl_t *db, void *tag)
 {
 	VERIFY(refcount_add(&db->db_holds, tag) > 1);
-	refcount_dbg_add(&db->db_holds_dbg, tag);
+	/*refcount_dbg_add(&db->db_holds_dbg, tag);*/
 }
 
 #pragma weak dmu_buf_try_add_ref = dbuf_try_add_ref
@@ -2554,7 +2554,7 @@ dbuf_try_add_ref(dmu_buf_t *db_fake, objset_t *os, uint64_t obj, uint64_t blkid,
 	if (found_db != NULL) {
 		if (db == found_db && dbuf_refcount(db) > db->db_dirtycnt) {
 			(void) refcount_add(&db->db_holds, tag);
-			refcount_dbg_add(&db->db_holds_dbg, tag);
+			/*refcount_dbg_add(&db->db_holds_dbg, tag);*/
 			result = B_TRUE;
 		}
 		mutex_exit(&found_db->db_mtx);
@@ -2600,11 +2600,11 @@ dbuf_rele_and_unlock(dmu_buf_impl_t *db, void *tag)
 	 * buffer has a corresponding dnode hold.
 	 */
 	holds = refcount_remove(&db->db_holds, tag);
-	if(refcount_dbg_remove(&db->db_holds_dbg, tag)==-1)
-	{
+	/*if(refcount_dbg_remove(&db->db_holds_dbg, tag)==-1)*/
+	/*{
 		dump_stack();
 		cmn_err(CE_PANIC, "refcount_dbg db:%p tag:%p",db,tag );
-	}
+	}*/
 	
 	ASSERT(holds >= 0);
 
