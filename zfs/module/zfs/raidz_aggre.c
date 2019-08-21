@@ -511,6 +511,7 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	}
 	
  	dmu_buf_will_dirty(map->dbuf_hdr, tx);
+	map->dbuf_id = 0;
 	map->hdr->free_index = 0;
 	map->hdr->total_count = 0;	
 	map->hdr->avail_count = 0;	
