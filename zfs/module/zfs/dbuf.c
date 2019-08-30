@@ -1664,7 +1664,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	if(refcount_dbg_remove(&db->db_holds_dbg, (void *)(uintptr_t)txg)==-1)
 	{
-		dump_stack();
+		/*dump_stack();*/
 		cmn_err(CE_PANIC, "refcount_dbg db:%p txg:%lx",db,txg );
 	}
 	if (refcount_remove(&db->db_holds, (void *)(uintptr_t)txg) == 0) {
@@ -2602,7 +2602,7 @@ dbuf_rele_and_unlock(dmu_buf_impl_t *db, void *tag)
 	holds = refcount_remove(&db->db_holds, tag);
 	if(refcount_dbg_remove(&db->db_holds_dbg, tag)==-1)
 	{
-		dump_stack();
+		/*dump_stack();*/
 		cmn_err(CE_PANIC, "refcount_dbg db:%p tag:%p",db,tag );
 	}
 	

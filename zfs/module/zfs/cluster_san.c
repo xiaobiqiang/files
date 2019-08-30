@@ -588,7 +588,7 @@ int cs_addr_valid(void *addr, const char *name)
 
 	if (!ok) {
 		cmn_err(CE_WARN, "invalid addr %s=%p", name, addr);
-		dump_stack();
+		/*dump_stack();*/
 	}
 	return (ok);
 }

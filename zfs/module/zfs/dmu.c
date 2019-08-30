@@ -2566,8 +2566,9 @@ dmu_mirror_write_data(dmu_buf_t *db, char *data, uint64_t offset,
             dn_object, dbp->db_blkid, offset);
         mirror_io->txg = txg;
         mirror_io->data_type = type;
+	#ifdef _KERNEL
         mirror_io->create_time = ddi_get_time();
-
+	#endif
     }
 
     err = zfs_mirror_write_data_msg(spa_id, dsl_id, dn_object,

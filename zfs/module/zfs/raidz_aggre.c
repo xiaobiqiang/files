@@ -506,10 +506,11 @@ void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx)
 	if (map->hdr->aggre_map_state != AGGRE_MAP_OBJ_RECLAIMED) {
 		return;
 	}
+ 	#ifdef _KERNEL
 	if (ddi_get_time()-map->hdr->aggre_map_filltime <raidz_clearedtime_count) {
 		return;
 	}
-	
+	#endif
  	dmu_buf_will_dirty(map->dbuf_hdr, tx);
 	map->hdr->free_index = 0;
 	map->hdr->total_count = 0;	
