@@ -1718,7 +1718,7 @@ zvol_free(zvol_state_t *zv)
 {
 
 	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
-	dump_stack();
+	/*dump_stack();*/
 
 	ASSERT(MUTEX_HELD(&zvol_state_lock));
 	ASSERT(zv->zv_open_count == 0);
