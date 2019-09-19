@@ -593,6 +593,16 @@ stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = sbd_notify_lu_active((sbd_notify_active_t *)ibuf,
 		    &iocd->stmf_error);		
 		break;
+	case SBD_IOCTL_BUILD_DRBD_LU:
+		if (iocd->stmf_ibuf_size < sizeof(sbd_bind_drbd_lu_t)) {
+			ret = EFAULT;
+			break;
+		}
+	
+		iocd->stmf_error = 0;
+		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t)ibuf, 
+				&iocd->stmf_error);
+		break;
 	default:
 		ret = ENOTTY;
 	}
@@ -2812,6 +2822,47 @@ sbd_notify_lu_active(sbd_notify_active_t *stlu, uint32_t *err_ret)
 	return 0;
 }
 
+int 
+sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret)
+{
+	struct sbd_lu *sl = NULL;
+	sbd_status_t iRet;
+	vnode_t *vp_drbd = NULL;
+	
+	cmn_err(CE_NOTE, "%s guid:%02x%02x%02x%02x%02x%02x%02x%02x"
+		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
+		drbdlu.sblu_guid[0],drbdlu.sblu_guid[1],drbdlu.sblu_guid[2],
+		drbdlu.sblu_guid[3],drbdlu.sblu_guid[4],drbdlu.sblu_guid[5],
+		drbdlu.sblu_guid[6],drbdlu.sblu_guid[7],drbdlu.sblu_guid[8],
+		drbdlu.sblu_guid[9],drbdlu.sblu_guid[10],drbdlu.sblu_guid[11],
+		drbdlu.sblu_guid[12],drbdlu.sblu_guid[13],drbdlu.sblu_guid[14],
+		drbdlu.sblu_guid[15],drbdlu.sbbd_path);
+	if (sbd_find_and_lock_lu_ex(&drbdlu->sblu_guid[0], 
+				NULL, SL_OP_MODIFY_LU, &sl) ||
+		vn_open(&drbdlu->sbbd_path[0], UIO_SYSSPACE, 
+				FREAD | FWRITE | FOFFMAX, 0, &vp_drbd, 0, 0)) {
+		cmn_err(CE_NOTE, "%s can't find sbd_lu or" 
+			" vn_open drbd device failed", __func__);
+		*err_ret = ENOENT;
+		goto failed;
+	}
+
+	mutex_enter(&sl->sl_lock);
+	sl->sl_drbd = vp_drbd;
+	sl->sl_flags |= SL_BIND_DRBD;
+	mutex_exit(&sl->sl_lock);
+	*err_ret = SBD_SUCCESS;
+	goto out;
+	
+failed:
+	if (vp_drbd)
+		vn_close(vp_drbd, 0, 0, 0, 0, 0);
+out:
+	if (sl)
+		sl->sl_trans_op = SL_OP_NONE;
+	return 0;
+}
+
 int
 sbd_close_delete_lu(sbd_lu_t *sl, int ret)
 {
@@ -4480,7 +4531,8 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 	int ret;
 	long resid;
 	hrtime_t xfer_start, xfer_done;
-
+	vnode_t *vp_dst;
+	
 	if(sl->sl_access_state!=SBD_LU_ACTIVE){
 		cmn_err(CE_WARN,   "%s  task = %p sl_access_state=%x is not allowed",__func__, (void *)task,sl->sl_access_state);
 		return (SBD_FAILURE);
@@ -4521,6 +4573,10 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 		rw_exit(&sl->sl_access_state_lock);
 		return (SBD_FAILURE);
 	}
+
+	vp_dst = (sl->sl_flags & SL_BIND_DRBD) && (
+				sl->sl_data_vp->v_type != VREG) ? 
+					sl->sl_drbd : sl->sl_data_vp;
 	ret = vn_rdwr(UIO_READ, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, CRED(),
 	    &resid);
@@ -4551,7 +4607,8 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 	sbd_status_t sret = SBD_SUCCESS;
 	int ioflag;
 	hrtime_t xfer_start, xfer_done;
-
+	vnode_t *vp_dst;
+	
 	if(sl->sl_access_state!=SBD_LU_ACTIVE){
 		cmn_err(CE_WARN,   "%s  task = %p sl_access_state=%x is not allowed",__func__, (void *)task,sl->sl_access_state);
 		return (SBD_FAILURE);
@@ -4588,7 +4645,10 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 		rw_exit(&sl->sl_access_state_lock);
 		return (SBD_FAILURE);
 	}
-	ret = vn_rdwr(UIO_WRITE, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
+	vp_dst = (sl->sl_flags & SL_BIND_DRBD) && (
+				sl->sl_data_vp->v_type != VREG) ? 
+					sl->sl_drbd : sl->sl_data_vp;
+	ret = vn_rdwr(UIO_WRITE, vp_dst, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, ioflag, RLIM64_INFINITY, CRED(),
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
