@@ -36,11 +36,17 @@ function stat_sys()
 	if [ ! -f "$TARGET_FILE" ]; then
 		touch ${TARGET_FILE}
 	fi
+    if [ ! -f "$PROC_NFSD" ]; then
+		local nfs_nr=0
+        local nfs_nw=0
+    else
+        local nfs_nr=`cat $PROC_NFSD |grep "io"|awk -F' ' '{print $2}'`
+        local nfs_nw=`cat $PROC_NFSD |grep "io"|awk -F' ' '{print $3}'`
+	fi
 	local sum=(0 0 0 0 0 0 0 0)
 	local fc_name=`cat $TARGET_FILE |grep "wwn"|awk -F' ' '{print $1}'`
 	local nic_name=`cat $PROC_NETDEV |grep ":"|awk -F':' '{print $1}'`
-	local nfs_nr=`cat $PROC_NFSD |grep "io"|awk -F' ' '{print $2}'`
-	local nfs_nw=`cat $PROC_NFSD |grep "io"|awk -F' ' '{print $3}'`
+	
 	for num in $fc_name
 	do
 		reads=`cat $TARGET_FILE|grep -w "$num"|awk -F' ' '{print $4}'`
