@@ -95,6 +95,7 @@ static int sbd_open(struct inode *inode, struct file *file);
 static int sbd_release(struct inode *inode, struct file *file);
 static long stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
+int sbd_unbind_lu_drbd(sbd_unbind_lu_drbd_t *drbdlu, uint32_t *err_ret);
 int sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret);
 void sbd_lp_cb(stmf_lu_provider_t *lp, int cmd, void *arg, uint32_t flags);
 stmf_status_t sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg,
@@ -2884,13 +2885,13 @@ sbd_unbind_lu_drbd(sbd_unbind_lu_drbd_t *drbdlu, uint32_t *err_ret)
 	vnode_t *vp_drbd = NULL;
 	
 	cmn_err(CE_NOTE, "%s guid:%02x%02x%02x%02x%02x%02x%02x%02x"
-                "%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
+                "%02x%02x%02x%02x%02x%02x%02x%02x", __func__,
                 drbdlu->stlu_guid[0],drbdlu->stlu_guid[1],drbdlu->stlu_guid[2],
                 drbdlu->stlu_guid[3],drbdlu->stlu_guid[4],drbdlu->stlu_guid[5],
                 drbdlu->stlu_guid[6],drbdlu->stlu_guid[7],drbdlu->stlu_guid[8],
                 drbdlu->stlu_guid[9],drbdlu->stlu_guid[10],drbdlu->stlu_guid[11],
                 drbdlu->stlu_guid[12],drbdlu->stlu_guid[13],drbdlu->stlu_guid[14],
-                drbdlu->stlu_guid[15],drbdlu->sbbd_path);
+                drbdlu->stlu_guid[15]);
 	if (sbd_find_and_lock_lu_ex(&drbdlu->stlu_guid[0], 
 				NULL, SL_OP_MODIFY_LU, &sl) != SBD_SUCCESS) {
 		cmn_err(CE_NOTE, "%s can't find sbd_lu", __func__);

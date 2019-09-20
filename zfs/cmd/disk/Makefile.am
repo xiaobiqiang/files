@@ -41,7 +41,7 @@ install-exec-hook:
 	mkdir /usr/gnemul/qemu-x86_64/bin/
 	cp -rf /tmp/megacli/lsiraid-2018-03-05/megacli/MegaCli64 /usr/gnemul/qemu-x86_64/bin/MegaCli64
 	chmod u+x  /usr/gnemul/qemu-x86_64/bin/MegaCli64
-	mkdir /var/fm
+	mkdir -p /var/fm
 	cp $(top_srcdir)/cmd/disk/sg_led_disk.sh /var/fm/
 	chmod a+x /var/fm/sg_led_disk.sh
 

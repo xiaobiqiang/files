@@ -654,13 +654,12 @@ stmfLuUnbindDrbd(const stmfGuid *guid)
 	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)NULL;
 
 	fprintf(stdout, "guid:%02x%02x%02x%02x%02x%02x%02x%02x"
-		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s\n", drbd_lu.stlu_guid[0],
+		"%02x%02x%02x%02x%02x%02x%02x%02x\n", drbd_lu.stlu_guid[0],
 		drbd_lu.stlu_guid[1],drbd_lu.stlu_guid[2],drbd_lu.stlu_guid[3],
 		drbd_lu.stlu_guid[4],drbd_lu.stlu_guid[5],drbd_lu.stlu_guid[6],
 		drbd_lu.stlu_guid[7],drbd_lu.stlu_guid[8],drbd_lu.stlu_guid[9],
 		drbd_lu.stlu_guid[10],drbd_lu.stlu_guid[11],drbd_lu.stlu_guid[12],
-		drbd_lu.stlu_guid[13],drbd_lu.stlu_guid[14],drbd_lu.stlu_guid[15],
-		drbd_lu.sbbd_path);
+		drbd_lu.stlu_guid[13],drbd_lu.stlu_guid[14],drbd_lu.stlu_guid[15]);
 	ioctlRet = ioctl(sbd_fd, SBD_IOCTL_UNSET_DRBD_LU, &sbdIoctl);
 	close(sbd_fd);
 	return ioctlRet ? ioctlRet : -sbdIoctl.stmf_error;
