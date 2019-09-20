@@ -511,12 +511,12 @@ get_fanpsu_status_by_name_tmp(fanpsu_handle_t * fp_hdl, const char *name, char *
 	char buff[1024] = {0};
 	fanpsu_nodeinfo_t node;
 	
-	sprintf(ipmi_cmd,"/etc/ipmi/fmd_get_info.sh '%s'",name);
+	sprintf(ipmi_cmd,"/var/fm/fmd/script/fmd_get_info.sh '%s'",name);
 	/*read host user pass*/
 	fp1 = popen(ipmi_cmd,"r");
 	if(NULL == fp1)
 	{
-		syslog(LOG_ERR,"open /etc/ipmi/config fail");
+		syslog(LOG_ERR,"open /var/fm/fmd/script/fmd_get_info.sh fail");
 		return -1;
 	}
 	
@@ -599,10 +599,10 @@ int ipmi_pusfan_walk(topo_mod_t *mod,fanpsu_handle_t * fp_hdl){/*{{{*/
 	fp_hdl->ch_mod = mod;
 	fp_hdl->ttree = topo_mod_devinfo(mod);
 	/*read host user pass*/
-	fp1 = popen("/etc/ipmi/fmd_get_info.sh","r");
+	fp1 = popen("/var/fm/fmd/script/fmd_get_info.sh","r");
 	if(NULL == fp1)
 	{
-		syslog(LOG_ERR,"fan /etc/ipmi/fmd_get_info.sh fail");
+		syslog(LOG_ERR,"fan /var/fm/fmd/script/fmd_get_info.sh fail");
 		return -1;
 	}
 	

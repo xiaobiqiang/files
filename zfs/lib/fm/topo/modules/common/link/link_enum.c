@@ -765,7 +765,7 @@ int fc_link_walk(conn_handle_t *chp){/*{{{*/
 		#endif
 		pclose(fp2);
 
-		if(!strncmp("online", state, 6)){
+		if(!strncasecmp("online", state, 6)){
 			status = FC_STATE_ONLINE;
 		}else{
 			status = FC_STATE_OFFLINE;

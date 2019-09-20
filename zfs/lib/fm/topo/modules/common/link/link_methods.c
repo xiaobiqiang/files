@@ -188,7 +188,7 @@ static int get_fcstate_by_name(conn_handle_t *chp /* not used */, const char *li
 #endif
 	pclose(fp);
 
-	if(!strncmp("online", state, 6)){
+	if(!strncasecmp("online", state, 6)){
 		uip = FC_STATE_ONLINE;
 	}else{
 		uip = FC_STATE_OFFLINE;
