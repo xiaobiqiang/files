@@ -86,7 +86,7 @@ static void sbd_rdc_stop_notify_cb(char *data_fname);
 static void sbd_set_remote_sync_flag(char *data_fname, int need_synced);
 static void sbd_transition_to_trans_standby_lu(char *data_fname);
 */
-
+static int sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret);
 extern sbd_status_t sbd_pgr_meta_init(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
 extern void sbd_pgr_reset(sbd_lu_t *sl);

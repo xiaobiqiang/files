@@ -85,9 +85,6 @@ static int setKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int getKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int bindDrbdFunc(int, char **, cmdOptions_t *, void *);
 
-
-
-
 /*
  *  MAJOR - This should only change when there is an incompatible change made
  *  to the interfaces or the output.
