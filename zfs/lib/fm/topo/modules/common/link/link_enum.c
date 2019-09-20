@@ -747,6 +747,38 @@ int ethernet_link_walk(conn_handle_t *chp){/*{{{*/
 	return (0);
 }
 
+int fc_link_walk(conn_handle_t *chp){/*{{{*/
+	FILE *fp1, *fp2;
+	char linkname[CMDLEN];
+	char state[CMDLEN];
+	char cmd[CMDLEN];
+	unsigned int status;
+	fp1 = popen("ls -l /sys/class/fc_host/|awk -F' ' '/host/{print $9}'", "r");
+	while(fgets(linkname, CMDLEN, fp1)){
+		linkname[strlen(linkname)-1] = 0;
+		sprintf(cmd, "cat /sys/class/fc_host/%s/port_state", linkname);
+		fp2 = popen(cmd, "r");
+		fgets(state, CMDLEN, fp2);
+		state[strlen(state)-1] = 0;
+		#if 0
+		printf("%s: %s\n", linkname, state);
+		#endif
+		pclose(fp2);
+
+		if(!strncmp("online", state, 6)){
+			status = FC_STATE_ONLINE;
+		}else{
+			status = FC_STATE_OFFLINE;
+		}
+
+		chp->ret_status |= conn_node_creat(chp, "fc_link", linkname, FC_STATE_ONLINE);
+	}
+
+	pclose(fp1);
+
+	return (0);
+}
+
 #if 0
 int get_link(dladm_handle_t dh, datalink_id_t linkid, void *arg){/*{{{*/
 	char link[MAXLINKNAMELEN];
@@ -793,7 +825,7 @@ heartbeat_list_gather(conn_handle_t *chp) {
 
 int fcport_list_gather(conn_handle_t *chp){/*{{{*/
 
-	//hbaport_walk(chp);
+	fc_link_walk(chp);
 
 	return chp->ret_status;
 }/*}}}*/
@@ -801,6 +833,7 @@ int fcport_list_gather(conn_handle_t *chp){/*{{{*/
 int ethernet_list_gather(conn_handle_t *chp){/*{{{*/
 
 	ethernet_link_walk(chp);
+	
 
 	return chp->ret_status;
 }/*}}}*/
@@ -831,10 +864,8 @@ int _topo_init(topo_mod_t *mod, topo_version_t version){/*{{{*/
 	conn_hdl->devtree = topo_mod_devinfo(mod);
 	DMESG("LHL ADD ++ link_topo_init %p   %p \n", mod, conn_hdl->devtree);
 #endif
-#if ADD_FC_LINK
-	fcport_list_gather(conn_hdl);
-#endif
 
+	fcport_list_gather(conn_hdl);
 	heartbeat_list_gather(conn_hdl);
 	ethernet_list_gather(conn_hdl);
 

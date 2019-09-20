@@ -176,6 +176,24 @@ static int link_status2nvl(const char *type, const char *name, unsigned int stat
 }/*}}}*/
 
 static int get_fcstate_by_name(conn_handle_t *chp /* not used */, const char *link, unsigned int *uip){/*{{{*/
+	FILE* fp;
+	char cmd[128];
+	char state[16];
+	sprintf(cmd, "cat /sys/class/fc_host/%s/port_state", link);
+	fp = popen(cmd, "r");
+	fgets(state, CMDLEN, fp);
+	state[strlen(state)-1] = 0;
+#if 0
+	printf("%s: %s\n", linkname, state);
+#endif
+	pclose(fp);
+
+	if(!strncmp("online", state, 6)){
+		uip = FC_STATE_ONLINE;
+	}else{
+		uip = FC_STATE_OFFLINE;
+	}
+	
 #if 0
 	unsigned long long hbaWWN;
 	HBA_HANDLE handle;
