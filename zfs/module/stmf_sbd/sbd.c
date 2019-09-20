@@ -4635,9 +4635,6 @@ sbd_data_read(sbd_lu_t *sl, struct scsi_task *task,
 		return (SBD_FAILURE);
 	}
 
-	vp_dst = (sl->sl_flags & SL_BIND_DRBD) && (
-				sl->sl_data_vp->v_type != VREG) ? 
-					sl->sl_drbd : sl->sl_data_vp;
 	ret = vn_rdwr(UIO_READ, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, CRED(),
 	    &resid);
@@ -4706,10 +4703,8 @@ sbd_data_write(sbd_lu_t *sl, struct scsi_task *task,
 		rw_exit(&sl->sl_access_state_lock);
 		return (SBD_FAILURE);
 	}
-	vp_dst = (sl->sl_flags & SL_BIND_DRBD) && (
-				sl->sl_data_vp->v_type != VREG) ? 
-					sl->sl_drbd : sl->sl_data_vp;
-	ret = vn_rdwr(UIO_WRITE, vp_dst, (caddr_t)buf, (ssize_t)size,
+
+	ret = vn_rdwr(UIO_WRITE, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, ioflag, RLIM64_INFINITY, CRED(),
 	    &resid);
 	rw_exit(&sl->sl_access_state_lock);
