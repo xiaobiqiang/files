@@ -314,7 +314,7 @@ bindDrbdFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args
 		inGuid.guid[i] = guid[i];
 	}
 
-	return stmfLuBindDrbd(&inGuid, "/dev/drbd3");
+	return stmfLuBindDrbd(&inGuid, &drbd_path[0]);
 }
 
 static int
