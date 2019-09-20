@@ -83,8 +83,7 @@ static int getIopsInfoFunc(int, char **, cmdOptions_t *, void *);
 static int listAllLunsFunc(int, char **, cmdOptions_t *, void *);
 static int setKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int getKbpsFunc(int, char **, cmdOptions_t *, void *);
-
-
+static int bindDrbdFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args); 
 
 
 /*

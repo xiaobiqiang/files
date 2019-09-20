@@ -86,7 +86,7 @@ static void sbd_rdc_stop_notify_cb(char *data_fname);
 static void sbd_set_remote_sync_flag(char *data_fname, int need_synced);
 static void sbd_transition_to_trans_standby_lu(char *data_fname);
 */
-
+static int sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret);
 extern sbd_status_t sbd_pgr_meta_init(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
 extern void sbd_pgr_reset(sbd_lu_t *sl);
@@ -600,7 +600,7 @@ stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 	
 		iocd->stmf_error = 0;
-		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t)ibuf, 
+		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t *)ibuf, 
 				&iocd->stmf_error);
 		break;
 	default:
@@ -2831,12 +2831,12 @@ sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret)
 	
 	cmn_err(CE_NOTE, "%s guid:%02x%02x%02x%02x%02x%02x%02x%02x"
 		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
-		drbdlu.sblu_guid[0],drbdlu.sblu_guid[1],drbdlu.sblu_guid[2],
-		drbdlu.sblu_guid[3],drbdlu.sblu_guid[4],drbdlu.sblu_guid[5],
-		drbdlu.sblu_guid[6],drbdlu.sblu_guid[7],drbdlu.sblu_guid[8],
-		drbdlu.sblu_guid[9],drbdlu.sblu_guid[10],drbdlu.sblu_guid[11],
-		drbdlu.sblu_guid[12],drbdlu.sblu_guid[13],drbdlu.sblu_guid[14],
-		drbdlu.sblu_guid[15],drbdlu.sbbd_path);
+		drbdlu->sblu_guid[0],drbdlu->sblu_guid[1],drbdlu->sblu_guid[2],
+		drbdlu->sblu_guid[3],drbdlu->sblu_guid[4],drbdlu->sblu_guid[5],
+		drbdlu->sblu_guid[6],drbdlu->sblu_guid[7],drbdlu->sblu_guid[8],
+		drbdlu->sblu_guid[9],drbdlu->sblu_guid[10],drbdlu->sblu_guid[11],
+		drbdlu->sblu_guid[12],drbdlu->sblu_guid[13],drbdlu->sblu_guid[14],
+		drbdlu->sblu_guid[15],drbdlu->sbbd_path);
 	if (sbd_find_and_lock_lu_ex(&drbdlu->sblu_guid[0], 
 				NULL, SL_OP_MODIFY_LU, &sl) ||
 		vn_open(&drbdlu->sbbd_path[0], UIO_SYSSPACE, 
