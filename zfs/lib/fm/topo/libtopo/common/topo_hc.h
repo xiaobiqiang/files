@@ -118,6 +118,8 @@ extern "C" {
 #define	TOPO_IO_SLOW		"is_slow"
 #define	TOPO_IO_DERR		"is_derr"
 #define	TOPO_IO_MERR		"is_merr"
+#define	TOPO_IO_TIMEOUT		"is_timeout"
+
 
 #define	TOPO_IO_NORESP		"no_resp"
 

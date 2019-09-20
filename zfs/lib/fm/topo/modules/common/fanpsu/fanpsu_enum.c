@@ -18,6 +18,8 @@ static int fanpsu_wrong_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t v
 	nvlist_t *in, nvlist_t **out);
 static int get_fanpsu_status_by_name(fanpsu_handle_t *chp, const char *name, char *state);
 
+static int get_fanpsu_status_by_name_tmp(fanpsu_handle_t *chp, const char *name, char *state);
+
 const topo_modops_t fanpsu_ops = {fanpsu_enum, NULL};
 const topo_modinfo_t fanpsu_info =
 		{"ceresdata add fan and psu state monitor module", FM_FMRI_SCHEME_HC, TOPO_VERSION, &fanpsu_ops};
@@ -172,7 +174,7 @@ static int fanpsu_wrong_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t v
 	nvlist_t *in, nvlist_t **out){
 	nvlist_t *nvl;
 	fanpsu_handle_t * chp;
-	char state[2];
+	char state[4];
 	char *nodename = NULL;
 	int err;
 	nvlist_t *fmri;
@@ -188,7 +190,7 @@ static int fanpsu_wrong_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t v
 		syslog(LOG_ERR, "update_linknode_state nodep no state prop entry.\n");
 		return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
 	}
-	get_fanpsu_status_by_name(chp, nodename, state);
+	get_fanpsu_status_by_name_tmp(chp, nodename, state);
 #if 0
 	printf("###invoked by fanpsu-transport ###node: %s, state: %s.\n", nodename, state);
 #endif
@@ -311,7 +313,7 @@ fanpsu_topo_node_create(fanpsu_handle_t *fp_hdl, fanpsu_nodeinfo_t *nodeinfo){
 		index = PSU_LIST_INDEX;
 		strcpy(type, "psu");
 	}else{
-		syslog(LOG_ERR, "fanpsu_topo_node_creat error type\n");
+		syslog(LOG_ERR, "fanpsu_topo_node_creat error type %s\n",nodeinfo->name);
 		return -1;
 	}
 
@@ -501,6 +503,32 @@ get_fanpsu_status_by_name(fanpsu_handle_t *chp, const char *name, char *state)
 	return rc;
 }
 
+static int
+get_fanpsu_status_by_name_tmp(fanpsu_handle_t * fp_hdl, const char *name, char *state)
+{
+	FILE *fp1, *fp2;
+	char ipmi_cmd[128];
+	char buff[1024] = {0};
+	fanpsu_nodeinfo_t node;
+	
+	sprintf(ipmi_cmd,"/var/fm/fmd/script/fmd_get_info.sh '%s'",name);
+	/*read host user pass*/
+	fp1 = popen(ipmi_cmd,"r");
+	if(NULL == fp1)
+	{
+		syslog(LOG_ERR,"open /var/fm/fmd/script/fmd_get_info.sh fail");
+		return -1;
+	}
+	
+	fgets(buff, 128, fp1);
+
+	strncpy(state,4,buff);
+
+	pclose(fp1);
+
+	return (0);
+}
+
 
 static int
 fanpsu_node_iter_byipmi(struct ipmi_intf *intf, uint8_t type,
@@ -562,6 +590,35 @@ fanpsu_get_node_by_ipmi(topo_mod_t *mod, fanpsu_handle_t *fp_hdl)
 	return 0;
 }
 
+int ipmi_pusfan_walk(topo_mod_t *mod,fanpsu_handle_t * fp_hdl){/*{{{*/
+	FILE *fp1, *fp2;
+	char ipmi_cmd[128];
+	char buff[1024] = {0};
+	fanpsu_nodeinfo_t node;
+	
+	fp_hdl->ch_mod = mod;
+	fp_hdl->ttree = topo_mod_devinfo(mod);
+	/*read host user pass*/
+	fp1 = popen("/var/fm/fmd/script/fmd_get_info.sh","r");
+	if(NULL == fp1)
+	{
+		syslog(LOG_ERR,"fan /var/fm/fmd/script/fmd_get_info.sh fail");
+		return -1;
+	}
+	
+	while(fgets(buff, 128, fp1)){
+
+		sscanf(buff,"%s|%s",node.name,node.value);
+		
+		fp_hdl->ret_status |= fanpsu_topo_node_create(fp_hdl, &node);
+	}
+
+	pclose(fp1);
+
+	return (0);
+}
+
+
 static int
 gather_fanpsu_status(topo_mod_t *mod, fanpsu_handle_t *fp_hdl){
 	fp_hdl->ch_mod = mod;
@@ -577,6 +634,7 @@ int
 _topo_init(topo_mod_t *mod, topo_version_t version){
 	fanpsu_handle_t *fp_hdl;
 
+	
 	topo_mod_dprintf(mod, "fanpsu module started.\n");
 	if(topo_mod_register(mod, &fanpsu_info, TOPO_VERSION)){
 		topo_mod_dprintf(mod, "%s registration failed: %s\n", "fanpsu", topo_mod_errmsg(mod));
@@ -588,7 +646,8 @@ _topo_init(topo_mod_t *mod, topo_version_t version){
 		goto error;
 	}
 	
-	if(gather_fanpsu_status(mod, fp_hdl)){
+	//if(gather_fanpsu_status(mod, fp_hdl)){
+	if(ipmi_pusfan_walk(mod, fp_hdl)){
 		topo_mod_dprintf(mod, "cannot get fan and psu status\n");
 		goto error;
 	}
