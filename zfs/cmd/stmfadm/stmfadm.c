@@ -190,6 +190,7 @@ optionTbl_t longOptions[] = {
 	{"host-group", required_arg, 'h', "group-name"},
 	{"verbose", no_arg, 'v', NULL},
 	{"cluster",no_arg,'c',NULL},
+	{"drbd-bdev", required_arg, 'd', "drbd-block-device"},
 	{NULL, 0, 0, 0}
 };
 
@@ -244,7 +245,7 @@ subCommandProps_t subcommands[] = {
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-view", removeViewFunc, "lac", "l", NULL,
 		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
-	{"set-drbd", bindDrbdFunc, "d", NULL, NULL, 
+	{"set-drbd", bindDrbdFunc, "d", "d", NULL, 
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
 	{"del-drbd", delDrbdFunc, NULL, NULL, NULL, 
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
