@@ -4161,12 +4161,10 @@ sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 		break;
 
 	case (SBD_CMD_SMALL_READ):
-		printk(KERN_WARNING "%s go into SBD_CMD_SMALL_READ", __func__);
 		sbd_handle_short_read_xfer_completion(task, scmd, dbuf);
 		break;
 
 	case (SBD_CMD_SMALL_WRITE):
-		printk(KERN_WARNING "%s go into SBD_CMD_SMALL_WRITE", __func__);
 		sbd_handle_short_write_xfer_completion(task, dbuf);
 		break;
 
