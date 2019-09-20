@@ -136,8 +136,9 @@ vn_open(const char *path, uio_seg_t seg, int flags, int mode,
 	*vpp = NULL;
 
 	if (!(flags & FCREAT) && (flags & FWRITE))
-		flags |= FEXCL;
-
+	{
+	/*	flags |= FEXCL; */
+	}
 	/* Note for filp_open() the two low bits must be remapped to mean:
 	 * 01 - read-only  -> 00 read-only
 	 * 10 - write-only -> 01 write-only

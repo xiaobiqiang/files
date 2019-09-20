@@ -610,7 +610,7 @@ stmfLuBindDrbd(const stmfGuid *guid, const char *drbd)
 		return iRet;
 	}
 
-	memcpy(&drbd_lu.sblu_guid[0], &guid->guid[0]);
+	memcpy(&drbd_lu.sblu_guid[0], &guid->guid[0], 16);
 	strncpy(&drbd_lu.sbbd_path[0], drbd, 64);
 	
 	sbdIoctl.stmf_version = STMF_VERSION_1;

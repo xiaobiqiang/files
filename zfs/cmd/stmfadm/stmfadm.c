@@ -83,6 +83,7 @@ static int getIopsInfoFunc(int, char **, cmdOptions_t *, void *);
 static int listAllLunsFunc(int, char **, cmdOptions_t *, void *);
 static int setKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int getKbpsFunc(int, char **, cmdOptions_t *, void *);
+static int bindDrbdFunc(int, char **, cmdOptions_t *, void *);
 
 
 
@@ -245,7 +246,7 @@ subCommandProps_t subcommands[] = {
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-view", removeViewFunc, "lac", "l", NULL,
 		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
-	{"bind_drbd", bindDrbdFunc, "d", "d", NULL, 
+	{"bind-drbd", bindDrbdFunc, "d", NULL, NULL, 
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
 	{"unmap-lu", unmapLuFunc, NULL, NULL, NULL,
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
@@ -312,7 +313,7 @@ bindDrbdFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args
 		inGuid.guid[i] = guid[i];
 	}
 
-	stmfRet = stmfLuBindDrbd(&inGuid, &drbd_path[0]);
+	stmfRet = stmfLuBindDrbd(&inGuid, "/dev/drbd2");
 }
 
 /*

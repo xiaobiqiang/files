@@ -95,6 +95,7 @@ static int sbd_open(struct inode *inode, struct file *file);
 static int sbd_release(struct inode *inode, struct file *file);
 static long stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
+int sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret);
 void sbd_lp_cb(stmf_lu_provider_t *lp, int cmd, void *arg, uint32_t flags);
 stmf_status_t sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg,
     uint32_t proxy_reg_arg_len, uint32_t type, void *sess);
@@ -600,7 +601,7 @@ stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 	
 		iocd->stmf_error = 0;
-		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t)ibuf, 
+		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t *)ibuf, 
 				&iocd->stmf_error);
 		break;
 	default:
@@ -2830,13 +2831,13 @@ sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret)
 	vnode_t *vp_drbd = NULL;
 	
 	cmn_err(CE_NOTE, "%s guid:%02x%02x%02x%02x%02x%02x%02x%02x"
-		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
-		drbdlu.sblu_guid[0],drbdlu.sblu_guid[1],drbdlu.sblu_guid[2],
-		drbdlu.sblu_guid[3],drbdlu.sblu_guid[4],drbdlu.sblu_guid[5],
-		drbdlu.sblu_guid[6],drbdlu.sblu_guid[7],drbdlu.sblu_guid[8],
-		drbdlu.sblu_guid[9],drbdlu.sblu_guid[10],drbdlu.sblu_guid[11],
-		drbdlu.sblu_guid[12],drbdlu.sblu_guid[13],drbdlu.sblu_guid[14],
-		drbdlu.sblu_guid[15],drbdlu.sbbd_path);
+                "%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
+                drbdlu->sblu_guid[0],drbdlu->sblu_guid[1],drbdlu->sblu_guid[2],
+                drbdlu->sblu_guid[3],drbdlu->sblu_guid[4],drbdlu->sblu_guid[5],
+                drbdlu->sblu_guid[6],drbdlu->sblu_guid[7],drbdlu->sblu_guid[8],
+                drbdlu->sblu_guid[9],drbdlu->sblu_guid[10],drbdlu->sblu_guid[11],
+                drbdlu->sblu_guid[12],drbdlu->sblu_guid[13],drbdlu->sblu_guid[14],
+                drbdlu->sblu_guid[15],drbdlu->sbbd_path);
 	if (sbd_find_and_lock_lu_ex(&drbdlu->sblu_guid[0], 
 				NULL, SL_OP_MODIFY_LU, &sl) ||
 		vn_open(&drbdlu->sbbd_path[0], UIO_SYSSPACE, 
@@ -2848,6 +2849,7 @@ sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret)
 	}
 
 	mutex_enter(&sl->sl_lock);
+	sl->sl_data_vp = vp_drbd;
 	sl->sl_drbd = vp_drbd;
 	sl->sl_flags |= SL_BIND_DRBD;
 	mutex_exit(&sl->sl_lock);
