@@ -596,12 +596,22 @@ stmf_sbd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case SBD_IOCTL_BUILD_DRBD_LU:
 		if (iocd->stmf_ibuf_size < sizeof(sbd_bind_drbd_lu_t)) {
-			ret = EFAULT;
+			iocd->stmf_error = EINVAL;
 			break;
 		}
 	
 		iocd->stmf_error = 0;
 		ret = sbd_bind_lu_drbd((sbd_bind_drbd_lu_t *)ibuf, 
+				&iocd->stmf_error);
+		break;
+	case SBD_IOCTL_UNSET_DRBD_LU:
+		if (iocd->stmf_ibuf_size < sizeof(sbd_unbind_lu_drbd_t)) {
+			iocd->stmf_error = EINVAL;
+			break;
+		}
+	
+		iocd->stmf_error = 0;
+		ret = sbd_unbind_lu_drbd((sbd_unbind_lu_drbd_t *)ibuf, 
 				&iocd->stmf_error);
 		break;
 	default:
@@ -2849,6 +2859,7 @@ sbd_bind_lu_drbd(sbd_bind_drbd_lu_t *drbdlu, uint32_t *err_ret)
 	}
 
 	mutex_enter(&sl->sl_lock);
+	sl->sl_origin_data_vp = sl->sl_data_vp;
 	sl->sl_data_vp = vp_drbd;
 	sl->sl_drbd = vp_drbd;
 	sl->sl_flags |= SL_BIND_DRBD;
@@ -2864,6 +2875,53 @@ out:
 		sl->sl_trans_op = SL_OP_NONE;
 	return 0;
 }
+
+int 
+sbd_unbind_lu_drbd(sbd_unbind_lu_drbd_t *drbdlu, uint32_t *err_ret)
+{
+	struct sbd_lu *sl = NULL;
+	sbd_status_t iRet;
+	vnode_t *vp_drbd = NULL;
+	
+	cmn_err(CE_NOTE, "%s guid:%02x%02x%02x%02x%02x%02x%02x%02x"
+                "%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", __func__,
+                drbdlu->stlu_guid[0],drbdlu->stlu_guid[1],drbdlu->stlu_guid[2],
+                drbdlu->stlu_guid[3],drbdlu->stlu_guid[4],drbdlu->stlu_guid[5],
+                drbdlu->stlu_guid[6],drbdlu->stlu_guid[7],drbdlu->stlu_guid[8],
+                drbdlu->stlu_guid[9],drbdlu->stlu_guid[10],drbdlu->stlu_guid[11],
+                drbdlu->stlu_guid[12],drbdlu->stlu_guid[13],drbdlu->stlu_guid[14],
+                drbdlu->stlu_guid[15],drbdlu->sbbd_path);
+	if (sbd_find_and_lock_lu_ex(&drbdlu->stlu_guid[0], 
+				NULL, SL_OP_MODIFY_LU, &sl) != SBD_SUCCESS) {
+		cmn_err(CE_NOTE, "%s can't find sbd_lu", __func__);
+		*err_ret = ENOENT;
+		goto out;
+	}
+
+	mutex_enter(&sl->sl_lock);
+	if (!(sl->sl_flags & SL_BIND_DRBD)) {
+		mutex_exit(&sl->sl_lock);
+		*err_ret = EINVAL;
+		goto out;
+	}
+	VERIFY(sl->sl_origin_data_vp != NULL);
+	sl->sl_flags &= ~SL_BIND_DRBD;
+	sl->sl_data_vp = sl->sl_origin_data_vp;
+	vp_drbd = sl->sl_drbd;
+	sl->sl_origin_data_vp = NULL;
+	sl->sl_drbd = NULL;
+	mutex_exit(&sl->sl_lock);
+	*err_ret = SBD_SUCCESS;
+	goto out;
+	
+out:
+	if (vp_drbd)
+		vn_close(vp_drbd, 0, 0, 0, 0, 0);
+	if (sl)
+		sl->sl_trans_op = SL_OP_NONE;
+	return 0;
+}
+
 
 int
 sbd_close_delete_lu(sbd_lu_t *sl, int ret)

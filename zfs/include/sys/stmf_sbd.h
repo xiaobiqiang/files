@@ -251,6 +251,7 @@ typedef struct sbd_lu {
 	uint32_t	sl_avs_master_state;
 
 	/* bind drbd block device? */
+	vnode_t			*sl_origin_data_vp;
 	vnode_t			*sl_drbd;
 } sbd_lu_t;
 

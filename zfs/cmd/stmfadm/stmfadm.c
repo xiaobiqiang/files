@@ -84,6 +84,7 @@ static int listAllLunsFunc(int, char **, cmdOptions_t *, void *);
 static int setKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int getKbpsFunc(int, char **, cmdOptions_t *, void *);
 static int bindDrbdFunc(int, char **, cmdOptions_t *, void *);
+static int delDrbdFunc(int, char **, cmdOptions_t *, void *);
 
 /*
  *  MAJOR - This should only change when there is an incompatible change made
@@ -243,7 +244,9 @@ subCommandProps_t subcommands[] = {
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-view", removeViewFunc, "lac", "l", NULL,
 		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
-	{"bind-drbd", bindDrbdFunc, "d", NULL, NULL, 
+	{"set-drbd", bindDrbdFunc, "d", NULL, NULL, 
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
+	{"del-drbd", delDrbdFunc, NULL, NULL, NULL, 
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
 	{"unmap-lu", unmapLuFunc, NULL, NULL, NULL,
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
@@ -310,8 +313,34 @@ bindDrbdFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args
 		inGuid.guid[i] = guid[i];
 	}
 
-	stmfRet = stmfLuBindDrbd(&inGuid, "/dev/drbd2");
+	return stmfLuBindDrbd(&inGuid, "/dev/drbd2");
 }
+
+static int
+delDrbdFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
+{
+	int i;
+	int stmfRet;
+	char sGuid[33] = {0};
+	unsigned char guid[sizeof(stmfGuid)];
+	stmfGuid inGuid;
+
+	for (i = 0; i < 32; i++)
+		sGuid[i] = tolower(operands[0][i]);
+	sGuid[i] = 0;
+	(void) sscanf(sGuid,
+	    "%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x",
+	    &guid[0], &guid[1], &guid[2], &guid[3], &guid[4], &guid[5],
+	    &guid[6], &guid[7], &guid[8], &guid[9], &guid[10],
+	    &guid[11], &guid[12], &guid[13], &guid[14], &guid[15]);
+
+	for (i = 0; i < sizeof (stmfGuid); i++) {
+		inGuid.guid[i] = guid[i];
+	}
+
+	return stmfLuUnbindDrbd(&inGuid);
+}
+
 
 /*
  * addHostGroupMemberFunc

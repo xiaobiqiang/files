@@ -620,7 +620,7 @@ stmfLuBindDrbd(const stmfGuid *guid, const char *drbd)
 	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)NULL;
 
 	fprintf(stdout, "guid:%02x%02x%02x%02x%02x%02x%02x%02x"
-		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s", drbd_lu.sblu_guid[0],
+		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s\n", drbd_lu.sblu_guid[0],
 		drbd_lu.sblu_guid[1],drbd_lu.sblu_guid[2],drbd_lu.sblu_guid[3],
 		drbd_lu.sblu_guid[4],drbd_lu.sblu_guid[5],drbd_lu.sblu_guid[6],
 		drbd_lu.sblu_guid[7],drbd_lu.sblu_guid[8],drbd_lu.sblu_guid[9],
@@ -631,6 +631,41 @@ stmfLuBindDrbd(const stmfGuid *guid, const char *drbd)
 	close(sbd_fd);
 	return ioctlRet ? ioctlRet : -sbdIoctl.stmf_error;
 }
+
+int
+stmfLuUnbindDrbd(const stmfGuid *guid)
+{
+	int iRet, ioctlRet;
+	int sbd_fd = -1;
+	stmf_iocdata_t sbdIoctl = {0};
+	sbd_unbind_lu_drbd_t drbd_lu = {0};
+	
+	if ((iRet = openSbd(OPEN_SBD, &sbd_fd)) != STMF_STATUS_SUCCESS) {
+		fprintf(stderr, "stmf: open sbd failed,error:%d", iRet);
+		return iRet;
+	}
+
+	memcpy(&drbd_lu.stlu_guid[0], &guid->guid[0], 16);
+	
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sizeof(sbd_unbind_lu_drbd_t);
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)&drbd_lu;
+	sbdIoctl.stmf_obuf_size = 0;
+	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)NULL;
+
+	fprintf(stdout, "guid:%02x%02x%02x%02x%02x%02x%02x%02x"
+		"%02x%02x%02x%02x%02x%02x%02x%02x, drbd:%s\n", drbd_lu.stlu_guid[0],
+		drbd_lu.stlu_guid[1],drbd_lu.stlu_guid[2],drbd_lu.stlu_guid[3],
+		drbd_lu.stlu_guid[4],drbd_lu.stlu_guid[5],drbd_lu.stlu_guid[6],
+		drbd_lu.stlu_guid[7],drbd_lu.stlu_guid[8],drbd_lu.stlu_guid[9],
+		drbd_lu.stlu_guid[10],drbd_lu.stlu_guid[11],drbd_lu.stlu_guid[12],
+		drbd_lu.stlu_guid[13],drbd_lu.stlu_guid[14],drbd_lu.stlu_guid[15],
+		drbd_lu.sbbd_path);
+	ioctlRet = ioctl(sbd_fd, SBD_IOCTL_UNSET_DRBD_LU, &sbdIoctl);
+	close(sbd_fd);
+	return ioctlRet ? ioctlRet : -sbdIoctl.stmf_error;
+}
+
 
 /*
  * stmfAddToTargetGroup
