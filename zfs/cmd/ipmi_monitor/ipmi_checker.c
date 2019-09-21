@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -5,6 +6,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <syslog.h>
 #include "ipmi_checker.h"
 #include "ini_parse.h"
 
@@ -16,7 +18,7 @@ static struct ipmi_opt ipmi_down_opts[] = {
 };
 static unsigned ipmi_down_opts_num = sizeof(ipmi_down_opts)/sizeof(struct ipmi_opt);
 static struct ipmi_conf *global_conf = NULL;
-static ipmi_module *ipmi_modules[] = {
+static struct ipmi_module *ipmi_modules[] = {
 	&power_module,
 	NULL
 };
@@ -211,7 +213,7 @@ ipmi_create_ipmi_conf(struct ipmi_conf **confp)
 		goto failed_parse;
 
 	if ((conf->ic_ioc_fd = open(conf->ic_ioc_dev, O_RDWR)) < 0)
-		return failed_open;
+		goto failed_open;
 	conf->ic_ioc_opened = 1;
 
 	*confp = conf;
@@ -244,9 +246,9 @@ __ipmi_parse_ipmi_conf(struct ipmi_conf *confp)
 	assert(confp->ic_conf && !confp->ic_conf_loaded);
 
 	memset(user, 0, IPMI_USER_LEN);
-	memset(passwd 0, IPMI_PASSWD_LEN);
-	memset(ipmi_ip 0, IPMI_IP_LEN);
-	memset(link_down 0, 32);
+	memset(passwd, 0, IPMI_PASSWD_LEN);
+	memset(ipmi_ip, 0, IPMI_IP_LEN);
+	memset(link_down, 0, 32);
 	
 	if (iniFileLoad(confp->ic_conf) == 0)
 		return -ENOMEM;

@@ -1,3 +1,6 @@
+#ifndef __IPMI_DEFINES_H
+#define __IPMI_DEFINES_H
+
 #include <pthread.h>
 
 #define IPMI_CONF					"/etc/ipmi_checker.ini"
@@ -149,9 +152,9 @@ struct ipmi_conf {
 						ic_link_down:2,
 						ic_link_up:1,
 						ic_last_link_alive:1,
-						ic_in_retry;
+						ic_in_retry:1,
 						ic_misc_running:1,
-						ic_rsvd:26;
+						ic_rsvd:23;
 
 	pthread_mutex_t		ic_mutex;
 	pthread_cond_t		ic_cv;
@@ -159,7 +162,7 @@ struct ipmi_conf {
 };
 
 typedef struct ipmi_iocdata {
-	unsigned moudle;
+	unsigned module;
 	unsigned module_spec;
 	unsigned long inbuf;
 	unsigned long outbuf;
@@ -171,4 +174,4 @@ extern void ipmi_delay_interval(pthread_mutex_t *, pthread_cond_t *, unsigned);
 extern void ipmi_delay_interval_locked(pthread_mutex_t *, pthread_cond_t *, unsigned);
 extern int ipmi_ioctl(struct ipmi_conf *, unsigned, void *, unsigned, void *, unsigned);
 
-
+#endif	/* __IPMI_DEFINES_H */

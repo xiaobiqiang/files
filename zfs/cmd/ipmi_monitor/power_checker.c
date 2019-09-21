@@ -1,4 +1,4 @@
-#include "power_checker.h"
+#include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -7,18 +7,10 @@
 #include <string.h>
 #include <time.h>
 #include "ini_parse.h"
+#include "power_checker.h"
 
 #define POWER_CMD_FORMAT		"ipmitool -N 1 -R 1 -H %s -U %s -P %s power status"	\
 								" | cut -d ' ' -f 4"
-
-struct ipmi_module power_module = {
-	.name 		= "power_checker",
-	.__init 	= power_checker_init,
-	.__exit 	= power_checker_exit,
-	.__notify 	= power_checker_notify,
-	.inited		= 0,
-	.exited 	= 0,
-};
 
 struct power_global {
 	struct ipmi_module 		*module;
@@ -58,7 +50,7 @@ static struct ipmi_opt down_abrt_opts[] = {
 	{POWER_ERRHDL_NEXT, 	POWER_ERR_NEXT_RETRY},
 	{POWER_ERRHDL_SUSP, 	POWER_DOWN_SUSP},
 	{POWER_ERRHDL_ABRT, 	POWER_ERR_ABRT}
-}, power_status_opts = {
+}, power_status_opts[] = {
 	{PSU_UNKNOWN, 			PSU_STATE_UNKNOWN},
 	{PSU_ON,				PSU_STATE_ON},
 	{PSU_OFF, 				PSU_STATE_OFF}
@@ -75,6 +67,16 @@ static void power_checker_once(struct power_global *);
 static void *power_checker(struct power_global *);
 static void power_checker_parse_conf(struct power_global *);
 static int power_checker_init(const struct ipmi_conf *conf);
+
+struct ipmi_module power_module = {
+        .name           = "power_checker",
+        .__init         = power_checker_init,
+        .__exit         = power_checker_exit,
+        .__notify       = power_checker_notify,
+        .inited         = 0,
+        .exited         = 0,
+};
+
 
 static int
 power_checker_init(const struct ipmi_conf *conf)
@@ -148,7 +150,8 @@ resume:
 		if (conf->checker_exit || conf->check_susp)
 			continue;
 		
-		ipmi_delay_interval_locked(conf);
+		ipmi_delay_interval_locked(&conf->ck_mtx, 
+				&conf->ck_cv, conf->check_tm);
 	}
 
 	if (conf->checker_exit && !conf->module->exited) {
@@ -172,7 +175,7 @@ power_checker_once(struct power_global *conf)
 	assert(conf->cmd_set);
 
 	power_detect_status(conf);
-	syslog(LOG_ERR, "%s curr_psu_status:%02x", __func, conf->curr_psu_status);
+	syslog(LOG_ERR, "%s curr_psu_status:%02x", __func__, conf->curr_psu_status);
 	switch (conf->curr_psu_status) {
 		case PSU_UNKNOWN:
 			switch (conf->check_err_hdl) {
@@ -180,7 +183,7 @@ power_checker_once(struct power_global *conf)
 					if (!conf->in_retry)
 						conf->in_retry = 1;
 					if (++conf->retried < conf->retry_times)
-						goto break_unknown;
+						goto break_retry;
 
 					conf->in_retry = 0;
 					conf->retried = 0;
@@ -188,7 +191,7 @@ power_checker_once(struct power_global *conf)
 					need_to_ioc = 1;
 					conf->check_resume = 0;
 					conf->check_susp = 1;
-break_unknown:
+break_retry:
 					break;
 				case POWER_ERRHDL_NEXT:
 					break;
