@@ -249,6 +249,10 @@ typedef struct sbd_lu {
 	uint64_t	sl_rs_owner_session_id;
 	uint32_t	sl_active_hostid;
 	uint32_t	sl_avs_master_state;
+
+	/* bind drbd block device? */
+	vnode_t			*sl_origin_data_vp;
+	vnode_t			*sl_drbd;
 } sbd_lu_t;
 
 /*
@@ -275,7 +279,7 @@ typedef struct sbd_lu {
 #define	SL_FLUSH_ON_DISABLED_WRITECACHE	    0x00040000
 #define	SL_CALL_ZVOL			    0x00080000
 #define	SL_UNMAP_ENABLED		    0x00100000
-
+#define SL_BIND_DRBD				0x00200000
 /*
  * sl_trans_op. LU is undergoing some transition and this field
  * tells what kind of transition that is.

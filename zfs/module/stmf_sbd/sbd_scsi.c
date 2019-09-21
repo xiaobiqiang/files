@@ -996,7 +996,10 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 		return;
 	}
-		
+
+	if ((sl->sl_flags & SL_BIND_DRBD) &&
+		(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF)) 
+		task->task_additional_flags &= ~TASK_AF_ACCEPT_LU_DBUF;
 	/*
 		 * Determine if this read can directly use DMU buffers.
 	 */
@@ -1806,6 +1809,7 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 		    STMF_SAA_WRITE_PROTECTED);
 		return;
 	}
+	
 	if (op == SCMD_WRITE) {
 		lba = READ_SCSI21(&task->task_cdb[1], uint64_t);
 		len = (uint32_t)task->task_cdb[4];
@@ -2072,6 +2076,10 @@ void
 sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+
+	if ((sl->sl_flags & SL_BIND_DRBD) &&
+		(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF)) 
+		task->task_additional_flags &= ~TASK_AF_ACCEPT_LU_DBUF;
 	
 	if ((sl->sl_access_state == SBD_LU_ACTIVE))  {
 		sbd_handle_active_write(task, initial_dbuf);

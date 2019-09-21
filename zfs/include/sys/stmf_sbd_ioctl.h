@@ -83,6 +83,8 @@ typedef enum sbd_ret {
 #define	SBD_IOCTL_SET_LU_STANDBY_ACCESS		SBD_IOCTL_DEF(14)
 #define	SBD_IOCTL_CLOSE_STANDBY_LU			SBD_IOCTL_DEF(15)
 #define	SBD_IOCTL_NOTIFY_LU_ACTIVE			SBD_IOCTL_DEF(16)
+#define	SBD_IOCTL_BUILD_DRBD_LU				SBD_IOCTL_DEF(17)
+#define	SBD_IOCTL_UNSET_DRBD_LU				SBD_IOCTL_DEF(18)
 
 
 typedef struct sbd_create_and_reg_lu {
@@ -143,12 +145,18 @@ typedef struct sbd_global_props {
 	char		mlu_buf[8];	/* likely more than 8 */
 } sbd_global_props_t;
 
+typedef struct sbd_bind_drbd_lu {
+	uint8_t		sblu_guid[16];
+	char		sbbd_path[64];
+} sbd_bind_drbd_lu_t;
+
 typedef struct sbd_set_lu_standby {
 	uint8_t		stlu_guid[16];
 } sbd_set_lu_standby_t;
 
 typedef sbd_set_lu_standby_t sbd_set_lu_standby_access_t;
 typedef sbd_set_lu_standby_t sbd_close_standby_lu_t;
+typedef sbd_set_lu_standby_t sbd_unbind_lu_drbd_t;
 
 typedef struct sbd_import_lu {
 	uint32_t	ilu_struct_size;
