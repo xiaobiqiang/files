@@ -194,6 +194,7 @@ AC_CONFIG_FILES([
 	cmd/scripts/Makefile
 	cmd/iscsitsvc/Makefile
 	cmd/itadm/Makefile
+	cmd/ipmi_monitor/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile
