@@ -21,6 +21,13 @@
 
 #define IPMI_POWER_NAME		"power"
 
+static void ipmi_power_exit(void);
+static int ipmi_power_init(void);
+static int ipmi_power_filter(uint32_t, void *, uint32_t);
+static void ipmi_power_push(uint32_t, void *, uint32_t, void *, uint32_t);
+static int ipmi_power_unsubscribe(struct ipmi_subscriber *);
+static int ipmi_power_subscribe(struct ipmi_subscriber *);
+
 struct ipmi_power_subscriber {
 	struct ipmi_subscriber *ipmi_suber;
 	struct list_head		entry;
@@ -77,7 +84,7 @@ ipmi_power_lookup_subscriber(struct ipmi_subscriber *ipmi_suber)
 
 	rw_enter(&psu_global.subers_rw, RW_READER);
 	power_suber = ipmi_power_lookup_subscriber_locked(ipmi_suber);
-	rw_exit(&psu_global.subers_lock);
+	rw_exit(&psu_global.subers_rw);
 	return power_suber;
 }
 
@@ -100,7 +107,7 @@ ipmi_power_subscribe(struct ipmi_subscriber *suber)
 	psu_global.nsubers++;
 	iRet = 0;
 out:
-	rw_exit(&psu_global.subers_lock);
+	rw_exit(&psu_global.subers_rw);
 	return iRet;
 }
 
@@ -108,7 +115,7 @@ static int
 ipmi_power_unsubscribe(struct ipmi_subscriber *suber)
 {
 	int iRet = -ENOENT;
-	struct ipmi_power_subscriber *power_priv, power_suber;
+	struct ipmi_power_subscriber *power_priv, *power_suber;
 
 	if (!suber->md_priv)
 		return -EINVAL;
@@ -125,7 +132,7 @@ ipmi_power_unsubscribe(struct ipmi_subscriber *suber)
 	psu_global.nsubers--;
 	iRet = 0;
 out:
-	rw_exit(&psu_global.subers_lock);
+	rw_exit(&psu_global.subers_rw);
 	if (!iRet && power_suber)
 		kfree(power_suber);
 	return iRet;	

@@ -16,10 +16,18 @@
 #include <linux/cdev.h>
 #include <linux/miscdevice.h>
 #include <asm/unaligned.h>
+#include <sys/kmem.h>
+#include <sys/vmem.h>
+#include <sys/sunddi.h>
 #include <sys/ipmi_notify_if.h>
 
 static int ipmi_notify_open(struct inode *, struct file *);
 static int ipmi_notify_unlocked_ioctl(struct file *, uint32_t, uint64_t);
+static void ipmi_notify_deactivate_modules(struct ipmi_notify_module **);
+static void ipmi_notify_activate_modules(struct ipmi_notify_module **);
+static int ipmi_notify_push(struct ipmi_notify_module *, uint32_t, void *, uint32_t, void *, uint32_t);
+static int ipmi_notify_copyout_iocdata(intptr_t, int, ipmi_iocdata_t *, void *);
+static int ipmi_notify_copyin_iocdata(intptr_t, int, ipmi_iocdata_t **, void **, void **);
 	
 static const struct file_operations ipmi_notify_fops = {
 	.owner		= THIS_MODULE,
@@ -34,7 +42,7 @@ static struct miscdevice ipmi_notify_dev = {
 };
 
 extern struct ipmi_notify_module ipmi_psu;
-static struct ipmi_module *ipmi_notify_modules[] = {
+static struct ipmi_notify_module *ipmi_notify_modules[] = {
 	&ipmi_psu,
 	NULL
 };
@@ -128,7 +136,7 @@ ipmi_notify_copyout_iocdata(intptr_t data, int mode, ipmi_iocdata_t *iocd, void 
 	int ret;
 
 	if (iocd->outlen) {
-		ret = ddi_copyout(obuf, (void *)(intptr_t)iocd->stmf_obuf,
+		ret = ddi_copyout(obuf, (void *)(intptr_t)iocd->outbuf,
 		    iocd->outlen, mode);
 		if (ret)
 			return (EFAULT);
@@ -156,7 +164,7 @@ ipmi_notify_subscribe(struct ipmi_subscriber *suber)
 
 	return module->_subscribe(suber);
 }
-EXPORT_SYMBOL(ipmi_subscribe);
+EXPORT_SYMBOL(ipmi_notify_subscribe);
 
 static int
 ipmi_notify_push(struct ipmi_notify_module *module, uint32_t module_cmd, 
@@ -165,8 +173,9 @@ ipmi_notify_push(struct ipmi_notify_module *module, uint32_t module_cmd,
 	if (module->_filter(module_cmd, ibuf, ilen))
 		return -ENOTSUP;
 
-	return module->_push(module_cmd, 
-			ibuf, ilen, obuf, olen);
+	module->_push(module_cmd, 
+		ibuf, ilen, obuf, olen);
+	return 0;
 }
 
 static void
@@ -209,7 +218,7 @@ ipmi_notify_init(void)
 {
 	int iRet;
 	
-	ipmi_notify_activate_modules(&ipmi_notify_modules);
+	ipmi_notify_activate_modules(ipmi_notify_modules);
 
 	if ((iRet = misc_register(&ipmi_notify_dev)) != 0) {
 		printk(KERN_WARNING "%s register ipmi_notify "
@@ -219,7 +228,7 @@ ipmi_notify_init(void)
 
 	return 0;
 failed_misc:
-	ipmi_notify_deactivate_modules(&ipmi_notify_modules);
+	ipmi_notify_deactivate_modules(ipmi_notify_modules);
 failed_out:
 	return iRet;
 }
@@ -229,7 +238,7 @@ ipmi_notify_exit(void)
 {
 	printk(KERN_INFO "%s ipmi_notify exit", __func__);
 	misc_deregister(&ipmi_notify_dev);
-	ipmi_notify_deactivate_modules(&ipmi_notify_modules);
+	ipmi_notify_deactivate_modules(ipmi_notify_modules);
 }
 
 module_init(ipmi_notify_init);

@@ -235,7 +235,7 @@ static void GetKeyValue(char *content, char **key, char **value)
 
 
 //释放ini文件所占资源
-void iniFileFree()
+void iniFileFree(void)
 {
 	if (gBuffer != NULL) {
 		free(gBuffer);

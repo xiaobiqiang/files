@@ -27,10 +27,8 @@ extern "C" {
 #endif
 
 //加载ini文件至内存
-int iniFileLoad(const char *filename);
 //释放ini文件所占资源
-void iniFileFree();
-
+void iniFileFree(void);
 //获取字符串，不带引号
 int iniGetString(const char *section, const char *key, char *value, int size, const char *defvalue);
 //获取整数值

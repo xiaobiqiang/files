@@ -2,6 +2,7 @@
 #define __SYS_IPMI_NOTIFY_IF_H
 
 #include <linux/types.h>
+#include <sys/types.h>
 
 /*
  * there can be 2^24 ioctl opts for every module.

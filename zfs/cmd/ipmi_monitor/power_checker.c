@@ -72,7 +72,7 @@ struct ipmi_module power_module = {
         .name           = "power_checker",
         .__init         = power_checker_init,
         .__exit         = power_checker_exit,
-        .__notify       = power_checker_notify,
+        .__post	        = power_checker_notify,
         .inited         = 0,
         .exited         = 0,
 };
@@ -87,7 +87,7 @@ power_checker_init(const struct ipmi_conf *conf)
 	power_conf.module = &power_module;
 	power_conf.ipmi_conf = conf;
 
-	power_checker_parse_conf(conf);
+	power_checker_parse_conf(&power_conf);
 	
 	pthread_mutex_init(&power_conf.ck_mtx, NULL);
 	pthread_cond_init(&power_conf.ck_cv, NULL);
