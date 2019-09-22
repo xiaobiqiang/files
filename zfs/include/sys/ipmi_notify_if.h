@@ -33,7 +33,7 @@ struct ipmi_subscriber {
 	char 		*name;
 	/* subscribe which module */
 	uint32_t	module;
-	uint32_t	flags;
+	uint32_t	flags;	//protected by atomic
 	/* deal with messages which are pushed by module subscribed */
 	void		(*msghdl)(uint32_t, void *, uint32_t, void *, uint32_t);
 

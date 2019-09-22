@@ -150,6 +150,7 @@ ipmi_notify_copyout_iocdata(intptr_t data, int mode, ipmi_iocdata_t *iocd, void 
 int
 ipmi_notify_subscribe(struct ipmi_subscriber *suber)
 {
+	int iRet;
 	struct ipmi_notify_module *module;
 	
 	if (!suber->msghdl ||
@@ -159,12 +160,42 @@ ipmi_notify_subscribe(struct ipmi_subscriber *suber)
 
 	module = ipmi_notify_modules[suber->module];
 	/* not support subscribe */
-	if (!module->_subscribe)	
+	if ((atomic_read(&suber->flags) & IPMI_SUBER_REALLY) ||
+		!module->_subscribe)	
 		return -ENOTSUP;
 
-	return module->_subscribe(suber);
+	iRet = module->_subscribe(suber);
+	if (iRet)
+		return iRet;
+	atomic_or_32(&suber->flags, IPMI_SUBER_REALLY);
+	return 0;
 }
 EXPORT_SYMBOL(ipmi_notify_subscribe);
+
+int
+ipmi_notify_unsubscribe(struct ipmi_subscriber *suber)
+{
+	int iRet;
+	struct ipmi_notify_module *module;
+	
+	if (!suber->msghdl ||
+		(suber->module <= IPMI_MODULE_FIRST) ||
+		(suber->module >= IPMI_MODULE_LAST))
+		return -EINVAL;
+
+	module = ipmi_notify_modules[suber->module];
+	/* not support subscribe */
+	if (!(atomic_read(&suber->flags) & IPMI_SUBER_REALLY) ||
+		!module->_unsubscribe)	
+		return -ENOTSUP;
+
+	iRet = module->_unsubscribe(suber);
+	if (iRet)
+		return iRet;
+	atomic_and_32(&suber->flags, ~IPMI_SUBER_REALLY);
+	return 0;
+}
+EXPORT_SYMBOL(ipmi_notify_unsubscribe);
 
 static int
 ipmi_notify_push(struct ipmi_notify_module *module, uint32_t module_cmd, 
