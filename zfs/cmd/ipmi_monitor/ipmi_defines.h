@@ -2,6 +2,7 @@
 #define __IPMI_DEFINES_H
 
 #include <pthread.h>
+#include <sys/ipmi_notify_if.h>
 
 #define IPMI_CONF					"/etc/ipmi_checker.ini"
 #define IPMI_IOC_DEV				"/dev/ipmi_notify"
@@ -9,12 +10,6 @@
 #define IPMI_USER_LEN				32
 #define IPMI_PASSWD_LEN				64
 #define IPMI_IP_LEN					16
-
-/*
- * there can be 2^10 ioctl opts for every module.
- */
-#define IPMI_IOC_CMD				0x000000ff
-#define IPMI_IOC(x)					(x << 10)
 
 /************ global setting ******************/
 #define IPMI_SECT_GLOBAL			"global"
@@ -43,8 +38,6 @@
 #define IPMI_LINK_DOWN_RETRIES		3
 
 /************ power module ***************/
-#define IPMI_MODULE_POWER			1
-
 #define IPMI_SECT_POWER				"power"
 #define IPMI_SECT_POWER_INTERVAL	"interval"
 #define IPMI_SECT_POWER_DOWN		"link_down"
@@ -77,10 +70,6 @@
 #define PSU_UNKNOWN					0
 #define PSU_ON						1
 #define PSU_OFF						2
-
-#define IPMI_IOC_PSU				IPMI_IOC(IPMI_MODULE_POWER)
-#define IPMI_IOC_PSU_ON				(IPMI_IOC_PSU | 0x1)
-#define IPMI_IOC_PSU_OFF			(IPMI_IOC_PSU | 0x2)
 
 #define IPMI_PING_ALIVE(ip, result)			\
 	{								\
@@ -126,7 +115,7 @@ struct ipmi_module {
 	char				*name;
 	int 				(*__init)(const struct ipmi_conf *conf);
 	void 				(*__exit)(const struct ipmi_conf *conf);
-	void 				(*__notify)(const struct ipmi_conf *conf, enum ipmi_event evt, void *extra);
+	void 				(*__post)(const struct ipmi_conf *conf, enum ipmi_event evt, void *extra);
 
 	unsigned int 		inited:1,
 						exited:1,
@@ -154,21 +143,12 @@ struct ipmi_conf {
 						ic_last_link_alive:1,
 						ic_in_retry:1,
 						ic_misc_running:1,
-						ic_rsvd:23;
+						ic_rsvd:22;
 
 	pthread_mutex_t		ic_mutex;
 	pthread_cond_t		ic_cv;
 	pthread_t			ic_misc;
 };
-
-typedef struct ipmi_iocdata {
-	unsigned module;
-	unsigned module_spec;
-	unsigned long inbuf;
-	unsigned long outbuf;
-	unsigned inlen;
-	unsigned outlen;
-} ipmi_iocdata_t;
 
 extern void ipmi_delay_interval(pthread_mutex_t *, pthread_cond_t *, unsigned);
 extern void ipmi_delay_interval_locked(pthread_mutex_t *, pthread_cond_t *, unsigned);

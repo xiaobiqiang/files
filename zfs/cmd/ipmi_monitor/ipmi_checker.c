@@ -187,8 +187,8 @@ ipmi_broadcast_event(struct ipmi_conf *conf,
 	struct ipmi_module *module = *modulep;
 
 	while (module) {
-		if (module->__notify)
-			module->__notify(conf, event, extra_ptr);
+		if (module->__post)
+			module->__post(conf, event, extra_ptr);
 
 		module = *(++modulep);
 	}

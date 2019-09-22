@@ -38,7 +38,7 @@ struct power_global {
 							in_retry:1,
 							last_psu_status:2,
 							curr_psu_status:2,
-							rsvd:19;
+							rsvd:18;
 };
 
 static struct ipmi_opt down_abrt_opts[] = {

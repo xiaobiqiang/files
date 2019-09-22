@@ -105,7 +105,9 @@ COMMON_H = \
 	$(top_srcdir)/include/sys/zio.h \
 	$(top_srcdir)/include/sys/zio_impl.h \
 	$(top_srcdir)/include/sys/zrlock.h \
-	$(top_srcdir)/include/sys/lun_migrate.h
+	$(top_srcdir)/include/sys/lun_migrate.h \
+	$(top_srcdir)/include/sys/ipmi_notify_if.h
+	
 
 KERNEL_H = \
 	$(top_srcdir)/include/sys/zfs_ioctl.h \

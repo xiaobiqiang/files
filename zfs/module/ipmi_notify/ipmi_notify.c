@@ -1,0 +1,237 @@
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/errno.h>
+#include <linux/blkdev.h>
+#include <linux/sched.h>
+#include <linux/workqueue.h>
+#include <linux/delay.h>
+#include <linux/pci.h>
+#include <linux/interrupt.h>
+#include <linux/aer.h>
+#include <linux/kernel.h>
+#include <linux/gfp.h>
+#include <asm/device.h>
+#include <linux/device.h>
+#include <linux/cdev.h>
+#include <linux/miscdevice.h>
+#include <asm/unaligned.h>
+#include <sys/ipmi_notify_if.h>
+
+static int ipmi_notify_open(struct inode *, struct file *);
+static int ipmi_notify_unlocked_ioctl(struct file *, uint32_t, uint64_t);
+	
+static const struct file_operations ipmi_notify_fops = {
+	.owner		= THIS_MODULE,
+	.unlocked_ioctl	= ipmi_notify_unlocked_ioctl,
+	.open		= ipmi_notify_open,
+};
+
+static struct miscdevice ipmi_notify_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name   = "ipmi_notify",
+	.fops   = &ipmi_notify_fops,
+};
+
+extern struct ipmi_notify_module ipmi_psu;
+static struct ipmi_module *ipmi_notify_modules[] = {
+	&ipmi_psu,
+	NULL
+};
+
+static int 
+ipmi_notify_open(struct inode *inodep, struct file *filep)
+{
+	return 0;
+}
+
+static int 
+ipmi_notify_unlocked_ioctl(struct file *filep, 
+			uint32_t cmd, uint64_t data)
+{
+	int iRet = -EINVAL;
+	ipmi_iocdata_t *iocdata;
+	void *inbuf, *outbuf;
+	struct ipmi_notify_module *module;
+	
+	if (cmd != IPMI_IOC_CMD)
+		return -EINVAL;
+
+	if (ipmi_notify_copyin_iocdata(data, 0, &iocdata,
+				&inbuf, &outbuf) != 0)
+		return -EFAULT;
+
+	if ((iocdata->module <= IPMI_MODULE_FIRST) ||
+		(iocdata->module >= IPMI_MODULE_LAST))
+		goto out;
+	
+	module = ipmi_notify_modules[iocdata->module];
+	iRet = ipmi_notify_push(module, iocdata->module_spec, inbuf, 
+				iocdata->inlen, outbuf, iocdata->outlen);
+	if (iRet == 0)
+		iRet = ipmi_notify_copyout_iocdata(
+					data, 0, iocdata, outbuf);
+out:
+	if (outbuf) {
+		kmem_free(outbuf, iocdata->outlen);
+		outbuf = NULL;
+	}
+	if (inbuf) {
+		kmem_free(inbuf, iocdata->inlen);
+		inbuf = NULL;
+	}
+	kmem_free(iocdata, sizeof (ipmi_iocdata_t));
+	return (iRet);
+}
+
+static int
+ipmi_notify_copyin_iocdata(intptr_t data, int mode, ipmi_iocdata_t **iocd,
+						void **ibuf, void **obuf)
+{
+	int ret;
+
+	*ibuf = NULL;
+	*obuf = NULL;
+	*iocd = kmem_zalloc(sizeof (ipmi_iocdata_t), KM_SLEEP);
+
+	ret = ddi_copyin((void *)data, *iocd, sizeof (ipmi_iocdata_t), mode);
+	if (ret)
+		return (EFAULT);
+
+	if ((*iocd)->inlen) {
+		*ibuf = vmem_zalloc((*iocd)->inlen, KM_SLEEP);
+		ret = ddi_copyin((void *)((intptr_t)(*iocd)->inbuf),
+		    *ibuf, (*iocd)->inlen, mode);
+	}
+	if ((*iocd)->outlen)
+		*obuf = vmem_zalloc((*iocd)->outlen, KM_SLEEP);
+
+	if (ret == 0)
+		return (0);
+	ret = EFAULT;
+copyin_iocdata_done:;
+	if (*obuf) {
+		vmem_free(*obuf, (*iocd)->outlen);
+		*obuf = NULL;
+	}
+	if (*ibuf) {
+		vmem_free(*ibuf, (*iocd)->inlen);
+		*ibuf = NULL;
+	}
+	kmem_free(*iocd, sizeof (ipmi_iocdata_t));
+	return (ret);
+}
+
+static int
+ipmi_notify_copyout_iocdata(intptr_t data, int mode, ipmi_iocdata_t *iocd, void *obuf)
+{
+	int ret;
+
+	if (iocd->outlen) {
+		ret = ddi_copyout(obuf, (void *)(intptr_t)iocd->stmf_obuf,
+		    iocd->outlen, mode);
+		if (ret)
+			return (EFAULT);
+	}
+	ret = ddi_copyout(iocd, (void *)data, sizeof (ipmi_iocdata_t), mode);
+	if (ret)
+		return (EFAULT);
+	return (0);
+}
+
+int
+ipmi_notify_subscribe(struct ipmi_subscriber *suber)
+{
+	struct ipmi_notify_module *module;
+	
+	if (!suber->msghdl ||
+		(suber->module <= IPMI_MODULE_FIRST) ||
+		(suber->module >= IPMI_MODULE_LAST))
+		return -EINVAL;
+
+	module = ipmi_notify_modules[suber->module];
+	/* not support subscribe */
+	if (!module->_subscribe)	
+		return -ENOTSUP;
+
+	return module->_subscribe(suber);
+}
+EXPORT_SYMBOL(ipmi_subscribe);
+
+static int
+ipmi_notify_push(struct ipmi_notify_module *module, uint32_t module_cmd, 
+			void *ibuf, uint32_t ilen, void *obuf, uint32_t olen)
+{
+	if (module->_filter(module_cmd, ibuf, ilen))
+		return -ENOTSUP;
+
+	return module->_push(module_cmd, 
+			ibuf, ilen, obuf, olen);
+}
+
+static void
+ipmi_notify_activate_modules(struct ipmi_notify_module **modules)
+{
+	int active, rv;
+	struct ipmi_notify_module *md = *modules;
+
+	while ((md = *(modules++)) != NULL) {
+		if (md->active)
+			continue;
+		
+		active = 1;
+		if (md->_init && ((rv = md->_init()) != 0)) {
+			active = 0;
+			printk(KERN_INFO "%s module[%s] activate failed, error[%d]",
+				__func__, md->name, rv);
+		}
+		md->active = active;
+	}
+}
+
+static void
+ipmi_notify_deactivate_modules(struct ipmi_notify_module **modules)
+{
+	struct ipmi_notify_module *md;
+
+	while ((md = *(modules++)) != NULL) {
+		if (!md->active)
+			continue;
+
+		if (md->_exit)
+			md->_exit();
+		md->active = 0;
+	}
+}
+
+static int __init
+ipmi_notify_init(void)
+{
+	int iRet;
+	
+	ipmi_notify_activate_modules(&ipmi_notify_modules);
+
+	if ((iRet = misc_register(&ipmi_notify_dev)) != 0) {
+		printk(KERN_WARNING "%s register ipmi_notify "
+			"miscdevice failed, error:%d", __func__, iRet);
+		goto failed_misc;
+	}
+
+	return 0;
+failed_misc:
+	ipmi_notify_deactivate_modules(&ipmi_notify_modules);
+failed_out:
+	return iRet;
+}
+
+static void __exit
+ipmi_notify_exit(void)
+{
+	printk(KERN_INFO "%s ipmi_notify exit", __func__);
+	misc_deregister(&ipmi_notify_dev);
+	ipmi_notify_deactivate_modules(&ipmi_notify_modules);
+}
+
+module_init(ipmi_notify_init);
+module_exit(ipmi_notify_exit);
+MODULE_LICENSE("GPL");

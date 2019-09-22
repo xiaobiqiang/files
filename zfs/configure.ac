@@ -220,6 +220,7 @@ AC_CONFIG_FILES([
 	module/utils/Makefile
 	module/idm/Makefile
 	module/iscsit/Makefile
+	module/ipmi_notify/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
