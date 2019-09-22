@@ -15,6 +15,5 @@ ipmisvc_LDADD = $(ZLIB) -lxml2 -lrt
 ipmisvc_LDFLAGS = -pthread
 
 install-exec-hook:
-	rm -rf /etc/ipmi_checker.ini
-	cp $(top_srcdir)/cmd/ipmi_checker/ipmi_checker.ini /etc/
+	$(INSTALL) ./ipmi_checker.ini /etc/
 

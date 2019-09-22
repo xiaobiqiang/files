@@ -239,6 +239,7 @@ power_detect_status(struct power_global *conf)
 		(void) getline(&line, &line_sz, fbuf);
 		if (line && line_sz) {
 			syslog(LOG_ERR, "power status: %s", line);
+			conf->curr_psu_status = PSU_UNKNOWN;
 			ipmi_checker_find_opt(power_status_opts, line, conf->curr_psu_status);
 			detected = 1;
 		}

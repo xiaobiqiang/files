@@ -26,7 +26,7 @@
 #define IPMI_IP						"0.0.0.0"
 #define IPMI_INTERVAL				1000
 #define IPMI_DOWN_ABRT				"abort"
-#define IPMI_DOWN_SUSP				"suspend"
+#define IPMI_DOWN_SUSP				"suspend"	/* only suspend, not post */
 #define IPMI_DOWN_POST				"post"		/* once detected, post, then continue */
 #define IPMI_DOWN_RETRIES			"retry"		/* retry some times, then post and suspend */
 #define IPMI_RETRIES				3
@@ -48,9 +48,9 @@
 #define POWER_DOWN_ABORT			"abort"
 #define POWER_DOWN_SUSP				"suspend"
 #define POWER_DOWN_IGNORE			"ignore"
-#define POWER_ERR_RETRY				"retry"
-#define POWER_ERR_NEXT_RETRY		"next_retry"
-#define POWER_ERR_SUSP				"suspend"
+#define POWER_ERR_RETRY				"retry"			/* retry some times, then post and suspend */
+#define POWER_ERR_NEXT_RETRY		"next_retry"	/* like ignore it */
+#define POWER_ERR_SUSP				"suspend"		/* once error, post and suspend */
 #define POWER_ERR_ABRT				"abort"
 #define POWER_RETRIES				3
 

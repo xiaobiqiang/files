@@ -136,6 +136,7 @@ ipmi_check_link_alive(struct ipmi_conf *conf)
 	enum ipmi_event event = 0;
 	
 	IPMI_PING_ALIVE(conf->ic_ip, alive);
+	syslog(LOG_ERR, "%s alive:%d", __func__, alive);
 	/* link down or up */
 	if (conf->ic_last_link_alive != alive) {
 		if (!alive) {
@@ -186,6 +187,7 @@ ipmi_broadcast_event(struct ipmi_conf *conf,
 	struct ipmi_module **modulep = ipmi_modules;
 	struct ipmi_module *module = *modulep;
 
+	syslog(LOG_ERR, "%s event:%d", __func__, event);
 	while (module) {
 		if (module->__post)
 			module->__post(conf, event, extra_ptr);
