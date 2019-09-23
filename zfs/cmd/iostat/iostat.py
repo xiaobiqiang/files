@@ -105,7 +105,8 @@ def kstat_get_tgt_name(uid):
     for s in k:
         if not s:
             continue
-        if (s.find("target-name") >= 0) or (s.find("target-alias") >= 0):
+        #if (s.find("target-name") >= 0) or (s.find("target-alias") >= 0):
+        if (s.find("target-name") >= 0):
             name, type, data = s.split()
             namedic[name] = data
     return namedic
