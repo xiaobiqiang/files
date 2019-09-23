@@ -21,7 +21,7 @@ dist_libfanpsu_transport_la_SOURCES = \
 	$(USER_C)
 
 install-exec-hook:
-	[ -d /var/fm/fmd/script/ ]||mkdir /var/fm/fmd/script/
+	[ -d /var/fm/fmd/script/ ]||mkdir -p /var/fm/fmd/script/
 	cp $(top_srcdir)/cmd/fm/modules/common/fanpsu-transport/fmd_get_info.sh /var/fm/fmd/script/
 		chmod a+x /var/fm/fmd/script/fmd_get_info.sh
 	cp $(top_srcdir)/cmd/fm/modules/common/fanpsu-transport/config /var/fm/fmd/script/
