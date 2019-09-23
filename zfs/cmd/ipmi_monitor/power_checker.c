@@ -169,7 +169,7 @@ resume:
 static void
 power_checker_once(struct power_global *conf)
 {
-	unsigned ioc;
+	unsigned ioc = 0;
 	unsigned need_to_ioc = 0;
 	
 	assert(conf->cmd_set);
@@ -211,7 +211,8 @@ break_unknown:
 			ioc = IPMI_IOC_PSU_ON;
 			/* @FULLTROUGHT */
 		case PSU_OFF:
-			ioc = IPMI_IOC_PSU_OFF;
+			if (!ioc)
+				ioc = IPMI_IOC_PSU_OFF;
 			if (conf->last_psu_status != conf->curr_psu_status)
 				need_to_ioc = 1;
 			if (conf->in_retry) {
@@ -232,13 +233,17 @@ power_detect_status(struct power_global *conf)
 	size_t line_sz = 0;
 	FILE *fbuf;
 	int detected = 0;
+	int line_len = 0;
 
 	conf->last_psu_status = conf->curr_psu_status;
 	fbuf = popen(conf->check_command, "r");
 	if (fbuf) {
 		(void) getline(&line, &line_sz, fbuf);
 		if (line && line_sz) {
-			syslog(LOG_ERR, "power status: %s", line);
+			line_len = strlen(line);
+			if (line[line_len-1] = '\n')
+				line[line_len-1] = '\0';
+			printf("power status: %s line_sz:%d\n", line, line_sz);
 			conf->curr_psu_status = PSU_UNKNOWN;
 			ipmi_checker_find_opt(power_status_opts, line, conf->curr_psu_status);
 			detected = 1;
@@ -272,6 +277,10 @@ power_checker_notify(const struct ipmi_conf *ipmi_conf,
 		case IPMI_EVT_LINK_UP:
 			if (!conf->start_check)
 				conf->start_check = 1;
+			if (conf->check_susp) {
+				conf->check_resume = 1;
+				conf->check_susp = 0;
+			}
 //			conf->check_resume = 1;
 //			conf->check_susp = 0;
 			break;

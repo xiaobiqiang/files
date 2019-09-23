@@ -35,11 +35,15 @@ int main(int argc, char **argv)
 {
 	int iRet;
 	
+	printf("start main\n");
 	ipmi_create_ipmi_conf(&global_conf);
+	printf("111111111\n");
 	if (!global_conf) 
 		return -EINVAL;
 
+	printf("2222222222\n");
 	ipmi_activate_modules(ipmi_modules);
+	printf("33333333333\n");
 
 	pthread_mutex_lock(&global_conf->ic_mutex);
 loop:
@@ -202,9 +206,11 @@ ipmi_create_ipmi_conf(struct ipmi_conf **confp)
 	int iRet;
 	struct ipmi_conf *conf;
 
-	assert((conf = malloc(sizeof(*conf))) != NULL);
-	memset(conf, 0, sizeof(*conf));
+	printf("start %s\n", __func__);
+	conf = malloc(sizeof(struct ipmi_conf));
+	memset(conf, 0, sizeof(struct ipmi_conf));
 
+	printf("start to init in %s\n", __func__);
 	pthread_mutex_init(&conf->ic_mutex, NULL);
 	pthread_cond_init(&conf->ic_cv, NULL);
 	conf->ic_ioc_dev = strdup(IPMI_IOC_DEV);
@@ -213,10 +219,12 @@ ipmi_create_ipmi_conf(struct ipmi_conf **confp)
 	
 	if (__ipmi_parse_ipmi_conf(conf) != 0)
 		goto failed_parse;
-
+	printf("__ipmi_parse_ipmi_conf finished in %s\n", __func__);
+	
 	if ((conf->ic_ioc_fd = open(conf->ic_ioc_dev, O_RDWR)) < 0)
 		goto failed_open;
 	conf->ic_ioc_opened = 1;
+	printf("open finished in %s\n", __func__);
 
 	*confp = conf;
 	return ;
@@ -247,6 +255,7 @@ __ipmi_parse_ipmi_conf(struct ipmi_conf *confp)
 	
 	assert(confp->ic_conf && !confp->ic_conf_loaded);
 
+	printf("start %s\n", __func__);
 	memset(user, 0, IPMI_USER_LEN);
 	memset(passwd, 0, IPMI_PASSWD_LEN);
 	memset(ipmi_ip, 0, IPMI_IP_LEN);
@@ -255,6 +264,7 @@ __ipmi_parse_ipmi_conf(struct ipmi_conf *confp)
 	if (iniFileLoad(confp->ic_conf) == 0)
 		return -ENOMEM;
 	confp->ic_conf_loaded = 1;
+	printf("start to iniGet in %s\n", __func__);
 	
 	(void) iniGetString(IPMI_SECT_GLOBAL, IPMI_SECT_GLOBAL_USER, 
 				user, IPMI_USER_LEN, IPMI_USER);
@@ -270,7 +280,7 @@ __ipmi_parse_ipmi_conf(struct ipmi_conf *confp)
 				IPMI_SECT_GLOBAL_RETRIES, IPMI_RETRIES);
 	confp->ic_up_threshold = iniGetInt(IPMI_SECT_GLOBAL,
 				IPMI_SECT_GLOBAL_UP_THRE, IPMI_UP_THRESHOLD);
-	if ((user[0] == '\0') || (passwd[0] == '\0') || (ipmi_ip[0] == '\0')) {
+	if ((user[0] == '\0') || (passwd[0] == '\0') || (ipmi_ip[0] == '\0')) {	
 		iniFileFree();
 		confp->ic_conf_loaded = 0;
 		return -EINVAL;
@@ -280,7 +290,7 @@ __ipmi_parse_ipmi_conf(struct ipmi_conf *confp)
 	confp->ic_passwd = strdup(passwd);
 	confp->ic_ip = strdup(ipmi_ip);
 	ipmi_checker_find_opt(ipmi_down_opts, link_down, confp->ic_link_down);
-	
+	printf("%s user:%s passwd:%s ipmi_ip:%s link_down:%02x ic_interval:%u ic_retries:%u ic_up_threshold:%u\n", __func__, user, passwd, ipmi_ip, confp->ic_link_down, confp->ic_interval, confp->ic_retries, confp->ic_up_threshold);	
 	assert(confp->ic_user && confp->ic_passwd && confp->ic_ip);
 	return 0;
 }
@@ -293,8 +303,8 @@ ipmi_ioctl(struct ipmi_conf *conf, unsigned ioc,
 	ipmi_iocdata_t iocdata = {0};
 
 	memset(&iocdata, 0, sizeof(ipmi_iocdata_t));
-	iocdata.module = ioc >> 10;
-	iocdata.module_spec = ioc & 0x3ff;
+	iocdata.module = ioc >> 24;
+	iocdata.module_spec = ioc & 0x00ffffff;
 	iocdata.inbuf = (unsigned long)inbuf;
 	iocdata.inlen = inlen;
 	iocdata.outbuf = (unsigned long)outbuf;

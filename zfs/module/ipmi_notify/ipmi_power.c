@@ -148,12 +148,17 @@ ipmi_power_push(uint32_t msg, void *ibuf, uint32_t ilen,
 	printk(KERN_INFO "%s pushed msg is %d", __func__, msg);
 	
 	rw_enter(&psu_global.subers_rw, RW_WRITER);	
+	printk(KERN_INFO "%s 1", __func__);
 	list_for_each_entry(power_suber, &psu_global.subers, entry) {
+		printk(KERN_INFO "%s 2", __func__);
 		iter_suber = power_suber->ipmi_suber;
 		if (iter_suber && iter_suber->msghdl)
 			iter_suber->msghdl(msg, ibuf, ilen, obuf, olen);
+		printk(KERN_INFO "%s 3", __func__);
 	}
+	printk(KERN_INFO "%s 4", __func__);
 	rw_exit(&psu_global.subers_rw);
+	printk(KERN_INFO "%s 5", __func__);
 }
 
 static int
@@ -171,6 +176,7 @@ ipmi_power_init(void)
 	psu_global.module = &ipmi_psu;
 	INIT_LIST_HEAD(&psu_global.subers);
 	rw_init(&psu_global.subers_rw, NULL, RW_DRIVER, NULL);
+	return 0;
 }
 
 static void 

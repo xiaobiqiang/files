@@ -19,6 +19,7 @@
 #include <sys/kmem.h>
 #include <sys/vmem.h>
 #include <sys/sunddi.h>
+#include <sys/atomic.h>
 #include <sys/ipmi_notify_if.h>
 
 static int ipmi_notify_open(struct inode *, struct file *);
@@ -43,6 +44,7 @@ static struct miscdevice ipmi_notify_dev = {
 
 extern struct ipmi_notify_module ipmi_psu;
 static struct ipmi_notify_module *ipmi_notify_modules[] = {
+	NULL,
 	&ipmi_psu,
 	NULL
 };
@@ -62,23 +64,29 @@ ipmi_notify_unlocked_ioctl(struct file *filep,
 	void *inbuf, *outbuf;
 	struct ipmi_notify_module *module;
 	
+	printk(KERN_INFO "1 cmd:%d", cmd);
 	if (cmd != IPMI_IOC_CMD)
 		return -EINVAL;
 
+	printk(KERN_INFO "2");
 	if (ipmi_notify_copyin_iocdata(data, 0, &iocdata,
 				&inbuf, &outbuf) != 0)
 		return -EFAULT;
 
+	printk(KERN_INFO "3");
 	if ((iocdata->module <= IPMI_MODULE_FIRST) ||
 		(iocdata->module >= IPMI_MODULE_LAST))
 		goto out;
 	
+	printk(KERN_INFO "4");
 	module = ipmi_notify_modules[iocdata->module];
 	iRet = ipmi_notify_push(module, iocdata->module_spec, inbuf, 
 				iocdata->inlen, outbuf, iocdata->outlen);
+	printk(KERN_INFO "5 iRet:%d", iRet);
 	if (iRet == 0)
 		iRet = ipmi_notify_copyout_iocdata(
 					data, 0, iocdata, outbuf);
+	printk(KERN_INFO "6 iRet:%d", iRet);
 out:
 	if (outbuf) {
 		kmem_free(outbuf, iocdata->outlen);
@@ -160,7 +168,7 @@ ipmi_notify_subscribe(struct ipmi_subscriber *suber)
 
 	module = ipmi_notify_modules[suber->module];
 	/* not support subscribe */
-	if ((atomic_read(&suber->flags) & IPMI_SUBER_REALLY) ||
+	if ((suber->flags & IPMI_SUBER_REALLY) ||
 		!module->_subscribe)	
 		return -ENOTSUP;
 
@@ -185,7 +193,7 @@ ipmi_notify_unsubscribe(struct ipmi_subscriber *suber)
 
 	module = ipmi_notify_modules[suber->module];
 	/* not support subscribe */
-	if (!(atomic_read(&suber->flags) & IPMI_SUBER_REALLY) ||
+	if (!(suber->flags & IPMI_SUBER_REALLY) ||
 		!module->_unsubscribe)	
 		return -ENOTSUP;
 
@@ -213,9 +221,9 @@ static void
 ipmi_notify_activate_modules(struct ipmi_notify_module **modules)
 {
 	int active, rv;
-	struct ipmi_notify_module *md = *modules;
+	struct ipmi_notify_module *md;
 
-	while ((md = *(modules++)) != NULL) {
+	while ((md = *(++modules)) != NULL) {
 		if (md->active)
 			continue;
 		
@@ -234,7 +242,7 @@ ipmi_notify_deactivate_modules(struct ipmi_notify_module **modules)
 {
 	struct ipmi_notify_module *md;
 
-	while ((md = *(modules++)) != NULL) {
+	while ((md = *(++modules)) != NULL) {
 		if (!md->active)
 			continue;
 

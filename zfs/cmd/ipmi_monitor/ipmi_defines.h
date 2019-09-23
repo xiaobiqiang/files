@@ -96,7 +96,8 @@
 		for (i=0; i<x##_num; i++) {		\
 			if (strcmp(x[i].opt_str, optstr))	\
 				continue;	\
-			optnum = i;	\
+			optnum = x[i].opt_num;	\
+			printf("%s optnum:%d\n", __func__, optnum);	\
 			break;		\
 		}		\
 	}	
