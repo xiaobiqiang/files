@@ -761,7 +761,7 @@ int fc_link_walk(conn_handle_t *chp){/*{{{*/
 		fgets(state, CMDLEN, fp2);
 		state[strlen(state)-1] = 0;
 		#if 0
-		printf("%s: %s\n", linkname, state);
+		syslog(LOG_ERR,"fc_status %s: %s\n", linkname, state);
 		#endif
 		pclose(fp2);
 
@@ -771,7 +771,7 @@ int fc_link_walk(conn_handle_t *chp){/*{{{*/
 			status = FC_STATE_OFFLINE;
 		}
 
-		chp->ret_status |= conn_node_creat(chp, "fc_link", linkname, FC_STATE_ONLINE);
+		chp->ret_status |= conn_node_creat(chp, "fc_link", linkname, status);
 	}
 
 	pclose(fp1);

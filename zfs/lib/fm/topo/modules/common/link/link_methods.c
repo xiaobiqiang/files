@@ -183,17 +183,16 @@ static int get_fcstate_by_name(conn_handle_t *chp /* not used */, const char *li
 	fp = popen(cmd, "r");
 	fgets(state, CMDLEN, fp);
 	state[strlen(state)-1] = 0;
-#if 0
-	printf("%s: %s\n", linkname, state);
-#endif
 	pclose(fp);
 
 	if(!strncasecmp("online", state, 6)){
-		uip = FC_STATE_ONLINE;
+		*uip = FC_STATE_ONLINE;
 	}else{
-		uip = FC_STATE_OFFLINE;
+		*uip = FC_STATE_OFFLINE;
 	}
-	
+#if 0
+	syslog(LOG_ERR,"fc_status:%s: %s ret=%d\n", link, state,*uip);
+#endif 
 #if 0
 	unsigned long long hbaWWN;
 	HBA_HANDLE handle;
@@ -336,7 +335,7 @@ int is_linkstate_changed(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers, n
 			return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
 		}
     }
-
+	//syslog(LOG_ERR,"fc_status type = %s name = %s",type,name);
 	if(!strcmp(type, FC_LINK)){
 		if(get_fcstate_by_name(chp, name, &state)){
 			LOG("failed get_fcstate_by_name type :%s name :%s.\n", type, name);
