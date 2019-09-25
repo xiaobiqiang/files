@@ -66,11 +66,11 @@
 			if (cs && ro && ds) {	\
 				printf("%s cs:%s ro:%s ds:%s", __func__, cs, ro, ds);	\
 				if (!strncmp(cs, "StandAlone", strlen("StandAlone"))) {		\
-					if (!strncmp(ro, "Primary", strlen("Primary") && 	\
+					if (!strncmp(ro, "Primary", strlen("Primary")) && 	\
 						(primary == 1) && 	\
 						!strncmp(ds, "UpToDate", strlen("UpToDate")))	\
 						status = 1;		\
-					else if (!strncmp(ro, "Secondary", strlen("Secondary") && !primary)	\
+					else if (!strncmp(ro, "Secondary", strlen("Secondary")) && !primary)	\
 						status = 1;	\
 				}	\
 			}	\
