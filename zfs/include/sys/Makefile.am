@@ -120,7 +120,8 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/callout.h \
 	$(top_srcdir)/include/sys/utils_vmem.h
 
-USER_H =
+USER_H =	\
+	$(top_srcdir)/include/sys/if_drbdsvc.h
 
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)
 
