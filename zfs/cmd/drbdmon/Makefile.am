@@ -9,9 +9,8 @@ sbin_PROGRAMS = drbdmonsvc
 drbdmonsvc_SOURCES = 	\
 	drbdmon.c
 
-drbdmonsvc_LDADD = $(ZLIB) -lxml2 -lrt
+drbdmonsvc_LDADD = \
+	$(top_builddir)/lib/libzfs_core/libzfs_core.la
+drbdmonsvc_LDADD += $(ZLIB) -lxml2 -lrt
 drbdmonsvc_LDFLAGS = -pthread
-
-install-exec-hook:
-	$(INSTALL) ./drbdmon.socket /usr/lib/systemd/system/
 

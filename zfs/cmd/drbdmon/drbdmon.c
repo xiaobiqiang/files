@@ -13,8 +13,13 @@
 #include <sys/list.h>
 #include <sys/thread_pool.h>
 #include <pthread.h>
+#include <linux/un.h>
 
-#define DRBDMON_SOCKET		"/usr/lib/systemd/system/drbdmon.socket"
+#ifndef	offsetof
+#define	offsetof(s, m)  ((size_t)(&((s *)0)->m))
+#endif
+
+#define DRBDMON_SOCKET		"/drbdmon.socket"
 #define DRBDMON_MAGIC		0x00deaf00
 #define DRBDMON_ERR_RECV	0x00000001
 #define DRBDMON_ERR_PARAM	0x00000002
@@ -172,11 +177,11 @@ static void drbdmon_delay_locked(pthread_mutex_t *, pthread_cond_t *, uint32_t);
 static struct {
 	enum drbdmon_rpc_type rpc;
 	uint32_t param_len;
-	void (*rpc_hdlp)(struct drbdmon_req *);
+	int (*rpc_hdlp)(struct drbdmon_req *);
 } drbdmon_rpc[] = {
 	{DRBDMON_RPC_FIRST, 			0, NULL},
 	{DRBDMON_RPC_RESUME_BREADPOINT, 
-		sizeof(drbdmon_param_resume_bp), drbdmon_resume_breakpoint},
+		sizeof(struct drbdmon_param_resume_bp), drbdmon_resume_breakpoint},
 	{DRBDMON_RPC_LAST, 				NULL}
 };
 
@@ -229,8 +234,8 @@ drbdmon_init_global(struct drbdmon_global *glop)
 			offsetof(struct drbdmon_req, entry));
 	glop->rcv_rqwait = &glop->rcv_rqlist1;
 	glop->rcv_rqlive = &glop->rcv_rqlist2;
-	pthread_mutex_init(&glop->rcv_mtx);
-	pthread_cond_init(&glop->rcv_cv);
+	pthread_mutex_init(&glop->rcv_mtx, NULL);
+	pthread_cond_init(&glop->rcv_cv, NULL);
 	pthread_create(&glop->rcv_ctx, NULL, drbdmon_recv, glop);
 	glop->hdl_ctx = tpool_create(1, glop->nhdl_ctx, 0, NULL);
 }
@@ -272,7 +277,7 @@ drbdmon_accept(struct drbdmon_global *glop, accept_fn callback_fnp)
 			continue;
 
 		if (callback_fnp)
-			callback_fnp(glop, new_fd, pr_addr, addr_len);
+			callback_fnp(glop, new_fd, &pr_addr, addr_len);
 	}
 }
 
@@ -380,9 +385,9 @@ drbdmon_recv(struct drbdmon_global *glop)
 	
 	while (!glop->mon_exit) {
 		pthread_mutex_lock(&glop->rcv_mtx);
-		if (list_empty(glop->rcv_rqwait)) {
+		if (list_is_empty(glop->rcv_rqwait)) {
 			glop->rcv_insleep = 1;
-			pthread_cond_wait(&glop->rcv_cv);
+			pthread_cond_wait(&glop->rcv_cv, &glop->rcv_mtx);
 		}
 
 		exchange = glop->rcv_rqwait;
@@ -390,7 +395,7 @@ drbdmon_recv(struct drbdmon_global *glop)
 		glop->rcv_rqlive = exchange;
 		pthread_mutex_unlock(&glop->rcv_mtx);
 
-		while (!list_empty(glop->rcv_rqlive)) {
+		while (!list_is_empty(glop->rcv_rqlive)) {
 			req = list_remove_head(glop->rcv_rqlive);
 			assert(req->pr_sockfd > 0);
 			
@@ -468,7 +473,7 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 {
 	int new_create = 0;
 	struct drbdmon_param_resume_bp *param_bp = 
-			(struct drbdmon_param_resume_bp *)req->ibuf;
+			(struct drbdmon_param_resume_bp *)req->ibufp;
 	struct drbdmon_resume_bp_ctx *bp_ctx;
 	
 	bp_ctx = drbdmon_lookup_resume_bp_ctx(param_bp->peer_ip);
@@ -506,7 +511,7 @@ drbdmon_lookup_resume_bp_ctx(const char *ip)
 	for (ctx = list_head(&drbdmon_bp_ctx_list); ctx;
 	    	ctx = list_next(&drbdmon_bp_ctx_list, ctx)) {
 		if (ctx->ip_addr == ip_bin)
-			break
+			break;
 	}
 	pthread_mutex_unlock(&drbdmon_bp_ctx_list_mtx);
 	return ctx;
@@ -517,7 +522,7 @@ drbdmon_create_resume_bp_ctx(struct drbdmon_param_resume_bp *param_bp)
 {
 	uint32_t ip_bin = 0;
 	struct drbdmon_resume_bp_ctx *bp_ctx = NULL;
-	tpool_t *tp = NULL, tp_invalidate = NULL;
+	tpool_t *tp = NULL, *tp_invalidate = NULL;
 	
 	bp_ctx = malloc(sizeof(struct drbdmon_resume_bp_ctx));
 	if (!bp_ctx || 
@@ -608,7 +613,7 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 				offsetof(struct drbdmon_param_resume_bp, opt));
 
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
-	while (!list_empty(&bp_ctx->resume_list)) {
+	while (!list_is_empty(&bp_ctx->resume_list)) {
 		status = 0;
 		param_bp = list_remove_head(&bp_ctx->resume_list);
 		if (mixed && !param_bp->opt.mon.handled) { //add after link up.
@@ -621,11 +626,11 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 		list_insert_tail(exchange, param_bp);
 	}
 
-	if (!list_empty(&retryList))
+	if (!list_is_empty(&retryList))
 		list_move_tail(&bp_ctx->resume_list, &retryList);
 	pthread_mutex_unlock(&bp_ctx->ctx_mtx);
 	
-	if (!list_empty(invalidateList))
+	if (!list_is_empty(invalidateList))
 		drbdmon_resume_bp_invalidate(bp_ctx, invalidateList);
 }
 
@@ -644,7 +649,7 @@ drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 	char validate_cmd[256] = "drbdadm invalidate-remote ";
 	uint32_t cmdlen = strlen(validate_cmd);
 	
-	while (!list_empty(invalidateList)) {
+	while (!list_is_empty(invalidateList)) {
 		param_bp = list_remove_head(invalidateList);
 		assert (param_bp->primary == 1);	/* only support primary now */
 
