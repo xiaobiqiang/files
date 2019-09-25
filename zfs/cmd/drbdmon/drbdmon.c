@@ -64,7 +64,7 @@
 			if ((ds = strstr(line, "ds:")) != NULL) 	\
 				ds += 3;	\
 			if (cs && ro && ds) {	\
-				printf("%s cs:%s ro:%s ds:%s", __func__, cs, ro, ds);	\
+				printf("%s cs:%s ro:%s ds:%s\n", __func__, cs, ro, ds);	\
 				if (!strncmp(cs, "StandAlone", strlen("StandAlone"))) {		\
 					if (!strncmp(ro, "Primary", strlen("Primary")) && 	\
 						(primary == 1) && 	\

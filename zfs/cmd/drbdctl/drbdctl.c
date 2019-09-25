@@ -40,7 +40,7 @@ optionTbl_t longOptions[] = {
  * Add new subcommands here
  */
 subCommandProps_t subcommands[] = {
-	{"set-resume-bp", drbdctl_set_resume_bp, "in", "in", NULL,
+	{"set-resume-bp", drbdctl_set_resume_bp, "inp", "inp", NULL,
 		OPERAND_MANDATORY_SINGLE, "resource-name", NULL},
 	{NULL, 0, NULL, NULL, 0, 0, 0, NULL}
 };
