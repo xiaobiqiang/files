@@ -49,8 +49,8 @@
 		char *primary_ds, *secondary_ds, *cs, *ro, *ds;	\
 		size_t nprimary_ds, nsecondary_ds;	\
 				\
-		status = 0;
-		snprintf(cmd, 128, "cat /proc/drbd | grep %d: ", drbdX);	\
+		status = 0;	\
+		snprintf(cmd, 128, "cat /proc/drbd | grep %d:", drbdX);	\
 		ostream = popen(cmd, "r");		\
 		getline(&line, &line_sz, ostream);		\
 		if (line && line_sz) {		\
@@ -66,7 +66,8 @@
 			if (cs && ro && ds) {	\
 				if (!strncmp(cs, "StandAlone", strlen("StandAlone")) &&		\
 					!strncmp(ro, "Secondary", strlen("Secondary")) &&	\
-					(!strncmp(ds, "Inconsistent") || !strncmp(ds, "UpToDate")))	\
+					(!strncmp(ds, "Inconsistent", strlen("Inconsistent")) || \
+						!strncmp(ds, "UpToDate", strlen("UpToDate"))))	\
 					status = 1;		\
 			}	\
 			free(line);		\
