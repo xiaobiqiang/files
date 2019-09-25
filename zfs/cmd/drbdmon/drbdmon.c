@@ -40,7 +40,7 @@
 		pclose(outbuf);				\
 	}
 
-#define DRBDMON_BP_INQR(drbdX, status)	\
+#define DRBDMON_BP_INQR(drbdX, status, primary)	\
 	{	\
 		char *line = NULL;	\
 		size_t line_sz = 0;		\
@@ -64,11 +64,15 @@
 			if ((ds = strstr(line, "ds:")) != NULL) 	\
 				ds += 3;	\
 			if (cs && ro && ds) {	\
-				if (!strncmp(cs, "StandAlone", strlen("StandAlone")) &&		\
-					!strncmp(ro, "Secondary", strlen("Secondary")) &&	\
-					(!strncmp(ds, "Inconsistent", strlen("Inconsistent")) || \
-						!strncmp(ds, "UpToDate", strlen("UpToDate"))))	\
-					status = 1;		\
+				printf("%s cs:%s ro:%s ds:%s", __func__, cs, ro, ds);	\
+				if (!strncmp(cs, "StandAlone", strlen("StandAlone"))) {		\
+					if (!strncmp(ro, "Primary", strlen("Primary") && 	\
+						(primary == 1) && 	\
+						!strncmp(ds, "UpToDate", strlen("UpToDate")))	\
+						status = 1;		\
+					else if (!strncmp(ro, "Secondary", strlen("Secondary") && !primary)	\
+						status = 1;	\
+				}	\
 			}	\
 			free(line);		\
 		}	\
@@ -619,8 +623,9 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 			list_insert_head(&retryList, param_bp);
 			continue;
 		}
-		DRBDMON_BP_INQR(param_bp->drbdX, status);
-		printf("%s status:%d, resource:%s\n", __func__, status, param_bp->resource);
+		DRBDMON_BP_INQR(param_bp->drbdX, status, param_bp->primary);
+		printf("%s status:%d, resource:%s\n", __func__, 
+				status, param_bp->resource);
 		param_bp->opt.mon.handled = 1;
 		exchange = status ? invalidateList : &retryList;
 		list_insert_tail(exchange, param_bp);
@@ -651,7 +656,6 @@ drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 	
 	while (!list_is_empty(invalidateList)) {
 		param_bp = list_remove_head(invalidateList);
-		assert (param_bp->primary == 0);	/* only support secondary now */
 
 		memcpy(&validate_cmd[cmdlen], param_bp->resource, 
 				strlen(param_bp->resource) + 1);

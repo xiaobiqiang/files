@@ -30,6 +30,7 @@ static int drbdctl_open(void);
 
 optionTbl_t longOptions[] = {
 	{"peer-ip", required_arg, 'i', "peer-ip"},
+	{"primary", required_arg, 'p', "is-primary"},
 	{"resource-name", required_arg, 'r', "resource-name"},
 	{"drbd-minor", required_arg, 'n', "drbd-minor"},
 	{NULL, 0, 0, 0}
@@ -139,7 +140,7 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 {
 	char peer_ip[16] = {0};
 	char resource[128] = {0};
-	int minor = -1;
+	int minor = -1, primary = -1;
 	struct drbdmon_head head;
 	struct drbdmon_param_resume_bp param_bp;
 	uint32_t error = 0;
@@ -158,6 +159,15 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 					return 1;
 				}
 				break;
+			case 'p':
+				errno = 0;
+				primary = (int)strtol(options->optarg, NULL, 10);
+				if (errno != 0) {
+					fprintf(stderr, "%s: %s: %s\n",
+				    	cmdName, options->optarg, gettext("invalid primary set"));
+					return 1;
+				}
+				break;
 			default:
 				(void) fprintf(stderr, "%s: %c: %s\n",
 				    cmdName, options->optval,
@@ -168,7 +178,8 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 
 	strncpy(resource, operands[0], 128);
 
-	if (!strlen(peer_ip) || !strlen(resource) || (minor < 0)) {
+	if (!strlen(peer_ip) || !strlen(resource) || 
+		(minor < 0) || (primary < 0)) {
 		fprintf(stderr, "%s: %s: %s\n",
 			cmdName, __func__, gettext("invalid parameters"));
 		return 1;
@@ -180,7 +191,7 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 	head.magic = DRBDMON_MAGIC;
 	head.rpc = DRBDMON_RPC_RESUME_BREADPOINT;
 
-	param_bp.primary = 0;
+	param_bp.primary = (primary ? 1 : 0);
 	param_bp.drbdX = minor;
 	strncpy(param_bp.peer_ip, peer_ip, 16);
 	strncpy(param_bp.resource, resource, 128);
