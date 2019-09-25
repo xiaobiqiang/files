@@ -180,7 +180,7 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 	head.magic = DRBDMON_MAGIC;
 	head.rpc = DRBDMON_RPC_RESUME_BREADPOINT;
 
-	param_bp.primary = 1;
+	param_bp.primary = 0;
 	param_bp.drbdX = minor;
 	strncpy(param_bp.peer_ip, peer_ip, 16);
 	strncpy(param_bp.resource, resource, 128);

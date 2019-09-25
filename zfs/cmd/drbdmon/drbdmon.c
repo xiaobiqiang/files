@@ -46,23 +46,27 @@
 		size_t line_sz = 0;		\
 		FILE *ostream;		\
 		char cmd[128] = {0};	\
-		char *primary_ds, *secondary_ds;	\
+		char *primary_ds, *secondary_ds, *cs, *ro, *ds;	\
 		size_t nprimary_ds, nsecondary_ds;	\
 				\
-		snprintf(cmd, 128, "cat /proc/drbd | grep %d: "		\
-					"| cut -d ' ' -f 4 | cut -d ':' -f 2", drbdX);	\
+		status = 0;
+		snprintf(cmd, 128, "cat /proc/drbd | grep %d: ", drbdX);	\
 		ostream = popen(cmd, "r");		\
 		getline(&line, &line_sz, ostream);		\
 		if (line && line_sz) {		\
 			line_sz = strlen(line);		\
 			if (line[line_sz-1] == '\n')		\
 				line[line_sz-1]= '\0';		\
-			primary_ds = line;		\
-			secondary_ds = strchr(line, '/');		\
-			if (secondary_ds && (secondary_ds != primary_ds)) {		\
-				*secondary_ds = '\0';		\
-				secondary_ds++;		\
-				if (!strcmp(primary_ds, "UpToDate") && strcmp(secondary_ds, "DUnknown"))	\
+			if ((cs = strstr(line, "cs:")) != NULL) 	\
+				cs += 3;	\
+			if ((ro = strstr(line, "ro:")) != NULL)	\ 
+				ro += 3;	\
+			if ((ds = strstr(line, "ds:")) != NULL) 	\
+				ds += 3;	\
+			if (cs && ro && ds) {	\
+				if (!strncmp(cs, "StandAlone", strlen("StandAlone")) &&		\
+					!strncmp(ro, "Secondary", strlen("Secondary")) &&	\
+					(!strncmp(ds, "Inconsistent") || !strncmp(ds, "UpToDate")))	\
 					status = 1;		\
 			}	\
 			free(line);		\
@@ -609,13 +613,13 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	while (!list_is_empty(&bp_ctx->resume_list)) {
-		status = 0;
 		param_bp = list_remove_head(&bp_ctx->resume_list);
 		if (mixed && !param_bp->opt.mon.handled) { //add after link up.
 			list_insert_head(&retryList, param_bp);
 			continue;
 		}
 		DRBDMON_BP_INQR(param_bp->drbdX, status);
+		printf("%s status:%d, resource:%s\n", __func__, status, param_bp->resource);
 		param_bp->opt.mon.handled = 1;
 		exchange = status ? invalidateList : &retryList;
 		list_insert_tail(exchange, param_bp);
@@ -641,16 +645,16 @@ static void
 drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 {
 	struct drbdmon_param_resume_bp *param_bp;
-	char validate_cmd[256] = "drbdadm invalidate-remote ";
+	char validate_cmd[256] = "drbdadm connect ";
 	uint32_t cmdlen = strlen(validate_cmd);
 	
 	while (!list_is_empty(invalidateList)) {
 		param_bp = list_remove_head(invalidateList);
-		assert (param_bp->primary == 1);	/* only support primary now */
+		assert (param_bp->primary == 0);	/* only support secondary now */
 
 		memcpy(&validate_cmd[cmdlen], param_bp->resource, 
 				strlen(param_bp->resource) + 1);
-		syslog(LOG_ERR, "%s invalidate[%s]", __func__, validate_cmd);
+		printf("%s connect[%s]", __func__, validate_cmd);
 		(void) system(validate_cmd);
 		free(param_bp);
 	}
