@@ -15,7 +15,8 @@
 #include <pthread.h>
 #include <linux/un.h>
 #include <sys/if_drbdsvc.h>
-#include "cmdparse.h"
+#include <locale.h>
+#include <cmdparse.h>
 
 #define VERSION_STRING_MAX_LEN	10
 #define VERSION_STRING_MAJOR	"1"
@@ -38,7 +39,7 @@ optionTbl_t longOptions[] = {
  * Add new subcommands here
  */
 subCommandProps_t subcommands[] = {
-	{"set-resume-bp", drbdctl_set_resume_bp, "ih", "ih", NULL,
+	{"set-resume-bp", drbdctl_set_resume_bp, "in", "in", NULL,
 		OPERAND_MANDATORY_SINGLE, "resource-name", NULL},
 	{NULL, 0, NULL, NULL, 0, 0, 0, NULL}
 };
@@ -106,12 +107,18 @@ drbdctl_read(void **obufp, uint32_t *olenp, uint32_t *error)
 
 	if ((head.magic != DRBDMON_MAGIC) ||
 		(head.ilen && !(obuf = malloc(head.ilen))) ||
-		(recv(sockfd, obuf, head.ilen, flags) < head.ilen))
+		(head.ilen && (recv(sockfd, obuf, head.ilen, flags) < head.ilen)))
 		goto failed;
 
-	*obufp = obuf;
-	*olenp = head.ilen;
-	*error = head.error;
+	if (obufp)
+		*obufp = obuf;
+	else if (obuf)
+		free(obuf);
+		
+	if (olenp)
+		*olenp = head.ilen;
+	if (error)
+		*error = head.error;
 	return 0;
 failed:
 	if (obuf)
@@ -142,9 +149,6 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 			case 'i':
 				strncpy(peer_ip, options->optarg, 16);
 				break;
-			case 'r':
-				strncpy(resource, options->optarg, 128);
-				break;
 			case 'n':
 				errno = 0;
 				minor = (uint32_t)strtol(options->optarg, NULL, 10);
@@ -161,6 +165,8 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 				return (1);
 		}
 	}
+
+	strncpy(resource, operands[0], 128);
 
 	if (!strlen(peer_ip) || !strlen(resource) || (minor < 0)) {
 		fprintf(stderr, "%s: %s: %s\n",

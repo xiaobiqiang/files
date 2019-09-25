@@ -14,6 +14,7 @@
 #include <sys/thread_pool.h>
 #include <pthread.h>
 #include <linux/un.h>
+#include <arpa/inet.h>
 #include <sys/if_drbdsvc.h>
 
 #ifndef	offsetof
@@ -48,10 +49,10 @@
 		char *primary_ds, *secondary_ds;	\
 		size_t nprimary_ds, nsecondary_ds;	\
 				\
-		snprintf(cmd, "cat /proc/drbd | grep %d: "		\
+		snprintf(cmd, 128, "cat /proc/drbd | grep %d: "		\
 					"| cut -d ' ' -f 4 | cut -d ':' -f 2", drbdX);	\
 		ostream = popen(cmd, "r");		\
-		getline(ostream, &line, &line_sz);		\
+		getline(&line, &line_sz, ostream);		\
 		if (line && line_sz) {		\
 			line_sz = strlen(line);		\
 			if (line[line_sz-1] == '\n')		\
@@ -125,6 +126,7 @@ static void drbdmon_resume_bp_fn(struct drbdmon_resume_bp_ctx *);
 static struct drbdmon_resume_bp_ctx *drbdmon_create_resume_bp_ctx(struct drbdmon_param_resume_bp *);
 static struct drbdmon_resume_bp_ctx *drbdmon_lookup_resume_bp_ctx(const char *);
 static int drbdmon_resume_breakpoint(struct drbdmon_req *);
+static int drbdmon_resume_bp_init(struct drbdmon_global *);
 static void drbdmon_free_request(struct drbdmon_req *);
 static void drbdmon_deal_request(struct drbdmon_req *);
 static void drbdmon_submit_request(struct drbdmon_req *, struct drbdmon_global *);
@@ -238,7 +240,9 @@ drbdmon_accept(struct drbdmon_global *glop, accept_fn callback_fnp)
 	
 	memset(&pr_addr, 0, sizeof(struct sockaddr_un));
 	while (!glop->mon_exit) {
+		printf("%s start to accept.\n", __func__);
 		new_fd = accept(glop->local_sock, &pr_addr, &addr_len);
+		printf("%s accepted, new:%d\n", __func__, new_fd);
 		if (new_fd < 0)
 			continue;
 
@@ -255,6 +259,7 @@ drbdmon_handle_connect(struct drbdmon_global *glop,
 	uint32_t	need_to_wake = 0;
 	struct sockaddr *addr = NULL;
 	
+	printf("%s fd:%d addr_len:%02x.\n", __func__, prfd, addr_len);
 	if (!(req = malloc(sizeof(struct drbdmon_req))) ||
 		(addr_len && !(addr = malloc(addr_len))))
 		goto failed;
@@ -274,6 +279,7 @@ drbdmon_handle_connect(struct drbdmon_global *glop,
 	if (need_to_wake)
 		pthread_cond_signal(&glop->rcv_cv);
 	
+	printf("%s exit success.\n", __func__);
 	return ;	
 failed:
 	if (addr && addr_len)
@@ -378,9 +384,10 @@ drbdmon_recv(struct drbdmon_global *glop)
 			req->olen = hdp->olen;
 			rcvsz = recv(req->pr_sockfd, req->ibufp, 
 						req->ilen, MSG_WAITALL);
-			if (rcvsz < req->ibufp)
+			if (rcvsz < req->ilen)
 				goto failed_recv;
-
+			printf("%s recved sock:%d, to drbdmon_submit_request\n",
+				__func__, req->pr_sockfd);
 			drbdmon_submit_request(req, glop);
 			continue;
 failed_recv:
@@ -395,6 +402,7 @@ static void
 drbdmon_submit_request(struct drbdmon_req *req, 
 				struct drbdmon_global *glop)
 {
+	printf("%s hdl_ctx:%p\n", __func__, glop->hdl_ctx);
 	(void) tpool_dispatch(glop->hdl_ctx, 
 				drbdmon_deal_request, req);
 }
@@ -405,7 +413,9 @@ drbdmon_deal_request(struct drbdmon_req *req)
 	uint32_t obuflen;
 	int error;
 	struct drbdmon_head *hdp = &req->head;
-
+	
+	printf("%s handle req, rpc:%d, param_len:%d ilen:%d\n",
+		__func__, hdp->rpc, drbdmon_rpc[hdp->rpc].param_len, req->ilen);
 	if ((hdp->rpc <= DRBDMON_RPC_FIRST) ||
 		(hdp->rpc >= DRBDMON_RPC_LAST) ||
 		(drbdmon_rpc[hdp->rpc].param_len != req->ilen)) {
@@ -414,6 +424,7 @@ drbdmon_deal_request(struct drbdmon_req *req)
 	}
 	
 	req->error = drbdmon_rpc[hdp->rpc].rpc_hdlp(req);
+	printf("%s handled, error:%d, send resp\n", __func__, req->error);
 failed:
 	(void) drbdmon_send_resp(req);
 	drbdmon_free_request(req);
@@ -434,6 +445,15 @@ drbdmon_free_request(struct drbdmon_req *req)
 	free(req);
 }
 
+static int
+drbdmon_resume_bp_init(struct drbdmon_global *glop)
+{
+	pthread_mutex_init(&drbdmon_bp_ctx_list_mtx, NULL);
+	list_create(&drbdmon_bp_ctx_list, 
+			sizeof(struct drbdmon_resume_bp_ctx),
+			offsetof(struct drbdmon_resume_bp_ctx, entry));
+}
+
 static int 
 drbdmon_resume_breakpoint(struct drbdmon_req *req)
 {
@@ -442,7 +462,9 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 			(struct drbdmon_param_resume_bp *)req->ibufp;
 	struct drbdmon_resume_bp_ctx *bp_ctx;
 	
+	printf("coming into %s, handle req\n", __func__);
 	bp_ctx = drbdmon_lookup_resume_bp_ctx(param_bp->peer_ip);
+	printf("%s find bp_ctx:%p\n", __func__, bp_ctx);
 	if (bp_ctx == NULL) {
 		bp_ctx = drbdmon_create_resume_bp_ctx(param_bp);
 		new_create = 1;
@@ -450,6 +472,9 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 	/* It's a invalid ip address most likely */
 	if (bp_ctx == NULL)
 		return DRBDMON_ERR_PARAM;
+	
+	printf("%s find bp_ctx:%p, new_create:%d\n", 
+		__func__, bp_ctx, new_create);
 
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	list_insert_tail(&bp_ctx->resume_list, param_bp);
@@ -497,6 +522,7 @@ drbdmon_create_resume_bp_ctx(struct drbdmon_param_resume_bp *param_bp)
 		!(tp_invalidate = tpool_create(1, 1, 0, NULL)))
 		goto failed;
 
+	printf("%s malloc and tpool_create succeed\n", __func__);
 	memset(bp_ctx, 0, sizeof(*bp_ctx));
 	bp_ctx->ip_addr = ip_bin;
 	bp_ctx->mon_ctx = tp;
@@ -529,13 +555,16 @@ drbdmon_resume_bp_fn(struct drbdmon_resume_bp_ctx *bp_ctx)
 {
 	int hasdown = 0, hasup = 0, prev = 0, curr = 0;
 
+	printf("coming into %s, checking ip:%s\n", 
+		__func__, bp_ctx->peer_ip);
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	while (!bp_ctx->exit) {
 		curr = 0;
 		pthread_mutex_unlock(&bp_ctx->ctx_mtx);
 		
+		printf("%s DRBDMON_PING ip %s\n", __func__, bp_ctx->peer_ip);
 		DRBDMON_PING(bp_ctx->peer_ip, curr);
-		printf("%s prev:%d curr:%d hasdown:%d hasup:%d",
+		printf("%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
 			__func__, prev, curr, hasdown, hasup);
 		if (curr && hasup) {
 			drbdmon_resume_bp_mixed(bp_ctx, 1);
@@ -631,6 +660,8 @@ drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 
 int main(int argc, char **argv)
 {
+	unlink(DRBDMON_SOCKET);
 	drbdmon_genl_global(&drbdmon_glp);
+	drbdmon_resume_bp_init(drbdmon_glp);
 	drbdmon_accept(drbdmon_glp, drbdmon_handle_connect);
 }
