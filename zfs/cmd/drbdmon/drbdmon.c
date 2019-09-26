@@ -681,7 +681,8 @@ drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 		}
 	}
 
-	bp_ctx = param_bp->opt.mon.bp_ctx;
+	bp_ctx = ((struct drbdmon_param_resume_bp *)
+			list_head(invalidateList))->opt.mon.bp_ctx;
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	list_move_tail(&bp_ctx->resume_list, invalidateList);
 	pthread_mutex_unlock(&bp_ctx->ctx_mtx);
