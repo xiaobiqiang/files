@@ -94,20 +94,6 @@ struct drbdmon_global {
 						rsvd:30;
 };
 
-struct drbdmon_resume_bp_ctx {
-	list_node_t		entry;
-	char			peer_ip[16];
-	char			local_ip[16];
-	pthread_mutex_t ctx_mtx;
-	pthread_cond_t	ctx_cv;
-	list_t			resume_list;
-	tpool_t			*mon_ctx;
-	tpool_t			*invalidate_ctx;
-	uint32_t		ip_addr;
-	uint32_t		exit:1,
-					rsvd:31;
-};
-
 typedef void (*accept_fn)(struct drbdmon_global *, int, struct sockaddr *, socklen_t);
 
 static void drbdmon_resume_bp_invalidate_impl(list_t *);
@@ -506,7 +492,8 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 	/* It's a invalid ip address most likely */
 	if (bp_ctx == NULL)
 		return DRBDMON_ERR_PARAM;
-	
+
+	param_bp->opt.mon.bp_ctx = bp_ctx;
 	printf("%s find bp_ctx:%p, new_create:%d\n", 
 		__func__, bp_ctx, new_create);
 
@@ -676,19 +663,28 @@ drbdmon_resume_bp_invalidate(struct drbdmon_resume_bp_ctx *bp_ctx,
 static void
 drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 {
+	int rv_conn = 0;
 	struct drbdmon_param_resume_bp *param_bp;
+	struct drbdmon_resume_bp_ctx *bp_ctx;
 	char validate_cmd[256] = "drbdadm connect ";
 	uint32_t cmdlen = strlen(validate_cmd);
 	
-	while (!list_is_empty(invalidateList)) {
-		param_bp = list_remove_head(invalidateList);
-
+	for (param_bp = list_head(invalidateList); param_bp;
+			param_bp = list_next(invalidateList, param_bp)) {
 		memcpy(&validate_cmd[cmdlen], param_bp->resource, 
 				strlen(param_bp->resource) + 1);
 		printf("%s connect[%s]", __func__, validate_cmd);
-		(void) system(validate_cmd);
-		free(param_bp);
+		if (system(validate_cmd) == 0) {
+			printf("%s system exec %s succeed\n", 
+				__func__, validate_cmd);
+			param_bp->opt.mon.handled = 0;
+		}
 	}
+
+	bp_ctx = param_bp->opt.mon.bp_ctx;
+	pthread_mutex_lock(&bp_ctx->ctx_mtx);
+	list_move_tail(&bp_ctx->resume_list, invalidateList);
+	pthread_mutex_unlock(&bp_ctx->ctx_mtx);
 	list_destroy(invalidateList);
 	free(invalidateList);
 }
