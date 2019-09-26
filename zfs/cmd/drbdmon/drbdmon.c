@@ -21,25 +21,6 @@
 #define	offsetof(s, m)  ((size_t)(&((s *)0)->m))
 #endif
 
-#define DRBDMON_PING(ip, result)		\
-	{								\
-		char *line = NULL;			\
-		size_t size = 0;			\
-		char cmd[256];				\
-		FILE *outbuf;				\
-									\
-		memset(cmd, 0, 256);		\
-		snprintf(cmd, 256, "ping %s -c 1 -W 1 | grep transmitted | cut -d ',' -f 3", (ip));	\
-		outbuf = popen(cmd, "r");	\
-		getline(&line, &size, outbuf);	\
-		if (line && size) {			\
-			result = (line[1] == '0');	\
-			free(line);				\
-			line = NULL;			\
-		}							\
-		pclose(outbuf);				\
-	}
-
 #define DRBDMON_BP_INQR(drbdX, status, primary)	\
 	{	\
 		char *line = NULL;	\
@@ -116,6 +97,7 @@ struct drbdmon_global {
 struct drbdmon_resume_bp_ctx {
 	list_node_t		entry;
 	char			peer_ip[16];
+	char			local_ip[16];
 	pthread_mutex_t ctx_mtx;
 	pthread_cond_t	ctx_cv;
 	list_t			resume_list;
@@ -150,6 +132,7 @@ static int drbdmon_create_unix_socket(struct drbdmon_global *);
 static void drbdmon_init_global(struct drbdmon_global *);
 static void drbdmon_genl_global(struct drbdmon_global **);
 static void drbdmon_delay_locked(pthread_mutex_t *, pthread_cond_t *, uint32_t);
+static int drbdmon_link_active(char *, char *);
 
 static struct {
 	enum drbdmon_rpc_type rpc;
@@ -166,6 +149,48 @@ static struct drbdmon_global *drbdmon_glp = NULL;
 
 pthread_mutex_t	drbdmon_bp_ctx_list_mtx;
 static list_t	drbdmon_bp_ctx_list;
+
+static int 
+drbdmon_link_active(char *loc_ip, char *pr_ip)
+{								
+	char *line = NULL;			
+	size_t size = 0;			
+	char cmd[256] = {0}, grep[32] = {0};				
+	FILE *outbuf;				
+	int result = 0;
+
+	snprintf(grep, 32, "inet %s", loc_ip);
+	snprintf(cmd, 128, "ip a | grep '%s'", grep);	
+	outbuf = popen(cmd, "r");		
+	if (outbuf) {
+		getline(&line, &size, outbuf);	
+		pclose(outbuf);
+	}
+	if (line && size) {		
+		size = strlen(line);		
+		if (line[size-1] == '\n')		
+			line[size-1]= '\0';	
+		if ((size <= 4) || strncmp(grep, &line[4], strlen(grep))) {
+			free(line);
+			return result;
+		}
+		free(line);
+		line = NULL;
+	}		
+	snprintf(cmd, 256, "ping %s -c 1 -W 1 | grep transmitted"
+				" | cut -d ',' -f 3", pr_ip);	
+	outbuf = popen(cmd, "r");
+	if (outbuf) {
+		getline(&line, &size, outbuf);	
+		pclose(outbuf);	
+	}
+	if (line && size) {			
+		result = (line[1] == '0');	
+		free(line);				
+		line = NULL;			
+	}	
+	return result;
+}
 
 static void
 drbdmon_delay_locked(pthread_mutex_t *mtx, pthread_cond_t *cv, uint32_t time)
@@ -537,6 +562,7 @@ drbdmon_create_resume_bp_ctx(struct drbdmon_param_resume_bp *param_bp)
 	bp_ctx->mon_ctx = tp;
 	bp_ctx->invalidate_ctx = tp_invalidate;
 	strncpy(bp_ctx->peer_ip, param_bp->peer_ip, 16);
+	strncpy(bp_ctx->local_ip, param_bp->local_ip, 16);
 	list_link_init(&bp_ctx->entry);
 	pthread_mutex_init(&bp_ctx->ctx_mtx, NULL);
 	pthread_cond_init(&bp_ctx->ctx_cv, NULL);
@@ -563,16 +589,16 @@ static void
 drbdmon_resume_bp_fn(struct drbdmon_resume_bp_ctx *bp_ctx)
 {
 	int hasdown = 0, hasup = 0, prev = 0, curr = 0;
-
-	printf("coming into %s, checking ip:%s\n", 
-		__func__, bp_ctx->peer_ip);
+	
+	printf("coming into %s, checking ip:%s, local:%s\n", 
+		__func__, bp_ctx->peer_ip, bp_ctx->local_ip);
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	while (!bp_ctx->exit) {
 		curr = 0;
 		pthread_mutex_unlock(&bp_ctx->ctx_mtx);
 		
 		printf("%s DRBDMON_PING ip %s\n", __func__, bp_ctx->peer_ip);
-		DRBDMON_PING(bp_ctx->peer_ip, curr);
+		curr = drbdmon_link_active(bp_ctx->local_ip, bp_ctx->peer_ip);
 		printf("%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
 			__func__, prev, curr, hasdown, hasup);
 		if (curr && hasup) {

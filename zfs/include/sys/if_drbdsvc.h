@@ -27,6 +27,7 @@ struct drbdmon_head {
 struct drbdmon_param_resume_bp {
 	uint32_t	primary;
 	uint32_t	drbdX;
+	char		local_ip[16];
 	char		peer_ip[16];
 	char		resource[128];
 	union {

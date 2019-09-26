@@ -30,6 +30,7 @@ static int drbdctl_open(void);
 
 optionTbl_t longOptions[] = {
 	{"peer-ip", required_arg, 'i', "peer-ip"},
+	{"local-ip", required_arg, 'l', "local-ip"},
 	{"primary", required_arg, 'p', "is-primary"},
 	{"resource-name", required_arg, 'r', "resource-name"},
 	{"drbd-minor", required_arg, 'n', "drbd-minor"},
@@ -40,7 +41,7 @@ optionTbl_t longOptions[] = {
  * Add new subcommands here
  */
 subCommandProps_t subcommands[] = {
-	{"set-resume-bp", drbdctl_set_resume_bp, "inp", "inp", NULL,
+	{"set-resume-bp", drbdctl_set_resume_bp, "ilnp", "ilnp", NULL,
 		OPERAND_MANDATORY_SINGLE, "resource-name", NULL},
 	{NULL, 0, NULL, NULL, 0, 0, 0, NULL}
 };
@@ -138,7 +139,7 @@ static int
 drbdctl_set_resume_bp(int operandLen, char *operands[],
 			cmdOptions_t *options, void *args)
 {
-	char peer_ip[16] = {0};
+	char peer_ip[16] = {0}, local_ip[16] = {0};
 	char resource[128] = {0};
 	int minor = -1, primary = -1;
 	struct drbdmon_head head;
@@ -149,6 +150,9 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 		switch (options->optval) {
 			case 'i':
 				strncpy(peer_ip, options->optarg, 16);
+				break;
+			case 'l':
+				strncpy(local_ip, options->optarg, 16);
 				break;
 			case 'n':
 				errno = 0;
@@ -179,7 +183,7 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 	strncpy(resource, operands[0], 128);
 
 	if (!strlen(peer_ip) || !strlen(resource) || 
-		(minor < 0) || (primary < 0)) {
+		!strlen(local_ip) || (minor < 0) || (primary < 0)) {
 		fprintf(stderr, "%s: %s: %s\n",
 			cmdName, __func__, gettext("invalid parameters"));
 		return 1;
@@ -194,6 +198,7 @@ drbdctl_set_resume_bp(int operandLen, char *operands[],
 	param_bp.primary = (primary ? 1 : 0);
 	param_bp.drbdX = minor;
 	strncpy(param_bp.peer_ip, peer_ip, 16);
+	strncpy(param_bp.local_ip, local_ip, 16);
 	strncpy(param_bp.resource, resource, 128);
 
 	if (drbdctl_open()) {
