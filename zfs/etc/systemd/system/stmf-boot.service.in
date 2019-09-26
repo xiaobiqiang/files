@@ -1,12 +1,13 @@
 [Unit]
-Description=Probe stmf module
+Description=Stmf Kernel Module Loader Service
 DefaultDependencies=no
 After=zfs-boot.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/modprobe zstmf_sbd ; /usr/sbin/rmmod qla2xxx ; /sbin/modprobe qlf_hengwei
+ExecStart=/sbin/modprobe zstmf 
+ExecStartPost=/sbin/modprobe zstmf_sbd
 
 [Install]
 WantedBy=zfs.target

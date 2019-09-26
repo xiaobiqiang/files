@@ -1,5 +1,5 @@
 [Unit]
-Description=Probe pppt module
+Description=Stmf PPPT Kernel Module Loader Service
 DefaultDependencies=no
 After=stmf-boot.service
 
