@@ -588,6 +588,8 @@ drbdmon_resume_bp_fn(struct drbdmon_resume_bp_ctx *bp_ctx)
 		curr = drbdmon_link_active(bp_ctx->local_ip, bp_ctx->peer_ip);
 		printf("%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
 			__func__, prev, curr, hasdown, hasup);
+		syslog(LOG_ERR, "%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
+                        __func__, prev, curr, hasdown, hasup);
 		if (curr && hasup) {
 			drbdmon_resume_bp_mixed(bp_ctx, 1);
 			goto cont;
@@ -639,6 +641,8 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 		DRBDMON_BP_INQR(param_bp->drbdX, status, param_bp->primary);
 		printf("%s status:%d, resource:%s\n", __func__, 
 				status, param_bp->resource);
+		syslog(LOG_ERR, "%s status:%d, resource:%s", __func__,
+                                status, param_bp->resource);
 		param_bp->opt.mon.handled = 1;
 		exchange = status ? invalidateList : &retryList;
 		list_insert_tail(exchange, param_bp);
