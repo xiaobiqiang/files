@@ -312,6 +312,7 @@ am__kernel_HEADERS_DIST = $(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/zio_impl.h \
 	$(top_srcdir)/include/sys/zrlock.h \
 	$(top_srcdir)/include/sys/lun_migrate.h \
+	$(top_srcdir)/include/sys/ipmi_notify_if.h \
 	$(top_srcdir)/include/sys/zfs_ioctl.h \
 	$(top_srcdir)/include/sys/zfs_mirror.h \
 	$(top_srcdir)/include/sys/zfs_onexit.h \
@@ -453,7 +454,9 @@ am__libzfs_HEADERS_DIST = $(top_srcdir)/include/sys/arc.h \
 	$(top_srcdir)/include/sys/zio.h \
 	$(top_srcdir)/include/sys/zio_impl.h \
 	$(top_srcdir)/include/sys/zrlock.h \
-	$(top_srcdir)/include/sys/lun_migrate.h
+	$(top_srcdir)/include/sys/lun_migrate.h \
+	$(top_srcdir)/include/sys/ipmi_notify_if.h \
+	$(top_srcdir)/include/sys/if_drbdsvc.h
 HEADERS = $(kernel_HEADERS) $(libzfs_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
@@ -811,7 +814,8 @@ COMMON_H = \
 	$(top_srcdir)/include/sys/zio.h \
 	$(top_srcdir)/include/sys/zio_impl.h \
 	$(top_srcdir)/include/sys/zrlock.h \
-	$(top_srcdir)/include/sys/lun_migrate.h
+	$(top_srcdir)/include/sys/lun_migrate.h \
+	$(top_srcdir)/include/sys/ipmi_notify_if.h
 
 KERNEL_H = \
 	$(top_srcdir)/include/sys/zfs_ioctl.h \
@@ -824,7 +828,9 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/callout.h \
 	$(top_srcdir)/include/sys/utils_vmem.h
 
-USER_H = 
+USER_H = \
+	$(top_srcdir)/include/sys/if_drbdsvc.h
+
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)
 @CONFIG_USER_TRUE@libzfsdir = $(includedir)/libzfs/sys
 @CONFIG_USER_TRUE@libzfs_HEADERS = $(COMMON_H) $(USER_H)

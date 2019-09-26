@@ -1,0 +1,11 @@
+src = @abs_top_srcdir@/module/ipmi_notify
+obj = @abs_builddir@
+
+MODULE := zipmi_notify
+
+EXTRA_CFLAGS = $(ZFS_MODULE_CFLAGS) @KERNELCPPFLAGS@
+
+obj-$(CONFIG_ZFS) := $(MODULE).o
+
+$(MODULE)-objs =  ipmi_notify.o
+$(MODULE)-objs += ipmi_power.o
