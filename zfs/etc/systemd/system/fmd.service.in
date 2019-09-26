@@ -1,9 +1,8 @@
 [Unit]
 Description=faulty management service
 DefaultDependencies=no
-Requires=NetworkManager.service
-After=zfs.target
-After=rpcbind.service
+Requires=NetworkManager.service rpcbind.service
+After=zfs.target rpcbind.service
 
 [Service]
 ExecStart=@sbindir@/fmd
