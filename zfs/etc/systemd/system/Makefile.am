@@ -17,7 +17,8 @@ systemdunit_DATA = \
 	configd.service \
 	stmf-svc.service \
 	pmm.service 	\
-	iscsitsvc.service
+	iscsitsvc.service	\
+	ipmi_monitor.service
 
 EXTRA_DIST = \
 	$(top_srcdir)/etc/systemd/system/zfs-zed.service.in \
@@ -36,7 +37,8 @@ EXTRA_DIST = \
 	$(top_srcdir)/etc/systemd/system/stmf-svc.service.in \
 	$(top_srcdir)/etc/systemd/system/50-zfs.preset.in \
 	$(top_srcdir)/etc/systemd/system/pmm.service.in  \
-	$(top_srcdir)/etc/systemd/system/iscsitsvc.service.in
+	$(top_srcdir)/etc/systemd/system/iscsitsvc.service.in	\
+	$(top_srcdir)/etc/systemd/system/ipmi_monitor.service.in
 
 $(systemdunit_DATA):
 	-$(SED) -e 's,@bindir\@,$(bindir),g' \
