@@ -45,7 +45,6 @@
 			if ((ds = strstr(line, "ds:")) != NULL) 	\
 				ds += 3;	\
 			if (cs && ro && ds) {	\
-				printf("%s cs:%s ro:%s ds:%s\n", __func__, cs, ro, ds);	\
 				if (!strncmp(cs, "StandAlone", strlen("StandAlone"))) {		\
 					if (!strncmp(ro, "Primary", strlen("Primary")) && 	\
 						(primary == 1) && 	\
@@ -261,9 +260,7 @@ drbdmon_accept(struct drbdmon_global *glop, accept_fn callback_fnp)
 	
 	memset(&pr_addr, 0, sizeof(struct sockaddr_un));
 	while (!glop->mon_exit) {
-		printf("%s start to accept.\n", __func__);
 		new_fd = accept(glop->local_sock, &pr_addr, &addr_len);
-		printf("%s accepted, new:%d\n", __func__, new_fd);
 		if (new_fd < 0)
 			continue;
 
@@ -280,7 +277,6 @@ drbdmon_handle_connect(struct drbdmon_global *glop,
 	uint32_t	need_to_wake = 0;
 	struct sockaddr *addr = NULL;
 	
-	printf("%s fd:%d addr_len:%02x.\n", __func__, prfd, addr_len);
 	if (!(req = malloc(sizeof(struct drbdmon_req))) ||
 		(addr_len && !(addr = malloc(addr_len))))
 		goto failed;
@@ -300,7 +296,6 @@ drbdmon_handle_connect(struct drbdmon_global *glop,
 	if (need_to_wake)
 		pthread_cond_signal(&glop->rcv_cv);
 	
-	printf("%s exit success.\n", __func__);
 	return ;	
 failed:
 	if (addr && addr_len)
@@ -407,8 +402,6 @@ drbdmon_recv(struct drbdmon_global *glop)
 						req->ilen, MSG_WAITALL);
 			if (rcvsz < req->ilen)
 				goto failed_recv;
-			printf("%s recved sock:%d, to drbdmon_submit_request\n",
-				__func__, req->pr_sockfd);
 			drbdmon_submit_request(req, glop);
 			continue;
 failed_recv:
@@ -423,7 +416,6 @@ static void
 drbdmon_submit_request(struct drbdmon_req *req, 
 				struct drbdmon_global *glop)
 {
-	printf("%s hdl_ctx:%p\n", __func__, glop->hdl_ctx);
 	(void) tpool_dispatch(glop->hdl_ctx, 
 				drbdmon_deal_request, req);
 }
@@ -435,7 +427,7 @@ drbdmon_deal_request(struct drbdmon_req *req)
 	int error;
 	struct drbdmon_head *hdp = &req->head;
 	
-	printf("%s handle req, rpc:%d, param_len:%d ilen:%d\n",
+	syslog(LOG_INFO, "%s handle req, rpc:%d, param_len:%d ilen:%d",
 		__func__, hdp->rpc, drbdmon_rpc[hdp->rpc].param_len, req->ilen);
 	if ((hdp->rpc <= DRBDMON_RPC_FIRST) ||
 		(hdp->rpc >= DRBDMON_RPC_LAST) ||
@@ -445,7 +437,8 @@ drbdmon_deal_request(struct drbdmon_req *req)
 	}
 	
 	req->error = drbdmon_rpc[hdp->rpc].rpc_hdlp(req);
-	printf("%s handled, error:%d, send resp\n", __func__, req->error);
+	syslog(LOG_INFO, "%s rpc[%u] handled, error:%d, send resp", 
+		__func__, hdp->rpc, req->error);
 failed:
 	(void) drbdmon_send_resp(req);
 	drbdmon_free_request(req);
@@ -483,9 +476,7 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 			(struct drbdmon_param_resume_bp *)req->ibufp;
 	struct drbdmon_resume_bp_ctx *bp_ctx;
 	
-	printf("coming into %s, handle req\n", __func__);
 	bp_ctx = drbdmon_lookup_resume_bp_ctx(param_bp->peer_ip);
-	printf("%s find bp_ctx:%p\n", __func__, bp_ctx);
 	if (bp_ctx == NULL) {
 		bp_ctx = drbdmon_create_resume_bp_ctx(param_bp);
 		new_create = 1;
@@ -495,8 +486,6 @@ drbdmon_resume_breakpoint(struct drbdmon_req *req)
 		return DRBDMON_ERR_PARAM;
 
 	param_bp->opt.mon.bp_ctx = bp_ctx;
-	printf("%s find bp_ctx:%p, new_create:%d\n", 
-		__func__, bp_ctx, new_create);
 
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	list_insert_tail(&bp_ctx->resume_list, param_bp);
@@ -544,7 +533,6 @@ drbdmon_create_resume_bp_ctx(struct drbdmon_param_resume_bp *param_bp)
 		!(tp_invalidate = tpool_create(1, 1, 0, NULL)))
 		goto failed;
 
-	printf("%s malloc and tpool_create succeed\n", __func__);
 	memset(bp_ctx, 0, sizeof(*bp_ctx));
 	bp_ctx->ip_addr = ip_bin;
 	bp_ctx->mon_ctx = tp;
@@ -578,19 +566,12 @@ drbdmon_resume_bp_fn(struct drbdmon_resume_bp_ctx *bp_ctx)
 {
 	int hasdown = 0, hasup = 0, prev = 0, curr = 0;
 	
-	printf("coming into %s, checking ip:%s, local:%s\n", 
-		__func__, bp_ctx->peer_ip, bp_ctx->local_ip);
 	pthread_mutex_lock(&bp_ctx->ctx_mtx);
 	while (!bp_ctx->exit) {
 		curr = 0;
 		pthread_mutex_unlock(&bp_ctx->ctx_mtx);
 		
-		printf("%s DRBDMON_PING ip %s\n", __func__, bp_ctx->peer_ip);
 		curr = drbdmon_link_active(bp_ctx->local_ip, bp_ctx->peer_ip);
-		printf("%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
-			__func__, prev, curr, hasdown, hasup);
-		syslog(LOG_ERR, "%s prev:%d curr:%d hasdown:%d hasup:%d\n\n",
-                        __func__, prev, curr, hasdown, hasup);
 		if (curr && hasup) {
 			drbdmon_resume_bp_mixed(bp_ctx, 1);
 			goto cont;
@@ -613,7 +594,7 @@ cont:
 
 	if (bp_ctx->exit) {
 		pthread_mutex_unlock(&bp_ctx->ctx_mtx);
-		syslog(LOG_ERR, "drbdmon thread[%s] exit", bp_ctx->peer_ip);
+		syslog(LOG_WARNING, "drbdmon thread[%s] exit", bp_ctx->peer_ip);
 		return ;
 	}
 }
@@ -640,9 +621,8 @@ drbdmon_resume_bp_mixed(struct drbdmon_resume_bp_ctx *bp_ctx, uint32_t mixed)
 			continue;
 		}
 		DRBDMON_BP_INQR(param_bp->drbdX, status, param_bp->primary);
-		printf("%s status:%d, resource:%s\n", __func__, 
-				status, param_bp->resource);
-		syslog(LOG_ERR, "%s status:%d, resource:%s", __func__,
+		if (status)
+			syslog(LOG_INFO, "%s status:%d, resource:%s", __func__,
                                 status, param_bp->resource);
 		param_bp->opt.mon.handled = 1;
 		exchange = status ? invalidateList : &retryList;
@@ -678,9 +658,9 @@ drbdmon_resume_bp_invalidate_impl(list_t *invalidateList)
 			param_bp = list_next(invalidateList, param_bp)) {
 		memcpy(&validate_cmd[cmdlen], param_bp->resource, 
 				strlen(param_bp->resource) + 1);
-		printf("%s connect[%s]", __func__, validate_cmd);
+		syslog(LOG_INFO, "%s connect[%s]", __func__, validate_cmd);
 		if (system(validate_cmd) == 0) {
-			printf("%s system exec %s succeed\n", 
+			syslog(LOG_INFO, "%s system exec %s succeed\n", 
 				__func__, validate_cmd);
 			param_bp->opt.mon.handled = 0;
 		}

@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <sys/thread_pool.h>
 #include "ini_parse.h"
 #include "power_checker.h"
 
@@ -16,19 +17,24 @@ struct power_global {
 	struct ipmi_module 		*module;
 	const struct ipmi_conf	*ipmi_conf;
 
-	unsigned int			buflen;
+	unsigned				buflen;
+	unsigned				err_fence_buflen;
 	char 					*check_command;
-
+	char 					*err_fence_cmd;
 	pthread_mutex_t			ck_mtx;
 	pthread_cond_t			ck_cv;
 	pthread_t				checker_wk;
+
+	tpool_t					*misc_ctx;
 
 	/* configure */
 	unsigned int			check_tm;		/* ms */
 	unsigned int			retry_times;	/* for error_hdl:retry */
 	unsigned int 			retried;
 	unsigned int			link_down_abort:2,	//0:abort  1:suspend 	2:continue
-							check_err_hdl:2,	//0:retry, post, suspend, 1:next_retry 2:suspend 3:abort
+							check_err_hdl:3,	//0:retry, post, suspend, 
+												//1:next_retry 2:suspend 3:abort
+												//7:exec specified command
 							
 							start_check:1,
 							checker_exit:1,
@@ -38,7 +44,8 @@ struct power_global {
 							in_retry:1,
 							last_psu_status:2,
 							curr_psu_status:2,
-							rsvd:18;
+							err_fence_cmdset:1,
+							rsvd:16;
 };
 
 static struct ipmi_opt down_abrt_opts[] = {
@@ -95,6 +102,7 @@ power_checker_init(const struct ipmi_conf *conf)
 				power_checker, &power_conf) != 0)
 		goto failed;
 	pthread_detach(power_conf.checker_wk);
+	power_conf.misc_ctx = tpool_create(1, 2, 0, NULL);
 	return 0;
 	
 failed:
@@ -116,7 +124,8 @@ power_checker_parse_conf(struct power_global *conf)
 	snprintf(conf->check_command, conf->buflen, POWER_CMD_FORMAT, 
 			ipmi_conf->ic_ip, ipmi_conf->ic_user, ipmi_conf->ic_passwd);
 	conf->cmd_set = 1;
-	
+
+	conf->check_err_hdl = POWER_ERRHDL_ASSIGN;
 	conf->check_tm = iniGetInt(IPMI_SECT_POWER, 
 			IPMI_SECT_POWER_INTERVAL, POWER_INTERVAL);
 	conf->retry_times = iniGetInt(IPMI_SECT_POWER, 
@@ -128,9 +137,16 @@ power_checker_parse_conf(struct power_global *conf)
 
 	ipmi_checker_find_opt(down_abrt_opts, link_down_abort, conf->link_down_abort);
 	ipmi_checker_find_opt(err_hdl_opts, err_hdl, conf->check_err_hdl);
-	syslog(LOG_ERR, "%s command:%s check_tm:%u retry_times:%u link_down:%02x err_hdl:%02x",
+	if (conf->check_err_hdl == POWER_ERRHDL_ASSIGN) {
+		conf->err_fence_buflen = strlen(err_hdl) + 1;
+		conf->err_fence_cmd = malloc(conf->err_fence_buflen);
+		memset(conf->err_fence_cmd, 0, conf->err_fence_buflen);
+		strncpy(conf->err_fence_cmd, err_hdl, conf->err_fence_buflen);
+		conf->err_fence_cmdset = 1;
+	}
+	syslog(LOG_ERR, "%s command:%s check_tm:%u retry_times:%u link_down:%02x err_hdl:%02x, err_cmd:%s",
 		__func__, conf->check_command, conf->check_tm, conf->retry_times, 
-		conf->link_down_abort, conf->check_err_hdl);
+		conf->link_down_abort, conf->check_err_hdl, conf->err_fence_cmd);
 }
 
 static void *
@@ -175,7 +191,6 @@ power_checker_once(struct power_global *conf)
 	assert(conf->cmd_set);
 
 	power_detect_status(conf);
-	syslog(LOG_ERR, "%s curr_psu_status:%02x", __func__, conf->curr_psu_status);
 	switch (conf->curr_psu_status) {
 		case PSU_UNKNOWN:
 			switch (conf->check_err_hdl) {
@@ -203,6 +218,12 @@ break_retry:
 					break;
 				case POWER_ERRHDL_ABRT:
 					conf->checker_exit = 1;
+					break;
+				case POWER_ERRHDL_ASSIGN:
+					if (conf->last_psu_status == PSU_UNKNOWN)
+						break;
+					assert(conf->err_fence_cmdset == 1);
+					(void) system(conf->err_fence_cmd);
 					break;
 			}
 break_unknown:
@@ -243,7 +264,6 @@ power_detect_status(struct power_global *conf)
 			line_len = strlen(line);
 			if (line[line_len-1] = '\n')
 				line[line_len-1] = '\0';
-			printf("power status: %s line_sz:%d\n", line, line_sz);
 			conf->curr_psu_status = PSU_UNKNOWN;
 			ipmi_checker_find_opt(power_status_opts, line, conf->curr_psu_status);
 			detected = 1;
@@ -252,8 +272,6 @@ power_detect_status(struct power_global *conf)
 
 	if (!detected)
 		conf->curr_psu_status = PSU_UNKNOWN;
-	syslog(LOG_ERR, "power status: %02x-->%02x", 
-		conf->last_psu_status, conf->curr_psu_status);
 	if (fbuf)
 		pclose (fbuf);
 }

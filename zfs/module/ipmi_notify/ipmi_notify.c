@@ -64,29 +64,23 @@ ipmi_notify_unlocked_ioctl(struct file *filep,
 	void *inbuf, *outbuf;
 	struct ipmi_notify_module *module;
 	
-	printk(KERN_INFO "1 cmd:%d", cmd);
 	if (cmd != IPMI_IOC_CMD)
 		return -EINVAL;
 
-	printk(KERN_INFO "2");
 	if (ipmi_notify_copyin_iocdata(data, 0, &iocdata,
 				&inbuf, &outbuf) != 0)
 		return -EFAULT;
 
-	printk(KERN_INFO "3");
 	if ((iocdata->module <= IPMI_MODULE_FIRST) ||
 		(iocdata->module >= IPMI_MODULE_LAST))
 		goto out;
 	
-	printk(KERN_INFO "4");
 	module = ipmi_notify_modules[iocdata->module];
 	iRet = ipmi_notify_push(module, iocdata->module_spec, inbuf, 
 				iocdata->inlen, outbuf, iocdata->outlen);
-	printk(KERN_INFO "5 iRet:%d", iRet);
 	if (iRet == 0)
 		iRet = ipmi_notify_copyout_iocdata(
 					data, 0, iocdata, outbuf);
-	printk(KERN_INFO "6 iRet:%d", iRet);
 out:
 	if (outbuf) {
 		kmem_free(outbuf, iocdata->outlen);
@@ -161,6 +155,8 @@ ipmi_notify_subscribe(struct ipmi_subscriber *suber)
 	int iRet;
 	struct ipmi_notify_module *module;
 	
+	printk(KERN_INFO "%s suber[%s] subscribe module[%u]",
+		__func__, suber->name, suber->module);
 	if (!suber->msghdl ||
 		(suber->module <= IPMI_MODULE_FIRST) ||
 		(suber->module >= IPMI_MODULE_LAST))
@@ -186,6 +182,8 @@ ipmi_notify_unsubscribe(struct ipmi_subscriber *suber)
 	int iRet;
 	struct ipmi_notify_module *module;
 	
+	printk(KERN_INFO "%s suber[%s] unsubscribe module[%u]",
+                __func__, suber->name, suber->module);
 	if (!suber->msghdl ||
 		(suber->module <= IPMI_MODULE_FIRST) ||
 		(suber->module >= IPMI_MODULE_LAST))
@@ -209,6 +207,8 @@ static int
 ipmi_notify_push(struct ipmi_notify_module *module, uint32_t module_cmd, 
 			void *ibuf, uint32_t ilen, void *obuf, uint32_t olen)
 {
+	printk(KERN_INFO "%s module[%s] push message[%u], ilen:%u, olen:%u",
+		__func__, module->name, module_cmd, ilen, olen);
 	if (module->_filter(module_cmd, ibuf, ilen))
 		return -ENOTSUP;
 

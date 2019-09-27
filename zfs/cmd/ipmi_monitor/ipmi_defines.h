@@ -62,6 +62,7 @@
 #define POWER_ERRHDL_NEXT			1
 #define POWER_ERRHDL_SUSP			2
 #define POWER_ERRHDL_ABRT			3
+#define POWER_ERRHDL_ASSIGN			7
 
 #define PSU_STATE_UNKNOWN			"unknown"
 #define PSU_STATE_ON				"on"
@@ -97,7 +98,6 @@
 			if (strcmp(x[i].opt_str, optstr))	\
 				continue;	\
 			optnum = x[i].opt_num;	\
-			printf("%s optnum:%d\n", __func__, optnum);	\
 			break;		\
 		}		\
 	}	
