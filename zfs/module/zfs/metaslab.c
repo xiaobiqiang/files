@@ -1251,6 +1251,7 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object, uint64_t txg,
 
 	ms = kmem_zalloc(sizeof (metaslab_t), KM_SLEEP);
 	mutex_init(&ms->ms_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ms->ms_sync_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ms->ms_load_cv, NULL, CV_DEFAULT, NULL);
 	ms->ms_id = id;
 	ms->ms_start = id << vd->vdev_ms_shift;
@@ -1302,9 +1303,11 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object, uint64_t txg,
 	 * map so that can verify frees.
 	 */
 	if (metaslab_debug_load && ms->ms_sm != NULL) {
+		mutex_enter(&ms->ms_sync_lock);
 		mutex_enter(&ms->ms_lock);
 		VERIFY0(metaslab_load(ms));
 		mutex_exit(&ms->ms_lock);
+		mutex_exit(&ms->ms_sync_lock);
 	}
 
 	if (txg != 0) {
@@ -1350,6 +1353,7 @@ metaslab_fini(metaslab_t *msp)
 	mutex_exit(&msp->ms_lock);
 	cv_destroy(&msp->ms_load_cv);
 	mutex_destroy(&msp->ms_lock);
+	mutex_destroy(&msp->ms_sync_lock);
 
 	kmem_free(msp, sizeof (metaslab_t));
 }
@@ -1587,6 +1591,7 @@ metaslab_preload(void *arg)
 
 	ASSERT(!MUTEX_HELD(&msp->ms_group->mg_lock));
 
+	mutex_enter(&msp->ms_sync_lock);
 	mutex_enter(&msp->ms_lock);
 	metaslab_load_wait(msp);
 	if (!msp->ms_loaded)
@@ -1597,6 +1602,7 @@ metaslab_preload(void *arg)
 	 */
 	msp->ms_access_txg = spa_syncing_txg(spa) + metaslab_unload_delay + 1;
 	mutex_exit(&msp->ms_lock);
+	mutex_exit(&msp->ms_sync_lock);
 	spl_fstrans_unmark(cookie);
 }
 
@@ -1879,6 +1885,7 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 		ASSERT(msp->ms_sm != NULL);
 	}
 
+	mutex_enter(&msp->ms_sync_lock);
 	mutex_enter(&msp->ms_lock);
 
 	/*
@@ -1944,6 +1951,7 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 		dmu_write(mos, vd->vdev_ms_array, sizeof (uint64_t) *
             msp->ms_id, sizeof (uint64_t), &object, tx, B_FALSE);
 	}
+	mutex_exit(&msp->ms_sync_lock);
 	dmu_tx_commit(tx);
 }
 
@@ -2136,6 +2144,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		if (msp == NULL)
 			return (-1ULL);
 
+		mutex_enter(&msp->ms_sync_lock);
 		mutex_enter(&msp->ms_lock);
 
 		/*
@@ -2148,6 +2157,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		    !(msp->ms_weight & METASLAB_ACTIVE_MASK) &&
 		    activation_weight == METASLAB_WEIGHT_PRIMARY)) {
 			mutex_exit(&msp->ms_lock);
+			mutex_exit(&msp->ms_sync_lock);
 			continue;
 		}
 
@@ -2156,11 +2166,13 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 			metaslab_passivate(msp,
 			    msp->ms_weight & ~METASLAB_ACTIVE_MASK);
 			mutex_exit(&msp->ms_lock);
+			mutex_exit(&msp->ms_sync_lock);
 			continue;
 		}
 
 		if (metaslab_activate(msp, activation_weight) != 0) {
 			mutex_exit(&msp->ms_lock);
+			mutex_exit(&msp->ms_sync_lock);
 			continue;
 		}
 
@@ -2171,6 +2183,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		 */
 		if (msp->ms_condensing) {
 			mutex_exit(&msp->ms_lock);
+			mutex_exit(&msp->ms_sync_lock);
 			continue;
 		}
 
@@ -2179,6 +2192,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 
 		metaslab_passivate(msp, metaslab_block_maxsize(msp));
 		mutex_exit(&msp->ms_lock);
+		mutex_exit(&msp->ms_sync_lock);
 	}
 
 	if (mg->mg_class == spa->spa_normal_class && spa->spa_raidz_aggre) {
@@ -2201,6 +2215,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 	msp->ms_access_txg = txg + metaslab_unload_delay;
 
 	mutex_exit(&msp->ms_lock);
+	mutex_exit(&msp->ms_sync_lock);
 
 	return (offset);
 }
@@ -2536,6 +2551,7 @@ metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
 	if (DVA_GET_GANG(dva))
 		size = vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE);
 
+	mutex_enter(&msp->ms_sync_lock);
 	mutex_enter(&msp->ms_lock);
 
 	if ((txg != 0 && spa_writeable(spa)) || !msp->ms_loaded)
@@ -2546,6 +2562,7 @@ metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
 
 	if (error || txg == 0) {	/* txg == 0 indicates dry run */
 		mutex_exit(&msp->ms_lock);
+		mutex_exit(&msp->ms_sync_lock);
 		return (error);
 	}
 
@@ -2562,6 +2579,7 @@ metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
 	}
 
 	mutex_exit(&msp->ms_lock);
+	mutex_exit(&msp->ms_sync_lock);
 
 	return (0);
 }
