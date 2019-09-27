@@ -234,7 +234,8 @@ drbdmon_create_unix_socket(struct drbdmon_global *glop)
 	int fd;
 	struct sockaddr_un my_addr;
 	
-	fd = socket(AF_LOCAL, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	unlink(DRBDMON_SOCKET);
+	fd = socket(AF_LOCAL, SOCK_STREAM, 0);
 	if (fd < 0)
 		return fd;
 
