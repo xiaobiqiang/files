@@ -145,20 +145,15 @@ ipmi_power_push(uint32_t msg, void *ibuf, uint32_t ilen,
 	struct ipmi_power_subscriber *power_suber;
 	struct ipmi_subscriber *iter_suber;
 
-	printk(KERN_INFO "%s pushed msg is %d", __func__, msg);
+	printk(KERN_INFO "%s push message[%d]", __func__, msg);
 	
 	rw_enter(&psu_global.subers_rw, RW_WRITER);	
-	printk(KERN_INFO "%s 1", __func__);
 	list_for_each_entry(power_suber, &psu_global.subers, entry) {
-		printk(KERN_INFO "%s 2", __func__);
 		iter_suber = power_suber->ipmi_suber;
 		if (iter_suber && iter_suber->msghdl)
 			iter_suber->msghdl(msg, ibuf, ilen, obuf, olen);
-		printk(KERN_INFO "%s 3", __func__);
 	}
-	printk(KERN_INFO "%s 4", __func__);
 	rw_exit(&psu_global.subers_rw);
-	printk(KERN_INFO "%s 5", __func__);
 }
 
 static int

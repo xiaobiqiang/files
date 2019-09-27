@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <sys/thread_pool.h>
 #include "ini_parse.h"
 #include "power_checker.h"
 
@@ -24,7 +25,7 @@ struct power_global {
 	pthread_cond_t			ck_cv;
 	pthread_t				checker_wk;
 
-	tpool					*misc_ctx;
+	tpool_t					*misc_ctx;
 
 	/* configure */
 	unsigned int			check_tm;		/* ms */
@@ -271,8 +272,6 @@ power_detect_status(struct power_global *conf)
 
 	if (!detected)
 		conf->curr_psu_status = PSU_UNKNOWN;
-	syslog(LOG_ERR, "power status: %02x-->%02x", 
-		conf->last_psu_status, conf->curr_psu_status);
 	if (fbuf)
 		pclose (fbuf);
 }

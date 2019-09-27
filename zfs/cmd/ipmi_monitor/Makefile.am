@@ -11,7 +11,9 @@ ipmisvc_SOURCES = 	\
 	ipmi_checker.c \
 	power_checker.c
 
-ipmisvc_LDADD = $(ZLIB) -lxml2 -lrt
+ipmisvc_LDADD =	\
+	$(top_builddir)/lib/libzfs_core/libzfs_core.la
+ipmisvc_LDADD += $(ZLIB) -lxml2 -lrt
 ipmisvc_LDFLAGS = -pthread
 
 install-exec-hook:
