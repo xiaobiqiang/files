@@ -1,7 +1,8 @@
 [Unit]
-Description=Start configd service
+Description=Stmf Configuration Loader Service
 DefaultDependencies=no
 After=pppt-boot.service
+Before=stmf-svc.service
 
 [Service]
 ExecStart=@sbindir@/configd

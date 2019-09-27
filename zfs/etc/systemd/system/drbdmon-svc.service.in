@@ -1,0 +1,16 @@
+[Unit]
+Description=DRBD Monitor Service
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=syslog.target
+After=stmf-svc.service
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe drbd
+ExecStart=@sbindir@/drbdmonsvc
+Restart=on-failure
+#ExecStop=/path/to/scrip delete-me if not necessary
+
+[Install]
+WantedBy=multi-user.target

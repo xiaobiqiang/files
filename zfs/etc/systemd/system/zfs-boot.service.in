@@ -1,5 +1,5 @@
 [Unit]
-Description=Probe zfs module
+Description=ZFS Filesystem Kernel Module Loader Service
 DefaultDependencies=no
 Requires=systemd-udev-settle.service
 After=systemd-udev-settle.service

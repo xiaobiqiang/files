@@ -1,12 +1,13 @@
 [Unit]
-Description=Stmf PPPT Kernel Module Loader Service
+Description=Fibre Channel Kernel Module Loader Service
 DefaultDependencies=no
 After=stmf-boot.service
+After=pppt-boot.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/modprobe zpppt
+ExecStart=/sbin/modprobe qlf_hengwei
 
 [Install]
 WantedBy=zfs.target
