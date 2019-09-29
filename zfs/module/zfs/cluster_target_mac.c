@@ -90,7 +90,10 @@ static struct packet_type cluster_packet_type __read_mostly = {
 
 static void freemsg(mblk_t *mp)
 {
-	kfree_skb(mp->skb);
+	/* only recv, skb isn't null */
+	if (mp->skb)
+		kfree_skb(mp->skb);
+	
 	kfree(mp);
 }
 static int cluster_inetdev_event(struct notifier_block *this, unsigned long event,
@@ -212,19 +215,101 @@ static void cluster_target_mac_rxmsg_free(void *rxmsg)
 	freemsg(mp);
 }
 
+static struct sk_buff *
+cluster_target_init_skb(cluster_target_port_mac_t *port_mac, 
+	mblk_t *mblk)
+{
+	struct sk_buff *skb;
+	char *data;
+	struct ether_header *eth_head;
+	cluster_target_msg_header_t *ct_head;
+	cluster_tran_data_origin_t *origin_data = mblk->origin_data;
+	int hdr_len, len;
+
+	hdr_len = sizeof (struct ether_header) + 
+		sizeof (cluster_target_msg_header_t);
+	if (mblk->is_first)
+		hdr_len += origin_data->header_len;
+
+	len = hdr_len + mblk->fragment_len;
+	skb = alloc_skb(len + 2, GFP_KERNEL);
+	if (!skb) {
+		cmn_err(CE_WARN, "%s skb failed", __func__);
+		return (NULL);
+	}
+
+	skb->dev = port_mac->dev;
+	skb->priority = 0;
+	
+	skb_reserve(skb, 2);
+	skb_reserve(skb, hdr_len);
+
+	if (mblk->fragment_len != 0 && mblk->fragment_data) {
+		if (mblk->is_sgl) {
+			struct scatterlist *sg = (struct scatterlist *)mblk->fragment_data;
+			if (sg) {
+                struct page *page = sg_page(sg);
+				BUG_ON(!page);
+                get_page(page);
+				skb_fill_page_desc(skb, skb_shinfo(skb)->nr_frags,
+					page, mblk->fragment_offset, mblk->fragment_len);
+				skb->len += mblk->fragment_len;
+				skb->data_len += mblk->fragment_len;
+				skb->truesize += mblk->fragment_len;
+			}			
+		} else {
+			skb_put(skb, mblk->fragment_len);
+			memcpy(skb->data, mblk->fragment_data, mblk->fragment_len);
+		}
+	}
+
+	if (mblk->is_first) {
+		if ((origin_data->header_len != 0) && (origin_data->header != NULL)) {
+			data = skb_push(skb, origin_data->header_len);
+			memcpy(data, origin_data->header, origin_data->header_len);
+		}
+	}
+	
+	data = skb_push(skb, sizeof(cluster_target_msg_header_t));
+	ct_head = (cluster_target_msg_header_t *)data;
+	memset(ct_head, 0, sizeof (*ct_head));
+	ct_head->msg_type = origin_data->msg_type;
+	ct_head->index = origin_data->index;
+	ct_head->len = mblk->fragment_len;
+	ct_head->total_len = origin_data->data_len;
+	ct_head->offset = mblk->fragment_offset;
+	ct_head->need_reply = (uint8_t)(origin_data->need_reply == B_TRUE);
+	ct_head->ex_len = mblk->is_first ? origin_data->header_len : 0;
+	ct_head->fc_tx_len = mblk->fc_tx_len;
+	ct_head->fc_rx_len = mblk->fc_rx_len;
+	memset(ct_head->reserved, 0x55, 8);
+
+	data = skb_push(skb, sizeof(struct ether_header));
+	eth_head = (struct ether_header *)data;
+	
+	skb_reset_mac_header(skb);
+	memcpy(eth_head->h_source, port_mac->dev->dev_addr, ETH_ALEN);
+	
+	if (mblk->dst == CLUSTER_SAN_BROADCAST_SESS) {
+		memcpy(eth_head->h_dest, mac_broadcast_addr, ETH_ALEN);
+	} else {
+		cluster_target_session_mac_t *sess_mac = mblk->dst;
+		memcpy(eth_head->h_dest, sess_mac->sess_daddr, ETH_ALEN);
+	}
+	eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
+	
+	return (skb);
+}
+
 static int
 cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 {
 	cluster_target_port_t *ctp = port;
 	cluster_target_port_mac_t *port_mac = ctp->target_private;
+	struct sk_buff *skb;
 	int repeat, ret = -1;
 	uint32_t tx_failed_times = 0;
-#ifdef SOLARIS
-	mblk_t *ret_mblk;
-	mac_tx_cookie_t ret_cookie;
-#else
 	int ret_cookie;
-#endif
 	boolean_t is_print = B_FALSE;
 
 	if (port_mac == NULL) {
@@ -248,28 +333,18 @@ cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 		return (ret);
 	}
 
-	for (repeat = 0; repeat < 1;repeat++ ) {
-#ifdef SOLARIS
-		ret_cookie = mac_tx(port_mac->mac_cli_handle, mblk, 0,
-			MAC_TX_NO_ENQUEUE | MAC_TX_NO_HOLD, &ret_mblk);
-		if (ret_cookie != NULL) {
-#else
-		(void) cs_addr_valid(mblk->skb, "mblk->skb");
-		ret_cookie = dev_queue_xmit(mblk->skb);
+	for (repeat = 0; repeat < CLUSTER_MAC_TX_MAX_REPEAT_COUNT; repeat++) {
+		skb = cluster_target_init_skb(port_mac, mblk);
+		
+		ret_cookie = dev_queue_xmit(skb);
 		if (unlikely(ret_cookie != 0)) {
-#endif
 			tx_failed_times = atomic_inc_32_nv(&port_mac->tx_failed_times);
 			if ((tx_failed_times % 100) == 0) {
 				is_print = B_TRUE;
 			}
 			mutex_enter(&port_mac->mac_tx_mtx);
-#ifdef SOLARIS
-			(void) cv_reltimedwait(&port_mac->mac_tx_cv, &port_mac->mac_tx_mtx,
-		    	drv_usectohz(100000), TR_CLOCK_TICK);
-#else
 			cv_timedwait(&port_mac->mac_tx_cv, &port_mac->mac_tx_mtx,
 						ddi_get_lbolt() + drv_usectohz(100000));
-#endif
 			mutex_exit(&port_mac->mac_tx_mtx);
 			if (port_mac->mac_link_state == CLUSTER_TARGET_MAC_LINK_STATE_DOWN) {
 				if (is_print) {
@@ -281,13 +356,9 @@ cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 				if (is_print) {
 					cmn_err(CE_WARN, "cluster target port send repeat");
 				}
-				//repeat ++;
 			}
 		} else {
 			atomic_swap_32(&port_mac->tx_failed_times, 0);
-#ifndef 	SOLARIS
-			kfree(mblk);
-#endif
 			ret = 0;
 			break;
 		}
@@ -298,12 +369,9 @@ cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 			cmn_err(CE_WARN, "cluster target port(%s) send msg failed, times(%d)",
 				ctp->link_name, tx_failed_times);
 		}
-#ifdef SOLARIS
-		freemsg(ret_mblk);
-#else
-		kfree(mblk);
-#endif
 	}
+
+	freemsg(mblk);
 	return (ret);
 }
 
@@ -340,15 +408,7 @@ static int cts_mac_tran_start(cluster_target_session_t *cts, void *fragmentation
 	mblk_t *mp = mac_tran_data->mp;
 	int ret;
 	uint32_t fc_rx_bytes;
-
-#ifdef SOLARIS
-	cluster_target_msg_header_t *ct_head = (cluster_target_msg_header_t *)
-		(mp->b_rptr + sizeof(struct ether_header));
-#else
-	cluster_target_msg_header_t *ct_head = (cluster_target_msg_header_t *)
-		(skb_mac_header(mp->skb) + sizeof(struct ether_header));
-#endif
-
+	
 	mutex_enter(&sess_mac->sess_fc_mtx);
 	while (mac_tran_data->len > sess_mac->sess_fc_throttle) {
 		cts_mac_tran_throttle_wait(cts);
@@ -357,8 +417,8 @@ static int cts_mac_tran_start(cluster_target_session_t *cts, void *fragmentation
 	mutex_exit(&sess_mac->sess_fc_mtx);
 
 	fc_rx_bytes = atomic_swap_32(&sess_mac->sess_fc_rx_bytes, 0);
-	ct_head->fc_rx_len = fc_rx_bytes;
-	ct_head->fc_tx_len = mac_tran_data->len;
+	mp->fc_tx_len = mac_tran_data->len;
+	mp->fc_rx_len = fc_rx_bytes;
 	ret = cluster_target_mac_send_mp(ctp, mp);
 
 	kmem_free(mac_tran_data, sizeof(cluster_target_mac_tran_data_t));
@@ -381,45 +441,11 @@ static void cluster_target_mac_tran_data_free(void *fragmentation)
 }
 
 static mblk_t *
-cluster_target_mac_get_mblk(char *data_seg,  uint32_t data_len, uint32_t hdr_len)
+cluster_target_mac_get_mblk(void)
 {
-	mblk_t *head_mblk = NULL;
-#ifdef SOLARIS
-	int err;
-	mblk_t *data_mblk = NULL;
-	if (data_seg != NULL)  {
-		data_mblk = esballoc((unsigned char *)data_seg, data_len, BPRI_HI, &frnop);
-
-		if (data_mblk == NULL) {
-			return (NULL);
-		}
-		data_mblk->b_wptr = data_mblk->b_rptr + data_len;
-	}
-
-	while ((head_mblk = allocb((size_t)(hdr_len), BPRI_MED)) == NULL) {
-		if ((err = strwaitbuf((size_t)hdr_len, BPRI_LO)) != 0) {
-			freemsg(data_mblk);
-			return (NULL);
-		}
-	}
-	
-	if (data_mblk != NULL)
-		head_mblk->b_cont = data_mblk;
-#else
-	head_mblk = kmalloc(sizeof(mblk_t), GFP_KERNEL);
-	if (head_mblk) {
-		head_mblk->skb = alloc_skb(data_len+hdr_len+2, GFP_KERNEL);
-		if (head_mblk->skb) {
-			skb_reserve(head_mblk->skb, 2);
-			skb_reserve(head_mblk->skb, hdr_len);
-			if (data_len != 0 && data_seg != NULL) {
-				skb_put(head_mblk->skb, data_len);
-				memcpy(head_mblk->skb->data, data_seg, data_len);
-			}
-		}
-	}
-#endif
-	return (head_mblk);
+	mblk_t *mblk = kmalloc(sizeof (mblk_t), GFP_KERNEL);
+	mblk->skb = NULL;
+	return (mblk);
 }
 
 static int cluster_target_mac_tran_data_fragment(
@@ -441,14 +467,12 @@ static int cluster_target_mac_tran_data_fragment(
 	cluster_target_msg_header_t *ct_head;
 	size_t head_len = sizeof(struct ether_header) +
 		sizeof(cluster_target_msg_header_t);
-#ifdef SOLARIS
-	void *ex_head;
-#endif
 	uint16_t ex_len;
 	cluster_target_mac_tran_data_t *mac_tran_data;
 	cluster_target_tran_data_t *data_array = NULL;
 	cluster_target_port_mac_t *port_mac = src;
 	cluster_target_session_mac_t *sess_mac = dst;
+	boolean_t is_first = B_TRUE;
 
 	if (origin_data->data_len == 0) {
 		fragment_cnt = 1;
@@ -488,74 +512,29 @@ static int cluster_target_mac_tran_data_fragment(
 				}
 			}
 		}
-		head_mp = cluster_target_mac_get_mblk(fragment_data, fragment_len,
-			head_len + ex_len);
+		head_mp = cluster_target_mac_get_mblk();
 		if (head_mp == NULL) {
 			ret = -1;
 			cmn_err(CE_WARN, "%s: get mblk failed, msgtype: 0x%x",
 				__func__, origin_data->msg_type);
 			goto GET_MBLK_FAILED;
 		}
-#ifdef SOLARIS
-		eth_head = (struct ether_header *)head_mp->b_rptr;
-		ct_head = (cluster_target_msg_header_t *)
-			(head_mp->b_rptr + sizeof(struct ether_header));
-		bcopy(port_mac->mac_addr,
-		    eth_head->ether_shost.ether_addr_octet, 
-			ETHERADDRL);
-		if (dst == CLUSTER_SAN_BROADCAST_SESS) {
-			bcopy(mac_broadcast_addr,
-			    eth_head->ether_dhost.ether_addr_octet, 
-				ETHERADDRL);
-		} else {
-			bcopy(sess_mac->sess_daddr,
-			    eth_head->ether_dhost.ether_addr_octet, 
-				ETHERADDRL);
-		}
-		eth_head->ether_type = htons(ETHERTYPE_CLUSTERSAN);
-#else
-		head_mp->skb->dev = port_mac->dev;
-		head_mp->skb->priority = 0;
-		if ((ex_len != 0) && (origin_data->header != NULL)) {
-			memcpy(skb_push(head_mp->skb, ex_len), origin_data->header, ex_len);
-		}
-		ct_head = (cluster_target_msg_header_t*)skb_push(head_mp->skb, sizeof(cluster_target_msg_header_t));
-		memset(ct_head, 0, sizeof(*ct_head));
-		eth_head = (struct ether_header *)skb_push(head_mp->skb, sizeof(struct ether_header));
-		skb_reset_mac_header(head_mp->skb);
-		memcpy(eth_head->h_source, port_mac->dev->dev_addr, ETH_ALEN);
-		if (dst == CLUSTER_SAN_BROADCAST_SESS) {
-			memcpy(eth_head->h_dest, mac_broadcast_addr, ETH_ALEN);
-		} else {
-			memcpy(eth_head->h_dest, sess_mac->sess_daddr, ETH_ALEN);
-		}
-		eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
-#endif
-		ct_head->msg_type = origin_data->msg_type;
-		ct_head->index = origin_data->index;
-		ct_head->len = fragment_len;
-		ct_head->total_len = origin_data->data_len;
-		ct_head->offset = fragment_offset;
-		ct_head->need_reply = (uint8_t)(origin_data->need_reply == B_TRUE);
-		ct_head->ex_len = ex_len;
-		memset(ct_head->reserved, 0x55, 8);
-#ifdef SOLARIS
-		head_mp->b_wptr = head_mp->b_rptr + head_len + ex_len;
-#endif
+		head_mp->origin_data = origin_data;
+		head_mp->is_sgl = 0;
+		head_mp->is_first = is_first;
+		head_mp->dst = dst;
+		head_mp->fragment_offset = fragment_offset;
+		head_mp->fragment_len = fragment_len;
+		head_mp->fragment_data = fragment_data;
 		mac_tran_data = kmem_zalloc(sizeof(cluster_target_mac_tran_data_t), KM_SLEEP);
 		mac_tran_data->mp = head_mp;
 		mac_tran_data->len = head_len + ex_len + fragment_len;
 		data_array[do_fragment_cnt].fragmentation = mac_tran_data;
-#ifdef SOLARIS
-		if ((ex_len != 0) && (origin_data->header != NULL)) {
-			ex_head = (void *)((uintptr_t)ct_head + sizeof(cluster_target_msg_header_t));
-			bcopy(origin_data->header, ex_head, ex_len);
-			ex_len = 0;
-		}
-#else		
+		if (is_first)
+			is_first = B_FALSE;
+		
 		if (ex_len != 0)
 			ex_len = 0;
-#endif
 		fragment_offset += fragment_len;
 		fragment_total_len += fragment_len;
 		do_fragment_cnt++;
@@ -602,9 +581,10 @@ static int cluster_target_mac_tran_data_fragment_sgl(
 	cluster_target_port_mac_t *port_mac = src;
 	cluster_target_session_mac_t *sess_mac = dst;
 	int remain = origin_data->data_len;
+	boolean_t is_first = B_TRUE;
 	
 	sgtable = (struct sg_table *)origin_data->data;
-	if (sgtable){
+	if (sgtable) {
 		fragment_cnt = sgtable->nents;
 		sg = sgtable->sgl;
 	}
@@ -616,71 +596,36 @@ static int cluster_target_mac_tran_data_fragment_sgl(
 		KM_SLEEP);
 	ex_len = origin_data->header_len;
 	 
-	do{		
-		if (ex_len ){ /* first mblk */
-			head_mp = cluster_target_mac_get_mblk(origin_data->header, origin_data->header_len,
-				head_len);
-		} else {
-			head_mp = cluster_target_mac_get_mblk(NULL, 0,
-				head_len);
-		}
+	do {
+		head_mp = cluster_target_mac_get_mblk();
 
-		if(head_mp==NULL){
+		if (head_mp == NULL) {
 			fragment_cnt = 0;
 			printk(KERN_WARNING "%s: alloc mblk failed\n",	__func__);
 			goto end_of_count_frarray;
-		}
-
-		head_mp->skb->dev = port_mac->dev;
-		head_mp->skb->priority = 0;
-		
-		ct_head = (cluster_target_msg_header_t*)skb_push(head_mp->skb, sizeof(cluster_target_msg_header_t));
-		memset(ct_head, 0, sizeof(*ct_head));
-		eth_head = (struct ether_header *)skb_push(head_mp->skb, sizeof(struct ether_header));
-		skb_reset_mac_header(head_mp->skb);
-
-		if (sg) {
-			fragment_len = min((size_t)sg->length, remain);
-	
-			page = sg_page(sg);
-			BUG_ON(!page);
-			get_page(page);
-						
-			skb_fill_page_desc(head_mp->skb,
-					   skb_shinfo(head_mp->skb)->nr_frags,
-					   page, sg->offset, fragment_len);
-			
-			head_mp->skb->len += fragment_len;
-			head_mp->skb->data_len += fragment_len;
-			head_mp->skb->truesize += fragment_len;
-			/*
-			printk(KERN_WARNING "%s: sg no[%d]  offset=%d len=%d frlen=%d remain=%d\n",	
-				__func__,do_fragment_cnt,sg->offset,sg->length,fragment_len,remain);
-				*/
 		}	
-		
-		memcpy(eth_head->h_source, port_mac->dev->dev_addr, ETH_ALEN);
-		if (dst == CLUSTER_SAN_BROADCAST_SESS) {
-			memcpy(eth_head->h_dest, mac_broadcast_addr, ETH_ALEN);
-		} else {
-			memcpy(eth_head->h_dest, sess_mac->sess_daddr, ETH_ALEN);
-		}
-		eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
 
-		ct_head->msg_type = origin_data->msg_type;
-		ct_head->index = origin_data->index;
-		ct_head->len = fragment_len;
-		ct_head->total_len = origin_data->data_len;
-		ct_head->offset = fragment_offset;
-		ct_head->need_reply = (uint8_t)(origin_data->need_reply == B_TRUE);
-		ct_head->ex_len = ex_len;
-		memset(ct_head->reserved, 0x55, 8);
-		
 		mac_tran_data = kmem_zalloc(sizeof(cluster_target_mac_tran_data_t), KM_SLEEP);
 		mac_tran_data->mp = head_mp;
-		mac_tran_data->len = head_len + ex_len + fragment_len;
+		head_mp->origin_data = origin_data;
+		head_mp->is_sgl = B_TRUE;
+		head_mp->is_first = is_first;
+		head_mp->dst = dst;
+		head_mp->fragment_offset = fragment_offset;
+		if (sg) {
+			fragment_len = min((size_t)sg->length, remain);
+			head_mp->fragment_len = fragment_len;
+			head_mp->fragment_data = (char *)sg;
+		} else {
+			head_mp->fragment_len = fragment_len = 0;
+			head_mp->fragment_data = NULL;
+		}		
+		mac_tran_data->len = head_len + ex_len + fragment_len;		
 		data_array[do_fragment_cnt].fragmentation = mac_tran_data;
-		if(ex_len)
+		if (is_first)
+			is_first = B_FALSE;
+		
+		if (ex_len)
 			ex_len = 0;
 		do_fragment_cnt++;
 		fragment_offset += fragment_len;
@@ -985,8 +930,7 @@ static void cts_mac_send_direct_impl(cluster_target_session_t *cts,
 	cluster_san_hostinfo_t *cshi = cts->sess_host_private;
 	cluster_target_port_mac_t *port_mac = ctp->target_private;
 	cluster_target_session_mac_t *sess_mac = cts->sess_target_private;
-	size_t head_len = sizeof(struct ether_header) +
-		sizeof(cluster_target_msg_header_t);
+	cluster_tran_data_origin_t origin_data = {0};
 
 	if ((cts->sess_flags & CLUSTER_TARGET_SESS_FLAG_UINIT) != 0) {
 		return;
@@ -995,45 +939,32 @@ static void cts_mac_send_direct_impl(cluster_target_session_t *cts,
 		return;
 	}
 	tx_index = atomic_inc_64_nv(&cshi->host_tx_index);
-	mp = cluster_target_mac_get_mblk(NULL, 0, head_len);
+	mp = cluster_target_mac_get_mblk();
 	if (mp == NULL) {
 		ctp_tx_rele(ctp);
 		cmn_err(CE_WARN, "%s: get mblk failed, msgtype: 0x%x",
 			__func__, msg_type);
 		return;
 	}
-#ifdef SOLARIS
-	eth_head = (struct ether_header *) mp->b_rptr;
-	ct_head = (cluster_target_msg_header_t *)
-		(mp->b_rptr + sizeof(struct ether_header));
-	bcopy(port_mac->mac_addr,
-	    eth_head->ether_shost.ether_addr_octet, 
-		ETHERADDRL);
-	bcopy(sess_mac->sess_daddr,
-	    eth_head->ether_dhost.ether_addr_octet, 
-		ETHERADDRL);
-	eth_head->ether_type = htons(ETHERTYPE_CLUSTERSAN);
-#else
-	mp->skb->dev = port_mac->dev;
-	mp->skb->priority = 0;
-	ct_head = (cluster_target_msg_header_t*)skb_push(mp->skb, sizeof(cluster_target_msg_header_t));
-	eth_head = (struct ether_header *)skb_push(mp->skb, sizeof(struct ether_header));
-	bcopy(port_mac->dev->dev_addr, eth_head->h_source, ETHERADDRL);
-	bcopy(sess_mac->sess_daddr, eth_head->h_dest, ETHERADDRL);
-	eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
-#endif
-	ct_head->msg_type = msg_type;
-	ct_head->index = tx_index;
-	ct_head->len = 0;
-	ct_head->total_len = 0;
-	ct_head->offset = 0;
-	ct_head->need_reply = 0;
-	ct_head->ex_len = 0;
-	ct_head->fc_tx_len = fc_tx_bytes;
-	ct_head->fc_rx_len = fc_rx_bytes;
-#ifdef SOLARIS
-	mp->b_wptr = mp->b_rptr + head_len;
-#endif
+	
+	origin_data.msg_type = msg_type;
+	origin_data.index = tx_index;
+	origin_data.data = NULL;
+	origin_data.data_len = 0;
+	origin_data.header = NULL;
+	origin_data.header_len = 0;
+	origin_data.need_reply = 0;
+
+	mp->origin_data = &origin_data;
+	mp->is_sgl = B_FALSE;
+	mp->is_first = B_TRUE;
+	mp->fc_tx_len = fc_tx_bytes;
+	mp->fc_rx_len = fc_rx_bytes;
+	mp->dst = sess_mac;
+	mp->fragment_offset = 0;
+	mp->fragment_len = 0;
+	mp->fragment_data = 0;
+	
 	cluster_target_mac_send_mp(ctp, mp);
 	ctp_tx_rele(ctp);
 }
