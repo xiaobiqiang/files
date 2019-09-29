@@ -43,8 +43,6 @@
 #endif
 #endif
 
-static struct kmem_cache *mblk_cache = NULL;
-
 #define	CLUSTER_MAC_TX_MAX_REPEAT_COUNT		3
 #define TARGET_PORT_NUM		2
 typedef struct TARGET_PORT_ARRAY
@@ -68,9 +66,16 @@ TARGET_PORT_ARRAY_t target_port_array[TARGET_PORT_NUM]=
 	}
 };
 
+static struct kmem_cache *mblk_cache = NULL;
+
 //extern pri_t minclsyspri, maxclsyspri;
+int cts_mac_flowcontrol = 1;
 uint32_t cts_mac_throttle_max = 2048 * 1024;
 uint32_t cts_mac_throttle_default = 1024 * 1024;
+
+int cts_mac_frame_statistics = 0;
+unsigned int cts_mac_send_success = 0;
+unsigned int cts_mac_recv_success = 0;
 
 uint8_t mac_broadcast_addr[ETHERADDRL] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
@@ -381,6 +386,8 @@ cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 			}
 		} else {
 			atomic_swap_32(&port_mac->tx_failed_times, 0);
+			if (cts_mac_frame_statistics)
+				atomic_inc_32(&cts_mac_send_success);
 			ret = 0;
 			break;
 		}
@@ -430,13 +437,15 @@ static int cts_mac_tran_start(cluster_target_session_t *cts, void *fragmentation
 	mblk_t *mp = mac_tran_data->mp;
 	int ret;
 	uint32_t fc_rx_bytes;
-	
-	mutex_enter(&sess_mac->sess_fc_mtx);
-	while (mac_tran_data->len > sess_mac->sess_fc_throttle) {
-		cts_mac_tran_throttle_wait(cts);
+
+	if (cts_mac_flowcontrol) {
+		mutex_enter(&sess_mac->sess_fc_mtx);
+		while (mac_tran_data->len > sess_mac->sess_fc_throttle) {
+			cts_mac_tran_throttle_wait(cts);
+		}
+		sess_mac->sess_fc_throttle -= mac_tran_data->len;
+		mutex_exit(&sess_mac->sess_fc_mtx);
 	}
-	sess_mac->sess_fc_throttle -= mac_tran_data->len;
-	mutex_exit(&sess_mac->sess_fc_mtx);
 
 	fc_rx_bytes = atomic_swap_32(&sess_mac->sess_fc_rx_bytes, 0);
 	mp->fc_tx_len = mac_tran_data->len;
@@ -892,6 +901,8 @@ static int cluster_rcv(struct sk_buff *skb, struct net_device *dev,
 	ct_head = (cluster_target_msg_header_t *)(skb_mac_header(skb) + sizeof(struct ether_header));
 	ctp_w = &port_mac->rx_worker[ct_head->index % port_mac->rx_worker_n];
 	mp = cluster_target_mac_get_mblk(skb, GFP_ATOMIC);
+	if (cts_mac_frame_statistics)
+		atomic_inc_32(&cts_mac_recv_success);
 	ctp_mac_rx_worker_wakeup(ctp_w, mp);
 
 #if 0
@@ -1137,8 +1148,9 @@ static void ctp_mac_rx_worker_handle(void *arg)
 			}
 		}
 		
-		ctp_mac_rx_throttle_handle(ctp);
 		if (w->worker_ntasks == 0) {
+			if (cts_mac_flowcontrol)
+				ctp_mac_rx_throttle_handle(ctp);
 			wait_event_timeout(w->worker_queue, (w->worker_ntasks != 0 || w->worker_flags & CLUSTER_TARGET_TH_STATE_STOP), 60 * HZ);
 			//cv_timedwait(&w->worker_cv, &w->worker_mtx, ddi_get_lbolt() + msecs_to_jiffies(60000));
 		} else {
@@ -1471,4 +1483,14 @@ void cluster_target_mac_port_destroy(cluster_target_port_t *ctp)
 #undef	ether_header
 #endif
 
+module_param(cts_mac_flowcontrol, int, 0644);
+MODULE_PARM_DESC(cts_mac_flowcontrol, "cts_mac_flowcontrol");
 
+module_param(cts_mac_frame_statistics, int, 0644);
+MODULE_PARM_DESC(cts_mac_frame_statistics, "cts_mac_frame_statistics");
+
+module_param(cts_mac_send_success, uint, 0644);
+MODULE_PARM_DESC(cts_mac_send_success, "cts_mac_send_success");
+
+module_param(cts_mac_recv_success, uint, 0644);
+MODULE_PARM_DESC(cts_mac_recv_success, "cts_mac_recv_success");
