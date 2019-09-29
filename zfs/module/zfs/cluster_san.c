@@ -71,7 +71,7 @@ uint32_t cluster_san_host_nrxworker = 16;
 
 uint32_t cluster_session_select_strategy = CLUSTER_SESSION_SEL_ROUNDROBIN;
 
-volatile uint64_t cts_reply_timeout = 3000; /* ms */
+volatile uint64_t cts_reply_timeout = 600; /* ms */
 
 volatile uint64_t cs_wd_polltime = 10; /* s */
 volatile uint64_t cts_expired_handle_time = 10; /* s */
@@ -3508,7 +3508,10 @@ static void cts_tran_worker_thread(void *arg)
 	cluster_target_tran_worker_t *tran_work = (cluster_target_tran_worker_t *)arg;
 	cluster_target_session_t *cts = tran_work->tran_target_private;
 	cluster_target_tran_node_t *tran_node;
-	int ret;
+	int ret = 0;
+	int ret_normal = 0;
+	int ret_pri = 0;
+	boolean_t b_pri = B_FALSE;
 
 	atomic_inc_32(&cts->sess_tran_running_n);
 
@@ -3524,15 +3527,45 @@ static void cts_tran_worker_thread(void *arg)
 
 			if (tran_node == NULL) {
 				tran_node = list_remove_head(tran_work->queue_r);
+				b_pri = B_FALSE;
+			} else {
+				b_pri = B_TRUE;
 			}
 
 			if (tran_node != NULL) {
 				atomic_dec_32(&tran_work->node_numbers);
- 				ret = cts_tran_start(cts, tran_node);
-				if (tran_node->wait != 0) {
+				if (tran_node->need_wait) {
+					if (b_pri && ret_pri != 0) {
+						/* skip */
+					} else if (!b_pri && ret_normal != 0) {
+						/* skip */
+					} else {
+						ret = cts_tran_start(cts, tran_node);
+					}
+				} else {
+					ret = cts_tran_start(cts, tran_node);
+				}
+				
+				if (tran_node->need_wait) {
+					if (b_pri) {
+						if (ret_pri == 0)
+							ret_pri = ret;
+					} else {
+						if (ret_normal == 0)
+							ret_normal = ret;
+					}
+				}
+				
+				if (tran_node->need_wait && tran_node->wait != 0) {
 					mutex_enter(tran_node->mtx);
 					tran_node->wait = 0;
-					tran_node->ret = ret;
+					if (b_pri) {
+						tran_node->ret = ret_pri;
+						ret_pri = 0;
+					} else {
+						tran_node->ret = ret_normal;
+						ret_normal = 0;
+					}
 					cv_signal(tran_node->cv);
 					mutex_exit(tran_node->mtx);
 				} else {
@@ -4129,7 +4162,10 @@ static void cluster_target_tran_worker_thread(void *arg)
 	cluster_target_tran_worker_t *tran_work = (cluster_target_tran_worker_t *)arg;
 	cluster_target_port_t * ctp = tran_work->tran_target_private;
 	cluster_target_tran_node_t *tran_node;
-	int ret;
+	int ret = 0;
+	int ret_normal = 0;
+	int ret_pri = 0;
+	boolean_t b_pri = B_FALSE;
 
 	atomic_inc_32(&ctp->tran_running_n);
 
@@ -4145,15 +4181,46 @@ static void cluster_target_tran_worker_thread(void *arg)
 
 			if (tran_node == NULL) {
 				tran_node = list_remove_head(tran_work->queue_r);
+				b_pri = B_FALSE;
+			} else {
+				b_pri = B_TRUE;
 			}
 
 			if (tran_node != NULL) {
 				atomic_dec_32(&tran_work->node_numbers);
-				ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
-				if (tran_node->wait != 0) {
+				if (tran_node->need_wait) {
+					if (b_pri && ret_pri != 0) {
+						/* skip */
+					} else if (!b_pri && ret_normal != 0) {
+						/* skip */
+					} else {
+						ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
+					}
+				} else {
+					ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
+				}
+				
+				if (tran_node->need_wait) {
+					if (b_pri) {
+						if (ret_pri == 0)
+							ret_pri = ret;
+					} else {
+						if (ret_normal == 0)
+							ret_normal = ret;
+					}
+				}
+				
+				if (tran_node->need_wait && tran_node->wait != 0) {
 					mutex_enter(tran_node->mtx);
 					tran_node->wait = 0;
-					tran_node->ret = ret;
+
+					if (b_pri) {
+						tran_node->ret = ret_pri;
+						ret_pri = 0;
+					} else {
+						tran_node->ret = ret_normal;
+						ret_normal = 0;
+					}
 					cv_signal(tran_node->cv);
 					mutex_exit(tran_node->mtx);
 				} else {
@@ -4510,8 +4577,10 @@ static int cluster_target_tran_worker_entry(
 	for (i = 0; i < cnt; i++) {
 		tran_node = kmem_zalloc(sizeof(cluster_target_tran_node_t), KM_SLEEP);
 		tran_node->fragmentation= data_array[i].fragmentation;
+		tran_node->need_wait = wait;
 		data_array[i].fragmentation = NULL;
 		if ((wait != 0) && ((i + 1) == cnt)) {
+			/* last one && wait */
 			tran_node->wait = wait;
 			tran_node->mtx = mtx;
 			tran_node->cv = cv;
