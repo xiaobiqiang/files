@@ -70,16 +70,18 @@ static struct kmem_cache *mblk_cache = NULL;
 
 //extern pri_t minclsyspri, maxclsyspri;
 int cts_mac_flowcontrol = 1;
-uint32_t cts_mac_throttle_max = 2048 * 1024;
-uint32_t cts_mac_throttle_default = 1024 * 1024;
+unsigned int cts_mac_throttle_max = 2048 * 1024;
+unsigned int cts_mac_throttle_default = 1024 * 1024;
 
 int cts_mac_frame_statistics = 0;
 unsigned int cts_mac_send_success = 0;
 unsigned int cts_mac_recv_success = 0;
+unsigned int cts_mac_send_failed = 0;
+unsigned int cts_mac_recv_failed = 0;
 
 uint8_t mac_broadcast_addr[ETHERADDRL] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-uint32_t cluster_target_mac_nrxworker = 1;
+unsigned int cluster_target_mac_nrxworker = 16;
 
 #ifndef SOLARIS
 #define	ETHERTYPE_CLUSTERSAN	(0x8908)	/* cluster san */
@@ -365,6 +367,9 @@ cluster_target_mac_send_mp(void *port, mblk_t *mblk)
 		
 		ret_cookie = dev_queue_xmit(skb);
 		if (unlikely(ret_cookie != 0)) {
+			if (cts_mac_frame_statistics)
+				atomic_inc_32(&cts_mac_send_failed);
+			
 			tx_failed_times = atomic_inc_32_nv(&port_mac->tx_failed_times);
 			if ((tx_failed_times % 100) == 0) {
 				is_print = B_TRUE;
@@ -901,8 +906,6 @@ static int cluster_rcv(struct sk_buff *skb, struct net_device *dev,
 	ct_head = (cluster_target_msg_header_t *)(skb_mac_header(skb) + sizeof(struct ether_header));
 	ctp_w = &port_mac->rx_worker[ct_head->index % port_mac->rx_worker_n];
 	mp = cluster_target_mac_get_mblk(skb, GFP_ATOMIC);
-	if (cts_mac_frame_statistics)
-		atomic_inc_32(&cts_mac_recv_success);
 	ctp_mac_rx_worker_wakeup(ctp_w, mp);
 
 #if 0
@@ -1080,8 +1083,13 @@ static void ctp_mac_rx_worker_handle(void *arg)
 				atomic_dec_32(&w->worker_ntasks);
 				fragment = cts_mac_mblk_to_fragment(ctp, mp);
 				if (fragment == NULL) {
+					if (cts_mac_frame_statistics)
+						atomic_inc_32(&cts_mac_recv_failed);
 					continue;
 				}
+				if (cts_mac_frame_statistics)
+					atomic_inc_32(&cts_mac_recv_success);
+				
 				/* put to session */
 				eth_head = fragment->phy_head;
 				ct_head = fragment->ct_head;
@@ -1486,6 +1494,12 @@ void cluster_target_mac_port_destroy(cluster_target_port_t *ctp)
 module_param(cts_mac_flowcontrol, int, 0644);
 MODULE_PARM_DESC(cts_mac_flowcontrol, "cts_mac_flowcontrol");
 
+module_param(cts_mac_throttle_max, uint, 0644);
+MODULE_PARM_DESC(cts_mac_throttle_max, "cts_mac_throttle_max");
+
+module_param(cts_mac_throttle_default, uint, 0644);
+MODULE_PARM_DESC(cts_mac_throttle_default, "cts_mac_throttle_default");
+
 module_param(cts_mac_frame_statistics, int, 0644);
 MODULE_PARM_DESC(cts_mac_frame_statistics, "cts_mac_frame_statistics");
 
@@ -1494,3 +1508,12 @@ MODULE_PARM_DESC(cts_mac_send_success, "cts_mac_send_success");
 
 module_param(cts_mac_recv_success, uint, 0644);
 MODULE_PARM_DESC(cts_mac_recv_success, "cts_mac_recv_success");
+
+module_param(cts_mac_send_failed, uint, 0644);
+MODULE_PARM_DESC(cts_mac_send_failed, "cts_mac_send_failed");
+
+module_param(cts_mac_recv_failed, uint, 0644);
+MODULE_PARM_DESC(cts_mac_recv_failed, "cts_mac_recv_failed");
+
+module_param(cluster_target_mac_nrxworker, uint, 0644);
+MODULE_PARM_DESC(cluster_target_mac_nrxworker, "cluster_target_mac_nrxworker");

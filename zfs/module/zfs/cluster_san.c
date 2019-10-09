@@ -61,10 +61,10 @@ cluster_san_t *clustersan = NULL;
 uint32_t cluster_target_tran_work_ndefault = 0;
 uint64_t cluster_target_broadcast_index = 0;
 
-uint32_t cluster_target_session_ntranwork = 1;
+unsigned int cluster_target_session_ntranwork = 16;
 uint32_t cluster_target_session_count = 0;
-uint32_t cluster_target_session_nrxworker = 1;
-uint32_t cluster_san_host_nrxworker = 16;
+unsigned int cluster_target_session_nrxworker = 16;
+unsigned int cluster_san_host_nrxworker = 16;
 
 #define	CLUSTER_SESSION_SEL_ROUNDROBIN			0x1
 #define	CLUSTER_SESSION_SEL_LOADBALANCING		0x2
@@ -3601,8 +3601,12 @@ static void cts_tran_worker_init(cluster_target_session_t *cts)
 
 	if (cluster_target_session_ntranwork == 0) {
 		cts->sess_tran_worker_n = num_online_cpus();
+		cmn_err(CE_NOTE, "zjn %s num_online_cpus %d", __func__, 
+			cts->sess_tran_worker_n);
 	} else {
 		cts->sess_tran_worker_n = cluster_target_session_ntranwork;
+		cmn_err(CE_NOTE, "zjn %s sess_tran_worker_n %d", __func__,
+			cts->sess_tran_worker_n);
 	}
 	cts->sess_tran_worker = (cluster_target_tran_worker_t *)kmem_zalloc(
 		sizeof(cluster_target_tran_worker_t) * cts->sess_tran_worker_n, KM_SLEEP);
@@ -5818,6 +5822,15 @@ clustersan_vsas_set_levent_callback(cs_vsas_rx_cb_t rx_cb, void *arg)
 	cluster_vsas_event_callback.arg = arg;
     return 0;
 }
+
+module_param(cluster_target_session_ntranwork, uint, 0644);
+MODULE_PARM_DESC(cluster_target_session_ntranwork, "cluster_target_session_ntranwork");
+
+module_param(cluster_target_session_nrxworker, uint, 0644);
+MODULE_PARM_DESC(cluster_target_session_nrxworker, "cluster_target_session_nrxworker");
+
+module_param(cluster_san_host_nrxworker, uint, 0644);
+MODULE_PARM_DESC(cluster_san_host_nrxworker, "cluster_san_host_nrxworker");
 
 EXPORT_SYMBOL(clustersan_vsas_set_levent_callback);
 EXPORT_SYMBOL(cluster_san_hostinfo_rele);
