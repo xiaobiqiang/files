@@ -112,6 +112,7 @@ struct arc_buf {
 	arc_buf_t		*b_next;
 	kmutex_t		b_evict_lock;
 	void			*b_data;
+	/* dbuf_do_evict */
 	arc_evict_func_t	*b_efunc;
 	void			*b_private;
 };
