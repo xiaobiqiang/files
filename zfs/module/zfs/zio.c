@@ -3600,7 +3600,7 @@ zio_done(zio_t *zio)
 		zio_remove_child(pio, zio, zl);
 		zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
 	}
-
+#ifdef DEBUG
 #ifdef _KERNEL
 	if(ddi_get_time()-zio->io_stamp1 >10){
 		cmn_err(CE_WARN, "%s , zio_timeout=%d nows=%ld %ld", __func__, 
@@ -3608,6 +3608,7 @@ zio_done(zio_t *zio)
 		cmn_err(CE_WARN, "%s ,zio=%p type=%d txg=%ld size=%ld io_vd=%p ", __func__, 
 			zio ,zio->io_type, zio->io_txg,zio->io_spa->spa_name,zio->io_size ,zio->io_vd);
 	}
+#endif
 #endif
 	raidz_aggre_zio_done(zio);
 	if (zio->io_waiter != NULL) {
