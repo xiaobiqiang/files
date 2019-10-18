@@ -16,7 +16,7 @@
 const char* fc_stat_script = "/usr/local/sbin/fc_stat.sh";
 
 struct per_fc_stat {
-	char     name[32];
+	char     name[128];
 	uint32_t nread;
 	uint32_t nwritten;
     uint32_t reads;
