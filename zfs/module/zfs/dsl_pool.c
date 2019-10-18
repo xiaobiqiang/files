@@ -160,6 +160,8 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	rrw_init(&dp->dp_config_rwlock, B_TRUE);
 	txg_init(dp, txg);
 
+	list_create(&dp->dp_synced_datasets, sizeof (dsl_dataset_t),
+	    offsetof(dsl_dataset_t, ds_synced_link));
 	txg_list_create(&dp->dp_dirty_datasets,
 	    offsetof(dsl_dataset_t, ds_dirty_link));
 	txg_list_create(&dp->dp_dirty_zilogs,
@@ -488,11 +490,8 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dsl_dataset_t *ds;
 	system_space_os_t *spos = NULL;
 	objset_t *mos = dp->dp_meta_objset;
-	list_t synced_datasets;
-
-	list_create(&synced_datasets, sizeof (dsl_dataset_t),
-	    offsetof(dsl_dataset_t, ds_synced_link));
-
+	list_t *synced_datasets = &dp->dp_synced_datasets;
+	
 	tx = dmu_tx_create_assigned(dp, txg);
 
 	/*
@@ -506,7 +505,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		 * may sync newly-created datasets on pass 2.
 		 */
 		ASSERT(!list_link_active(&ds->ds_synced_link));
-		list_insert_tail(&synced_datasets, ds);
+		list_insert_tail(synced_datasets, ds);
 
 		if (ds->ds_objset->os_is_group) {
 			spos = kmem_zalloc(sizeof(system_space_os_t), KM_SLEEP);
@@ -530,8 +529,8 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 * After the data blocks have been written (ensured by the zio_wait()
 	 * above), update the user/group space accounting.
 	 */
-	for (ds = list_head(&synced_datasets); ds != NULL;
-	    ds = list_next(&synced_datasets, ds)) {
+	for (ds = list_head(synced_datasets); ds != NULL;
+	    ds = list_next(synced_datasets, ds)) {
 		dmu_objset_do_userquota_updates(ds->ds_objset, tx);
 	}
 
@@ -557,12 +556,11 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 *  - move dead blocks from the pending deadlist to the on-disk deadlist
 	 *  - release hold from dsl_dataset_dirty()
 	 */
-	while ((ds = list_remove_head(&synced_datasets)) != NULL) {
+	for (ds = list_head(synced_datasets); ds; 
+				ds = list_next(synced_datasets, ds)) {
 		ASSERTV(objset_t *os = ds->ds_objset);
 		bplist_iterate(&ds->ds_pending_deadlist,
 		    deadlist_enqueue_cb, &ds->ds_deadlist, tx);
-		ASSERT(!dmu_objset_is_dirty(os, txg));
-		dmu_buf_rele(ds->ds_dbuf, ds);
 	}
 
 	while ((dd = txg_list_remove(&dp->dp_dirty_dirs, txg)) != NULL) {
@@ -621,22 +619,27 @@ dsl_pool_sync_done(dsl_pool_t *dp, uint64_t txg)
 	zilog_t *zilog;
     objset_t *os;
     uint64_t ds_object;
-
+	dsl_dataset_t *ds_synced;
+	
 	while ((zilog = txg_list_remove(&dp->dp_dirty_zilogs, txg))) {
 		dsl_dataset_t *ds = dmu_objset_ds(zilog->zl_os);
-#ifdef _KERNEL
-        os = ds->ds_objset;
-        ds_object = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object: 0;
-        zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
-            txg, 0, MIRROR_DATA_ALIGNED);
-        zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
-            txg, 0, MIRROR_DATA_META_ALIGNED);
-        zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
-            txg, 0, MIRROR_DATA_UNALIGNED);
-#endif
 		zil_clean(zilog, txg);
 		ASSERT(!dmu_objset_is_dirty(zilog->zl_os, txg));
 		dmu_buf_rele(ds->ds_dbuf, zilog);
+	}
+	while (ds_synced = list_remove_head(&dp->dp_synced_datasets)) {
+#ifdef _KERNEL
+	 	os = ds_synced->ds_objset;
+	    ds_object = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object: 0;
+	    zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
+	        txg, 0, MIRROR_DATA_ALIGNED);
+	    zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
+	        txg, 0, MIRROR_DATA_META_ALIGNED);
+	    zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
+	        txg, 0, MIRROR_DATA_UNALIGNED);
+		ASSERT(!dmu_objset_is_dirty(os, txg));
+		dmu_buf_rele(ds_synced->ds_dbuf, ds_synced);
+#endif
 	}
 	ASSERT(!dmu_objset_is_dirty(dp->dp_meta_objset, txg));
 }

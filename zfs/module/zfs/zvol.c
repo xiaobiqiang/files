@@ -161,7 +161,8 @@ zvol_replay_rawdata(objset_t *os, char *data,
    dmu_tx_hold_write(tx, object,  offset, len);
    error = dmu_tx_assign(tx, TXG_WAIT);
    if (error) {
-       dmu_tx_abort(tx);
+		printk(KERN_WARNING "%s error:%d", __func__, error);
+       	dmu_tx_abort(tx);
    } else {
        dmu_write(os, object, offset, len, data,
            tx, B_FALSE);
