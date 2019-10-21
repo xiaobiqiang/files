@@ -231,6 +231,7 @@ typedef struct sbd_lu {
 	void		*sl_zvol_objset_hdl;
 	void		*sl_zvol_zil_hdl;
 	void		*sl_zvol_rl_hdl;
+	/* zvol_state_t's zv_dbuf (dmu_dbuf_impl_t)*/
 	void		*sl_zvol_bonus_hdl;
 
 	/* Backing store */

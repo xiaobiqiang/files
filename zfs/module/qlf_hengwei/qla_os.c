@@ -2891,7 +2891,7 @@ skip_dpc:
             "end add target\n");
 	ql_log(ql_log_info, base_vha, 0x00fb,
             "ready to start target\n");
-	qlt_port_start(base_vha);
+	kthread_run(qlt_port_start, base_vha, "port_start_%p", base_vha);
 	ql_log(ql_log_info, base_vha, 0x00fb,
             "end to add target\n");
 	//qlt_enable_vha(base_vha);

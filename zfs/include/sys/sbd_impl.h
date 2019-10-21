@@ -203,7 +203,7 @@ typedef struct sbd_cmd {
 	uint8_t		nbufs;
 	uint16_t	cmd_type;	/* Type of command */
 	uint32_t	trans_data_len;	/* Length of transient data buf */
-	uint64_t	addr;		/* current */
+	uint64_t	addr;		/* current zvol lba addr*/
 	uint32_t	len;		/* len left */
 	uint32_t	current_ro;	/* running relative offset */
 	uint8_t		*trans_data;	/* Any transient data */

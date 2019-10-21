@@ -19,7 +19,7 @@ systemdunit_DATA = \
 	pmm.service 	\
 	iscsitsvc.service	\
 	ipmi_monitor.service	\
-	fc_boot.service	\
+	fc-boot.service	\
 	drbdmon-svc.service	
 
 EXTRA_DIST = \
@@ -41,7 +41,7 @@ EXTRA_DIST = \
 	$(top_srcdir)/etc/systemd/system/pmm.service.in  \
 	$(top_srcdir)/etc/systemd/system/iscsitsvc.service.in	\
 	$(top_srcdir)/etc/systemd/system/ipmi_monitor.service.in \
-	$(top_srcdir)/etc/systemd/system/fc_boot.service.in	\
+	$(top_srcdir)/etc/systemd/system/fc-boot.service.in	\
 	$(top_srcdir)/etc/systemd/system/drbdmon-svc.service.in
 
 $(systemdunit_DATA):
