@@ -5364,13 +5364,16 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 		return -ENOMEM;
 	}
 
+	/*
 	cluster_san_hb_stop();
 	zfs_mirror_stop_watchdog_thread();
-
+	*/
+	
 	printk("%s: start to send data\n", __func__);
 	index = (uint64_t *)buf;
 	for (i = 0; i < cnt; i++) {
 		*index = i;
+		cmn_err(CE_WARN, "ZFS_MIRROR_SPEED_TEST send data %llu", *index);
 		/* FIXME: send msg */
 		ret = zfs_mirror_tx_speed_data(buf, bs, need_reply);
 		if (ret) {
