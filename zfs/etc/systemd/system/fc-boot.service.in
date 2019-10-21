@@ -3,12 +3,13 @@ Description=Fibre Channel Kernel Module Loader Service
 DefaultDependencies=no
 After=stmf-boot.service
 After=pppt-boot.service
+After=stmf-svc.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=/sbin/rmmod qla2xxx
+ExecStartPre=/usr/sbin/rmmod qla2xxx
 ExecStart=/sbin/modprobe qlf_hengwei
 
 [Install]
-WantedBy=zfs.target
+WantedBy=multi-user.target
