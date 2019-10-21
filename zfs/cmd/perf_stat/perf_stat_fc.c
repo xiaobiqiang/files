@@ -16,11 +16,11 @@
 const char* fc_stat_script = "/usr/local/sbin/fc_stat.sh";
 
 struct per_fc_stat {
-	char     name[32];
-	uint32_t nread;
-	uint32_t nwritten;
-    uint32_t reads;
-    uint32_t writes;
+	char     name[128];
+	uint64_t nread;
+	uint64_t nwritten;
+    uint64_t reads;
+    uint64_t writes;
 	struct per_fc_stat	*next;
 };
 
@@ -136,7 +136,7 @@ store_fc_stat_history(struct fc_stat_snapshot *old_snap, struct fc_stat_snapshot
 	for (p0 = old_snap->head, p1 = snap->head; p0 != NULL && p1 != NULL;) {
 		int cmp = strcmp(p0->name, p1->name);
 		if (cmp == 0) {
-			uint32_t diff_r, diff_w;
+			uint64_t diff_r, diff_w;
 			double rps, wps, rbps, wbps;
 //			assert(p0->reads <= p1->reads);
 //			assert(p0->writes <= p1->writes);
@@ -219,7 +219,7 @@ perf_stat_fc(void)
 	snap->timestamp = time(NULL);
 	for (buf = result->head; buf; buf = buf->next) {
 		struct per_fc_stat *stat;
-        unsigned long int ul;
+        unsigned long long int ull;
 		if (buf->bufc < 5)
 			continue;
         
@@ -231,36 +231,36 @@ perf_stat_fc(void)
 		}
         if (strncmp(buf->bufv[0], "wwn.", 4) == 0)
 		{ 
-            strcpy(stat->name,buf->bufv[0]);
+            sprintf(stat->name, "%s", buf->bufv[0]);
         }
         log_write("bufv:%s",stat->name);
-		if ((ul = str2ul(buf->bufv[1])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[1]);
+		if ((ull = str2ull(buf->bufv[1])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[1]);
 			free(stat);
 			goto failed;
 		}
-		stat->nread = ul;
-		if ((ul = str2ul(buf->bufv[2])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[2]);
+		stat->nread = ull;
+		if ((ull = str2ull(buf->bufv[2])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[2]);
 			log_write("invalid number bufv[2]");
 			free(stat);
 			goto failed;
 		}
-		stat->nwritten = ul;
-		if ((ul = str2ul(buf->bufv[3])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[3]);
+		stat->nwritten = ull;
+		if ((ull = str2ull(buf->bufv[3])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[3]);
 			log_write("invalid number bufv[3]");
 			free(stat);
 			goto failed;
 		}
-		stat->reads = ul;
-        if ((ul = str2ul(buf->bufv[4])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[4]);
+		stat->reads = ull;
+        if ((ull = str2ull(buf->bufv[4])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[4]);
 			log_write("invalid number bufv[4]");
 			free(stat);
 			goto failed;
 		}
-		stat->writes = ul;
+		stat->writes = ull;
         
 		stat->next = snap->head;
 		snap->head = stat;
