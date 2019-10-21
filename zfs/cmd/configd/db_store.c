@@ -1214,8 +1214,20 @@ dbCreateGroup(char *groupName, int groupType, int *retGroupID)
 int 
 dbDeleteGroup(int groupID)
 {
+	int iRet;
 	char sql[SQL_LEN] = {0};
 
+	snprintf(sql, sizeof(sql), "DELETE FROM %s WHERE "
+		"%s = %d;",
+		GROUP_ELEM_TABLE,
+		GELEM_GROUP_ID_COL_NAME,
+		groupID);
+	iRet = dbExecuteSql(db, sql);
+	if (iRet != 0) {
+		syslog(LOG_ERR, "delete host group(%d) member failed,error(%d)",
+			groupID, iRet);
+		return iRet;
+	}
 	snprintf(sql, sizeof(sql), "DELETE FROM %s WHERE "
 		"%s = %d;",
 		GROUP_TABLE,
