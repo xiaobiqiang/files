@@ -965,7 +965,7 @@ static void
 zfs_mirror_clean_unaligned (void *arg)
 {
     cs_rx_data_t *cs_data = arg;
-    zfs_mirror_msg_mirrordata_header_t *header =
+    zfs_mirror_msg_clean_header_t *header =
         cs_data->ex_head;
 
     zfs_mirror_clean_unaligned_cache_list(header->spa_id, header->os_id, cs_data);
