@@ -1722,8 +1722,6 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 	 * can't be metadata because the loaned arc buf comes from the
 	 * user-data kmem area.
 	 */
-	printk(KERN_WARNING "%s offset:%llu db_offset:%llu sync:%02x", 
-		__func__, offset, db->db.db_offset, b_sync);
 	if (offset == db->db.db_offset && blksz == db->db.db_size &&
 	    DBUF_GET_BUFC_TYPE(db) == ARC_BUFC_DATA) {
 		dbuf_assign_arcbuf(db, buf, tx);
