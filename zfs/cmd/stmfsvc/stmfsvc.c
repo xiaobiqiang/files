@@ -84,7 +84,25 @@ char *cmdName;
 static int
 stmf_check_stmf_enable(void)
 {
-	return stmfCheckService();
+	pthread_mutex_t mtx;
+	pthread_cond_t cv;
+	struct timespec tmsp;
+	int max_tries = 50, tried = 0;
+
+	pthread_mutex_init(&mtx, NULL);
+	pthread_cond_init(&cv, NULL);
+	memset(&tmsp, 0, sizeof(struct timespec));	
+
+	pthread_mutex_lock(&mtx);
+	while (!stmfCheckService() && (++tried <= max_tries)) {
+		printf("%s wait configd service ready, times(%d)\n", __func__, tried);
+		clock_gettime(CLOCK_REALTIME, &tmsp);
+		tmsp.tv_sec += 1;
+		pthread_cond_timedwait(&cv, &mtx, &tmsp);
+	}
+	pthread_mutex_unlock(&mtx);
+
+	return tried > max_tries ? 0 : 1;
 }
 
 static void
