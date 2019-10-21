@@ -131,7 +131,7 @@ store_sys_stat_history(struct sys_stat_snapshot *old_snap, struct sys_stat_snaps
 	xmlNodePtr sys_node, time_node, unique_node, name_node,
 		reads_node, writes_node, nread_node, nwritten_node;
 	struct per_sys_stat *p0, *p1;
-	char buf[32];
+	char buf[64];
 	char path[128];
 	uint32_t elapse;
 
@@ -144,7 +144,7 @@ store_sys_stat_history(struct sys_stat_snapshot *old_snap, struct sys_stat_snaps
 	for (p0 = old_snap->head, p1 = snap->head; p0 != NULL && p1 != NULL;) {
 		int cmp = strcmp(p0->hostname, p1->hostname);
 		if (cmp == 0) {
-			uint32_t fc_diff_r, fc_diff_w, nic_diff_r, nic_diff_w, nfs_diff_r, nfs_diff_w;
+			uint64_t fc_diff_r, fc_diff_w, nic_diff_r, nic_diff_w, nfs_diff_r, nfs_diff_w;
 			double fc_rps, fc_wps, fc_rbps, fc_wbps, nic_rbps, nic_wbps, nic_rps, nic_wps ,
                 nfs_wbps, nfs_rbps,sum_rps, sum_wps, sum_rbps, sum_wbps;
 
@@ -247,7 +247,7 @@ perf_stat_sys(void)
 	snap->timestamp = time(NULL);
 	for (buf = result->head; buf; buf = buf->next) {
 		struct per_sys_stat *stat;
-		unsigned long int ul;
+		unsigned long long int ull;
 		if (buf->bufc < 10)
 			continue;
 		stat = malloc(sizeof(struct per_sys_stat));
@@ -255,66 +255,66 @@ perf_stat_sys(void)
 			syslog(LOG_ERR, "alloc per_sys_stat failed");
 			goto failed;
 		}
-		if ((ul = str2ul(buf->bufv[0])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[0]);
+		if ((ull = str2ull(buf->bufv[0])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[0]);
 			free(stat);
 			goto failed;
 		}
-		stat->fc_reads = ul;
-		if ((ul = str2ul(buf->bufv[1])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[1]);
+		stat->fc_reads = ull;
+		if ((ull = str2ull(buf->bufv[1])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ulll: invalid number: %s", buf->bufv[1]);
 			free(stat);
 			goto failed;
 		}
-		stat->fc_writes= ul;
-        if ((ul = str2ul(buf->bufv[2])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[2]);
+		stat->fc_writes= ull;
+        if ((ull = str2ull(buf->bufv[2])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[2]);
 			free(stat);
 			goto failed;
 		}
-		stat->fc_nread= ul;
-        if ((ul = str2ul(buf->bufv[3])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[3]);
+		stat->fc_nread= ull;
+        if ((ull = str2ull(buf->bufv[3])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[3]);
 			free(stat);
 			goto failed;
 		}
-		stat->fc_nwritten = ul;
-		if ((ul = str2ul(buf->bufv[4])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[4]);
+		stat->fc_nwritten = ull;
+		if ((ull = str2ull(buf->bufv[4])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[4]);
 			free(stat);
 			goto failed;
 		}
-		stat->nic_nread = ul;
-		if ((ul = str2ul(buf->bufv[5])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[5]);
+		stat->nic_nread = ull;
+		if ((ull = str2ull(buf->bufv[5])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[5]);
 			free(stat);
 			goto failed;
 		}
-		stat->nic_nwritten = ul;
-        if ((ul = str2ul(buf->bufv[6])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[6]);
+		stat->nic_nwritten = ull;
+        if ((ull = str2ull(buf->bufv[6])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[6]);
 			free(stat);
 			goto failed;
 		}
-		stat->nic_reads = ul;
-        if ((ul = str2ul(buf->bufv[7])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[7]);
+		stat->nic_reads = ull;
+        if ((ull = str2ull(buf->bufv[7])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[7]);
 			free(stat);
 			goto failed;
 		}
-		stat->nic_writes = ul;
-        if ((ul = str2ul(buf->bufv[8])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[6]);
+		stat->nic_writes = ull;
+        if ((ull = str2ull(buf->bufv[8])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[6]);
 			free(stat);
 			goto failed;
 		}
-		stat->nfs_nread = ul;
-        if ((ul = str2ul(buf->bufv[9])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[7]);
+		stat->nfs_nread = ull;
+        if ((ull = str2ull(buf->bufv[9])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[7]);
 			free(stat);
 			goto failed;
 		}
-		stat->nfs_nwritten = ul;
+		stat->nfs_nwritten = ull;
         (void)get_hostname(stat->hostname);
         
 		stat->next = snap->head;
