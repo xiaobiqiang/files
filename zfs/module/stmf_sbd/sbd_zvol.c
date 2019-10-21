@@ -277,6 +277,9 @@ void *sbd_zvol_create_parent_io(sbd_lu_t *sl)
  * The buffers will match the zvol object blocks sizes and alignments
  * such that a data copy may be avoided when the buffers are assigned.
  */
+/*
+ * alloc arc_buf_t to zvio->abp
+ */
 int
 sbd_zvol_alloc_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 {
@@ -438,6 +441,9 @@ typedef struct direct_para {
  *
  * flags == 0 - create transaction and assign all arc bufs to offsets
  * flags == ZVIO_COMMIT - same as above and commit to zil on sync devices
+ */
+/*
+ * dmu_assign_arcbuf every arc_buf_t of this dbuf.
  */
 int
 sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)

@@ -956,7 +956,7 @@ static void
 zfs_mirror_clean_unaligned (void *arg)
 {
     cs_rx_data_t *cs_data = arg;
-    zfs_mirror_msg_mirrordata_header_t *header =
+    zfs_mirror_msg_clean_header_t *header =
         cs_data->ex_head;
 
     zfs_mirror_clean_unaligned_cache_list(header->spa_id, header->os_id, cs_data);
@@ -1431,7 +1431,7 @@ static void zfs_mirror_aligned_handle(void *arg)
     mirror_cache_txg_list_t *txg_list;
     mirror_aligned_cache_t *aligned_cache;
     zfs_mirror_cache_data_t *cache_data;
-
+	
     atomic_inc_64(&zfs_mirror_mac_port->rx_ali_data_frames);
     atomic_add_64(&zfs_mirror_mac_port->rs_ali_cache_size,
         cs_data->data_len);
@@ -1909,23 +1909,26 @@ zfs_mirror_candidate_hosts_show(char *buf, uint32_t len)
 	rw_enter(&zfs_mirror_mac_port->mirror_host_rwlock, RW_READER);
 
 	if (avl_is_empty(tree))
-		return (NULL);
+		goto failed;
 
 	n = snprintf(buf, len, "up, mirror hosts: ");
 	if (n < 0 || n >= len)
-		return (NULL);
+		goto failed;
 	off += n;
 
 	for (node = avl_first(tree); node != NULL; node = AVL_NEXT(tree, node)) {
 		n = snprintf(buf+off, len-off, "%u ", node->hostid);
 		if (n < 0 || n >= len-off)
-			return (NULL);
+			goto failed;
 		off += n;
 	}
 
 	rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
 
 	return (buf);
+failed:
+	rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
+	return NULL;
 }
 
 #endif
@@ -3061,6 +3064,11 @@ static int zfs_mirror_write_get_last_synced_txg_msg(
     return (ret);
 }
 
+/*
+ * iter every txg_list of aligned_cache, if time gap is larger than 
+ * zfs_mirror_ali_timeout, then remove txg_list to aligned_expired->txg_clean_list,
+ * otherwise save the hostid and spa_id of this txg_list to aligned_expired->spa_host_list.
+ */
 static uint_t zfs_mirror_aligned_expired_cb(mod_hash_key_t hash_key,
     mod_hash_val_t *val, void *arg)
 {
@@ -3377,6 +3385,12 @@ typedef struct zfs_mirror_clean_aligned_arg {
     int cnt;
 }zfs_mirror_clean_aligned_arg_t;
 
+/*
+ * find aligned_cache of spa_os whose spa has clean_aligned txg,
+ * iter txg_list of aligned_cache, if txg of this larger than last synced txg,
+ * means that it's newer and don't remove to clean_aligned->txg_clean_list,
+ * otherwise remove from aligned_cache and append to clean_aligned->txg_clean_list.
+ */
 static uint_t zfs_mirror_clean_aligned_cb(mod_hash_key_t hash_key,
     mod_hash_val_t *val, void *arg)
 {

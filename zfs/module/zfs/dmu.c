@@ -1691,6 +1691,9 @@ dmu_return_arcbuf(arc_buf_t *buf)
  * If this is not possible copy the contents of passed arc buf via
  * dmu_write().
  */
+/*
+ * offset is off at the volume.
+ */
 void
 dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
     dmu_tx_t *tx, boolean_t b_sync, boolean_t w_app_meta)
