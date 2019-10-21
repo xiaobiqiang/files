@@ -69,15 +69,6 @@ uint64_t zfs_mirror_no_reply_threshold = 10;
 
 uint64_t zfs_mirror_send_txg_gap = 5;
 
-/*
- * debug mirror data is all send or received?
- */
-boolean_t zfs_mirror_debug = B_TRUE;
-uint64_t zfs_mirror_rcv_aligned_bytes = 0;
-uint64_t zfs_mirror_rcv_unali_bytes = 0;
-uint64_t zfs_mirror_snd_aligned_bytes = 0;
-uint64_t zfs_mirror_snd_unali_bytes = 0;
-
 boolean_t zfs_mirror_timeout_switch = B_TRUE;
 
 #define	ZFS_MIRROR_WD_CHECK_GUID_N		64
@@ -1230,19 +1221,6 @@ zfs_mirror_write_data_msg(uint64_t spa_id, uint64_t os_id, uint64_t object_id,
         ret = 1;
     }
 
-	if (ret == 0) {
-		if (data_type == MIRROR_DATA_ALIGNED) {
-			if (zfs_mirror_debug)
-				atomic_add_64(&zfs_mirror_snd_aligned_bytes, len);
-	    } else if (data_type == MIRROR_DATA_UNALIGNED) {
-	    	if (zfs_mirror_debug)
-				atomic_add_64(&zfs_mirror_snd_unali_bytes, len);
-	    } else if (data_type == MIRROR_DATA_META_ALIGNED) {
-	    	if (zfs_mirror_debug)
-				atomic_add_64(&zfs_mirror_snd_aligned_bytes, len);
-	    }
-	}
-
     return (ret);
 }
 
@@ -1453,9 +1431,7 @@ static void zfs_mirror_aligned_handle(void *arg)
     mirror_cache_txg_list_t *txg_list;
     mirror_aligned_cache_t *aligned_cache;
     zfs_mirror_cache_data_t *cache_data;
-
-	if (zfs_mirror_debug)
-		atomic_add_64(&zfs_mirror_rcv_aligned_bytes, cs_data->data_len);
+	
     atomic_inc_64(&zfs_mirror_mac_port->rx_ali_data_frames);
     atomic_add_64(&zfs_mirror_mac_port->rs_ali_cache_size,
         cs_data->data_len);
@@ -1501,8 +1477,6 @@ zfs_mirror_unaligned_handle (void *arg)
     mirror_unaligned_cache_t *unaligned_cache;
     zfs_mirror_cache_data_t *cache_data;
 
-	if (zfs_mirror_debug)
-		atomic_add_64(&zfs_mirror_rcv_unali_bytes, cs_data->data_len);
     atomic_inc_64(&zfs_mirror_mac_port->rx_nonali_data_frames);
     atomic_add_64(&zfs_mirror_mac_port->rs_nonali_cache_size,
         cs_data->data_len);
@@ -1949,12 +1923,6 @@ zfs_mirror_candidate_hosts_show(char *buf, uint32_t len)
 		off += n;
 	}
 
-	n = snprintf(buf+off, len-off, "rcv_ali_bytes:%llu rcv_unali_bytes:%llu "
-				"snd_ali_bytes:%llu snd_unali_bytes:%llu", 
-				zfs_mirror_rcv_aligned_bytes, zfs_mirror_rcv_unali_bytes,
-				zfs_mirror_snd_aligned_bytes, zfs_mirror_snd_unali_bytes);
-	if (n < 0 || n >= len-off)
-		goto failed;
 	rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
 
 	return (buf);
