@@ -502,34 +502,6 @@ stmfCommCheckService(void)
 	ack_common_t *ack = NULL;
 	int ret;
 
-	/* lookup configd is start up */
-	snprintf(command, sizeof(command), 
-		"ps -C %s | wc -l", COMM_SERVICE);
-	fp = popen(command, "r");
-	if (!fp) {
-		printf("%s popen %s failed\n", __func__,
-			command);
-		syslog(LOG_ERR, "%s popen %s failed", __func__,
-			command);
-		return (STMF_PS_ERROR_COMM);
-	}
-
-	if (fgets(buf, sizeof(buf), fp) != NULL) {
-		int count = atoi(buf);
-		if ((count - 1) == 0) {
-			printf("%s comm service not exist\n", __func__);
-			syslog(LOG_ERR, "%s comm service not exist", 
-				__func__);
-			return (STMF_PS_ERROR_COMM);
-		}
-	} else {
-		printf("%s fgets failed\n", __func__);
-		syslog(LOG_ERR, "%s fgets failed", __func__);
-		return (STMF_PS_ERROR_COMM);
-	}
-
-	pclose(fp);
-
 	if (stmfCommState() != COMM_STATE_RUNNING) {
 		if (stmfCommInit() != 0) {
 			syslog(LOG_ERR, "%s comm init failed", __func__);
