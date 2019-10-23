@@ -2173,12 +2173,7 @@ sbd_try_transition_to_active_lu(sbd_lu_t *sl, int context)
 		return;
 	}
 
-	/*
-	info.role = RDC_ROLE_MASTER;
-	info.context = context;
-	info.hostid = sl->sl_active_hostid;
-	rdc_request_role(sl->sl_name, &info);
-	*/
+	(void) sbd_transition_to_active_lu(sl->sl_data_filename);
 }
 
 #if 0

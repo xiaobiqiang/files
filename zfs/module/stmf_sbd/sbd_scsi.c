@@ -2077,6 +2077,9 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 
+	/*
+	 * if set drbd, then submit bio instead of zvol dbuf.
+	 */
 	if ((sl->sl_flags & SL_BIND_DRBD) &&
 		(task->task_additional_flags & TASK_AF_ACCEPT_LU_DBUF)) 
 		task->task_additional_flags &= ~TASK_AF_ACCEPT_LU_DBUF;

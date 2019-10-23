@@ -7614,7 +7614,7 @@ zpool_do_release(int argc, char **argv)
 	int sharenfs = 0, sharesmb = 0;
 
 	/* check options */
-	bzero(&cb, sizeof(status_cbdata_t));
+	bzero(&cb, sizeof(release_cbdata_t));
 	while ((c = getopt(argc, argv, "avcs:")) != -1) {
 		switch (c) {
 		case 'v':
