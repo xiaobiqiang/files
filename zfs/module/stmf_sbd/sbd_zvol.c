@@ -529,9 +529,9 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	kmem_free(zvio->zvio_abp,
 	    sizeof (arc_buf_t *) * dbuf->db_sglist_length);
 	zvio->zvio_abp = NULL;
-	if (sync && write_direct) {
+/*	if (sync && write_direct) {
 		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
-	}
+	} */
 	return (0);
 }
 
