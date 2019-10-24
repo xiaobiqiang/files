@@ -2737,6 +2737,7 @@ void* zfs_import_lu(void *arg)
 	ret = stmfImportLu(STMF_DISK, dev_buf, &createdGuid);
 	if (ret == 0) {
 		stmfOnlineLogicalUnit(&createdGuid);
+		stmfNotifyLuActive(dev_buf);
 		syslog(LOG_INFO, " import lu success, %s", lu_name);
  	} else {
  		syslog(LOG_ERR, " import lu failed, %s, ret:0x%x", lu_name, ret);
@@ -2810,22 +2811,6 @@ zfs_import_all_lus(libzfs_handle_t *hdl, char *data)
 			pthread_join(lu_list->tid, NULL);
 		free(lu_list);
 	}
-	
-	zc = malloc(sizeof(zfs_cmd_t));
-	if (zc == NULL) {
-		syslog(LOG_NOTICE, "%s: not wait pool(%s)'s zvol create minor done",
-			__func__, data);
-		return ;
-	}
-	bzero(zc, sizeof(zfs_cmd_t));
-	assert(zc->zc_nvlist_src_size == 0);
-	strcpy(zc->zc_name, data);
-	ret = zfs_ioctl(hdl, ZFS_IOC_ZVOL_CREATE_MINOR_DONE_WAIT, zc);
-	if (ret != 0) {
-		syslog(LOG_NOTICE, "%s: failed wait pool(%s)'s zvol create minor done",
-			__func__, data);
-	}
-	free(zc);
 }
 
 int 
