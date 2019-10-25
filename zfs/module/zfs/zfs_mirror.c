@@ -1795,6 +1795,8 @@ zfs_mirror_cs_link_evt_cb(void *private,
                 }
             }
             rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
+			cmn_err(CE_NOTE, "mirror host link down ,host: %s, %d finished",
+                cshi->hostname, cshi->hostid);
             break;
         default:
             break;
