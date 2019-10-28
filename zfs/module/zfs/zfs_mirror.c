@@ -72,7 +72,7 @@ uint64_t zfs_mirror_send_txg_gap = 5;
 boolean_t zfs_mirror_timeout_switch = B_TRUE;
 
 #define	ZFS_MIRROR_WD_CHECK_GUID_N		64
-#define	ZFS_MIRROR_WD_CHECK_NONALI_N		800
+#define	ZFS_MIRROR_WD_CHECK_NONALI_N	10000
 
 #define	ZFS_MIRROR_TRACE_TIME_DEBUG		0
 
@@ -3253,9 +3253,10 @@ static int zfs_mirror_unaligned_expired_handle(void)
     int total = 0;
     int i;
 
-    unaligned_located = kmem_zalloc(
-        sizeof(zfs_mirror_io_located_t) * ZFS_MIRROR_WD_CHECK_NONALI_N,
-        KM_SLEEP);
+    unaligned_located = vmalloc(
+        sizeof(zfs_mirror_io_located_t) * ZFS_MIRROR_WD_CHECK_NONALI_N);
+	bzero(unaligned_located, 
+		sizeof(zfs_mirror_io_located_t) * ZFS_MIRROR_WD_CHECK_NONALI_N);
     list_create(&clean_list, sizeof (zfs_mirror_nonali_hash_t),
         offsetof(zfs_mirror_nonali_hash_t, hash_list_node));
 
@@ -3325,8 +3326,7 @@ static int zfs_mirror_unaligned_expired_handle(void)
         }
     }
     kmem_free(spa_os_pair, sizeof(zfs_mirror_spa_os_pair_t));
-    kmem_free(unaligned_located,
-        sizeof(zfs_mirror_io_located_t) * ZFS_MIRROR_WD_CHECK_NONALI_N);
+    vfree(unaligned_located);
 
     while ((hash_blk = list_remove_head(&clean_list)) != NULL) {
         while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {

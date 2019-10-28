@@ -2604,11 +2604,11 @@ dmu_objset_replay_all_cache(objset_t *os)
     if (spa_writeable(dmu_objset_spa(os))) {
         os->os_breplaying = B_TRUE;
         zil_replay(os, user_data, os->os_replay);
-        if (zfs_mirror_hold() == 0) {
+/*        if (zfs_mirror_hold() == 0) {
             zfs_mirror_get_all_buf(os);
             zil_replay_all_data(os);
             zfs_mirror_rele();
-        }
+        } */
         os->os_breplaying = B_FALSE;
     }
 }
