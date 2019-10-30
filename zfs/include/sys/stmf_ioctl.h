@@ -163,7 +163,7 @@ typedef struct stmf_alua_state_desc {
 
 typedef struct stmf_lu_state_desc {
 	uint8_t lu_access_state;
-	uint8_t	lu_guid[16];
+	void *lu_sess;
 } stmf_lu_state_desc_t;
 
 typedef struct stmf_lu_task_limit {
