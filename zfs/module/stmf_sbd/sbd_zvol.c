@@ -455,7 +455,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	boolean_t write_meta = (dbuf->db_flags & DB_WRITE_META_DATA) ? B_TRUE : B_FALSE;
 	sbd_zvol_io_t	*zvio = dbuf->db_lu_private;
 	dmu_tx_t	*tx;
-	int		sync, i, error, ret;
+	int		sync, i, error, ret = 0;
 	rl_t 		*rl;
 	arc_buf_t	**abp = zvio->zvio_abp;
 	int		flags = zvio->zvio_flags;
@@ -516,12 +516,14 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		abuf = abp[i];
 		size = arc_buf_size(abuf);
 		/* TODO: */
-		dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync, write_meta);
+		ret = dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync, write_meta);
+		if (ret != 0)
+			break;
 		/*dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync);*/
 		toffset += size;
 		resid -= size;
 	}
-	ASSERT(resid == 0);
+//	ASSERT(resid == 0);
 	txg = tx->tx_txg;
 	write_direct = dmu_tx_sync_log(tx);
 	dmu_tx_commit(tx);
@@ -532,7 +534,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	if (sync && write_direct) {
 		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
 	} 
-	return (0);
+	return (ret);
 }
 
 /*

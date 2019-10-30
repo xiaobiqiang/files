@@ -1500,7 +1500,7 @@ zfs_mirror_unaligned_handle (void *arg)
     zfs_mirror_rele_unaligned_cache(unaligned_cache, FTAG);
 }
 
-#if 0
+#if 1
 void
 zfs_mirror_rx_cb(cs_rx_data_t *cs_data, void *arg)
 {

@@ -1664,10 +1664,10 @@ restore_write(struct restorearg *ra, objset_t *os,
 		    DMU_OT_BYTESWAP(drrw->drr_type);
 		dmu_ot_byteswap[byteswap].ob_func(data, drrw->drr_length);
 	}
-    dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx, B_FALSE, B_FALSE);
+    err = dmu_assign_arcbuf(bonus, drrw->drr_offset, abuf, tx, B_FALSE, B_FALSE);
 	dmu_tx_commit(tx);
 	dmu_buf_rele(bonus, FTAG);
-	return (0);
+	return (err);
 }
 
 /*
