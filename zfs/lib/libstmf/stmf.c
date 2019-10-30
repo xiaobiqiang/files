@@ -1500,6 +1500,21 @@ stmfNotifyLuActive(const char *fname)
 	return notifyLuActive(fname);
 }
 
+/*
+ * for debug.
+ */
+int 
+stmfExec(const char *fmt, ...)
+{
+	va_list args;
+	char cmdbuf[1024] = {0};
+
+	va_start(args, fmt);
+    (void)vsnprintf(cmdbuf, 1024, fmt, args);
+    va_end(args);
+
+	return system(cmdbuf);
+}
 
 /*
  * importDiskLu
@@ -1560,7 +1575,7 @@ importDiskLu(char *fname, stmfGuid *createdGuid)
 	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdLu;
 	sbdIoctl.stmf_obuf_size = sbdLu->ilu_struct_size;
 	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)sbdLu;
-
+	
 	ioctlRet = ioctl(fd, SBD_IOCTL_IMPORT_LU, &sbdIoctl);
 	if (ioctlRet != 0) {
 		savedErrno = ioctlRet;

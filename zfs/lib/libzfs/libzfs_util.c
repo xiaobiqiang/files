@@ -2717,8 +2717,9 @@ zfs_import_pool_call_back(zfs_handle_t *zhp, void *data)
 {
 	zfs_ilu_ctx_t *zicp = (zfs_ilu_ctx_t *)data;
 	syslog(LOG_DEBUG, "%s: zfs_name:%s", __func__, zfs_get_name(zhp));
-	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
-		zfs_get_lus_call_back(zhp, data);
+	
+	if (strcmp(zfs_get_name(zhp), zicp->pool_name) == 0) {
+		zfs_iter_filesystems(zhp, zfs_get_lus_call_back, data);
 	}
 	zfs_close(zhp);
 	return (0);
@@ -2907,7 +2908,7 @@ zfs_standby_pool_lu_access(zfs_handle_t *zhp, void *data)
 int 
 zfs_standby_pool_call_back(zfs_handle_t *zhp, void *data)
 {
-	zfs_standby_pool_lu_access(zhp, data);
+	zfs_iter_filesystems(zhp, zfs_standby_pool_lu_access, data);
 	return (0);
 }
 void 
