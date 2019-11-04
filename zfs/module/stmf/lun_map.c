@@ -588,16 +588,8 @@ stmf_update_sessions_per_ve(stmf_view_entry_t *ve,
 		rw_enter(&ilport->ilport_lock, RW_WRITER);
 		for (iss = ilport->ilport_ss_list; iss != NULL;
 		    iss = iss->iss_next) {
-			if (action == 1) {
-				if (!all_hg && iss->iss_hg && iss->iss_hg != ve->ve_hg)
-					continue;
-			} else {
-				if (!all_hg && iss->iss_hg != ve->ve_hg)
-					continue;
-			}
-			
-			if ((action == 1) && !iss->iss_hg)
-				iss->iss_hg = ve->ve_hg;
+			if (!all_hg && iss->iss_hg != ve->ve_hg)
+				continue;
 			
 			/* This host belongs to the host group */
 			if (action == 0) { /* to remove */

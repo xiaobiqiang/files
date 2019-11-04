@@ -1,8 +1,7 @@
 include $(top_srcdir)/config/Rules.am
 
 VPATH = \
-	$(top_srcdir)/cmd/common	\
-	$(top_srcdir)/module/idm
+	$(top_srcdir)/cmd/common
 
 DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/include \

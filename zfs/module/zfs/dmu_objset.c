@@ -2608,7 +2608,7 @@ dmu_objset_replay_all_cache(objset_t *os)
             zfs_mirror_get_all_buf(os);
             zil_replay_all_data(os);
             zfs_mirror_rele();
-        }
+        } 
         os->os_breplaying = B_FALSE;
     }
 }

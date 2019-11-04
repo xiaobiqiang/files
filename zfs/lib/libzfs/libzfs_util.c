@@ -2717,6 +2717,7 @@ zfs_import_pool_call_back(zfs_handle_t *zhp, void *data)
 {
 	zfs_ilu_ctx_t *zicp = (zfs_ilu_ctx_t *)data;
 	syslog(LOG_DEBUG, "%s: zfs_name:%s", __func__, zfs_get_name(zhp));
+	
 	if (strcmp(zfs_get_name(zhp), zicp->pool_name) == 0) {
 		zfs_iter_filesystems(zhp, zfs_get_lus_call_back, data);
 	}
@@ -2737,6 +2738,7 @@ void* zfs_import_lu(void *arg)
 	ret = stmfImportLu(STMF_DISK, dev_buf, &createdGuid);
 	if (ret == 0) {
 		stmfOnlineLogicalUnit(&createdGuid);
+		stmfNotifyLuActive(dev_buf);
 		syslog(LOG_INFO, " import lu success, %s", lu_name);
  	} else {
  		syslog(LOG_ERR, " import lu failed, %s, ret:0x%x", lu_name, ret);
@@ -2810,22 +2812,6 @@ zfs_import_all_lus(libzfs_handle_t *hdl, char *data)
 			pthread_join(lu_list->tid, NULL);
 		free(lu_list);
 	}
-	
-	zc = malloc(sizeof(zfs_cmd_t));
-	if (zc == NULL) {
-		syslog(LOG_NOTICE, "%s: not wait pool(%s)'s zvol create minor done",
-			__func__, data);
-		return ;
-	}
-	bzero(zc, sizeof(zfs_cmd_t));
-	assert(zc->zc_nvlist_src_size == 0);
-	strcpy(zc->zc_name, data);
-	ret = zfs_ioctl(hdl, ZFS_IOC_ZVOL_CREATE_MINOR_DONE_WAIT, zc);
-	if (ret != 0) {
-		syslog(LOG_NOTICE, "%s: failed wait pool(%s)'s zvol create minor done",
-			__func__, data);
-	}
-	free(zc);
 }
 
 int 
@@ -2908,7 +2894,7 @@ zfs_standby_lu_access(char *dataset, void *data)
 }
 
 int 
-zfs_standby_lu_access_callback(zfs_handle_t *zhp, void *data)
+zfs_standby_pool_lu_access(zfs_handle_t *zhp, void *data)
 {
 	zfs_standby_ilu_ctx_t *zicp = (zfs_standby_ilu_ctx_t *)data;
 	if (strcmp(zhp->zpool_hdl->zpool_name, zicp->pool_name) == 0 &&
@@ -2922,7 +2908,7 @@ zfs_standby_lu_access_callback(zfs_handle_t *zhp, void *data)
 int 
 zfs_standby_pool_call_back(zfs_handle_t *zhp, void *data)
 {
-	zfs_iter_filesystems(zhp, zfs_standby_lu_access_callback, data);
+	zfs_iter_filesystems(zhp, zfs_standby_pool_lu_access, data);
 	return (0);
 }
 void 
