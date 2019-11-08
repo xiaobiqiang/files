@@ -5322,39 +5322,43 @@ qlt_free_atio(void *fca_cmd)
 
 /********************************** basic func ****************************************/
 int
-ddi_dma_alloc_handle(struct pci_dev *pdev, ddi_dma_attr_t *attr,
-	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+ddi_dma_alloc_handle(struct pci_dev *pdev, int number, ddi_dma_handle_t *handlep)
 {
 	*handlep = kzalloc(sizeof(struct __ddi_dma_handle), GFP_KERNEL);
 	(*handlep)->dev = pdev;
+	(*handlep)->ptrarr = (void **)kzalloc(sizeof(void*) * number , GFP_KERNEL);
+	(*handlep)->dma_handle_arr = (dma_addr_t *)kzalloc(sizeof(dma_addr_t) * number , GFP_KERNEL);
+	(*handlep)->number = number;
 	return ((*handlep)->dev == NULL ? -1 : 0);
 }
 
 int
 ddi_dma_mem_alloc(ddi_dma_handle_t dma_handle, size_t length,
-	ddi_device_acc_attr_t *accattrp, uint_t flags,
-	int (*waitfp)(caddr_t), caddr_t arg, caddr_t *kaddrp,
-	size_t *real_length, ddi_acc_handle_t *handle)
+	 ddi_acc_handle_t *handle)
 {
+	int i;
+
 	*handle = kzalloc(sizeof(struct __ddi_acc_handle), GFP_KERNEL);
 	if (*handle == NULL) {
 		printk("%s %d error\n", __func__, __LINE__);
 		return -1;
 	}
 	(*handle)->dma_handle = dma_handle;
-	dma_handle->ptr = dma_alloc_coherent(&dma_handle->dev->dev, length, &dma_handle->dma_handle, GFP_KERNEL);
-	if (dma_handle->ptr == NULL) {
-		kfree(*handle);
-		printk("%s %d error\n", __func__, __LINE__);
-		return (-1);
+
+	for(i=0; i<dma_handle->number; i++)
+	{
+		dma_handle->ptrarr[i] = dma_alloc_coherent(&dma_handle->dev->dev, length, &dma_handle->dma_handle_arr[i], GFP_KERNEL);
+		if (dma_handle->ptrarr[i] == NULL) {
+			kfree(*handle);
+			printk("%s %d error\n", __func__, __LINE__);
+			return (-1);
+		}
 	}
-	
-	dma_handle->size = length;
-	*kaddrp = dma_handle->ptr;
-	*real_length = length;
+
 	return DDI_SUCCESS;
 }
 
+#if 0
 int
 ddi_dma_addr_bind_handle(ddi_dma_handle_t handle, struct as *reserved,
 	caddr_t addr, size_t len, uint_t flags, int (*waitfp)(caddr_t),
@@ -5364,6 +5368,7 @@ ddi_dma_addr_bind_handle(ddi_dma_handle_t handle, struct as *reserved,
 	cookiep->dmac_laddress = handle->dma_handle;
 	return DDI_SUCCESS;
 }
+#endif
 
 int
 ddi_dma_unbind_handle(ddi_dma_handle_t h)
@@ -5374,8 +5379,15 @@ ddi_dma_unbind_handle(ddi_dma_handle_t h)
 void
 ddi_dma_mem_free(ddi_acc_handle_t *handlep)
 {
-	dma_free_coherent(&(*handlep)->dma_handle->dev->dev, (*handlep)->dma_handle->size, 
-		(*handlep)->dma_handle->ptr, (*handlep)->dma_handle->dma_handle);
+	int i;
+	ddi_dma_handle_t   dma_handle = (*handlep)->dma_handle;
+
+	for (i=0; i< dma_handle->number; i++) {
+		if (dma_handle->ptrarr[i] == NULL)
+			break;
+		dma_free_coherent(&dma_handle->dev->dev, dma_handle->size, 
+			dma_handle->ptrarr[i], dma_handle->dma_handle_arr[i]);
+	}
 	kfree(*handlep);
 	*handlep = NULL;
 }
@@ -5437,12 +5449,9 @@ qlt_dmem_init(scsi_qla_host_t *vha)
 	qlt_dmem_bctl_t		*bc;
 	qlt_dmem_bctl_t		*prev = NULL;
 	int			ndx, i;
-	uint32_t		total_mem;
 	uint8_t			*addr;
 	uint8_t			*host_addr;
 	uint64_t		dev_addr;
-	ddi_dma_cookie_t	cookie;
-	uint32_t		ncookie;
 	uint32_t		bsize;
 	size_t			len;
 
@@ -5490,50 +5499,36 @@ qlt_dmem_init(scsi_qla_host_t *vha)
 		}
 		p->dmem_bctls_mem = bctl;
 		qlf_mutex_init(&p->dmem_lock, NULL, MUTEX_DRIVER, NULL);
-		if ((i = ddi_dma_alloc_handle(vha->hw->pdev, &qlt_scsi_dma_attr,
-		    DDI_DMA_SLEEP, 0, &p->dmem_dma_handle)) != DDI_SUCCESS) {
+		if ((i = ddi_dma_alloc_handle(vha->hw->pdev, p->dmem_nbufs, 
+			&p->dmem_dma_handle)) != DDI_SUCCESS) {
 			EL(vha, "ddi_dma_alloc_handle status=%xh\n", i);
 			goto alloc_handle_failed;
 		}
-
-		total_mem = p->dmem_buf_size * p->dmem_nbufs;
-
-		if ((i = ddi_dma_mem_alloc(p->dmem_dma_handle, total_mem, &acc,
-		    DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, 0, (caddr_t *)&addr,
-		    &len, &p->dmem_acc_handle)) != DDI_SUCCESS) {
+	
+		if ((i = ddi_dma_mem_alloc(p->dmem_dma_handle,p->dmem_buf_size,
+			&p->dmem_acc_handle)) != DDI_SUCCESS) {
 			EL(vha, "ddi_dma_mem_alloc status=%xh\n", i);
 			goto mem_alloc_failed;
 		}
-
-		if ((i = ddi_dma_addr_bind_handle(p->dmem_dma_handle, NULL,
-		    (caddr_t)addr, total_mem, DDI_DMA_RDWR | DDI_DMA_STREAMING,
-		    DDI_DMA_DONTWAIT, 0, &cookie, &ncookie)) != DDI_SUCCESS) {
-			EL(vha, "ddi_dma_addr_bind_handle status=%xh\n", i);
-			goto addr_bind_handle_failed;
-		}
-		if (ncookie != 1) {
-			EL(vha, "ncookie=%d\n", ncookie);
-			goto dmem_init_failed;
-		}
-
-		p->dmem_host_addr = host_addr = addr;
-		p->dmem_dev_addr = dev_addr = (uint64_t)cookie.dmac_laddress;
+		
 		bsize = p->dmem_buf_size;
 		p->dmem_bctl_free_list = bctl;
 		p->dmem_nbufs_free = p->dmem_nbufs;
+		
 		for (i = 0; i < p->dmem_nbufs; i++) {
 			stmf_data_buf_t	*db;
+			
 			prev = bctl;
 			bctl->bctl_bucket = p;
 			bctl->bctl_buf = db = stmf_alloc(STMF_STRUCT_DATA_BUF,
 			    0, 0);
 			db->db_port_private = bctl;
-			db->db_sglist[0].seg_addr = host_addr;
-			bctl->bctl_dev_addr = dev_addr;
+			db->db_sglist[0].seg_addr = p->dmem_dma_handle->ptrarr[i];
+			bctl->bctl_dev_addr = p->dmem_dma_handle->dma_handle_arr[i];
+			
 			db->db_sglist[0].seg_length = db->db_buf_size = bsize;
 			db->db_sglist_length = 1;
-			host_addr += bsize;
-			dev_addr += bsize;
+			
 			bctl++;
 			prev->bctl_next = bctl;
 		}
@@ -5550,7 +5545,7 @@ dmem_failure_loop:;
 	}
 dmem_init_failed:;
 	(void) ddi_dma_unbind_handle(p->dmem_dma_handle);
-addr_bind_handle_failed:;
+
 	ddi_dma_mem_free(&p->dmem_acc_handle);
 mem_alloc_failed:;
 	ddi_dma_free_handle(&p->dmem_dma_handle);
