@@ -1321,14 +1321,14 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
 		if (didcpy < tocpy)
 			err = EIO;
 
+		if (mirror_success > 0  && b_sync) {
+/*            dmu_direct_write(db, tx);
+            if (!tx->tx_bdirect)
+                tx->tx_bdirect = B_TRUE; */
+			err = EIO;
+        }
 		if (err)
             break;
-
-        if (mirror_success > 0  && b_sync) {
-            dmu_direct_write(db, tx);
-            if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE;
-        }
 
 		size -= tocpy;
 		offset += didcpy;

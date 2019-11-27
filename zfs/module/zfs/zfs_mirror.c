@@ -1199,7 +1199,7 @@ zfs_mirror_write_data_msg(uint64_t spa_id, uint64_t os_id, uint64_t object_id,
         header->msg_head.msg_type = ZFS_MIRROR_META_DATA;
     }
 	
-    ret = cluster_san_host_send(cshi,
+    ret = cluster_san_host_send_sgl(cshi,
         data, len, header, sizeof(zfs_mirror_msg_mirrordata_header_t),
         CLUSTER_SAN_MSGTYPE_ZFS_MIRROR, 0, B_TRUE, 1);
     kmem_free(header, sizeof(zfs_mirror_msg_mirrordata_header_t));
