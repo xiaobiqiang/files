@@ -7,6 +7,7 @@
 #include <linux/in.h>  
 #include <linux/inet.h>  
 #include <linux/socket.h>  
+#include <uapi/linux/tcp.h>
 #include <net/sock.h>
 #include <sys/taskq.h>
 #include <sys/list.h>
@@ -37,7 +38,7 @@ static int cluster_target_socket_tran_data_fragment(
 
 static int cts_socket_tran_start(cluster_target_session_t *cts, void *fragmentation)
 {
-    int ret = 0;
+/*    int ret = 0;
     struct msghdr msg;
     struct kvec vec[3];
     cluster_tran_data_origin_t *origin_data = fragmentation;
@@ -87,7 +88,8 @@ static int cts_socket_tran_start(cluster_target_session_t *cts, void *fragmentat
             (int)(sizeof(cluster_target_msg_header_t)+origin_data->header_len+origin_data->data_len));  
         return ret;
     } else
-        return 0;
+        return 0;*/
+	return 0;
 }
 
 cts_fragment_data_t *
@@ -603,7 +605,6 @@ static void cts_socket_hb_thread(void *arg)
 			if ((ret = kernel_bind(sess_socket->s_socket, &sess_socket->l_addr, 
 					sizeof(struct sockaddr_in))) != 0) {
 				printk("%s server:kernel_bind error! (ret = %d)\n", __func__, ret);
-                VERIFY(0);
 			}
 			
             ret = kernel_connect(sess_socket->s_socket,(struct sockaddr *)&(sess_socket->s_addr), sizeof(struct sockaddr),0);  
