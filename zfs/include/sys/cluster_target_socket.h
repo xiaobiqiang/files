@@ -21,6 +21,7 @@ typedef struct cluster_target_port_socket {
 typedef struct cluster_target_socket_param {
    char hostname[256];
    char ipaddr[16];
+   char local[16];
    int port;
    int hostid;
    int priority;
@@ -29,6 +30,7 @@ typedef struct cluster_target_socket_param {
 typedef struct cluster_target_session_socket {
 	cluster_target_socket_param_t *param;
     struct sockaddr_in s_addr;
+	struct sockaddr_in l_addr;
     struct socket *s_socket;
     struct socket *r_socket;
     kmutex_t s_lock;

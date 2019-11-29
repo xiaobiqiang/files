@@ -260,9 +260,12 @@ static void cluster_target_socket_session_init(cluster_target_session_t *cts, vo
     memset(&sess_socket->s_addr,0,sizeof(sess_socket->s_addr));  
     sess_socket->s_addr.sin_family=AF_INET;  
     sess_socket->s_addr.sin_port=htons(param->port);  
-
-   
     sess_socket->s_addr.sin_addr.s_addr=in_aton(param->ipaddr);
+
+	memset(&sess_socket->l_addr,0,sizeof(sess_socket->l_addr));  
+    sess_socket->l_addr.sin_family=AF_INET;  
+    sess_socket->l_addr.sin_port=htons(0);  
+    sess_socket->l_addr.sin_addr.s_addr=in_aton(param->local);
     
     printk("%s port=%d ip=%s\n", __func__, param->port, param->ipaddr);
 
@@ -419,7 +422,7 @@ static void cts_socket_accept_thread(void *arg)
     client_arg_t * client_arg;
 
     while (atomic_read(&port_socket->accept_thread_stop) == 0) {
-        ret = kernel_accept(port_socket->srv_socket, &client_sock, 16);
+        ret = kernel_accept(port_socket->srv_socket, &client_sock, 0);
         if(ret<0){  
             printk("%s:accept error. (ret = %d)\n", __func__, ret);
             continue;
@@ -431,6 +434,26 @@ static void cts_socket_accept_thread(void *arg)
         client_arg->ctp = ctp;
         taskq_dispatch(port_socket->accept_tq, cts_socket_set_client_socket, (void *)client_arg,TQ_SLEEP);
     }
+}
+
+static int cluster_target_socket_setsockopt(struct socket *so)
+{
+	int rval;
+	int sndbuf = 256 * 1024, rcvbuf = 256 *1024;
+	int on = 1, off = 0;
+	
+	if (((rval = kernel_setsockopt(so, SOL_SOCKET, SO_REUSEADDR, 
+					&on, sizeof(on))) != 0) || 
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_REUSEPORT, 
+					&on, sizeof(on))) != 0) ||
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_SNDBUF, 
+					&sndbuf, sizeof(sndbuf))) != 0) ||
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_RCVBUF, 
+					&rcvbuf, sizeof(rcvbuf))) != 0) ||
+		((rval = kernel_setsockopt(so, SOL_TCP, TCP_NODELAY, 
+					&on, sizeof(on))) != 0))
+		return rval;
+	return 0;
 }
 
 int cluster_target_socket_port_init(
@@ -473,27 +496,26 @@ int cluster_target_socket_port_init(
 
     printk("%s port=%d ip=%s\n", __func__, port, port_socket->ipaddr);
 
-    ret=sock_create(AF_INET, SOCK_STREAM,0,&(port_socket->srv_socket));
-    if(ret){
+    if ((ret = sock_create_kern(&init_net, AF_INET, SOCK_STREAM, 
+			0, &(port_socket->srv_socket))) != 0) {
         printk("server:socket_create error! (ret = %d)\n", ret);
         goto err1;
     }
-    
+
+	cluster_target_socket_setsockopt(port_socket->srv_socket);
+	
     memset(&s_addr,0,sizeof(s_addr));  
     s_addr.sin_family=AF_INET;  
     s_addr.sin_port=htons(port_socket->port);  
-    s_addr.sin_addr.s_addr=htonl(INADDR_ANY);
+    s_addr.sin_addr.s_addr= in_aton(port_socket->ipaddr);
      
-    ret = kernel_bind(port_socket->srv_socket,
-        (struct sockaddr *)&s_addr,sizeof(struct sockaddr_in));  
-    if(ret<0){  
+    if ((ret = kernel_bind(port_socket->srv_socket,
+        (struct sockaddr *)&s_addr,sizeof(struct sockaddr_in))) != 0) {  
         printk("server: bind error. (ret = %d)\n", ret);
         goto err2;
-    }  
-
-    
-    ret = kernel_listen(port_socket->srv_socket, 16);
-    if(ret<0){  
+    } 
+	
+    if ((ret = kernel_listen(port_socket->srv_socket, 24)) != 0) {  
         printk("server: listen error. (ret = %d)\n", ret); 
         goto err2;
     }  
@@ -572,11 +594,18 @@ static void cts_socket_hb_thread(void *arg)
             }
             
             mutex_enter(&sess_socket->s_lock);
-            ret = sock_create(AF_INET, SOCK_STREAM,0,&sess_socket->s_socket);
+            ret = sock_create_kern(&init_net, AF_INET, SOCK_STREAM,0,&sess_socket->s_socket);
             if(ret){
                 printk("server:socket_create error! (ret = %d)\n", ret);
-                VERIFY(ret == 0);
+                VERIFY(0);
             }
+
+			if ((ret = kernel_bind(sess_socket->s_socket, &sess_socket->l_addr, 
+					sizeof(struct sockaddr_in))) != 0) {
+				printk("%s server:kernel_bind error! (ret = %d)\n", __func__, ret);
+                VERIFY(0);
+			}
+			
             ret = kernel_connect(sess_socket->s_socket,(struct sockaddr *)&(sess_socket->s_addr), sizeof(struct sockaddr),0);  
             if(ret==0){  
                 mutex_exit(&sess_socket->s_lock);

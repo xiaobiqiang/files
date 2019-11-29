@@ -373,7 +373,7 @@ get_usage(zfs_help_t idx)
 			"\t    -c: disable the cluster san include all target\n"
 			"\tclustersan rpcto hostname=... hostid=... ip=... port=... \n"
 			"\t        priority=... rdma=<on/off>\n"
-			"\tclustersan socket hostname=... hostid=... ip=...port=...\n"
+			"\tclustersan socket hostname=... hostid=... ip=... port=... local=...\n"
 			"\tclustersan state\n"
 			"\tclustersan set [failover=<loadbalance|roundrobin>]\n"
 			"\t    [ipmi=<on/off>]\n"
@@ -8428,6 +8428,7 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
     uint32_t hostid = 0;
     char *ip = NULL;
     char *name;
+	char *local;
     char *value;
     int link_pri = 0;
     int port = 1866;
@@ -8461,6 +8462,8 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 			if (link_pri < 0) {
 				link_pri = 0;
 			}
+		} else if (strcmp(name, "local") == 0) {
+			local = value;
 		} else {
 			(void) fprintf(stderr, gettext("don't support: "
 				"%s=%s\n"), name, value);
@@ -8480,7 +8483,11 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 		(void) fprintf(stderr, gettext("must specify ip address\n"));
 		usage(B_FALSE);
 	}
-    ret = zfs_cluster_socket_do(g_zfs, hostname, hostid, ip, link_pri, port);
+	if (local == NULL) {
+		(void) fprintf(stderr, gettext("must specify local ip address\n"));
+		usage(B_FALSE);
+	}
+    ret = zfs_cluster_socket_do(g_zfs, local, hostname, hostid, ip, link_pri, port);
 	return (ret);
 }
 
