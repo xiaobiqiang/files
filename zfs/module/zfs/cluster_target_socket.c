@@ -61,7 +61,7 @@ cts_socket_dt_cb(cts_socket_dt_t *dt)
 {
 	cluster_target_session_t *cts = dt->dt_cts;
 	
-	if (dt->status != 0)
+	if (dt->dt_status != 0)
 		cv_broadcast(&cts->sess_cv);
 	cts_socket_dt_free(dt);
 }
@@ -127,7 +127,7 @@ static int cts_socket_tran_start(cluster_target_session_t *cts, void *fragmentat
 	dt->dt_complete_cb = cts_socket_dt_cb;
 	dt->dt_cts = cts;
 	
-	ret = cts_tx_process(dt);
+	ret = cts_tx_process(dt, cts);
     if (ret != 0) {
         cv_broadcast(&cts->sess_cv);
         printk("%s link should be down\n", __func__);
@@ -800,6 +800,7 @@ cts_socket_dt_cache_cons(void *hdl, void *arg, int flags)
 
 	bzero(dt, sizeof(cts_socket_dt_t));
 	dt->dt_complete_cb = cts_socket_dt_free;
+	return 0;
 }
 
 void cts_socket_init(void)
