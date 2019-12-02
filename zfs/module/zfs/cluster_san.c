@@ -1101,7 +1101,7 @@ int cluster_san_init()
 	zfs_hbx_init();
 	/* cluster_target_rpc_rdma_svc_init(); */
 	/* cluster_target_rpc_rdma_clnt_init(); */
-
+	cts_socket_init();
 #ifdef COMM_TEST
 	init_waitqueue_head(&comm_st.wait_queue);
 	csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_TEST, cluster_comm_test_rx, NULL);

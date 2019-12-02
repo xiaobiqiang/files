@@ -39,11 +39,21 @@ typedef struct cluster_target_session_socket {
 	int socket_link_state;
     taskq_t *rcv_tq;
     atomic_t rcv_thread_stop;
+	taskq_t *tx_tq;
+	kmutex_t tx_mtx;
+	kcondvar_t tx_cv;
+	list_t dt_r_list;
+	list_t dt_w_list;
+	list_t *dt_wtt_list;
+	list_t *dt_xmt_list;
+	boolean_t tx_thread_stop;
 } cluster_target_session_socket_t;
 
 int cluster_target_socket_port_init(
 	cluster_target_port_t *ctp, char *link_name, nvlist_t *nvl_conf);
 void cts_socket_hb_init(cluster_target_session_t *cts);
 void cluster_target_socket_port_fini(cluster_target_port_t *ctp);
+void cts_socket_init(void);
+
 #endif
 
