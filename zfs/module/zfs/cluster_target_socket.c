@@ -683,7 +683,8 @@ static void cts_socket_hb_thread(void *arg)
     struct msghdr msg;
     struct kvec vec;
     cluster_target_msg_header_t  ct_head;
-    
+	cts_socket_dt_t *dt;
+	
 	ct_head.msg_type = CLUSTER_SAN_MSGTYPE_HB;
 	ct_head.index = 0;
     ct_head.len = 0;
@@ -733,18 +734,14 @@ static void cts_socket_hb_thread(void *arg)
             }
         } else {
             mutex_exit(&cts->sess_lock);
-            memset(&vec,0,sizeof(vec));  
-            memset(&msg,0,sizeof(msg));  
-            vec.iov_base=&ct_head;  
-            vec.iov_len=sizeof(cluster_target_msg_header_t); 
-            ret = kernel_sendmsg(sess_socket->s_socket, &msg, &vec, 1, 
-                        sizeof(cluster_target_msg_header_t));
-            if (ret > 0 && ret != sizeof(cluster_target_msg_header_t)) {
-                printk("%s kernel_sendmsg return %d, should be %d\n", __func__, 
-                    ret, (int)(sizeof(cluster_target_msg_header_t)));
-            }
-            
-            if (ret < 0){
+			dt = kmem_cache_alloc(cts_socket_dt_cache, KM_SLEEP);
+            dt->dt_iov[0].iov_base=&ct_head;  
+            dt->dt_iov[0].iov_len=sizeof(cluster_target_msg_header_t); 
+			dt->dt_iov_len = 1;
+			dt->dt_iov_buflen = sizeof(cluster_target_msg_header_t);
+			dt->dt_cts = cts;
+          
+            if ((ret = cts_tx_process(dt, cts)) < 0){
                 if (cluster_target_session_hold(cts, "up2down evt") == 0) {
                     mutex_enter(&cts->sess_lock);
                     cts->sess_linkstate = CTS_LINK_DOWN;
