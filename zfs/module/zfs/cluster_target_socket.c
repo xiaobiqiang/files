@@ -865,6 +865,8 @@ cluster_target_socket_port_online(cluster_target_port_socket_t *tpso)
 	addr_in4.sin_port = htons(tpso->tpso_port);
 	addr_in4.sin_addr.s_addr = in_aton(tpso->tpso_ipaddr);
 
+	cluster_target_socket_create(AF_INET, SOCK_STREAM, 0, &tpso->tpso_so);
+	
 	if (((rval = kernel_bind(tpso->tpso_so, &addr_in4,
 			sizeof(addr_in4))) != CLUSTER_STATUS_SUCCESS) ||
 		((rval = kernel_listen(tpso->tpso_so, 
