@@ -215,6 +215,7 @@ cluster_target_socket_session_new(cluster_target_port_socket_t *tpso,
 	snprintf(tsso->tsso_ipaddr, 16, "%d.%d.%d.%d",
                 addr_in4.sa_data[2], addr_in4.sa_data[3],
                 addr_in4.sa_data[4], addr_in4.sa_data[5]);
+	cmn_err(CE_NOTE, "%s new session ip(%s)", __func__, tsso->tsso_ipaddr);
 	cluster_target_socket_refcnt_init(&tsso->tsso_refcnt, tsso);
 	mutex_init(&tsso->tsso_rx_mtx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&tsso->tsso_rx_cv, NULL, CV_DRIVER, NULL);
@@ -487,6 +488,8 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 			break;
 		case SOS_S4_XPRT_UP:
 			cv_signal(&tsso->tsso_sm_cv);
+			cmn_err(CE_NOTE, "%s session ip(%s) come into SOS_S4_XPRT_UP",
+				__func__, tsso->tsso_ipaddr);
 			cluster_target_socket_session_connect_finish(tsso);
 			taskq_dispatch(clustersan->cs_async_taskq, 
 				cts_link_down_to_up_handle, tsso->tsso_cts, TQ_SLEEP);
@@ -704,6 +707,8 @@ cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 {
 	cs_rx_data_t *cs_data, *cs_data_next;
 	cluster_target_port_socket_t *tpso = worker->worker_private;
+
+	cmn_err(CE_NOTE, "TARGET SOCKET RX HANDLE THREAD RUNNING");
 
 	mutex_enter(&worker->worker_mtx);
 	worker->worker_running = B_TRUE;
@@ -959,3 +964,19 @@ failed_out:
 	return rval;
 }
 
+cluster_status_t
+cluster_target_socket_init(void)
+{
+	bzero(ctso, sizeof(cts_global_t));
+	
+	rw_init(&ctso->ctso_rw, NULL, RW_DRIVER, NULL);
+	list_create(&ctso->ctso_tpso_list, sizeof(cluster_target_port_socket_t),
+		offsetof(cluster_target_port_socket_t, tpso_node));
+	list_create(&ctso->ctso_tsso_list, sizeof(cluster_target_session_socket_t),
+		offsetof(cluster_target_session_socket_t, tsso_node));
+	ctso->ctso_refasync_taskq = taskq_create("ctso_refasync_taskq", 1,
+		minclsyspri, 8, 16, TASKQ_PREPOPULATE);
+	if (ctso->ctso_refasync_taskq == NULL)
+		return -1;
+	return CLUSTER_STATUS_SUCCESS;
+}

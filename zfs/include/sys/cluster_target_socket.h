@@ -186,6 +186,6 @@ int cluster_target_socket_port_init(
 void cts_socket_hb_init(cluster_target_session_t *cts);
 void cluster_target_socket_port_fini(cluster_target_port_t *ctp);
 void cts_socket_init(void);
-
+cluster_status_t cluster_target_socket_init(void);
 #endif
 
