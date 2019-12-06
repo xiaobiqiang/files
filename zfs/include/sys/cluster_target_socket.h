@@ -5,6 +5,9 @@
 #include <linux/socket.h>  
 #include <net/sock.h>
 #include <asm/atomic.h>
+#include <sys/callout.h>
+
+#define CTSO_FTAG	__func__
 
 #define TSSO_SM_AUDIT_DEPTH		64
 
@@ -118,7 +121,7 @@ typedef struct cluster_target_port_socket {
 	 * new design
 	 */
 	list_node_t tpso_node;
-	trfam_refcnt_t tpso_refcnt;
+	cluster_target_socket_refcnt_t tpso_refcnt;
 	list_t tpso_sess_list;
 	cluster_target_port_t *tpso_ctp;
 	char tpso_ipaddr[16];
@@ -133,7 +136,7 @@ typedef struct cluster_target_port_socket {
 	 * for session rx handle
 	 */
 	uint32_t tpso_rx_process_nthread;
-	cluster_target_socket_worker *tpso_rx_process_ctx;
+	cluster_target_socket_worker_t *tpso_rx_process_ctx;
 } cluster_target_port_socket_t;
 
 typedef struct cluster_target_socket_param {
@@ -151,7 +154,7 @@ typedef struct cluster_target_session_socket {
 	 */
 	list_node_t tsso_node;
 	list_node_t tsso_tpso_node;
-	trfam_refcnt_t tsso_refcnt;
+	cluster_target_socket_refcnt_t tsso_refcnt;
 	char tsso_local_ip[16];
 	char tsso_ipaddr[16];
 	uint32_t tsso_port;

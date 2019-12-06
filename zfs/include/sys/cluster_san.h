@@ -501,6 +501,7 @@ int cts_rx_hook_add(uint32_t msg_type, cs_rx_cb_t rx_cb, void *arg);
 int cts_rx_hook_remove(uint32_t msg_type);
 int csh_rx_hook_add(uint32_t msg_type, cs_rx_cb_t rx_cb, void *arg);
 int csh_rx_hook_remove(uint32_t msg_type);
+cs_rx_data_t *cts_rx_data_alloc(uint64_t len);
 void csh_rx_data_free(cs_rx_data_t *cs_data, boolean_t csh_hold);
 int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	void *data, uint64_t len, void *header, uint64_t header_len,
@@ -549,6 +550,8 @@ int cluster_get_host_ipmi_ip(uint32_t hostid, char *ipmi_ipaddr);
 
 void zfs_mirror_cancel_check_spa_txg(uint32_t hostid);
 void csh_rx_data_free_ext(cs_rx_data_t *cs_data);
+void cluster_san_host_rx_handle(
+        cs_rx_data_t *cs_data);
 
 #endif/* #ifndef	_SYS_CLUSTER_SAN_H */
 

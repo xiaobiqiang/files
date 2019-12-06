@@ -593,7 +593,7 @@ int cs_addr_valid(void *addr, const char *name)
 	return (ok);
 }
 
-static cs_rx_data_t *cts_rx_data_alloc(uint64_t len)
+cs_rx_data_t *cts_rx_data_alloc(uint64_t len)
 {
 	cs_rx_data_t *cs_data;
 
@@ -2508,7 +2508,7 @@ cluster_target_session_worker_handle(void *arg)
 	atomic_dec_32(&cts->sess_rx_worker_n);
 }
 
-static void cluster_san_host_rx_handle(cs_rx_data_t *cs_data);
+void cluster_san_host_rx_handle(cs_rx_data_t *cs_data);
 static cs_rx_data_t *cluster_san_host_fragment_handle(cluster_san_hostinfo_t *cshi, cts_fragment_data_t *fragment);
 
 void
@@ -3074,7 +3074,7 @@ static void cluster_san_rx_clusterevt_handle(cs_rx_data_t *cs_data)
 	}
 }
 
-static void cluster_san_host_rx_handle(
+void cluster_san_host_rx_handle(
 	cs_rx_data_t *cs_data)
 {
 	/* cluster_san_hostinfo_t *cshi = cs_data->cs_private; */
