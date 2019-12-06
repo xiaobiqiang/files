@@ -980,3 +980,9 @@ cluster_target_socket_init(void)
 		return -1;
 	return CLUSTER_STATUS_SUCCESS;
 }
+
+void
+cluster_target_socket_port_fini(cluster_target_port_t *ctp)
+{
+
+}
