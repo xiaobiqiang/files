@@ -185,6 +185,28 @@ cluster_target_socket_shutdown(struct socket *so)
 	kernel_sock_shutdown(so, SHUT_RDWR);
 }
 
+cluster_status_t
+cluster_target_socket_setsockopt(struct socket *so)
+{
+	cluster_status_t rval;
+	int sndbuf = 256 * 1024, rcvbuf = 256 *1024;
+	int on = 1, off = 0;
+	
+	if (((rval = kernel_setsockopt(so, SOL_SOCKET, SO_REUSEADDR, 
+					&on, sizeof(on))) != CLUSTER_STATUS_SUCCESS) || 
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_REUSEPORT, 
+					&on, sizeof(on))) != CLUSTER_STATUS_SUCCESS) ||
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_SNDBUF, 
+					&sndbuf, sizeof(sndbuf))) != CLUSTER_STATUS_SUCCESS) ||
+		((rval = kernel_setsockopt(so, SOL_SOCKET, SO_RCVBUF, 
+					&rcvbuf, sizeof(rcvbuf))) != CLUSTER_STATUS_SUCCESS) ||
+		((rval = kernel_setsockopt(so, SOL_TCP, TCP_NODELAY, 
+					&on, sizeof(on))) != CLUSTER_STATUS_SUCCESS))
+		return rval;
+	return CLUSTER_STATUS_SUCCESS;
+}	
+
+
 static void
 cluster_target_socket_session_hold(cluster_target_session_socket_t *tsso, void *tag)
 {
@@ -622,7 +644,7 @@ cluster_target_socket_session_init_nonexist(cluster_target_session_socket_t **ts
 	if ((rval = cluster_target_socket_create(AF_INET, SOCK_STREAM, 0, 
 			&so)) != CLUSTER_STATUS_SUCCESS)
 		return rval;
-	
+	cluster_target_socket_setsockopt(so);
 	cluster_target_socket_session_new(tpso, cts, so, &tsso);
 	cluster_target_socket_session_sminit(tsso);
 	strncpy(tsso->tsso_local_ip, param->local, 16);
@@ -723,14 +745,9 @@ cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 		worker->worker_list_r = exchange_list;
 		mutex_exit(&worker->worker_mtx);
 
-		cs_data = list_head(worker->worker_list_r);
-		cmn_err(CE_NOTE, "%s cs_data(%p)", __func__, cs_data);
-		while (cs_data) {
-			cs_data_next = list_next(worker->worker_list_r, cs_data);
-			list_remove(worker->worker_list_r, cs_data);
+		cmn_err(CE_NOTE, "%s", __func__);
+		while ((cs_data = list_remove_head(worker->worker_list_r)) != NULL)
 			cluster_san_host_rx_handle(cs_data);
-			cs_data = cs_data_next;
-		}
 
 		mutex_enter(&worker->worker_mtx);
 	}
@@ -788,10 +805,13 @@ cluster_target_socket_port_free_rx_worker(cluster_target_port_socket_t *tpso)
 		}
 		mutex_exit(&worker->worker_mtx);
 
+		cmn_err(CE_NOTE, "%s wait for rx handle thread exit", __func__);
+		
 		mutex_enter(&worker->worker_mtx);
 		while (!worker->worker_stopped)
 			cv_wait(&worker->worker_cv, &worker->worker_mtx);
 		mutex_exit(&worker->worker_mtx);
+		cmn_err(CE_NOTE, "%s rx handle thread exit", __func__);
 	}
 	kmem_free(tpso->tpso_rx_process_ctx, sizeof(cluster_target_socket_worker_t) *
 		tpso->tpso_rx_process_nthread);
@@ -873,12 +893,11 @@ cluster_target_socket_port_online(cluster_target_port_socket_t *tpso)
 	addr_in4.sin_port = htons(tpso->tpso_port);
 	addr_in4.sin_addr.s_addr = in_aton(tpso->tpso_ipaddr);
 
-	cluster_target_socket_create(AF_INET, SOCK_STREAM, 0, &tpso->tpso_so);
-	
 	if (((rval = kernel_bind(tpso->tpso_so, &addr_in4,
 			sizeof(addr_in4))) != CLUSTER_STATUS_SUCCESS) ||
 		((rval = kernel_listen(tpso->tpso_so, 
 			24)) != CLUSTER_STATUS_SUCCESS)) {
+		cluster_target_socket_destroy(tpso->tpso_so);
 		cmn_err(CE_NOTE, "%s bind so error(%d)", __func__, rval);
 		return rval;
 	}
@@ -901,18 +920,24 @@ cluster_target_socket_port_portal_up(cluster_target_port_socket_t *tpso)
 	int rval;
 	struct socket *so;
 
+	cmn_err(CE_NOTE, "coming into %s", __func__);
+
 	if ((rval = cluster_target_socket_create(AF_INET,
-			SOCK_STREAM, 0, &so)) != CLUSTER_STATUS_SUCCESS)
+			SOCK_STREAM, 0, &so)) != CLUSTER_STATUS_SUCCESS) {
+		cmn_err(CE_NOTE, "%s socket_create failed", __func__);
 		return rval;
+	}
 	
 	tpso->tpso_so = so;
-
+	cluster_target_socket_setsockopt(tpso->tpso_so);
 	if ((rval = cluster_target_socket_port_online(tpso))
 			!= CLUSTER_STATUS_SUCCESS) {
 		cluster_target_socket_destroy(so);
+		cmn_err(CE_NOTE, "%s port_online failed", __func__);
 		return rval;
 	}
 
+	cmn_err(CE_NOTE, "%s success", __func__);
 	return CLUSTER_STATUS_SUCCESS;
 }
 
@@ -948,7 +973,7 @@ int cluster_target_socket_port_init(cluster_target_port_t *ctp,
 
 	cluster_target_socket_port_hold(tpso, CTSO_FTAG);
 	
-	rval = cluster_target_socket_port_online(tpso);
+	rval = cluster_target_socket_port_portal_up(tpso);
 	if (rval != CLUSTER_STATUS_SUCCESS)
 		goto failed_out;
 	
@@ -972,8 +997,11 @@ int cluster_target_socket_port_init(cluster_target_port_t *ctp,
 	return CLUSTER_STATUS_SUCCESS;
 	
 failed_out:
+	cmn_err(CE_NOTE, "coming into cluster_target_socket_port_rele");
 	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
+	cmn_err(CE_NOTE, "coming into cluster_target_socket_port_free");
 	cluster_target_socket_port_free(tpso);
+	cmn_err(CE_NOTE, "go out cluster_target_socket_port_init");
 	return rval;
 }
 

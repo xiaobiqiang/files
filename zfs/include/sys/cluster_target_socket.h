@@ -113,7 +113,6 @@ typedef struct cluster_target_socket_worker {
 	kcondvar_t		worker_cv;
 	boolean_t		worker_running;
 	boolean_t 		worker_stopped;
-	uint32_t		worker_ntasks;
 	struct task_struct *worker_ctx;
 	void 			*worker_private;
 } cluster_target_socket_worker_t;
@@ -157,17 +156,17 @@ typedef struct cluster_target_session_socket {
 	list_node_t tsso_node;
 	list_node_t tsso_tpso_node;
 	cluster_target_socket_refcnt_t tsso_refcnt;
-	char tsso_local_ip[16];
-	char tsso_ipaddr[16];
-	uint32_t tsso_port;
 	cluster_target_port_socket_t *tsso_tpso;
 	cluster_target_session_t *tsso_cts;
 	struct socket *tsso_so;
+	char tsso_local_ip[16];
+	char tsso_ipaddr[16];
+	uint32_t tsso_port;
+	boolean_t tsso_rx_running;
 	kmutex_t tsso_rx_mtx;
 	kcondvar_t tsso_rx_cv;
 	struct task_struct *tsso_rx;
 	list_t tsso_rx_data_list;
-	boolean_t tsso_rx_running;
 
 	/*
 	 * socket session state machine
