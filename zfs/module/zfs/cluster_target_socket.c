@@ -731,9 +731,11 @@ cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 		mutex_enter(&worker->worker_mtx);
 	}
 
+	cmn_err(CE_NOTE, "TARGET SOCKET RX HANDLE THREAD EXIT");
 	worker->worker_running = B_FALSE;
 	worker->worker_stopped = B_TRUE;
 	cv_signal(&worker->worker_cv);
+	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
 	mutex_exit(&worker->worker_mtx);
 }
 
@@ -875,6 +877,8 @@ cluster_target_socket_port_online(cluster_target_port_socket_t *tpso)
 		return rval;
 	}
 
+	cmn_err(CE_NOTE, "%s going to watch port(%d)", __func__, tpso->tpso_port);
+
 	tpso->tpso_accepter = kthread_run(cluster_target_socket_port_watcher,
 		tpso, "ctp_watcher_%d", tpso->tpso_port);
 	mutex_enter(&tpso->tpso_mtx);
@@ -962,6 +966,7 @@ int cluster_target_socket_port_init(cluster_target_port_t *ctp,
 	return CLUSTER_STATUS_SUCCESS;
 	
 failed_out:
+	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
 	cluster_target_socket_port_free(tpso);
 	return rval;
 }
