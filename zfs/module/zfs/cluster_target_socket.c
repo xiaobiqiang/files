@@ -342,7 +342,7 @@ cluster_target_socket_session_rx_process(
 		return ;
 	}
 
-	list_insert_tail(&worker->worker_list_w, cs_data);
+	list_insert_tail(worker->worker_list_w, cs_data);
 	cv_signal(&worker->worker_cv);
 	mutex_exit(&worker->worker_mtx);
 }
@@ -705,6 +705,7 @@ cluster_target_socket_port_rele(cluster_target_port_socket_t *tpso, void *tag)
 static void
 cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 {
+	list_t *exchange_list;
 	cs_rx_data_t *cs_data, *cs_data_next;
 	cluster_target_port_socket_t *tpso = worker->worker_private;
 
@@ -715,15 +716,18 @@ cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 	cv_signal(&worker->worker_cv);
 
 	while (worker->worker_running) {
-		if (list_is_empty(&worker->worker_list_w))
+		if (list_is_empty(worker->worker_list_w))
 			cv_wait(&worker->worker_cv, &worker->worker_mtx);
-		list_move_tail(&worker->worker_list_r, &worker->worker_list_w);
+		exchange_list = worker->worker_list_w;
+		worker->worker_list_w = worker->worker_list_r;
+		worker->worker_list_r = exchange_list;
 		mutex_exit(&worker->worker_mtx);
 
-		cs_data = list_head(&worker->worker_list_r);
+		cs_data = list_head(worker->worker_list_r);
+		cmn_err(CE_NOTE, "%s cs_data(%p)", __func__, cs_data);
 		while (cs_data) {
-			cs_data_next = list_next(&worker->worker_list_r, cs_data);
-			list_remove(&worker->worker_list_r, cs_data);
+			cs_data_next = list_next(worker->worker_list_r, cs_data);
+			list_remove(worker->worker_list_r, cs_data);
 			cluster_san_host_rx_handle(cs_data);
 			cs_data = cs_data_next;
 		}
@@ -752,9 +756,11 @@ cluster_target_socket_port_new_rx_worker(cluster_target_port_socket_t *tpso)
 		cluster_target_socket_port_hold(tpso, CTSO_FTAG);
 		worker = tpso->tpso_rx_process_ctx + idx;
 		worker->worker_private = tpso;
-		list_create(&worker->worker_list_r, sizeof(cs_rx_data_t),
+		worker->worker_list_r = &worker->worker_list1;
+		worker->worker_list_w = &worker->worker_list2;
+		list_create(&worker->worker_list1, sizeof(cs_rx_data_t),
 			offsetof(cs_rx_data_t, node));
-		list_create(&worker->worker_list_w, sizeof(cs_rx_data_t),
+		list_create(&worker->worker_list2, sizeof(cs_rx_data_t),
 			offsetof(cs_rx_data_t, node));
 		mutex_init(&worker->worker_mtx, NULL, MUTEX_DEFAULT, NULL);
 		cv_init(&worker->worker_cv, NULL, CV_DRIVER, NULL);

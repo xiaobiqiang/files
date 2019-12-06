@@ -105,8 +105,10 @@ typedef enum cluster_target_socket_session_state {
 } cluster_target_socket_session_state_e;
 
 typedef struct cluster_target_socket_worker {
-	list_t			worker_list_r;
-	list_t			worker_list_w;
+	list_t			*worker_list_r;
+	list_t			*worker_list_w;
+	list_t 			worker_list1;
+	list_t 			worker_list2;
 	kmutex_t		worker_mtx;
 	kcondvar_t		worker_cv;
 	boolean_t		worker_running;
