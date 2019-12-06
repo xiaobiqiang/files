@@ -3893,7 +3893,8 @@ cluster_target_session_t *cluster_target_session_add(
 			/* cts_rpc_rdma_hb_init(cts); */
 		} else if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
 		    /* todo: heart beat */
-            cts_socket_hb_init(cts);
+//            cts_socket_hb_init(cts);
+			cts_tran_worker_init(cts);
 		} else {
 			cts_tran_worker_init(cts);
 			cluster_target_session_worker_init(cts);
