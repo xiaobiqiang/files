@@ -10,8 +10,7 @@
 #define CTSO_FTAG	__func__
 
 #define TSSO_SM_AUDIT_DEPTH		64
-
-#define CTSO_REFAUDIT_MAX_RECORD
+#define CTSO_REFAUDIT_MAX_RECORD	64
 #define ctso_assert(cond)	\
 	do {	\
 		if (!(cond))	\
@@ -21,25 +20,28 @@
 
 #define CTSO_REFAUDIT(refcnt, ftag, type)	{	\
 	cluster_target_socket_refaudit_record_t *adr;	\
-	uint32_t adr_offset;	\
-	adr_offset = (refcnt)->tr_audit.adt_idx & (refcnt)->tr_audit.adt_max_depth;	\
-	adr = &(refcnt)->tr_audit.adt_record[0] + adr_offset;	\
+			\
+	adr = (refcnt)->tr_audit.adt_record;		\
+	adr += (refcnt)->tr_audit.adt_idx;		\
+	(refcnt)->tr_audit.adt_idx++;	\
 	adr->adr_nref = (refcnt)->tr_nref;	\
 	adr->adr_fn = strdup(ftag);		\
 	adr->adr_type = type;	\
-	(refcnt)->tr_audit.adt_idx++;	\
+	(refcnt)->tr_audit.adt_idx &= (refcnt)->tr_audit.adt_max_depth;	\
 }
 
 #define CTSO_SESS_SM_AUDIT(tsso, event, ftag)		\
 {	\
 	cluster_target_socket_sm_audit_t *sa = &(tsso)->tsso_sm_audit;	\
-	int idx = sa->sa_idx & sa->sa_max_depth;	\
-	cluster_target_socket_sm_audit_record_t *sar = &sa->sa_record[0] + idx;	\
+	cluster_target_socket_sm_audit_record_t *sar; \
+		\
+	sar = sa->sa_record + sa->sa_idx;	\
+	sa->sa_idx++;		\
 	sar->sar_ostate = tsso->tsso_last_state;	\
 	sar->sar_nstate = tsso->tsso_curr_state;	\
 	sar->sar_event = event;	\
 	sar->sar_ftag = strdup(ftag);	\
-	sa->sa_idx++;	\
+	sa->sa_idx &= sa->sa_max_depth;	\
 }
 
 typedef enum cluster_target_socket_refwait {

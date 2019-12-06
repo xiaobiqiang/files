@@ -354,7 +354,7 @@ cluster_target_socket_session_rx_process(
 
 	cluster_target_socket_session_hold(tsso, CTSO_FTAG);
 
-	worker_idx = cs_data->data_index & tpso->tpso_rx_process_nthread;
+	worker_idx = cs_data->data_index & (tpso->tpso_rx_process_nthread - 1);
 	worker = tpso->tpso_rx_process_ctx + worker_idx;
 	mutex_enter(&worker->worker_mtx);
 	if (!worker->worker_running) {
