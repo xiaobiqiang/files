@@ -5364,7 +5364,7 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 		return -ENOMEM;
 	}
 
-	cluster_san_hb_stop();
+//	cluster_san_hb_stop();
 	zfs_mirror_stop_watchdog_thread();
 
 	printk("%s: start to send data\n", __func__);

@@ -3878,9 +3878,6 @@ cluster_target_session_t *cluster_target_session_add(
 		atomic_inc_64(&ctp->ref_count); /* hold "cts_init" */
 		cts->sess_port_private = (void *)ctp;
 		cts->sess_pri = ctp->pri;
-
-		ctp->f_session_init(cts, phy_head);
-
 		if ((ctp->protocol & TARGET_PROTOCOL_CLUSTER) != 0) {
 			cts->sess_flags |= CLUSTER_TARGET_SESS_FLAG_SAN;
 		}
@@ -3890,6 +3887,9 @@ cluster_target_session_t *cluster_target_session_add(
 		cluster_san_hostinfo_hold(cshi);
 		cts->sess_host_private = cshi;
 		cts->sess_id = atomic_inc_32_nv(&cluster_target_session_count);
+
+		ctp->f_session_init(cts, phy_head);
+
 		if (ctp->target_type == CLUSTER_TARGET_RPC_RDMA) {
 			/* cts_rpc_rdma_hb_init(cts); */
 		} else if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
@@ -4705,20 +4705,23 @@ int cluster_target_session_send(cluster_target_session_t *cts,
 			cts_reply_notify(cts->sess_host_private, origin_data->index);
 		}
 		return (ret);
-	} else if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
+	}/* else if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
 	    ret = ctp->f_session_tran_start(cts, origin_data);
 		if ((ret == 0) && (origin_data->need_reply != 0)) {
 			cts_reply_notify(cts->sess_host_private, origin_data->index);
 		}
         return (ret);
-	}
+	} */
 
 	/* fragmentation */
+	cmn_err(CE_NOTE, "idx(%llu) exlen(%u) dlen(%llu)", 
+		origin_data->index, origin_data->header_len, origin_data->data_len);
 	ret = ctp->f_tran_fragment(ctp->target_private, cts->sess_target_private,
 		origin_data, &data_array, &fragment_cnt);
 
 	if (ret == 0) {
 		ret = cts_send_wait(cts, data_array, fragment_cnt, pri);
+		cmn_err(CE_NOTE, "cts_send_wait rval(%d)", ret);
 		if (ret != 0) {
 			for (i = 0; i < fragment_cnt; i++) {
 				if (data_array[i].fragmentation != NULL) {
@@ -4727,6 +4730,8 @@ int cluster_target_session_send(cluster_target_session_t *cts,
 			}
 		}
 		kmem_free(data_array, sizeof(cluster_target_tran_data_t) * fragment_cnt);
+		if ((ctp->target_type == CLUSTER_TARGET_SOCKET) && origin_data->need_reply)
+			cts_reply_notify(cts->sess_host_private, origin_data->index);
 	}
 
 	return (ret);
