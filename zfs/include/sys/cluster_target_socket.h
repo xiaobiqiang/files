@@ -8,6 +8,8 @@
 #include <sys/callout.h>
 
 #define CTSO_FTAG	__func__
+#define CTSO_PORT_RX_PROCESS_NTHREAD	16
+#define CTSO_MAX_PORT	4
 
 #define TSSO_SM_AUDIT_DEPTH		64
 #define CTSO_REFAUDIT_MAX_RECORD	64
@@ -30,19 +32,22 @@
 	(refcnt)->tr_audit.adt_idx &= (refcnt)->tr_audit.adt_max_depth;	\
 }
 
-#define CTSO_SESS_SM_AUDIT(tsso, event, ftag)		\
+#define CTSO_SESS_SM_AUDIT(tssp, event, ftag)		\
 {	\
-	cluster_target_socket_sm_audit_t *sa = &(tsso)->tsso_sm_audit;	\
+	cluster_target_socket_sm_audit_t *sa = &(tssp)->tssp_sm_audit;	\
 	cluster_target_socket_sm_audit_record_t *sar; \
 		\
 	sar = sa->sa_record + sa->sa_idx;	\
 	sa->sa_idx++;		\
-	sar->sar_ostate = tsso->tsso_last_state;	\
-	sar->sar_nstate = tsso->tsso_curr_state;	\
+	sar->sar_ostate = tssp->tssp_last_state;	\
+	sar->sar_nstate = tssp->tssp_curr_state;	\
 	sar->sar_event = event;	\
 	sar->sar_ftag = strdup(ftag);	\
 	sa->sa_idx &= sa->sa_max_depth;	\
 }
+
+typedef struct cluster_target_port_socket cluster_target_port_socket_t;
+typedef struct cluster_target_session_socket_port cluster_target_session_socket_port_t;
 
 typedef enum cluster_target_socket_refwait {
 	CTSO_REF_NOWAIT,
@@ -117,36 +122,43 @@ typedef struct cluster_target_socket_worker {
 	boolean_t 		worker_stopped;
 	struct task_struct *worker_ctx;
 	void 			*worker_private;
+	uint32_t 		worker_idx;
 } cluster_target_socket_worker_t;
 
-typedef struct cluster_target_port_socket {
+typedef struct cluster_target_port_socket_port {
+	char tpsp_ipaddr[16];
+    uint32_t tpsp_port;
+
+	struct socket *tpsp_so;
+	kmutex_t tpsp_mtx;
+	kcondvar_t tpsp_cv;
+	struct task_struct *tpsp_accepter;
+	boolean_t tpsp_accepter_running;
+
+	cluster_target_port_socket_t *tpsp_tpso;
+} cluster_target_port_socket_port_t;
+
+struct cluster_target_port_socket {
 	/*
 	 * new design
 	 */
 	list_node_t tpso_node;
 	cluster_target_socket_refcnt_t tpso_refcnt;
-	list_t tpso_sess_list;
-	cluster_target_port_t *tpso_ctp;
 	char tpso_ipaddr[16];
-    uint32_t tpso_port;
-	struct socket *tpso_so;
+	
 	kmutex_t tpso_mtx;
-	kcondvar_t tpso_cv;
-	struct task_struct *tpso_accepter;
-	boolean_t tpso_accepter_running;
-
-	/*
-	 * for session rx handle
-	 */
-	uint32_t tpso_rx_process_nthread;
-	cluster_target_socket_worker_t *tpso_rx_process_ctx;
-} cluster_target_port_socket_t;
+	cluster_target_port_t *tpso_ctp;
+	list_t tpso_sess_list;
+	cluster_target_socket_worker_t *tpso_rx_process_ctx[CTSO_PORT_RX_PROCESS_NTHREAD];
+	uint32_t tpso_tpsp_cnt;
+	uint32_t tpso_aligin;
+	cluster_target_port_socket_port_t *tpso_tpsp[CTSO_MAX_PORT];
+};
 
 typedef struct cluster_target_socket_param {
    char hostname[256];
    char ipaddr[16];
    char local[16];
-   int port;
    int hostid;
    int priority;
 } cluster_target_socket_param_t;
@@ -160,29 +172,68 @@ typedef struct cluster_target_session_socket {
 	cluster_target_socket_refcnt_t tsso_refcnt;
 	cluster_target_port_socket_t *tsso_tpso;
 	cluster_target_session_t *tsso_cts;
-	struct socket *tsso_so;
 	char tsso_local_ip[16];
 	char tsso_ipaddr[16];
-	uint32_t tsso_port;
-	boolean_t tsso_rx_running;
-	kmutex_t tsso_rx_mtx;
-	kcondvar_t tsso_rx_cv;
-	struct task_struct *tsso_rx;
-	list_t tsso_rx_data_list;
 
-	/*
-	 * socket session state machine
-	 */
-	kmutex_t tsso_sm_mtx;
-	kcondvar_t tsso_sm_cv;
-	cluster_target_socket_sm_audit_t tsso_sm_audit;
-	taskq_t *tsso_sm_ctx;
-	cluster_target_socket_session_state_e tsso_curr_state;
-	cluster_target_socket_session_state_e tsso_last_state;
-
-	cluster_status_t tsso_connect_status;
-	timeout_id_t tsso_conn_tmhdl;
+	kmutex_t tsso_mtx;
+	kcondvar_t tsso_cv;
+	uint32_t tsso_status;
+	uint32_t tsso_aligin;
+	uint32_t tsso_tssp_cnt;
+	uint32_t tsso_tssp_idx;
+	cluster_target_session_socket_port_t *tsso_tssp[CTSO_MAX_PORT];
 } cluster_target_session_socket_t;
+
+struct cluster_target_session_socket_port {
+        cluster_target_session_socket_t *tssp_tsso;
+        struct socket *tssp_so;
+        char tssp_local_ip[16];
+        char tssp_ipaddr[16];
+        uint32_t tssp_port;
+        boolean_t tssp_rx_running;
+        kmutex_t tssp_rx_mtx;
+        kcondvar_t tssp_rx_cv;
+        struct task_struct *tssp_rx;
+        list_t tssp_rx_data_list;
+
+		boolean_t tssp_tx_running;
+		uint32_t tssp_tx_align;
+		kmutex_t tssp_tx_mtx;
+		kcondvar_t tssp_tx_cv;
+		struct task_struct *tssp_tx;
+		list_t tssp_tx_wait_list;
+		list_t tssp_tx_live_list;
+
+        /*
+         * socket session state machine
+         */
+        kmutex_t tssp_sm_mtx;
+        kcondvar_t tssp_sm_cv;
+        cluster_target_socket_sm_audit_t tssp_sm_audit;
+        taskq_t *tssp_sm_ctx;
+        cluster_target_socket_session_state_e tssp_curr_state;
+        cluster_target_socket_session_state_e tssp_last_state;
+
+        cluster_status_t tssp_connect_status;
+        timeout_id_t tssp_conn_tmhdl;
+};
+
+typedef struct cluster_target_socket_tran_data {
+	list_node_t tdt_node;
+	cluster_target_session_socket_port_t *tdt_tssp;
+	/*
+	 * iov[0] = ct_head
+	 * iov[1] = ex_head
+	 * iov[2] = data
+	 */
+	cluster_target_msg_header_t tdt_ct_head;
+	struct msghdr tdt_sohdr;
+	struct kvec tdt_iov[3];
+	uint32_t tdt_iovlen;
+	uint32_t tdt_iovbuflen;
+
+	uint32_t tdt_tran_idx;
+} cluster_target_socket_tran_data_t;
 
 int cluster_target_socket_port_init(
 	cluster_target_port_t *ctp, char *link_name, nvlist_t *nvl_conf);
@@ -191,4 +242,5 @@ void cluster_target_socket_port_fini(cluster_target_port_t *ctp);
 void cts_socket_init(void);
 cluster_status_t cluster_target_socket_init(void);
 #endif
+
 

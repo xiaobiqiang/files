@@ -5528,8 +5528,6 @@ int cluster_socket_config(zfs_cmd_t *zc)
     param->hostid = zc->zc_guid;
     strcpy(param->hostname, zc->zc_value);
 	strcpy(param->local, zc->zc_top_ds);
-    printk("%s zc->zc_sendobj=%d\n", __func__, zc->zc_history_offset);
-    param->port = zc->zc_history_offset;
     strcpy(param->ipaddr, zc->zc_string);
     param->priority = zc->zc_obj;
 

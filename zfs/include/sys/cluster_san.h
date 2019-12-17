@@ -160,6 +160,7 @@ typedef struct cluster_target_tran_worker {
 	uint32_t state;
 	uint32_t node_numbers;
 	void *tran_target_private;
+	uint32_t idx;
 } cluster_target_tran_worker_t;
 
 typedef struct cts_rx_worker {
@@ -554,4 +555,5 @@ void cluster_san_host_rx_handle(
         cs_rx_data_t *cs_data);
 
 #endif/* #ifndef	_SYS_CLUSTER_SAN_H */
+
 

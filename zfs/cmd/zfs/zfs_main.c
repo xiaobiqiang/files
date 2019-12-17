@@ -7882,23 +7882,7 @@ static int zfs_do_clustersan_enable(int argc, char **argv)
             ret = 1;
             goto out;
         }
-        portstr = strchr(ipaddr, ':');
-        if (portstr != NULL) {
-            *portstr = '\0';
-            portstr++;
-            port = atoi(portstr);
-            if (port < 0 || port > 65535)
-                goto out;
-        } else {
-            port = 1866;
-        }
         if (nvlist_add_string(nvl_conf, "ipaddr", ipaddr) != 0) {
-            (void) fprintf(stderr,
-					gettext("internal error: out of memory\n"));
-            ret = 1;
-            goto out;
-        }
-        if (nvlist_add_int32(nvl_conf, "port", port) != 0) {
             (void) fprintf(stderr,
 					gettext("internal error: out of memory\n"));
             ret = 1;
@@ -8449,12 +8433,6 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 			hostname = value;
 		} else if (strcmp(name, "hostid") == 0) {
 			hostid = atoi(value);
-		} else if (strcmp(name, "port") == 0) {
-			port = atoi(value);
-            if (port < 0 || port > 65535) {
-                printf("port should > 0 and < 65536");
-                usage(B_FALSE);
-            }
 		} else if (strcmp(name, "ip") == 0) {
 			ip = value;
 		} else if (strcmp(name, "priority") == 0) {
