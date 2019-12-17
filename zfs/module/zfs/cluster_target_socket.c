@@ -1369,7 +1369,7 @@ cluster_target_socket_tx_data_cons(void *hdl, void *arg, int flags)
 {
 	cluster_target_socket_tran_data_t *tdt = hdl;
 
-	bzero(&tdt->tdt_sohdr);
+	bzero(&tdt->tdt_sohdr, sizeof(struct msghdr));
 	tdt->tdt_iovbuflen = sizeof(cluster_target_msg_header_t);
 	tdt->tdt_iovlen = 1;
 	tdt->tdt_iov[0].iov_base = &tdt->tdt_ct_head;
