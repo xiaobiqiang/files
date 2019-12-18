@@ -200,7 +200,7 @@ cluster_status_t
 cluster_target_socket_setsockopt(struct socket *so)
 {
 	cluster_status_t rval;
-	int sndbuf = 256 * 1024, rcvbuf = 256 *1024;
+	int sndbuf = 2 * 1024 * 1024, rcvbuf = 2 * 1024 *1024;
 	int on = 1, off = 0;
 	
 	if (((rval = kernel_setsockopt(so, SOL_SOCKET, SO_REUSEADDR, 
@@ -309,9 +309,28 @@ cluster_target_socket_session_tran_start(
 	cluster_target_session_socket_port_t *tssp;
 	cluster_target_socket_tran_data_t *tdt;
 	cluster_target_msg_header_t *ct_head;
+	cluster_evt_header_t *evt_header;
+	kmutex_t mtx;
+	kcondvar_t cv;
 
+	mutex_init(&mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&cv, NULL, CV_DRIVER, NULL);
+	
 	tdt = kmem_cache_alloc(ctso->ctso_tx_data_cache, KM_NOSLEEP);
 	tdt->tdt_tssp = tsso->tsso_tssp[origin_data->index % tsso->tsso_tssp_cnt];
+	tdt->tdt_waiting = B_TRUE;
+	tdt->tdt_mtx = &mtx;
+	tdt->tdt_cv = &cv;
+
+/*	cmn_err(CE_NOTE, "idx(%llu) msg_type(%02x) hlen(%04x) dlen(%x)",
+		origin_data->index, origin_data->msg_type, 
+		origin_data->header_len, origin_data->data_len);
+
+	if (origin_data->msg_type == CLUSTER_SAN_MSGTYPE_CLUSTER) {
+		evt_header = origin_data->header;
+		cmn_err(CE_NOTE, "%s msg_type(%02x) data_len(%x)", __func__, 
+			evt_header->msg_type, origin_data->data_len);
+	} */
 
 	ct_head = &tdt->tdt_ct_head;
 	ct_head->ex_len = origin_data->header_len;
@@ -324,12 +343,39 @@ cluster_target_socket_session_tran_start(
 
 	tdt->tdt_iov[1].iov_base = origin_data->header;
 	tdt->tdt_iov[1].iov_len = origin_data->header_len;
+
 	tdt->tdt_iov[2].iov_base = origin_data->data;
 	tdt->tdt_iov[2].iov_len = origin_data->data_len;
+
+/*	if (origin_data->header_len) {
+		tdt->tdt_iov[1].iov_base = kmem_alloc(origin_data->header_len);
+		bcopy(origin_data->header, tdt->tdt_iov[1].iov_base, 
+			origin_data->header_len);
+		tdt->tdt_iov[1].iov_len = origin_data->header_len;
+	} else {
+		tdt->tdt_iov[1].iov_base = NULL;
+		tdt->tdt_iov[1].iov_len = 0;
+	}
+
+	if (origin_data->data_len) {
+		tdt->tdt_iov[2].iov_base = vmalloc(origin_data->data_len);
+		bcopy(origin_data->data, tdt->tdt_iov[2].iov_base, origin_data->data_len);
+		tdt->tdt_iov[2].iov_len = origin_data->data_len;
+	} else {
+		tdt->tdt_iov[2].iov_base = NULL;
+		tdt->tdt_iov[2].iov_len = 0;
+	} */
+
 	tdt->tdt_iovlen += 2;
 	tdt->tdt_iovbuflen += origin_data->header_len + origin_data->data_len;
-
+	
 	cluster_target_socket_session_tx_process(tdt);
+
+	mutex_enter(tdt->tdt_mtx);
+	while (tdt->tdt_waiting)
+		cv_wait(tdt->tdt_cv, tdt->tdt_mtx);
+	mutex_exit(tdt->tdt_mtx);
+	kmem_cache_free(ctso->ctso_tx_data_cache, tdt);
 /*	mutex_enter(&tssp->tssp_sm_mtx);
 	if (tssp->tssp_curr_state != SOS_S4_XPRT_UP) {
 		mutex_exit(&tssp->tssp_sm_mtx);
@@ -348,6 +394,7 @@ cluster_target_socket_session_port_rx(cluster_target_session_socket_port_t *tssp
 	cluster_target_msg_header_t ct_head;
 	boolean_t conn_break = B_FALSE;
 	cluster_target_session_socket_t *tsso = tssp->tssp_tsso;
+	cluster_evt_header_t *evt_header;
 	
 	cmn_err(CE_NOTE, "PORT SESSION(%p) RX THREAD IS RUNNING", tssp);
 	
@@ -365,6 +412,10 @@ cluster_target_socket_session_port_rx(cluster_target_session_socket_port_t *tssp
 			conn_break = B_TRUE;
 			continue;
 		}
+
+/*		cmn_err(CE_NOTE, "idx(%llu) msg_type(%02x) hlen(%04x) dlen(%x)",
+			ct_head.index, ct_head.msg_type, 
+			ct_head.ex_len, ct_head.total_len); */
 		
 		cluster_target_socket_session_rx_new_csdata(
 			tssp->tssp_tsso, &ct_head, &cs_data);
@@ -378,6 +429,12 @@ cluster_target_socket_session_port_rx(cluster_target_session_socket_port_t *tssp
 			conn_break = B_TRUE;
 			continue;
 		}
+
+/*		if (ct_head.msg_type == CLUSTER_SAN_MSGTYPE_CLUSTER) {
+			evt_header = cs_data->ex_head;
+			cmn_err(CE_NOTE, "%s msg_type(%02x) data_len(%x)", __func__, 
+				evt_header->msg_type, cs_data->data_len);
+		} */
 		
 		cluster_target_socket_session_rx_process(tssp->tssp_tsso, cs_data);
 		mutex_enter(&tssp->tssp_rx_mtx);
@@ -404,7 +461,6 @@ cluster_target_socket_session_port_tx(cluster_target_session_socket_port_t *tssp
 
 	while (tssp->tssp_tx_running) {
 		if (list_is_empty(&tssp->tssp_tx_wait_list)) {
-			cmn_err(CE_NOTE, "tssp(%p) tx thread going to sleep", tssp);
 			cv_wait(&tssp->tssp_tx_cv, &tssp->tssp_tx_mtx);
 		}
 
@@ -414,8 +470,10 @@ cluster_target_socket_session_port_tx(cluster_target_session_socket_port_t *tssp
 		while ((tdt = list_remove_head(&tssp->tssp_tx_live_list)) != NULL) {
 			rval = kernel_sendmsg(tssp->tssp_so, &tdt->tdt_sohdr, 
 				tdt->tdt_iov, tdt->tdt_iovlen, tdt->tdt_iovbuflen);
-			if (rval != CLUSTER_STATUS_SUCCESS)
-				break;
+			mutex_enter(tdt->tdt_mtx);
+			tdt->tdt_waiting = B_FALSE;
+			cv_signal(tdt->tdt_cv);
+			mutex_exit(tdt->tdt_mtx);
 		}
 
 		mutex_enter(&tssp->tssp_tx_mtx);
@@ -913,6 +971,7 @@ cluster_target_socket_session_init_exist(cluster_target_session_socket_t *tsso,
 	/*
 	 * other member need be inited.
 	 */
+	return CLUSTER_STATUS_SUCCESS;
 }
 
 static int
@@ -1374,6 +1433,7 @@ cluster_target_socket_tx_data_cons(void *hdl, void *arg, int flags)
 	tdt->tdt_iovlen = 1;
 	tdt->tdt_iov[0].iov_base = &tdt->tdt_ct_head;
 	tdt->tdt_iov[0].iov_len = tdt->tdt_iovbuflen;
+	return 0;
 }
 
 cluster_status_t

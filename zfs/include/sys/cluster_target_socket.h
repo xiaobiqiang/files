@@ -231,6 +231,10 @@ typedef struct cluster_target_socket_tran_data {
 	struct kvec tdt_iov[3];
 	uint32_t tdt_iovlen;
 	uint32_t tdt_iovbuflen;
+	
+	kmutex_t *tdt_mtx;
+	kcondvar_t *tdt_cv;
+	boolean_t tdt_waiting;
 
 	uint32_t tdt_tran_idx;
 } cluster_target_socket_tran_data_t;

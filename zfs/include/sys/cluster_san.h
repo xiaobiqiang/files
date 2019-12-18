@@ -102,8 +102,8 @@ typedef struct cluster_target_msg_header {
 } cluster_target_msg_header_t;
 
 typedef struct cluster_evt_header {
-	uint32_t msg_type;
-	uint8_t pad[4];
+	uint8_t msg_type;
+	uint8_t pad[7];
 	uint64_t msg_id;
 } cluster_evt_header_t;
 

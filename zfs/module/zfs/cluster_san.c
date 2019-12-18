@@ -4859,6 +4859,7 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	if (cshi == NULL) {
 		return (-1);
 	}
+		
 	/* retry and reply */
 	tx_index = atomic_inc_64_nv(&cshi->host_tx_index);
 	if (need_reply) {
