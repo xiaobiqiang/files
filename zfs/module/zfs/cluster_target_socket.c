@@ -441,14 +441,14 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 		/*
 		 * test not to alloc mem when rx data.
 		 */
-		if (ct_head.total_len >= 4 * 1024) {
+/*		if (ct_head.total_len >= 4 * 1024) {
 			cs_data->data = NULL;
 			cs_data->data_len = 0;
 			cs_data->ex_head = NULL;
 			cs_data->ex_len = 0;
 			cs_data->msg_type = CLUSTER_SAN_MSGTYPE_HB;
 			
-		} 
+		}  */
 
 /*		if (ct_head.msg_type == CLUSTER_SAN_MSGTYPE_CLUSTER) {
 			evt_header = cs_data->ex_head;
@@ -900,18 +900,18 @@ cluster_target_socket_session_rx_new_csdata(
 	 * fix txg_sync write big mem data msg. 
 	 * 8K lun block, 4K host device block.
 	 */
-/*	if (hdrp->total_len > 1024 * 1024) {
+	if (hdrp->total_len > 1024 * 1024) {
 		cs_data = cts_rx_data_alloc(0);
 		cs_data->data = vmalloc(hdrp->total_len);
 		cs_data->data_len = hdrp->total_len;
 	} else
 		cs_data = cts_rx_data_alloc(hdrp->total_len); 
-	cs_data->ex_head = kmem_alloc(hdrp->ex_len, KM_SLEEP); */
+	cs_data->ex_head = kmem_alloc(hdrp->ex_len, KM_SLEEP); 
 
 	/*
 	 * test not to alloc mem when rx data.
 	 */
-	if (hdrp->total_len >= 4 * 1024) {
+/*	if (hdrp->total_len >= 4 * 1024) {
 		cs_data = cts_rx_data_alloc(0);
 		cs_data->data = rcv_data;
 		cs_data->data_len = hdrp->total_len;
@@ -919,7 +919,7 @@ cluster_target_socket_session_rx_new_csdata(
 	} else {
 		cs_data = cts_rx_data_alloc(hdrp->total_len);
 		cs_data->ex_head = kmem_alloc(hdrp->ex_len, KM_SLEEP);
-	}
+	} */
 	cs_data->data_index = hdrp->index;
 	cs_data->msg_type = hdrp->msg_type;
 	cs_data->cs_private = cshi;
