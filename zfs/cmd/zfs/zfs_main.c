@@ -7710,7 +7710,7 @@ zfs_do_speed_test(int argc, char **argv)
 	int c;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:n:r")) != -1) {
+	while ((c = getopt(argc, argv, "s:n:r:")) != -1) {
 		switch (c) {
 		case 's':
 			end = NULL;
@@ -7729,7 +7729,8 @@ zfs_do_speed_test(int argc, char **argv)
 			}
 			break;
 		case 'r':
-			need_reply = 1;
+			end = NULL;
+			need_reply = strtol(optarg, &end, 10);
 			break;
 		default:
 			fprintf(stderr, "invalid option\n");
@@ -7738,7 +7739,7 @@ zfs_do_speed_test(int argc, char **argv)
 		}
 	}
 
-	if ((bs == 0) || (cnt == 0)) {
+	if ((bs == 0) || (cnt == 0) || (need_reply == 0)) {
 		usage(B_FALSE);
 		return -EINVAL;
 	}

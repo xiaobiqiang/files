@@ -653,7 +653,10 @@ void csh_rx_data_free(cs_rx_data_t *cs_data, boolean_t csh_hold)
 			kmem_free(cs_data->data, cs_data->data_len);
 		}
 #else
-		cs_kmem_free(cs_data->data, cs_data->data_len);
+		if (cs_data->data_len > 1024 * 1024)
+			vfree(cs_data->data);
+		else
+			cs_kmem_free(cs_data->data, cs_data->data_len);
 #endif
 	}
 	if ((cs_data->ex_head != NULL) && (cs_data->ex_len != 0)) {
