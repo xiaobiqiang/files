@@ -2938,7 +2938,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
 	cmn_err(CE_WARN, "%s raidz_aggre_map_open %s  ",__func__,spa->spa_name );
-	spa->spa_map_manager.mm_active_obj_index = -1;
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4540,7 +4539,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
 	
 	spa->spa_map_manager.mm_active_obj_index = 0;
-	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
 	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
