@@ -180,6 +180,7 @@ int metaslab_lba_weighting_enabled = B_TRUE;
  * Enable/disable metaslab group biasing.
  */
 int metaslab_bias_enabled = B_TRUE;
+extern int vdev_alloc_ratio_thresh2;
 
 static uint64_t metaslab_fragmentation(metaslab_t *);
 extern void raidz_aggre_metaslab_align(vdev_t *vd, uint64_t *start, uint64_t *size);
@@ -2195,19 +2196,6 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
 		mutex_exit(&msp->ms_sync_lock);
 	}
 
-	if (mg->mg_class == spa->spa_normal_class && spa->spa_raidz_aggre) {
-		uint64_t dcols = spa->spa_raidz_aggre_nparity + spa->spa_raidz_aggre_num;
-		uint64_t b = offset >> spa->spa_raidz_ashift;
-		uint64_t x = offset % (1 << spa->spa_raidz_ashift);
-		uint64_t f = b % dcols;
-
-		if (x != 0 || f != 0) {
-			cmn_err(CE_PANIC, "offset=%lx dcols=%lx b=%lx x=%lx f=%lx shift=%d %x", 
-				(long)offset, (long)dcols, (long)b, (long)x, (long)f, 
-				spa->spa_raidz_ashift, 1 << spa->spa_raidz_ashift);	
-		}
-	}
-	
 	if (range_tree_space(msp->ms_alloctree[txg & TXG_MASK]) == 0)
 		vdev_dirty(mg->mg_vd, VDD_METASLAB, msp, txg);
 
@@ -2225,7 +2213,7 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t psize, uint64_t asize,
  */
 static int
 metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
-    dva_t *dva, int d, dva_t *hintdva, uint64_t txg, int flags)
+    dva_t *dva, int d, dva_t *hintdva, uint64_t txg, int flags, int aggre_num)
 {
 	metaslab_group_t *mg, *fast_mg, *rotor;
 	vdev_t *vd;
@@ -2237,12 +2225,14 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	uint64_t asize;
 	uint64_t distance;
 
+    int again = 0;
+	int space_skip = 0;
 	ASSERT(!DVA_IS_VALID(&dva[d]));
 
 	/*
 	 * For testing, make some blocks above a certain size be gang blocks.
 	 */
-	if (!spa->spa_raidz_aggre && psize >= metaslab_gang_bang && (ddi_get_lbolt() & 3) == 0)
+	if (aggre_num <= 1 && psize >= metaslab_gang_bang && (ddi_get_lbolt() & 3) == 0)
 		return (SET_ERROR(ENOSPC));
 
 	if (flags & METASLAB_FASTWRITE)
@@ -2270,7 +2260,7 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	 * way, we can hope for locality in vdev_cache, plus it makes our
 	 * fault domains something tractable.
 	 */
-	if (hintdva) {
+	if (hintdva && DVA_IS_VALID(&hintdva[d])) {
 		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&hintdva[d]));
 
 		/*
@@ -2317,6 +2307,21 @@ top:
 		ASSERT(mg->mg_activation_count == 1);
 
 		vd = mg->mg_vd;
+		
+		if ((spa->spa_raidz_aggre_mixed & RAIDZ_AGGRE_DIFF_CONFIG) &&
+			aggre_num > 1 && 
+			vd->vdev_ops == &vdev_raidz_aggre_ops &&
+			vd->vdev_children - vd->vdev_nparity == aggre_num &&
+			!vd->vdev_ismeta) {
+			boolean_t skip = B_FALSE;
+			if (vdev_space_alloc_full(vd, vdev_alloc_ratio_thresh2)) {
+				skip = again ? B_FALSE : B_TRUE;
+				space_skip = 1;
+			}
+			
+			if (skip)
+				goto next;
+		}
 
 		/*
 		 * Don't allocate from faulted devices.
@@ -2366,6 +2371,7 @@ top:
 			all_zero = B_FALSE;
 
 		asize = vdev_psize_to_asize(vd, psize);
+		/*
 		if (mc == spa->spa_normal_class && spa->spa_raidz_aggre) {
 			int alignsize;
 			alignsize = (spa->spa_raidz_aggre_num + spa->spa_raidz_aggre_nparity) << spa->spa_raidz_ashift;
@@ -2374,7 +2380,7 @@ top:
 				asize = psize + psize * spa->spa_raidz_aggre_nparity / spa->spa_raidz_aggre_num;	
 			}
 		}
-		
+		*/
 		/* ASSERT(P2PHASE(asize, 1ULL << vd->vdev_ashift) == 0); */
 
 		offset = metaslab_group_alloc(mg, psize, asize, txg, distance,
@@ -2450,6 +2456,13 @@ next:
 		mc->mc_rotor = mg->mg_next;
 		mc->mc_aliquot = 0;
 	} while ((mg = mg->mg_next) != rotor);
+
+	if (aggre_num > 1 && space_skip && !again) {
+		again = 1;
+		space_skip = 0;
+		mg = rotor;
+		goto top;
+	}
 
 	if (!all_zero) {
 		dshift++;
@@ -2586,7 +2599,7 @@ metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
 
 int
 metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
-    int ndvas, uint64_t txg, blkptr_t *hintbp, int flags)
+    int ndvas, uint64_t txg, blkptr_t *hintbp, int flags, int aggre_num)
 {
 	dva_t *dva = bp->blk_dva;
 	dva_t *hintdva = hintbp->blk_dva;
@@ -2602,17 +2615,6 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 		spa_config_exit(spa, SCL_ALLOC, FTAG);
 		return (SET_ERROR(ENOSPC));
 	}
-
-	if (spa->spa_raidz_aggre && mc == spa->spa_normal_class) {
-		alignsize = spa->spa_raidz_aggre_num << spa->spa_raidz_ashift;
-		if (psize % alignsize) {
-			uint64_t allocsize;
-			VERIFY(psize >= 1);
-			allocsize = (((psize - 1) / alignsize) + 1) * alignsize;
-			/*cmn_err(CE_WARN, "%s size=%lx allocsize=%lx txg=%lx", __func__, (long)psize, (long)allocsize,(long )txg);*/
-			psize = allocsize;
-		}
-	}
 	
 	ASSERT(ndvas > 0 && ndvas <= spa_max_replication(spa));
 	ASSERT(BP_GET_NDVAS(bp) == 0);
@@ -2620,7 +2622,7 @@ metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
 
 	for (d = 0; d < ndvas; d++) {
 		error = metaslab_alloc_dva(spa, mc, psize, dva, d, hintdva,
-		    txg, flags);
+		    txg, flags, aggre_num);
 		if (error != 0) {
 			for (d--; d >= 0; d--) {
 				metaslab_free_dva(spa, &dva[d], txg, B_TRUE);

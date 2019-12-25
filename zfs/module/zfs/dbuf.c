@@ -96,6 +96,9 @@ char *dbuf_rewrite_tag ="rewrite";
 char *dbuf_segs_tag = "onsegs";
 char *dbuf_seg_in_os_tag = "onsegs";
 char *dbuf_cache_tag = "oncache";
+int dbuf_aggre_ctl = 1;
+int rand_ratio_bit = 2;
+extern int spa_use_together_lock;
 
 /* ARGSUSED */
 static int
@@ -3097,35 +3100,86 @@ void  dbuf_dr_sort_list(list_t * dr_list)
 	list_destroy(&tmp_dr_list);
 }
 
+static boolean_t
+dbuf_need_together(spa_t *spa, dnode_t *dn)
+{
+	if (!dbuf_aggre_ctl)
+		return (B_FALSE);
+
+	if (!spa_is_raidz_aggre(spa))
+		return (B_FALSE);
+	
+	if ((dn->dn_type != DMU_OT_PLAIN_FILE_CONTENTS && dn->dn_type != DMU_OT_ZVOL))
+		return (B_FALSE);
+
+	if (spa->spa_raidz_aggre_mixed & RAIDZ_AGGRE_MIX_NORMAL) {
+		if ((ddi_get_lbolt() & (1 << rand_ratio_bit - 1)) == 0)
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static int
+dbuf_ntogether(spa_t *spa)
+{
+	int index, ntogether = 0;
+	together_item_t *item;
+	
+	if (spa_use_together_lock)
+		rw_enter(&spa->spa_together_lock, RW_READER);
+	if (!spa->spa_together_arr) {
+		ntogether = 0;
+		goto end;
+	}
+
+	if (!(spa->spa_raidz_aggre_mixed & RAIDZ_AGGRE_DIFF_CONFIG)) {
+		ntogether = spa->spa_together_arr[0].together;
+		goto end;
+	}
+
+	/* diff config need to update spa_together_index, state */
+	spa->spa_together_index %= spa->spa_together_arr_num;
+	index = spa->spa_together_index;
+	do {
+		item = &spa->spa_together_arr[spa->spa_together_index++];
+		if (item->state) {
+			ntogether = item->together;
+			break;
+		}
+		spa->spa_together_index %= spa->spa_together_arr_num;
+	} while (spa->spa_together_index != index);
+
+end:
+	if (spa_use_together_lock)
+		rw_exit(&spa->spa_together_lock);
+	return (ntogether);
+}
+
 void
 dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx)
 {
+	uint8_t num, ntogether = 0;
 	dbuf_dirty_record_t *dr;
 	dbuf_dirty_record_t *drarray[TG_MAX_DISK_NUM + 1];
 	dnode_t *dn;
 	spa_t *spa = tx->tx_pool->dp_spa;
 	int i;
-	uint8_t num, ntogether = 0;
-
+	
 	if (list_head(list) == NULL)
 		return;
 
-	if (spa->spa_raidz_aggre == B_TRUE)
-		ntogether = spa->spa_raidz_aggre_num;
 
 	dr = list_head(list);
 	dn = DB_DNODE(dr->dr_dbuf);
+	if (dbuf_need_together(spa, dn))
+		ntogether = dbuf_ntogether(spa);
 	
-	if (dn->dn_type != DMU_OT_PLAIN_FILE_CONTENTS && dn->dn_type != DMU_OT_ZVOL)
-		ntogether = 0;
-
 	num = 0;
 	for (i = 0; i < TG_MAX_DISK_NUM + 1; i++)
 		drarray[i] = NULL;
 
 	dbuf_dr_sort_list(list);
-
-	while ((dr = list_head(list))) {
+	while (dr = list_head(list)) {
 		if (dr->dr_zio != NULL) {
 			/*
 			 * If we find an already initialized zio then we
@@ -3192,8 +3246,9 @@ dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx)
 			}
 		}
 	}
-
-	for (i=0; i < num; i++) {
+	
+	for(i=0;i<num;i++)
+	{
 		dr = drarray[i];
 		if (dr->dr_zio != NULL) {
 			zio_nowait(dr->dr_zio);
