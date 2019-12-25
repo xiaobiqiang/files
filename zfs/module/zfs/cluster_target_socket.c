@@ -15,12 +15,25 @@
 #include <sys/cluster_target_socket.h>
 #include <sys/fs/zfs.h>
 
-typedef struct cluster_target_socket_session_sm_ctx {
+typedef struct cluster_target_socket_session_conn_sm_ctx {
 	cluster_target_session_socket_conn_t *smc_tssp;
+	cluster_target_socket_session_conn_event_e smc_event;
+	uintptr_t smc_extinfo;
+	char smc_tag[128];
+} cluster_target_socket_session_conn_sm_ctx_t;
+
+typedef struct cluster_target_socket_session_sm_ctx {
+	list_node_t smc_node;
+	cluster_target_session_socket_t *smc_tsso;
 	cluster_target_socket_session_event_e smc_event;
 	uintptr_t smc_extinfo;
 	char smc_tag[128];
 } cluster_target_socket_session_sm_ctx_t;
+
+typedef struct cluster_target_socket_session_conn_cleanup {
+	cluster_target_session_socket_conn_t *cu_tssp;
+	
+} cluster_target_socket_session_conn_cleanup_t;
 
 typedef struct cluster_tso_global_s {
 	krwlock_t ctso_rw;
@@ -39,7 +52,7 @@ cluster_target_socket_session_rx_iov(struct socket *so, struct kvec *kvp,
         uint32_t kvlen, uint32_t totlen);
 static void
 cluster_target_socket_session_conn_sm_event(cluster_target_session_socket_conn_t *tssp,
-        cluster_target_socket_session_event_e event, uintptr_t extinfo, void *tag);
+        cluster_target_socket_session_conn_event_e event, uintptr_t extinfo, void *tag);
 static cluster_status_t
 cluster_target_socket_session_rx_buf(struct socket *so, void *buf, uint32_t buflen);
 static void
@@ -51,6 +64,15 @@ static void
 cluster_target_socket_port_hold(cluster_target_port_socket_t *tpso, void *tag);
 static void
 cluster_target_socket_port_rele(cluster_target_port_socket_t *tpso, void *tag);
+static void
+cluster_target_socket_session_conn_sminit(cluster_target_session_socket_conn_t *tssp);
+static void
+cluster_target_socket_session_conn_smfini(cluster_target_session_socket_conn_t *tssp);
+static void
+cluster_target_socket_session_sm_event(cluster_target_session_socket_t *tsso,
+        cluster_target_socket_session_event_e event, void *extptr, void *tag);
+static void
+cluster_target_socket_port_watcher(cluster_target_port_socket_t *tpso);
 
 void 
 cluster_target_socket_refcnt_reset(cluster_target_socket_refcnt_t *refcnt)
@@ -90,7 +112,7 @@ void
 cluster_target_socket_refcnt_hold(cluster_target_socket_refcnt_t *refcnt, void *ftag)
 {
 	mutex_enter(&refcnt->tr_mtx);
-	ctso_assert(refcnt->tr_wait == CTSO_REF_NOWAIT);
+//	ctso_assert(refcnt->tr_wait == CTSO_REF_NOWAIT);
 	refcnt->tr_nref++;
 	CTSO_REFAUDIT(refcnt, ftag, "hold");
 	mutex_exit(&refcnt->tr_mtx);
@@ -393,6 +415,50 @@ cluster_target_socket_session_tran_start(
 }
 
 static void
+cluster_target_socket_session_conn_new(cluster_target_session_socket_t *tsso,
+	struct socket *so, char *ip, uint16_t port, 
+	cluster_target_session_socket_conn_t **tsspp)
+{
+	cluster_target_session_socket_conn_t *tssp;
+
+	tssp = kmem_zalloc(sizeof(cluster_target_session_socket_conn_t), KM_SLEEP);
+	tssp->tssp_so = so;
+	tssp->tssp_port = port;
+	tssp->tssp_tsso = tsso;
+	cluster_target_socket_session_hold(tsso, CTSO_FTAG);
+	strncpy(tssp->tssp_ipaddr, ip, 16);
+	tssp->tssp_conn_tmhdl = TIMEOUT_ID_INVALID;
+	
+	mutex_init(&tssp->tssp_rx_mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tssp->tssp_rx_cv, NULL, CV_DRIVER, NULL);
+	list_create(&tssp->tssp_rx_data_list, sizeof(cs_rx_data_t),
+		offsetof(cs_rx_data_t, node));
+
+	mutex_init(&tssp->tssp_tx_mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tssp->tssp_tx_cv, NULL, CV_DRIVER, NULL);
+	list_create(&tssp->tssp_tx_wait_list, sizeof(cluster_target_socket_tran_data_t),
+		offsetof(cluster_target_socket_tran_data_t, tdt_node));
+	list_create(&tssp->tssp_tx_live_list, sizeof(cluster_target_socket_tran_data_t),
+		offsetof(cluster_target_socket_tran_data_t, tdt_node));
+	
+	cluster_target_socket_session_conn_sminit(tssp);
+	
+	*tsspp = tssp;
+}
+
+
+static void
+cluster_target_socket_session_conn_free(cluster_target_session_socket_conn_t *tssp)
+{
+	if (tssp->tssp_so)
+		cluster_target_socket_destroy(tssp->tssp_so);
+	cluster_target_socket_session_conn_smfini(tssp);
+	cluster_target_socket_session_rele(tssp->tssp_tsso, CTSO_FTAG);
+	tssp->tssp_tsso = NULL;
+	kmem_free(tssp, sizeof(cluster_target_session_socket_conn_t));
+}
+
+static void
 cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp)
 {
 	cluster_status_t rval;
@@ -416,8 +482,13 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 		if ((rval = cluster_target_socket_session_rx_buf(tssp->tssp_so,
 				&ct_head, sizeof(ct_head))) != CLUSTER_STATUS_SUCCESS) {
 			mutex_enter(&tssp->tssp_rx_mtx);
+			/*
+			 * if rx_running is true at this time,
+			 * it's broken pipe mostly.
+			 */
+			if (tssp->tssp_rx_running)
+				conn_break = B_TRUE;
 			tssp->tssp_rx_running = B_FALSE;
-			conn_break = B_TRUE;
 			continue;
 		}
 
@@ -433,8 +504,13 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 				cs_data->data, cs_data->data_len)) != CLUSTER_STATUS_SUCCESS)) {
 			csh_rx_data_free_ext(cs_data);
 			mutex_enter(&tssp->tssp_rx_mtx);
+			/*
+			 * if rx_running is true at this time,
+			 * it's broken pipe mostly.
+			 */
+			if (tssp->tssp_rx_running)
+				conn_break = B_TRUE;
 			tssp->tssp_rx_running = B_FALSE;
-			conn_break = B_TRUE;
 			continue;
 		}
 
@@ -460,9 +536,14 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 		mutex_enter(&tssp->tssp_rx_mtx);
 	}
 
-	mutex_exit(&tssp->tssp_rx_mtx);
+	if (conn_break)
+		cluster_target_socket_session_conn_sm_event(tssp,
+			SOE_TSSP_CONN_LOST, NULL, CTSO_FTAG);
 	cluster_target_socket_session_rele(tsso, CTSO_FTAG);
 	cmn_err(CE_NOTE, "PORT SESSION(%p) RX THREAD EXIT", tssp);
+	tssp->tssp_rx_stoped = B_TRUE;
+	cv_signal(&tssp->tssp_rx_cv);
+	mutex_exit(&tssp->tssp_rx_mtx);
 }
 
 /*
@@ -499,9 +580,11 @@ cluster_target_socket_session_conn_tx(cluster_target_session_socket_conn_t *tssp
 		mutex_enter(&tssp->tssp_tx_mtx);
 	}
 
-	mutex_exit(&tssp->tssp_rx_mtx);
 	cluster_target_socket_session_rele(tsso, CTSO_FTAG);
 	cmn_err(CE_NOTE, "PORT SESSION(%p) TX THREAD EXIT", tssp);
+	tssp->tssp_tx_stoped = B_TRUE;
+	cv_signal(&tssp->tssp_tx_cv);
+	mutex_exit(&tssp->tssp_tx_mtx);
 }
 
 static void
@@ -514,7 +597,7 @@ cluster_target_socket_session_conn_connect_timedout(cluster_target_session_socke
 }
 
 static void
-cluster_target_socket_session_conn_connect_finish(cluster_target_session_socket_conn_t *tssp)
+cluster_target_socket_session_conn_connect(cluster_target_session_socket_conn_t *tssp)
 {
 	/* tx and rx thread */
 	cluster_target_socket_session_hold(tssp->tssp_tsso, CTSO_FTAG);
@@ -535,9 +618,38 @@ cluster_target_socket_session_conn_connect_finish(cluster_target_session_socket_
 }
 
 static void
+cluster_target_socket_session_conn_disconnect(cluster_target_session_socket_conn_t *tssp)
+{
+	mutex_enter(&tssp->tssp_tx_mtx);
+	if (tssp->tssp_tx_running) {
+		tssp->tssp_tx_running = B_FALSE;
+		cv_signal(&tssp->tssp_tx_cv);
+		while (!tssp->tssp_tx_stoped)
+			cv_wait(&tssp->tssp_tx_cv, &tssp->tssp_tx_mtx);
+	}
+	mutex_exit(&tssp->tssp_tx_mtx);
+
+	mutex_enter(&tssp->tssp_rx_mtx);
+	if (tssp->tssp_rx_running) {
+		tssp->tssp_rx_running = B_FALSE;
+		cluster_target_socket_shutdown(tssp->tssp_so);
+		while (!tssp->tssp_rx_stoped)
+			cv_wait(&tssp->tssp_rx_cv, &tssp->tssp_rx_mtx);
+	}
+	mutex_exit(&tssp->tssp_rx_mtx);
+}
+
+static void
+cluster_target_socket_session_conn_complete(cluster_target_session_socket_conn_t *tssp)
+{
+	cluster_target_socket_session_sm_event(tssp->tssp_tsso,
+		SSE_TSSP_COMPLETE, tssp, CTSO_FTAG);
+}
+
+static void
 cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_state_e new_state, 
-	cluster_target_socket_session_sm_ctx_t *smc)
+	cluster_target_socket_session_conn_state_e new_state, 
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
 {
 	cluster_status_t rval;
 	struct sockaddr_in addr_in4;
@@ -548,9 +660,10 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 		new_state, smc->smc_event);
 
 	mutex_enter(&tssp->tssp_sm_mtx);
-	CTSO_SESS_SM_AUDIT(tssp, smc->smc_event, smc->smc_tag);
 	tssp->tssp_last_state = tssp->tssp_curr_state;
 	tssp->tssp_curr_state = new_state;
+	CTSO_SM_AUDIT(&tssp->tssp_sm_audit, smc->smc_event, smc->smc_tag,
+		tssp->tssp_last_state, tssp->tssp_curr_state);
 	mutex_exit(&tssp->tssp_sm_mtx);
 
 	switch (tssp->tssp_curr_state) {
@@ -590,7 +703,8 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 
 				mutex_enter(&tssp->tssp_sm_mtx);
 				tssp->tssp_connect_status = rval;
-				cv_signal(&tssp->tssp_sm_cv);
+				//maybe someone wait it in the future.who know?
+				cv_signal(&tssp->tssp_sm_cv);	
 				mutex_exit(&tssp->tssp_sm_mtx);
 				cluster_target_socket_session_conn_sm_event(tssp,
 					SOE_CN_BIND_ERROR, NULL, CTSO_FTAG);
@@ -603,7 +717,7 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 			addr_in4.sin_addr.s_addr = in_aton(tssp->tssp_ipaddr);
 			tssp->tssp_conn_tmhdl = timeout(
 				cluster_target_socket_session_conn_connect_timedout,
-				tssp, SEC_TO_TICK(3));
+				tssp, SEC_TO_TICK(CTSO_CONNECT_TIMEOUT));
 			if ((rval = kernel_connect(tssp->tssp_so, &addr_in4,
 					sizeof(struct sockaddr_in), 0)) != 0) {
 				cmn_err(CE_NOTE, "%s connect ip(%s) error(%d)",
@@ -624,26 +738,39 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 			cv_signal(&tssp->tssp_sm_cv);
 			cmn_err(CE_NOTE, "%s session ip(%s) port(%d) come into SOS_S4_XPRT_UP",
 				__func__, tssp->tssp_ipaddr, tssp->tssp_port);
-			cluster_target_socket_session_conn_connect_finish(tssp);
-			mutex_enter(&tssp->tssp_tsso->tsso_mtx);
-			tssp->tssp_tsso->tsso_s4_cnt++;
-			if (tssp->tssp_tsso->tsso_s4_cnt == tssp->tssp_tsso->tsso_tssp_cnt) {
-				cluster_target_session_hold(tssp->tssp_tsso->tsso_cts, "down2up evt");
-				if (tssp->tssp_tsso->tsso_cts->sess_linkstate == CTS_LINK_DOWN)
-					tssp->tssp_tsso->tsso_cts->sess_linkstate = CTS_LINK_UP;
-				taskq_dispatch(clustersan->cs_async_taskq, 
-					cts_link_down_to_up_handle, 
-					tssp->tssp_tsso->tsso_cts, TQ_SLEEP);
-			}
-			mutex_exit(&tssp->tssp_tsso->tsso_mtx);
+			cluster_target_socket_session_conn_connect(tssp);
+			cluster_target_socket_session_sm_event(tssp->tssp_tsso,
+				SSE_TSSP_READY, NULL, CTSO_FTAG);
+			break;
+		case SOS_S5_IN_EPIPE:
+			cmn_err(CE_NOTE, "%s session ip(%s) come into SOS_S5_IN_EPIPE",
+				__func__, tssp->tssp_ipaddr);
+			/* FALLTHROUGH */
+		case SOS_S6_IN_LOGOUT:
+			if (smc->smc_event == SOE_TSSO_IN_CLEANUP)
+				cmn_err(CE_NOTE, "%s session ip(%s) come into SOS_S6_IN_LOGOUT",
+					__func__, tssp->tssp_ipaddr);
+			cluster_target_socket_session_conn_disconnect(tssp);
+			/* FALLTHROUGH */
+		case SOS_S7_CLEANUP:
+			/* 
+			 * we can't abort cs_rx_data not completed.
+			 * so nothing to do now.
+			 */
+			/* FALLTHROUGH */
+		case SOS_S8_COMPLETE:
+			cmn_err(CE_NOTE, "%s session ip(%s) come into SOS_S8_COMPLETE",
+				__func__, tssp->tssp_ipaddr);
+			taskq_dispatch(ctso->ctso_refasync_taskq,
+				cluster_target_socket_session_conn_complete,
+				tssp, TQ_SLEEP);
 			break;
 	}
 }
 
-
 static void
 cluster_target_socket_session_conn_s1_free(cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_sm_ctx_t *smc)
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
 {
 	switch (smc->smc_event) {
 		case SOE_RX_CONNECT:
@@ -654,24 +781,32 @@ cluster_target_socket_session_conn_s1_free(cluster_target_session_socket_conn_t 
 			cluster_target_socket_session_conn_new_state(tssp,
 				SOS_S3_CONN_SND, smc);
 			break;
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S8_COMPLETE, smc);
+			break;
 	}
 }
 
 static void
 cluster_target_socket_session_conn_s2_xprt_wait(cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_sm_ctx_t *smc)
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
 {
 	switch (smc->smc_event) {
 		case SOE_USER_CONNECT:
 			cluster_target_socket_session_conn_new_state(tssp,
 				SOS_S4_XPRT_UP, smc);
 			break;
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S8_COMPLETE, smc);
+			break;
 	}
 }
 
 static void
 cluster_target_socket_session_conn_s3_conn_send(cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_sm_ctx_t *smc)
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
 {
 	switch (smc->smc_event) {
 		case SOE_CONNECT_SUCCESS:
@@ -685,15 +820,59 @@ cluster_target_socket_session_conn_s3_conn_send(cluster_target_session_socket_co
 		case SOE_CN_BIND_ERROR:
 			cv_signal(&tssp->tssp_sm_cv);
 			cluster_target_socket_session_conn_new_state(tssp,
-				SOS_S5_CLEANUP, smc);
+				SOS_S7_CLEANUP, smc);
+			break;
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S8_COMPLETE, smc);
 			break;
 	}
 }
 
 static void
+cluster_target_socket_session_conn_s4_xprt_up(cluster_target_session_socket_conn_t *tssp,
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S6_IN_LOGOUT, smc);
+			break;
+		case SOE_TSSP_CONN_LOST:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S5_IN_EPIPE, smc);
+	}
+}
+
+static void
+cluster_target_socket_session_conn_s5_in_pipe(cluster_target_session_socket_conn_t *tssp,
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S6_IN_LOGOUT, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_conn_s6_in_logout(cluster_target_session_socket_conn_t *tssp,
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S6_IN_LOGOUT, smc);
+			break;
+	}
+}
+
+
+static void
 cluster_target_socket_session_conn_event_handle(void *arg)
 {
-	cluster_target_socket_session_sm_ctx_t *smc = arg;
+	cluster_target_socket_session_conn_sm_ctx_t *smc = arg;
 	cluster_target_session_socket_conn_t *tssp = smc->smc_tssp;
 
 	switch (tssp->tssp_curr_state) {
@@ -707,22 +886,24 @@ cluster_target_socket_session_conn_event_handle(void *arg)
 			cluster_target_socket_session_conn_s3_conn_send(tssp, smc);
 			break;
 		case SOS_S4_XPRT_UP:
+			cluster_target_socket_session_conn_s4_xprt_up(tssp, smc);
 			break;
 	}
 
 	cluster_target_socket_session_rele(tssp->tssp_tsso, CTSO_FTAG);
+	kmem_free(smc, sizeof(cluster_target_socket_session_conn_sm_ctx_t));
 }
 
 static void
 cluster_target_socket_session_conn_sm_event_locked(
 	cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_event_e event, 
+	cluster_target_socket_session_conn_event_e event, 
 	uintptr_t extinfo, void *tag)
 {
-	cluster_target_socket_session_sm_ctx_t *smc;
+	cluster_target_socket_session_conn_sm_ctx_t *smc;
 
 	cluster_target_socket_session_hold(tssp->tssp_tsso, tag);
-	smc = kmem_alloc(sizeof(cluster_target_socket_session_sm_ctx_t), KM_SLEEP);
+	smc = kmem_alloc(sizeof(cluster_target_socket_session_conn_sm_ctx_t), KM_SLEEP);
 	smc->smc_tssp = tssp;
 	smc->smc_event = event;
 	smc->smc_extinfo = extinfo;
@@ -735,7 +916,7 @@ cluster_target_socket_session_conn_sm_event_locked(
 
 static void
 cluster_target_socket_session_conn_sm_event(cluster_target_session_socket_conn_t *tssp,
-	cluster_target_socket_session_event_e event, uintptr_t extinfo, void *tag)
+	cluster_target_socket_session_conn_event_e event, uintptr_t extinfo, void *tag)
 {
 	mutex_enter(&tssp->tssp_sm_mtx);
 	cluster_target_socket_session_conn_sm_event_locked(tssp, event, extinfo, tag);
@@ -770,39 +951,282 @@ cluster_target_socket_session_conn_smfini(cluster_target_session_socket_conn_t *
 	tssp->tssp_sm_ctx = NULL;
 }
 
-
 static void
-cluster_target_socket_session_conn_new(cluster_target_session_socket_t *tsso,
-	struct socket *so, char *ip, uint16_t port, 
-	cluster_target_session_socket_conn_t **tsspp)
+cluster_target_socket_session_sminit(cluster_target_session_socket_t *tsso)
 {
-	cluster_target_session_socket_conn_t *tssp;
-
-	tssp = kmem_zalloc(sizeof(cluster_target_session_socket_conn_t), KM_SLEEP);
-	tssp->tssp_so = so;
-	tssp->tssp_port = port;
-	tssp->tssp_tsso = tsso;
-	cluster_target_socket_session_hold(tsso, CTSO_FTAG);
-	strncpy(tssp->tssp_ipaddr, ip, 16);
-	tssp->tssp_conn_tmhdl = TIMEOUT_ID_INVALID;
-	
-	mutex_init(&tssp->tssp_rx_mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&tssp->tssp_rx_cv, NULL, CV_DRIVER, NULL);
-	list_create(&tssp->tssp_rx_data_list, sizeof(cs_rx_data_t),
-		offsetof(cs_rx_data_t, node));
-
-	mutex_init(&tssp->tssp_tx_mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&tssp->tssp_tx_cv, NULL, CV_DRIVER, NULL);
-	list_create(&tssp->tssp_tx_wait_list, sizeof(cluster_target_socket_tran_data_t),
-		offsetof(cluster_target_socket_tran_data_t, tdt_node));
-	list_create(&tssp->tssp_tx_live_list, sizeof(cluster_target_socket_tran_data_t),
-		offsetof(cluster_target_socket_tran_data_t, tdt_node));
-	
-	cluster_target_socket_session_conn_sminit(tssp);
-	
-	*tsspp = tssp;
+	mutex_init(&tsso->tsso_sm_mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tsso->tsso_sm_cv, NULL, CV_DRIVER, NULL);
+	list_create(&tsso->tsso_smevt_list, sizeof(cluster_target_socket_session_sm_ctx_t),
+		offsetof(cluster_target_socket_session_sm_ctx_t, smc_node));
+	tsso->tsso_curr_state = SSS_S1_FREE;
+	tsso->tsso_last_state = SSS_S1_FREE;
+	tsso->tsso_sm_busy = B_FALSE;
+	tsso->tsso_sm_audit.sa_max_depth = TSSO_SM_AUDIT_DEPTH - 1;
 }
 
+static void
+cluster_target_socket_session_smfini(cluster_target_session_socket_t *tsso)
+{
+	mutex_destroy(&tsso->tsso_sm_mtx);
+	cv_destroy(&tsso->tsso_sm_cv);
+	list_destroy(&tsso->tsso_smevt_list);
+}
+
+static void
+cluster_target_socket_session_clean_tssp(cluster_target_session_socket_t *tsso)
+{
+	int idx = 0;
+	cluster_target_session_socket_conn_t *tssp;
+	
+	mutex_enter(&tsso->tsso_mtx);
+	for (; idx < tsso->tsso_tssp_cnt; idx++) {
+		if ((tssp = tsso->tsso_tssp[idx]) != NULL)
+			cluster_target_socket_session_conn_sm_event(tssp,
+				SOE_TSSO_IN_CLEANUP, NULL, CTSO_FTAG);
+	}
+	mutex_exit(&tsso->tsso_mtx);
+}
+
+static void
+cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_state_e new_state, 
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	cluster_status_t rval, idx = 0;
+	cluster_target_session_socket_conn_t *tssp;
+	
+	cmn_err(CE_NOTE, "tsso(%s) state(%d --> %d --> %d) cause(%d)",
+		tsso->tsso_ipaddr, tsso->tsso_last_state, tsso->tsso_curr_state, 
+		new_state, smc->smc_event);
+
+	mutex_enter(&tsso->tsso_sm_mtx);
+	tsso->tsso_last_state = tsso->tsso_curr_state;
+	tsso->tsso_curr_state = new_state;
+	CTSO_SM_AUDIT(&tsso->tsso_sm_audit, smc->smc_event, smc->smc_tag, 
+		tsso->tsso_last_state, tsso->tsso_curr_state);
+	mutex_exit(&tsso->tsso_sm_mtx);
+
+	switch (tsso->tsso_curr_state) {
+		case SSS_S1_FREE:
+			break;
+		case SSS_S2_READY_WAIT:
+			for ( ; idx < tsso->tsso_tssp_cnt; idx++)
+				cluster_target_socket_session_conn_sm_event(
+					tsso->tsso_tssp[idx], SOE_USER_CONNECT, 
+					NULL, CTSO_FTAG);
+			break;
+		case SSS_S3_READY:
+			ctso_assert(MUTEX_HELD(&tsso->tsso_mtx));
+			cluster_target_session_hold(tsso->tsso_cts, "down2up evt");
+			if (tsso->tsso_cts->sess_linkstate == CTS_LINK_DOWN) {
+				tsso->tsso_cts->sess_linkstate = CTS_LINK_UP;
+				taskq_dispatch(clustersan->cs_async_taskq, 
+					cts_link_down_to_up_handle, 
+					tsso->tsso_cts, TQ_SLEEP);
+			} else
+				cluster_target_session_rele(tsso->tsso_cts, "down2up evt");
+			/*
+			 * wake up user connect process
+			 */
+			cv_signal(&tsso->tsso_sm_cv);
+			break;
+		case SSS_S4_IN_TSSP_CLEAN:
+			tssp = smc->smc_extinfo;
+			mutex_enter(&tsso->tsso_mtx);
+			cmn_err(CE_NOTE, "tssp(%p) idx(%d) of tsso(%s) to free",
+				tssp, tssp->tssp_tsso_idx, tsso->tsso_ipaddr);
+			tsso->tsso_tssp[tssp->tssp_tsso_idx] = NULL;
+			tsso->tsso_tssp_realcnt--;
+			cluster_target_socket_session_conn_free(tssp);
+			if ((tsso->tsso_status == CLUSTER_STATUS_SUCCESS) &&
+				(tsso->tsso_tssp_realcnt == 0)) {
+				cluster_target_session_hold(tsso->tsso_cts, "up2down evt");
+				if (tsso->tsso_cts->sess_linkstate == CTS_LINK_UP) {
+					tsso->tsso_cts->sess_linkstate = CTS_LINK_DOWN;
+					taskq_dispatch(clustersan->cs_async_taskq, 
+						cts_link_up_to_down_handle, 
+						tsso->tsso_cts, TQ_SLEEP);
+				} else 
+					cluster_target_session_rele(tsso->tsso_cts, "up2down evt");
+			}
+			mutex_exit(&tsso->tsso_mtx);
+			break;
+		case SSS_S5_CLEANUP:
+			/*
+			 * wake up active connect fail, user process wait it.
+			 */
+			cv_signal(&tsso->tsso_sm_cv);
+			cluster_target_socket_session_clean_tssp(tsso);
+			/* FALLTHROUGH */
+		case SSS_S6_COMPLETE:
+			
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_s1_free(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SSE_USER_CONNECT:
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S2_READY_WAIT, smc);
+			break;
+		case SSE_TPSO_COMPLETE:
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S5_CLEANUP, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_s2_ready_wait(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	cluster_target_session_socket_conn_t *tssp = smc->smc_extinfo;
+
+	switch (smc->smc_event) {
+		case SSE_TSSP_READY:
+			mutex_enter(&tsso->tsso_mtx);
+			tsso->tsso_s4_cnt++;
+			if (tsso->tsso_s4_cnt == tsso->tsso_tssp_cnt)
+				cluster_target_socket_session_new_state(tsso, 
+					SSS_S3_READY, smc);
+			mutex_exit(&tsso->tsso_mtx);
+			break;
+		case SSE_TSSP_COMPLETE:	/* connect appear errors */
+			mutex_enter(&tsso->tsso_mtx);
+			if (tssp->tssp_connect_status != CLUSTER_STATUS_SUCCESS)
+				tsso->tsso_status = tssp->tssp_connect_status;
+			mutex_exit(&tsso->tsso_mtx);
+			/* FALLTHROUGH */
+		case SSE_TPSO_COMPLETE:
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S5_CLEANUP, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_s3_ready(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SSE_TPSO_COMPLETE:
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S5_CLEANUP, smc);
+			break;
+			/* FALLTHROUGH */
+		case SSE_TSSP_COMPLETE:	/* peer conn lost */
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S4_IN_TSSP_CLEAN, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_s4_in_tssp_clean(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	cluster_target_session_socket_conn_t *tssp = smc->smc_extinfo;
+
+	switch (smc->smc_event) {
+		case SSE_TSSP_COMPLETE:	
+			mutex_enter(&tsso->tsso_mtx);
+			if (tssp->tssp_connect_status != CLUSTER_STATUS_SUCCESS)
+				tsso->tsso_status = tssp->tssp_connect_status;
+			mutex_exit(&tsso->tsso_mtx);
+			cluster_target_socket_session_new_state(tsso,
+				SSS_S4_IN_TSSP_CLEAN, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_s5_cleanup(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
+{
+	cluster_target_session_socket_conn_t *tssp = smc->smc_extinfo;
+
+	switch (smc->smc_event) {
+		case SSE_TSSP_COMPLETE:	
+			mutex_enter(&tsso->tsso_mtx);
+			if (tssp->tssp_connect_status != CLUSTER_STATUS_SUCCESS)
+				tsso->tsso_status = tssp->tssp_connect_status;
+			mutex_exit(&tsso->tsso_mtx);
+			cluster_target_socket_session_new_state(tsso,
+				SSS_S4_IN_TSSP_CLEAN, smc);
+			break;
+	}
+}
+
+static void
+cluster_target_socket_session_sm_dispatch(cluster_target_socket_session_sm_ctx_t *smc)
+{
+	cluster_target_session_socket_t *tsso = smc->smc_tsso;
+
+	switch(tsso->tsso_curr_state) {
+		case SSS_S1_FREE:
+			cluster_target_socket_session_s1_free(tsso, smc);
+			break;
+		case SSS_S2_READY_WAIT:
+			cluster_target_socket_session_s2_ready_wait(tsso, smc);
+			break;
+		case SSS_S3_READY:
+			cluster_target_socket_session_s3_ready(tsso, smc);
+			break;
+		case SSS_S4_IN_TSSP_CLEAN:
+			cluster_target_socket_session_s4_in_tssp_clean(tsso, smc);
+			break;
+		case SSS_S5_CLEANUP:
+			cluster_target_socket_session_s5_cleanup(tsso, smc);
+			break;
+	}
+
+	cluster_target_socket_session_rele(tsso, smc->smc_tag);
+	kmem_free(smc, sizeof(cluster_target_socket_session_sm_ctx_t));
+}
+
+static void
+cluster_target_socket_session_sm_event_locked(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_event_e event, void *extptr, void *tag)
+{
+	cluster_target_socket_session_sm_ctx_t *smc;
+	
+	ctso_assert(MUTEX_HELD(&tsso->tsso_sm_mtx));
+	if ((tsso->tsso_curr_state == SSS_S6_COMPLETE) ||
+		(tsso->tsso_curr_state == SSS_S7_DESTROYED))
+		return ;
+
+	cluster_target_socket_session_hold(tsso, tag);
+	smc = kmem_zalloc(sizeof(cluster_target_socket_session_sm_ctx_t), KM_SLEEP);
+	smc->smc_tsso = tsso;
+	smc->smc_event = event;
+	smc->smc_extinfo = extptr;
+	strncpy(smc->smc_tag, tag, 128);
+	list_insert_tail(&tsso->tsso_smevt_list, smc);
+	
+	if (!tsso->tsso_sm_busy) {
+		tsso->tsso_sm_busy = B_TRUE;
+		while ((smc = list_remove_head(&tsso->tsso_smevt_list)) != NULL) {
+			mutex_exit(&tsso->tsso_sm_mtx);
+			cluster_target_socket_session_sm_dispatch(smc);
+			mutex_enter(&tsso->tsso_sm_mtx);
+		}
+	}
+
+	tsso->tsso_sm_busy = B_FALSE;	
+}
+
+static void
+cluster_target_socket_session_sm_event(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_event_e event, void *extptr, void *tag)
+{
+	mutex_enter(&tsso->tsso_sm_mtx);
+	cluster_target_socket_session_sm_event_locked(tsso, event, extptr, tag);
+	mutex_exit(&tsso->tsso_sm_mtx);
+}
 
 static void
 cluster_target_socket_session_new(cluster_target_port_socket_t *tpso,
@@ -831,15 +1255,21 @@ cluster_target_socket_session_new(cluster_target_port_socket_t *tpso,
 		tsso->tsso_cts = cts;
 		tsso->tsso_tssp_cnt = CTSO_CONN_NUM;
 		strncpy(tsso->tsso_ipaddr, sess_ip, 16);
+		cluster_target_socket_session_sminit(tsso);
 		cluster_target_socket_session_hold(tsso, CTSO_FTAG);
 		list_insert_tail(&ctso->ctso_tsso_list, tsso);
+		mutex_enter(&tpso->tpso_mtx);
+		list_insert_tail(&tpso->tpso_sess_list, tsso);
+		mutex_exit(&tpso->tpso_mtx);
 	}
 
 	cluster_target_socket_session_conn_new(tsso, so, 
 		sess_ip, sess_port, &tssp);
 
 	mutex_enter(&tsso->tsso_mtx);
+	tssp->tssp_tsso_idx = tsso->tsso_tssp_idx;
 	tsso->tsso_tssp[tsso->tsso_tssp_idx++] = tssp;
+	tsso->tsso_tssp_realcnt++;
 	mutex_exit(&tsso->tsso_mtx);
 	
 	*tssop = tsso;
@@ -848,8 +1278,34 @@ cluster_target_socket_session_new(cluster_target_port_socket_t *tpso,
 static void
 cluster_target_socket_session_free(cluster_target_session_socket_t *tsso)
 {
+	int idx = 0;
+	cluster_target_port_socket_t *tpso = tsso->tsso_tpso;
+	cluster_target_session_socket_conn_t *tssp;
+
+	ctso_assert(rw_owner(&ctso->ctso_rw) == curthread);
+	
+	cluster_target_socket_session_sm_event(tsso,
+		SSE_TPSO_COMPLETE, NULL, CTSO_FTAG);
+
+	/*
+	 * remove from ctso global list
+	 */
+	cluster_target_socket_session_rele(tsso, CTSO_FTAG);
+	list_remove(&ctso->ctso_tsso_list, tsso);
+	
+	cmn_err(CE_NOTE, "tsso(%s) is going to wait ref", tsso->tsso_ipaddr);
+	cluster_target_socket_refcnt_wait_ref(&tsso->tsso_refcnt, CTSO_FTAG);
+	cmn_err(CE_NOTE, "tsso(%s) wait ref finished", tsso->tsso_ipaddr);
+	cluster_target_socket_port_rele(tsso->tsso_tpso, CTSO_FTAG);
 	cluster_target_socket_refcnt_destroy(&tsso->tsso_refcnt);
 	kmem_free(tsso, sizeof(cluster_target_session_socket_t));
+}
+
+static void
+cluster_target_socket_session_release(cluster_target_session_socket_t *tsso)
+{
+	cluster_target_socket_session_sm_event(tsso,
+			SSE_TPSO_COMPLETE, NULL, CTSO_FTAG);
 }
 
 static cluster_status_t
@@ -955,27 +1411,24 @@ cluster_target_socket_session_rx_process(
 }
 
 static cluster_status_t
+cluster_target_socket_wait_conn_timeout(cluster_target_session_socket_t *tsso)
+{
+	mutex_enter(&tsso->tsso_mtx);
+	tsso->tsso_status = -ETIMEDOUT;
+	cv_signal(&tsso->tsso_cv);
+	mutex_exit(&tsso->tsso_mtx);
+}
+
+static cluster_status_t
 cluster_target_socket_session_init_nonexist(cluster_target_session_socket_t **tssop,
-	cluster_target_session_t *cts, cluster_target_socket_param_t *param)
+	cluster_target_port_socket_t *tpso, cluster_target_session_t *cts, 
+	cluster_target_socket_param_t *param)
 {
 	cluster_status_t rval;
 	struct socket *so;
 	cluster_target_session_socket_t *tsso;
-	cluster_target_port_socket_t *tpso;
 	uint16_t srv_port = CTSO_SRV_PORT;
 	int idx = 0;
-	
-	for (tpso = list_head(&ctso->ctso_tpso_list); tpso;
-		tpso = list_next(&ctso->ctso_tpso_list, tpso)) {
-		if (strcmp(tpso->tpso_ipaddr, param->local) == 0)
-			break;
-	}
-
-	if (tpso == NULL) {
-		cmn_err(CE_NOTE, "%s ip(%s) is not enabled yet",
-			__func__, param->ipaddr);
-		return EOFFLINE;
-	}
 
 	for (idx = 0; idx < CTSO_CONN_NUM; idx++) {
 		cluster_target_socket_create(AF_INET, SOCK_STREAM, 0, &so);
@@ -996,19 +1449,27 @@ cluster_target_socket_session_init_exist(cluster_target_session_socket_t *tsso,
 	cluster_target_session_t *cts, cluster_target_socket_param_t *param)
 {
 	uint32_t idx = 0;
+	cluster_status_t rval = CLUSTER_STATUS_SUCCESS;
+	
 	/*
 	 * wait for peer connect local all successfully
 	 */
 	mutex_enter(&tsso->tsso_mtx);
+	tsso->tsso_wtconn_tmhdl = timeout(cluster_target_socket_wait_conn_timeout, 
+		tsso, SEC_TO_TICK(CTSO_CONNECT_TIMEOUT));
 	while ((tsso->tsso_tssp_idx != tsso->tsso_tssp_cnt) &&
 		(tsso->tsso_status == CLUSTER_STATUS_SUCCESS)) {
 		rw_exit(&ctso->ctso_rw);
 		cv_wait(&tsso->tsso_cv, &tsso->tsso_mtx);
 		rw_enter(&ctso->ctso_rw, RW_WRITER);
 	}
+
+	if (tsso->tsso_status != CLUSTER_STATUS_SUCCESS) {
+		rval = tsso->tsso_status;
+		goto out;
+	}
 	for ( ; idx < tsso->tsso_tssp_cnt; idx++)
 		strncpy(tsso->tsso_tssp[idx]->tssp_local_ip, param->local, 16);
-	mutex_exit(&tsso->tsso_mtx);
 	
 	tsso->tsso_cts = cts;
 	strncpy(tsso->tsso_local_ip, param->local, 16);
@@ -1017,7 +1478,10 @@ cluster_target_socket_session_init_exist(cluster_target_session_socket_t *tsso,
 	/*
 	 * other member need be inited.
 	 */
-	return CLUSTER_STATUS_SUCCESS;
+	
+out:
+	mutex_exit(&tsso->tsso_mtx);
+	return rval;
 }
 
 static int
@@ -1027,38 +1491,60 @@ cluster_target_socket_session_init(cluster_target_session_t *cts,
 	int rval, idx = 0;
 	cluster_target_session_socket_t *tsso;
 	cluster_target_session_socket_conn_t *tssp;
+	cluster_target_port_socket_t *tpso;
 	
 	rw_enter(&ctso->ctso_rw, RW_WRITER);
+	for (tpso = list_head(&ctso->ctso_tpso_list); tpso;
+		tpso = list_next(&ctso->ctso_tpso_list, tpso)) {
+		if (strcmp(tpso->tpso_ipaddr, param->local) == 0)
+			break;
+	}
+
+	if (tpso == NULL) {
+		cmn_err(CE_NOTE, "%s ip(%s) is not enabled yet",
+			__func__, param->ipaddr);
+		rval = -EINVAL;
+		goto failed_out;
+	}
+	
 	for (tsso = list_head(&ctso->ctso_tsso_list); tsso;
 		tsso = list_next(&ctso->ctso_tsso_list, tsso)) {
-//		cmn_err(CE_NOTE, "tsso_ip(%s) user_ip(%s)", tsso->tsso_ipaddr, param->ipaddr);
 		if (strcmp(tsso->tsso_ipaddr, param->ipaddr) == 0)
 			break;
 	}
 
 	if (tsso != NULL)
 		rval = cluster_target_socket_session_init_exist(tsso, cts, param);
-	else {
-		rval = cluster_target_socket_session_init_nonexist(&tsso, cts, param);
-/*		if (tsso != NULL) {
-			cluster_target_socket_session_hold(tsso, CTSO_FTAG);
-			list_insert_tail(&tsso->tsso_tpso->tpso_sess_list, tsso);
-		} */
+	else
+		rval = cluster_target_socket_session_init_nonexist(&tsso, tpso, cts, param);
+
+	switch (rval) {
+		case CLUSTER_STATUS_SUCCESS:
+			cluster_target_socket_session_sm_event(tsso, 
+				SSE_USER_CONNECT, NULL, CTSO_FTAG);
+			mutex_enter(&tsso->tsso_sm_mtx);
+			while (tsso->tsso_curr_state < SSS_S3_READY)
+				cv_wait(&tsso->tsso_sm_cv, &tsso->tsso_sm_mtx);
+			/*
+			 * for exist, the user_connect operate must be successful
+			 * once all connections are accepted.
+			 * for nonexist, it can be failed because of binding or 
+			 * connecting error or timeout.
+			 */
+			if (tsso->tsso_curr_state > SSS_S3_READY)
+				rval = tsso->tsso_status;
+			mutex_exit(&tsso->tsso_sm_mtx);
+			break;
+		default:
+			if (tsso != NULL) {
+				mutex_enter(&tpso->tpso_mtx);
+				list_remove(&tpso->tpso_sess_list, tsso);
+				mutex_exit(&tpso->tpso_mtx);
+				cluster_target_socket_session_free(tsso);
+			}
+			break;
 	}
 
-	if (rval != CLUSTER_STATUS_SUCCESS)
-		goto failed_out;
-
-	for ( ; idx < tsso->tsso_tssp_cnt; idx++) {
-		tssp = tsso->tsso_tssp[idx];
-		cluster_target_socket_session_conn_sm_event(tssp, 
-			SOE_USER_CONNECT, NULL, CTSO_FTAG);
-		mutex_enter(&tssp->tssp_sm_mtx);
-		while ((tssp->tssp_curr_state != SOS_S4_XPRT_UP) &&
-			(tssp->tssp_connect_status == CLUSTER_STATUS_SUCCESS))
-			cv_wait(&tssp->tssp_sm_cv, &tssp->tssp_sm_mtx);
-		mutex_exit(&tssp->tssp_sm_mtx); 
-	}
 failed_out:
 	rw_exit(&ctso->ctso_rw);
 	return rval;
@@ -1067,7 +1553,7 @@ failed_out:
 static void
 cluster_target_socket_session_destroy(cluster_target_session_t *cts)
 {
-
+	/* all sessions are destroyed in port_fini */
 }
 
 static void
@@ -1127,6 +1613,31 @@ cluster_target_socket_port_send(void *ctp, void *fragment)
 }
 
 static void
+cluster_target_socket_port_start_accepter(cluster_target_port_socket_t *tpso)
+{
+	cluster_target_socket_port_hold(tpso, CTSO_FTAG);
+	tpso->tpso_accepter = kthread_run(cluster_target_socket_port_watcher,
+		tpso, "tpso_watcher_%d", tpso->tpso_port);
+	mutex_enter(&tpso->tpso_mtx);
+	while (!tpso->tpso_accepter_running)
+		cv_wait(&tpso->tpso_cv, &tpso->tpso_mtx);
+	mutex_exit(&tpso->tpso_mtx);
+}
+
+static void
+cluster_target_socket_port_stop_accepter(cluster_target_port_socket_t *tpso)
+{
+	/*
+	 * wake up kernel_accept
+	 */
+	mutex_enter(&tpso->tpso_mtx);
+	cluster_target_socket_shutdown(tpso->tpso_so);
+	tpso->tpso_accepter_running = B_FALSE;
+	cv_wait(&tpso->tpso_cv, &tpso->tpso_mtx);
+	mutex_exit(&tpso->tpso_mtx);
+}
+
+static void
 cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 {
 	list_t *exchange_list;
@@ -1153,12 +1664,12 @@ cluster_target_socket_port_rx_handle(cluster_target_socket_worker_t *worker)
 		mutex_enter(&worker->worker_mtx);
 	}
 
-	cmn_err(CE_NOTE, "TARGET SOCKET RX HANDLE THREAD EXIT");
 	worker->worker_running = B_FALSE;
 	worker->worker_stopped = B_TRUE;
 	cv_signal(&worker->worker_cv);
 	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
 	mutex_exit(&worker->worker_mtx);
+	cmn_err(CE_NOTE, "TARGET SOCKET RX HANDLE THREAD EXIT");
 }
 
 static void
@@ -1210,7 +1721,6 @@ cluster_target_socket_port_free_rx_worker(cluster_target_port_socket_t *tpso)
 		while (!worker->worker_stopped)
 			cv_wait(&worker->worker_cv, &worker->worker_mtx);
 		mutex_exit(&worker->worker_mtx);
-		cmn_err(CE_NOTE, "%s rx handle thread(%d) exit", __func__, idx);
 		kmem_free(worker, sizeof(cluster_target_socket_worker_t));
 		tpso->tpso_rx_process_ctx[idx] = NULL;
 	}
@@ -1256,6 +1766,9 @@ static void
 cluster_target_socket_port_free(cluster_target_port_socket_t *tpso)
 {
 	cluster_target_socket_port_free_rx_worker(tpso);
+	cmn_err(CE_NOTE, "tpso is going to wait ref");
+	cluster_target_socket_refcnt_wait_ref(&tpso->tpso_refcnt, CTSO_FTAG);
+	cmn_err(CE_NOTE, "tpso wait ref finished");
 	cluster_target_socket_refcnt_destroy(&tpso->tpso_refcnt);
 	kmem_free(tpso, sizeof(cluster_target_port_socket_t));
 }
@@ -1304,6 +1817,9 @@ cluster_target_socket_port_watcher(cluster_target_port_socket_t *tpso)
 		rw_enter(&ctso->ctso_rw, RW_WRITER);
 		cluster_target_socket_session_new(tpso, NULL, new_so, 
 			sess_ip, sess_port, &tsso);
+		/*
+		 * wake up user connect when connections are not all established.
+		 */
 		cv_signal(&tsso->tsso_cv);
 		cluster_target_socket_session_conn_sm_event(
 			tsso->tsso_tssp[tsso->tsso_tssp_idx-1], 
@@ -1312,7 +1828,11 @@ cluster_target_socket_port_watcher(cluster_target_port_socket_t *tpso)
 	}
 
 	tpso->tpso_accepter_running = B_FALSE;
+	cv_signal(&tpso->tpso_cv);
 	mutex_exit(&tpso->tpso_mtx);
+	cmn_err(CE_NOTE, "CLUSTER TARGET SOCKET PORT(%d) OFFLINE",
+		tpso->tpso_port);
+	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
 }
 
 static cluster_status_t
@@ -1346,14 +1866,17 @@ cluster_target_socket_port_portal_up(cluster_target_port_socket_t *tpso)
 		return rval;
 	}
 
-	tpso->tpso_accepter = kthread_run(cluster_target_socket_port_watcher,
-		tpso, "tpso_watcher_%d", tpso->tpso_port);
-	mutex_enter(&tpso->tpso_mtx);
-	while (!tpso->tpso_accepter_running)
-		cv_wait(&tpso->tpso_cv, &tpso->tpso_mtx);
-	mutex_exit(&tpso->tpso_mtx);
+	cluster_target_socket_port_start_accepter(tpso);
 
 	return CLUSTER_STATUS_SUCCESS;
+}
+
+static void
+cluster_target_socket_port_portal_down(cluster_target_port_socket_t *tpso)
+{
+	cluster_target_socket_port_stop_accepter(tpso);
+	cluster_target_socket_destroy(tpso->tpso_so);
+	tpso->tpso_so = NULL;
 }
 
 int cluster_target_socket_port_init(cluster_target_port_t *ctp, 
@@ -1394,9 +1917,33 @@ int cluster_target_socket_port_init(cluster_target_port_t *ctp,
 	ctp->target_private = tpso;
 
 	rw_enter(&ctso->ctso_rw, RW_WRITER);
+	cluster_target_socket_port_hold(tpso, CTSO_FTAG);
 	list_insert_tail(&ctso->ctso_tpso_list, tpso);
 	rw_exit(&ctso->ctso_rw);
 	return CLUSTER_STATUS_SUCCESS;
+}
+
+void
+cluster_target_socket_port_fini(cluster_target_port_t *ctp)
+{
+	cluster_target_port_socket_t *tpso = ctp->target_private;
+	cluster_target_session_socket_t *tsso = NULL;
+	
+	rw_enter(&ctso->ctso_rw, RW_WRITER);
+	cluster_target_socket_port_rele(tpso, CTSO_FTAG);
+	list_remove(&ctso->ctso_tpso_list, tpso);
+	
+	mutex_enter(&tpso->tpso_mtx);
+	while ((tsso = list_remove_head(&tpso->tpso_sess_list)) != NULL) {
+		mutex_exit(&tpso->tpso_mtx);
+		cluster_target_socket_session_free(tsso);
+		mutex_enter(&tpso->tpso_mtx);
+	}
+	mutex_exit(&tpso->tpso_mtx);
+	
+	cluster_target_socket_port_portal_down(tpso);
+	cluster_target_socket_port_free(tpso);
+	rw_exit(&ctso->ctso_rw);
 }
 
 static int
@@ -1436,10 +1983,3 @@ cluster_target_socket_init(void)
 	}
 	return CLUSTER_STATUS_SUCCESS;
 }
-
-void
-cluster_target_socket_port_fini(cluster_target_port_t *ctp)
-{
-
-}
-

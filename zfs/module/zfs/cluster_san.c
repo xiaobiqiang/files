@@ -4506,6 +4506,8 @@ static void cluster_target_port_destroy(cluster_target_port_t *ctp)
 	} else if (ctp->target_type == CLUSTER_TARGET_RPC_RDMA) {
 		/* cluster_rdma_target_port = NULL; */
 		/* cluster_target_rpc_rdma_destroy(ctp); */
+	} else if (ctp->target_type == CLUSTER_TARGET_SOCKET){
+
 	} else {
 		cmn_err(CE_WARN, "%s: unkonwn target: %d", __func__, ctp->target_type);
 	}
