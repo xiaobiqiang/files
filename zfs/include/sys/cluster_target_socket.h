@@ -9,12 +9,14 @@
 
 #define CTSO_FTAG	__func__
 #define CTSO_PORT_RX_PROCESS_NTHREAD	16
-#define CTSO_MAX_PORT	4
 #define CTSO_CONN_NUM	4
 #define CTSO_SRV_PORT	1866
 
 #define TSSO_SM_AUDIT_DEPTH		64
 #define CTSO_REFAUDIT_MAX_RECORD	64
+
+#define CTSO_CONNECT_TIMEOUT	2
+
 #define ctso_assert(cond)	\
 	do {	\
 		if (!(cond))	\
@@ -34,18 +36,17 @@
 	(refcnt)->tr_audit.adt_idx &= (refcnt)->tr_audit.adt_max_depth;	\
 }
 
-#define CTSO_SESS_SM_AUDIT(tssp, event, ftag)		\
+#define CTSO_SM_AUDIT(sa, event, ftag, last, curr)		\
 {	\
-	cluster_target_socket_sm_audit_t *sa = &(tssp)->tssp_sm_audit;	\
 	cluster_target_socket_sm_audit_record_t *sar; \
 		\
-	sar = sa->sa_record + sa->sa_idx;	\
-	sa->sa_idx++;		\
-	sar->sar_ostate = tssp->tssp_last_state;	\
-	sar->sar_nstate = tssp->tssp_curr_state;	\
+	sar = (sa)->sa_record + (sa)->sa_idx;	\
+	(sa)->sa_idx++;		\
+	sar->sar_ostate = last;	\
+	sar->sar_nstate = curr;	\
 	sar->sar_event = event;	\
 	sar->sar_ftag = strdup(ftag);	\
-	sa->sa_idx &= sa->sa_max_depth;	\
+	(sa)->sa_idx &= (sa)->sa_max_depth;	\
 }
 
 typedef struct cluster_target_port_socket cluster_target_port_socket_t;
@@ -57,13 +58,22 @@ typedef enum cluster_target_socket_refwait {
 	CTSO_REF_WAIT_ASYNC
 } cluster_target_socket_refwait_e;
 
-typedef enum cluster_target_socket_session_event {
+typedef enum cluster_target_socket_session_conn_event {
 	SOE_RX_CONNECT,
 	SOE_SESS_CONFLICT,
 	SOE_USER_CONNECT,
 	SOE_CN_BIND_ERROR,
 	SOE_CONNECT_ERROR,
 	SOE_CONNECT_SUCCESS,
+	SOE_TSSO_IN_CLEANUP,
+	SOE_TSSP_CONN_LOST,
+} cluster_target_socket_session_conn_event_e;
+
+typedef enum cluster_target_socket_session_event {
+	SSE_USER_CONNECT,
+	SSE_TSSP_READY,
+	SSE_TSSP_COMPLETE,
+	SSE_TPSO_COMPLETE,
 } cluster_target_socket_session_event_e;
 
 typedef void (*cluster_target_socket_refcnt_cb_t)(void *);
@@ -105,12 +115,25 @@ typedef struct cluster_target_socket_sm_audit {
 	cluster_target_socket_sm_audit_record_t sa_record[CTSO_REFAUDIT_MAX_RECORD];
 } cluster_target_socket_sm_audit_t;
 
-typedef enum cluster_target_socket_session_state {
+typedef enum cluster_target_socket_session_conn_state {
 	SOS_S1_FREE,
 	SOS_S2_XPRT_WAIT,
 	SOS_S3_CONN_SND,
 	SOS_S4_XPRT_UP,
-	SOS_S5_CLEANUP,
+	SOS_S5_IN_EPIPE,
+	SOS_S6_IN_LOGOUT,
+	SOS_S7_CLEANUP,
+	SOS_S8_COMPLETE,
+} cluster_target_socket_session_conn_state_e;
+
+typedef enum cluster_target_socket_session_state {
+	SSS_S1_FREE,
+	SSS_S2_READY_WAIT,
+	SSS_S3_READY,
+	SSS_S4_IN_TSSP_CLEAN,
+	SSS_S5_CLEANUP,
+	SSS_S6_COMPLETE,	/* going to destroy */
+	SSS_S7_DESTROYED	/* destroyed */
 } cluster_target_socket_session_state_e;
 
 typedef struct cluster_target_socket_worker {
@@ -166,6 +189,10 @@ typedef struct cluster_target_socket_param {
    int priority;
 } cluster_target_socket_param_t;
 
+#define TSSO_STATUS_OK			CLUSTER_STATUS_SUCCESS
+#define TSSO_STATUS_IN_CLEAN	0x1
+#define TSSO_STATUS_CAN_FREE	0x2
+
 typedef struct cluster_target_session_socket {
 	/*
 	 * new design
@@ -184,7 +211,22 @@ typedef struct cluster_target_session_socket {
 	uint32_t tsso_s4_cnt;
 	uint32_t tsso_tssp_cnt;
 	uint32_t tsso_tssp_idx;
+	uint32_t tsso_tssp_realcnt;
+	uint32_t tsso_align1;
 	cluster_target_session_socket_conn_t *tsso_tssp[CTSO_CONN_NUM];
+	timeout_id_t tsso_wtconn_tmhdl;
+
+	/*
+     * socket session state machine
+     */
+    kmutex_t tsso_sm_mtx;
+    kcondvar_t tsso_sm_cv;
+	list_t tsso_smevt_list;
+    cluster_target_socket_sm_audit_t tsso_sm_audit;
+    cluster_target_socket_session_state_e tsso_curr_state;
+    cluster_target_socket_session_state_e tsso_last_state;
+	boolean_t tsso_sm_busy;
+	uint32_t tsso_align;
 } cluster_target_session_socket_t;
 
 struct cluster_target_session_socket_conn {
@@ -196,15 +238,15 @@ struct cluster_target_session_socket_conn {
 	cluster_status_t tssp_connect_status;
     timeout_id_t tssp_conn_tmhdl;
 	
-	uint32_t tssp_rx_align;
     boolean_t tssp_rx_running;
+	boolean_t tssp_rx_stoped;
     kmutex_t tssp_rx_mtx;
     kcondvar_t tssp_rx_cv;
     struct task_struct *tssp_rx;
     list_t tssp_rx_data_list;
 
 	boolean_t tssp_tx_running;
-	uint32_t tssp_tx_align;
+	boolean_t tssp_tx_stoped;
 	kmutex_t tssp_tx_mtx;
 	kcondvar_t tssp_tx_cv;
 	struct task_struct *tssp_tx;
@@ -212,14 +254,16 @@ struct cluster_target_session_socket_conn {
 	list_t tssp_tx_live_list;
 
     /*
-     * socket session state machine
+     * socket session connection state machine
      */
     kmutex_t tssp_sm_mtx;
     kcondvar_t tssp_sm_cv;
     cluster_target_socket_sm_audit_t tssp_sm_audit;
     taskq_t *tssp_sm_ctx;
-    cluster_target_socket_session_state_e tssp_curr_state;
-    cluster_target_socket_session_state_e tssp_last_state;
+    cluster_target_socket_session_conn_state_e tssp_curr_state;
+    cluster_target_socket_session_conn_state_e tssp_last_state;
+
+	uint32_t tssp_tsso_idx;
 };
 
 typedef struct cluster_target_socket_tran_data {
