@@ -1216,7 +1216,7 @@ raidz_check_and_reclaim_space(spa_t *spa)
 
 		ASSERT(data != NULL);
 		elem = (aggre_map_elem_t *)data;
-		err = raidz_aggre_process_elem(spa, pos + 1, elem, &state);
+		err = raidz_aggre_process_elem(spa, pos , elem, &state);
 		#if 0
 		DTRACE_PROBE3(process__result, spa_t *, spa, 
 			uint64_t, pos,

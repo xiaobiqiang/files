@@ -284,9 +284,10 @@ vdev_raidz_map_free(raidz_map_t *rm)
         	zio_buf_free(rm->rm_col[c].rc_data, rm->rm_col[c].rc_size);
 	}
 
-	if (rm->rm_datacopy != NULL)
+	if (rm->rm_datacopy != NULL){
+		size = size > SPA_MAXBLOCKSIZE ? SPA_MAXBLOCKSIZE : size;
 		zio_buf_free(rm->rm_datacopy, size);
-
+	}
 	kmem_free(rm, offsetof(raidz_map_t, rm_col[rm->rm_scols]));
 }
 
