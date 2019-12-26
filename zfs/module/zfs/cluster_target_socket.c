@@ -314,7 +314,7 @@ static int
 cluster_target_socket_session_tx_process(cluster_target_socket_tran_data_t *tdt)
 {
 	cluster_target_session_socket_conn_t *tssp = tdt->tdt_tssp;
-
+	
 	mutex_enter(&tssp->tssp_tx_mtx);
 	list_insert_tail(&tssp->tssp_tx_wait_list, tdt);
 	cv_signal(&tssp->tssp_tx_cv);
@@ -396,6 +396,13 @@ cluster_target_socket_session_tran_start(
 	tdt->tdt_iovlen = 3;
 	tdt->tdt_iovbuflen = sizeof(cluster_target_msg_header_t) + 
 		origin_data->header_len + origin_data->data_len;
+
+	mutex_enter(&tsso->tsso_sm_mtx);
+	if (tsso->tsso_curr_state != SSS_S3_READY) {
+		mutex_exit(&tsso->tsso_sm_mtx);
+		return -EOFFLINE;
+	}
+	mutex_exit(&tsso->tsso_sm_mtx);
 	
 	cluster_target_socket_session_tx_process(tdt);
 
@@ -719,20 +726,30 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 				cluster_target_socket_session_conn_connect_timedout,
 				tssp, SEC_TO_TICK(CTSO_CONNECT_TIMEOUT));
 			if ((rval = kernel_connect(tssp->tssp_so, &addr_in4,
-					sizeof(struct sockaddr_in), 0)) != 0) {
-				cmn_err(CE_NOTE, "%s connect ip(%s) error(%d)",
-					__func__, tssp->tssp_ipaddr, rval);
-				
-				mutex_enter(&tssp->tssp_sm_mtx);
-				tssp->tssp_connect_status = rval;
-				cv_signal(&tssp->tssp_sm_cv);
-				mutex_exit(&tssp->tssp_sm_mtx);
+					sizeof(struct sockaddr_in), 0)) == 0) {
 				cluster_target_socket_session_conn_sm_event(tssp,
-					SOE_CONNECT_ERROR, NULL, CTSO_FTAG);
-				break;
+					SOE_CONNECT_SUCCESS, NULL, CTSO_FTAG);
+			} else {
+				/*
+				 * peer port offline
+				 */
+				if (rval == -ECONNREFUSED) {
+					cmn_err(CE_NOTE, "peer(%s) port offline, wait it now...",
+						tssp->tssp_ipaddr);
+					cluster_target_socket_session_conn_sm_event(tssp,
+						SOE_PRPORT_OFFLINE, NULL, CTSO_FTAG);
+				} else {
+					cmn_err(CE_NOTE, "%s connect ip(%s) error(%d)",
+						__func__, tssp->tssp_ipaddr, rval);
+					
+					mutex_enter(&tssp->tssp_sm_mtx);
+					tssp->tssp_connect_status = rval;
+					cv_signal(&tssp->tssp_sm_cv);
+					mutex_exit(&tssp->tssp_sm_mtx);
+					cluster_target_socket_session_conn_sm_event(tssp,
+						SOE_CONNECT_ERROR, NULL, CTSO_FTAG);
+				}
 			}
-			cluster_target_socket_session_conn_sm_event(tssp,
-				SOE_CONNECT_SUCCESS, NULL, CTSO_FTAG);
 			break;
 		case SOS_S4_XPRT_UP:
 			cv_signal(&tssp->tssp_sm_cv);
@@ -814,6 +831,7 @@ cluster_target_socket_session_conn_s3_conn_send(cluster_target_session_socket_co
 			cluster_target_socket_session_conn_new_state(tssp,
 				SOS_S4_XPRT_UP, smc);
 			break;
+		case SOE_PRPORT_OFFLINE:
 		case SOE_CONNECT_ERROR:
 			untimeout(tssp->tssp_conn_tmhdl);
 			/* @FALLTHROUGH */
@@ -947,6 +965,7 @@ cluster_target_socket_session_conn_smfini(cluster_target_session_socket_conn_t *
 		return ;
 
 	mutex_destroy(&tssp->tssp_sm_mtx);
+	taskq_wait(tssp->tssp_sm_ctx);
 	taskq_destroy(tssp->tssp_sm_ctx);
 	tssp->tssp_sm_ctx = NULL;
 }
@@ -1035,19 +1054,23 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 			mutex_enter(&tsso->tsso_mtx);
 			cmn_err(CE_NOTE, "tssp(%p) idx(%d) of tsso(%s) to free",
 				tssp, tssp->tssp_tsso_idx, tsso->tsso_ipaddr);
-			tsso->tsso_tssp[tssp->tssp_tsso_idx] = NULL;
-			tsso->tsso_tssp_realcnt--;
-			cluster_target_socket_session_conn_free(tssp);
-			if ((tsso->tsso_status == CLUSTER_STATUS_SUCCESS) &&
-				(tsso->tsso_tssp_realcnt == 0)) {
-				cluster_target_session_hold(tsso->tsso_cts, "up2down evt");
-				if (tsso->tsso_cts->sess_linkstate == CTS_LINK_UP) {
-					tsso->tsso_cts->sess_linkstate = CTS_LINK_DOWN;
-					taskq_dispatch(clustersan->cs_async_taskq, 
-						cts_link_up_to_down_handle, 
-						tsso->tsso_cts, TQ_SLEEP);
-				} else 
-					cluster_target_session_rele(tsso->tsso_cts, "up2down evt");
+			tsso->tsso_tssp_idx = 0;
+			tsso->tsso_s4_cnt = 0;
+			if (tsso->tsso_tssp[tssp->tssp_tsso_idx] != NULL) {
+				tsso->tsso_tssp[tssp->tssp_tsso_idx] = NULL;
+				tsso->tsso_tssp_realcnt--;
+				cluster_target_socket_session_conn_free(tssp);
+				if ((tsso->tsso_status == CLUSTER_STATUS_SUCCESS) &&
+					(tsso->tsso_tssp_realcnt == 0)) {
+					cluster_target_session_hold(tsso->tsso_cts, "up2down evt");
+					if (tsso->tsso_cts->sess_linkstate == CTS_LINK_UP) {
+						tsso->tsso_cts->sess_linkstate = CTS_LINK_DOWN;
+						taskq_dispatch(clustersan->cs_async_taskq, 
+							cts_link_up_to_down_handle, 
+							tsso->tsso_cts, TQ_SLEEP);
+					} else 
+						cluster_target_session_rele(tsso->tsso_cts, "up2down evt");
+				}
 			}
 			mutex_exit(&tsso->tsso_mtx);
 			break;
@@ -1139,6 +1162,14 @@ cluster_target_socket_session_s4_in_tssp_clean(cluster_target_session_socket_t *
 			mutex_exit(&tsso->tsso_mtx);
 			cluster_target_socket_session_new_state(tsso,
 				SSS_S4_IN_TSSP_CLEAN, smc);
+			break;
+		case SSE_TSSP_READY:
+			mutex_enter(&tsso->tsso_mtx);
+			tsso->tsso_s4_cnt++;
+			if (tsso->tsso_s4_cnt == tsso->tsso_tssp_cnt)
+				cluster_target_socket_session_new_state(tsso, 
+					SSS_S3_READY, smc);
+			mutex_exit(&tsso->tsso_mtx);
 			break;
 	}
 }
