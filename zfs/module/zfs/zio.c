@@ -2106,7 +2106,7 @@ zio_write_gang_block(zio_t *pio)
 
 	error = metaslab_alloc(spa, spa_normal_class(spa), SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
-	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER);
+	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER,1);
 	if (error) {
 		pio->io_error = error;
 		return (ZIO_PIPELINE_CONTINUE);
@@ -2655,11 +2655,14 @@ zio_dva_allocate(zio_t *zio)
 
 	if (zio->io_aggre_io) {
 		mutex_enter(&zio->io_aggre_io->ai_lock);
+		aggre_num = zio->io_aggre_io->ai_together;
+		ASSERT(aggre_num > 1);
 						
 		if (zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_SUCC) {
 			memcpy(&bp->blk_dva[0], &zio->io_aggre_io->ai_dva[0], sizeof(dva_t));
 			BP_SET_BIRTH(bp, zio->io_txg, zio->io_txg);
 			BP_SET_APPMETA(bp, prop_p->zp_app_meta);
+			BP_SET_AGGRENUM(bp, zio->io_aggre_io->ai_together);
 			mutex_exit(&zio->io_aggre_io->ai_lock);
 			return (ZIO_PIPELINE_CONTINUE);
 		} else if (zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_FAIL) {
@@ -2667,14 +2670,13 @@ zio_dva_allocate(zio_t *zio)
 			mutex_exit(&zio->io_aggre_io->ai_lock);
 			return (ZIO_PIPELINE_CONTINUE);
 		}
-		aggre_num = zio->io_spa->spa_raidz_aggre_num;
-		ASSERT(aggre_num > 1);
+		
 		ASSERT(zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_WAITSTART);
 	}
 
 space_alloc:    
 	error = metaslab_alloc(spa, mc, zio->io_size * aggre_num, bp,
-	    zio->io_prop.zp_copies, zio->io_txg, NULL, flags);
+	    zio->io_prop.zp_copies, zio->io_txg, NULL, flags, aggre_num);
 
 	if (error) {
 		if ((error == ENOSPC) && (mc != spa->spa_low_class)) {
@@ -2700,20 +2702,14 @@ space_alloc:
 		zio->io_error = error;
 	}
 	BP_SET_APPMETA(bp, prop_p->zp_app_meta);
-	BP_SET_APPLOW(bp, prop_p->zp_app_low);
-
-	if (zio->io_aggre_io) {
-		if (!error) {
-			/*
-			if (DVA_GET_OFFSET(&bp->blk_dva[0]) % (2048*dcols)) {
-				cmn_err(CE_WARN,"%s the tgdva is not divided", __func__);
-				metaslab_free_dva(spa, &bp->blk_dva[0], zio->io_txg, B_TRUE);
-				goto space_alloc;
-			}*/
+	
+	if (zio->io_aggre_io != NULL) {
+		if(!error) {
+			BP_SET_AGGRENUM(bp, zio->io_aggre_io->ai_together);
 			zio->io_aggre_io->ai_dvaalloc_stat = TGDVA_ALLOC_SUCC;
-			/*DVA_SET_ASIZE(&bp->blk_dva[0], zio->io_size);*/
 			memcpy(&zio->io_aggre_io->ai_dva[0], &bp->blk_dva[0], sizeof(dva_t));
 			memcpy(&zio->io_aggre_io->ai_map.tgm_dva ,&bp->blk_dva[0], sizeof(dva_t));
+			
 		} else {
 			zio->io_error = error;
 			zio->io_aggre_io->ai_ioerror = error;
@@ -2722,7 +2718,7 @@ space_alloc:
 		}
 		mutex_exit(&zio->io_aggre_io->ai_lock);
 	}
-
+	BP_SET_APPLOW(bp, prop_p->zp_app_low);
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
@@ -2789,13 +2785,13 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, uint64_t size,
 	if (use_slog) {
 		error = metaslab_alloc(spa, spa_log_class(spa), size,
 		    new_bp, 1, txg, NULL,
-		    METASLAB_FASTWRITE | METASLAB_GANG_AVOID);
+		    METASLAB_FASTWRITE | METASLAB_GANG_AVOID, 1);
 	}
 
 	if (error) {
 		error = metaslab_alloc(spa, spa_normal_class(spa), size,
 		    new_bp, 1, txg, NULL,
-		    METASLAB_FASTWRITE);
+		    METASLAB_FASTWRITE, 1);
 	}
 
 	if (error == 0) {

@@ -977,6 +977,11 @@ extern uint64_t spa_get_ios(spa_t *spa);
 extern uint64_t spa_import_flags(spa_t *spa);
 extern boolean_t spa_get_group_flags(spa_t *spa);
 
+extern boolean_t spa_is_raidz_aggre(spa_t *spa);
+extern void spa_update_raidz_aggre_vdev_state(spa_t *spa, 
+	int aggre_num, int state);
+extern int spa_raidz_aggre_vdev_state(spa_t * spa, int aggre_num);
+
 #ifdef	__cplusplus
 }
 #endif

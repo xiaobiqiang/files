@@ -69,6 +69,8 @@ static vdev_ops_t *vdev_ops_table[] = {
 	NULL
 };
 
+int vdev_alloc_ratio_thresh1 = 80;
+int vdev_alloc_ratio_thresh2 = 90;
 /*
  * Given a vdev type, return the appropriate ops vector.
  */
@@ -2952,6 +2954,16 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 	}
 }
 
+int
+vdev_space_alloc_full(vdev_t *vd, int thresh)
+{
+	ASSERT(vd->vdev_ops == &vdev_raidz_aggre_ops);
+	if (vd->vdev_stat.vs_alloc >= vd->vdev_stat.vs_space * thresh / 100)
+		return (1);
+	
+	return (0);
+}
+
 /*
  * Update the in-core space usage stats for this vdev, its metaslab class,
  * and the root vdev.
@@ -2991,6 +3003,41 @@ vdev_space_update(vdev_t *vd, int64_t alloc_delta, int64_t defer_delta,
 		rvd->vdev_stat.vs_space += space_delta;
 		rvd->vdev_stat.vs_dspace += dspace_delta;
 		mutex_exit(&rvd->vdev_stat_lock);
+	}
+
+	if ((spa->spa_raidz_aggre_mixed & RAIDZ_AGGRE_DIFF_CONFIG) &&
+		vd->vdev_ops == &vdev_raidz_aggre_ops &&
+		!vd->vdev_ismeta) {
+		int aggre_num = vd->vdev_children - vd->vdev_nparity;
+		ASSERT(vdev_alloc_ratio_thresh1 <= vdev_alloc_ratio_thresh2);
+		
+		if (alloc_delta > 0 &&
+			vdev_space_alloc_full(vd, vdev_alloc_ratio_thresh2) &&
+			spa_raidz_aggre_vdev_state(spa, aggre_num) == 1) {
+			metaslab_group_t *mg_tmp;
+			vdev_t *vd_tmp;
+			boolean_t flag = B_TRUE;
+			
+			mg_tmp = mg->mg_next;
+			while (mg_tmp && mg_tmp != mg) {
+				vd_tmp = mg_tmp->mg_vd;
+				if (vd_tmp->vdev_ops == &vdev_raidz_aggre_ops &&
+					!vd_tmp->vdev_ismeta &&
+					vd_tmp->vdev_children - vd_tmp->vdev_nparity == aggre_num &&
+					!vdev_space_alloc_full(vd_tmp, vdev_alloc_ratio_thresh2)) {
+					flag = B_FALSE;
+					break;
+				}
+				mg_tmp = mg_tmp->mg_next;
+			}
+
+			if (flag)
+				spa_update_raidz_aggre_vdev_state(spa, aggre_num, 0);
+		} else if (alloc_delta < 0 &&
+			!vdev_space_alloc_full(vd, vdev_alloc_ratio_thresh1) &&
+			spa_raidz_aggre_vdev_state(spa, aggre_num) == 0) {
+			spa_update_raidz_aggre_vdev_state(spa, aggre_num, 1);
+		}
 	}
 
 	if (mc != NULL) {

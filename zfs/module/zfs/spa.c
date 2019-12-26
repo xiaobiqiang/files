@@ -154,6 +154,7 @@ boolean_t	zio_taskq_sysdc = B_TRUE;	/* use SDC scheduling class */
 uint_t		zio_taskq_basedc = 80;		/* base duty cycle */
 
 boolean_t	spa_create_process = B_TRUE;	/* no process ==> no sysdc */
+int spa_use_together_lock = 1;
 
 /*
  * This (illegal) pool name is used when temporarily importing a spa_t in order
@@ -2937,7 +2938,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
 	cmn_err(CE_WARN, "%s raidz_aggre_map_open %s  ",__func__,spa->spa_name );
-	spa->spa_map_manager.mm_active_obj_index = -1;
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4495,7 +4495,9 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		spa_history_create_obj(spa, tx);
 
 	raidz_aggre_check(spa);
-	raidz_aggre_create_map_obj(spa, tx, spa->spa_raidz_aggre_num);
+	raidz_aggre_create_map_obj(spa, tx, TG_MAX_DISK_NUM);
+	raidz_aggre_map_open(spa);
+
 	/*
 	 * Set pool properties.
 	 */
@@ -4537,7 +4539,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
 	
 	spa->spa_map_manager.mm_active_obj_index = 0;
-	raidz_aggre_map_open(spa);
 	start_space_reclaim_thread(spa);
 	
 	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
@@ -4787,11 +4788,11 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	cmn_err(CE_WARN,"%s %s do raidz_aggre_check", __func__,pool);
 	raidz_aggre_check(spa);
 	
-	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa->spa_raidz_aggre);
+	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa_is_raidz_aggre(spa));
 	start_space_reclaim_thread(spa);
 	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 
-	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa->spa_raidz_aggre);
+	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa_is_raidz_aggre(spa));
 	mutex_exit(&spa_namespace_lock);
 	spa_history_log_version(spa, "import");
 	zvol_create_minors(spa, pool, B_FALSE);
@@ -5344,6 +5345,9 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	mutex_enter(&spa_namespace_lock);
 	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 	mutex_exit(&spa_namespace_lock);
+
+	raidz_aggre_check(spa);
+	start_space_reclaim_thread(spa);
 
 	return (0);
 }
@@ -7446,27 +7450,20 @@ spa_sync(spa_t *spa, uint64_t txg)
 			    &spa->spa_deferred_bpobj, tx);
 		}
 		
-		if (spa->spa_raidz_aggre && (spa->spa_space_reclaim_state & SPACE_RECLAIM_START))
-		{
+		if (spa_is_raidz_aggre(spa)) {
 			clock_t start, delta;
+			aggre_map_t *filling_map;
 			start = ddi_get_lbolt();
-			
-			if(spa->spa_map_manager.mm_active_obj_index == -1) {
-			 	raidz_aggre_map_free_1open(spa, tx);
-				spa->spa_map_manager.mm_active_obj_index = 0;
-			}else {
-				raidz_aggre_map_free_range_all(spa, tx);
 
-				if(spa->spa_space_reclaim_state & SPACE_RECLAIM_RUN){
-					aggre_map_t *amap = raidz_aggre_map_current(spa);
-					if(amap!=NULL)
-						clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, amap, tx);
-				}
-			}
+			update_reclaim_map(spa, tx);
+			filling_map = raidz_aggre_map_current(spa, tx);
+			if (filling_map)
+				clist_iterate(aggre_map_list, raidz_aggre_elem_enqueue_cb, filling_map, tx);
 			
 			delta = ddi_get_lbolt() - start;
-			if(delta>1000)
-				cmn_err(CE_WARN, "%s %s spa_sync %lld take: %ld ", __func__, spa->spa_name, txg,delta );
+			if (delta > 1000)
+				cmn_err(CE_WARN, "%s %s spa_sync %ld take: %ld ", __func__, 
+					spa->spa_name, (long)txg,(long)delta);
 		}
 		ddt_sync(spa, txg);
 		dsl_scan_sync(dp, tx);
@@ -7848,6 +7845,56 @@ spa_event_notify(spa_t *spa, vdev_t *vd, const char *name)
 	zfs_ereport_post(name, spa, vd, NULL, 0, 0);
 #endif
 }
+
+boolean_t
+spa_is_raidz_aggre(spa_t *spa)
+{
+	return !list_is_empty(&spa->spa_raidz_aggre_config);
+}
+
+void
+spa_update_raidz_aggre_vdev_state(spa_t *spa, int aggre_num, int state)
+{
+	int i;
+	together_item_t *item;
+
+	if (spa_use_together_lock)
+		rw_enter(&spa->spa_together_lock, RW_WRITER);
+	for (i = 0; i < spa->spa_together_arr_num; i++) {
+		item = &spa->spa_together_arr[i];
+		if (item->together == aggre_num)
+			item->state = state;
+	}
+	if (spa_use_together_lock)
+		rw_exit(&spa->spa_together_lock);
+}
+
+int
+spa_raidz_aggre_vdev_state(spa_t * spa, int aggre_num)
+{
+	int i, state = -1;
+	together_item_t *item;
+
+	if (spa_use_together_lock)
+		rw_enter(&spa->spa_together_lock, RW_READER);
+	if (!spa->spa_together_arr) {
+		if (spa_use_together_lock)
+			rw_exit(&spa->spa_together_lock);
+		return (-1);
+	}
+	
+	for (i = 0; i < spa->spa_together_arr_num; i++) {
+		item = &spa->spa_together_arr[i];
+		if (item->together == aggre_num) {
+			state = item->state;
+			break;
+		}
+	}
+	if (spa_use_together_lock)
+		rw_exit(&spa->spa_together_lock);
+	return (state);
+}
+
 
 #if defined(_KERNEL) && defined(HAVE_SPL)
 /* state manipulation functions */
