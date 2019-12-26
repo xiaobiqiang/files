@@ -627,7 +627,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	VERIFY(spa->spa_comment == NULL || nvlist_add_string(config,
 	    ZPOOL_CONFIG_COMMENT, spa->spa_comment) == 0);
 	VERIFY(nvlist_add_boolean_value(config, ZPOOL_CONFIG_ISAGGRE,
-		spa_isaggre(spa)) == 0);
+		spa_is_raidz_aggre(spa)) == 0);
 
 #ifdef	_KERNEL
 	hostid = zone_get_hostid(NULL);
