@@ -167,6 +167,21 @@ cluster_target_socket_refcnt_rele_and_destroy(
 	mutex_exit(&refcnt->tr_mtx);
 }
 
+static void
+cluster_target_socket_refcnt_print_track(cluster_target_socket_refcnt_t *refcnt)
+{
+	int idx = 0;
+	cluster_target_socket_refaudit_record_t *sar;
+	cluster_target_socket_refaudit_t *sa = &refcnt->tr_audit;
+
+	for ( ; idx < sa->adt_idx; idx++) {
+		sar = &sa->adt_record[idx];
+		cmn_err(CE_NOTE, "nrefcnt(%u) func(%s) op(%s)",
+			sar->adr_nref, sar->adr_fn, sar->adr_type);
+	}
+	cmn_err(CE_NOTE, "\n");
+}
+
 void 
 cluster_target_socket_refcnt_wait_ref(cluster_target_socket_refcnt_t *refcnt, void *ftag)
 {
@@ -174,8 +189,11 @@ cluster_target_socket_refcnt_wait_ref(cluster_target_socket_refcnt_t *refcnt, vo
 	CTSO_REFAUDIT(refcnt, ftag, "sync_wait");
 	
 	refcnt->tr_wait= CTSO_REF_WAIT_SYNC;
-	while (refcnt->tr_nref != 0)
-		cv_wait(&refcnt->tr_cv, &refcnt->tr_mtx);
+	while (refcnt->tr_nref != 0) {
+		cv_timedwait(&refcnt->tr_cv, &refcnt->tr_mtx,
+			ddi_get_lbolt() + drv_usectohz(3000 * 1000));
+		cluster_target_socket_refcnt_print_track(refcnt);
+	}
 	mutex_exit(&refcnt->tr_mtx);
 }
 
@@ -457,6 +475,8 @@ cluster_target_socket_session_conn_new(cluster_target_session_socket_t *tsso,
 static void
 cluster_target_socket_session_conn_free(cluster_target_session_socket_conn_t *tssp)
 {
+	cmn_err(CE_NOTE, "tssp(%p) idx(%d) of tsso(%s) to free",
+		tssp, tssp->tssp_tsso_idx, tssp->tssp_tsso->tsso_ipaddr);
 	if (tssp->tssp_so)
 		cluster_target_socket_destroy(tssp->tssp_so);
 	cluster_target_socket_session_conn_smfini(tssp);
@@ -755,6 +775,7 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 			cv_signal(&tssp->tssp_sm_cv);
 			cmn_err(CE_NOTE, "%s session ip(%s) port(%d) come into SOS_S4_XPRT_UP",
 				__func__, tssp->tssp_ipaddr, tssp->tssp_port);
+			tssp->tssp_connect_status = CLUSTER_STATUS_SUCCESS;
 			cluster_target_socket_session_conn_connect(tssp);
 			cluster_target_socket_session_sm_event(tssp->tssp_tsso,
 				SSE_TSSP_READY, NULL, CTSO_FTAG);
@@ -789,10 +810,20 @@ static void
 cluster_target_socket_session_conn_s1_free(cluster_target_session_socket_conn_t *tssp,
 	cluster_target_socket_session_conn_sm_ctx_t *smc)
 {
+	cluster_target_session_socket_t *tsso = tssp->tssp_tsso;
+	
 	switch (smc->smc_event) {
 		case SOE_RX_CONNECT:
-			cluster_target_socket_session_conn_new_state(tssp, 
-				SOS_S2_XPRT_WAIT, smc);
+			mutex_enter(&tsso->tsso_sm_mtx);
+			if (tsso->tsso_curr_state == SSS_S4_IN_TSSP_CLEAN) {
+				mutex_exit(&tsso->tsso_sm_mtx);
+				cluster_target_socket_session_conn_new_state(tssp, 
+					SOS_S4_XPRT_UP, smc);
+			} else {
+				mutex_exit(&tsso->tsso_sm_mtx);
+				cluster_target_socket_session_conn_new_state(tssp, 
+					SOS_S2_XPRT_WAIT, smc);
+			}
 			break;
 		case SOE_USER_CONNECT:
 			cluster_target_socket_session_conn_new_state(tssp,
@@ -886,6 +917,17 @@ cluster_target_socket_session_conn_s6_in_logout(cluster_target_session_socket_co
 	}
 }
 
+static void
+cluster_target_socket_session_conn_s7_cleanup(cluster_target_session_socket_conn_t *tssp,
+	cluster_target_socket_session_conn_sm_ctx_t *smc)
+{
+	switch (smc->smc_event) {
+		case SOE_TSSO_IN_CLEANUP:
+			cluster_target_socket_session_conn_new_state(tssp,
+				SOS_S8_COMPLETE, smc);
+			break;
+	}
+}
 
 static void
 cluster_target_socket_session_conn_event_handle(void *arg)
@@ -905,6 +947,15 @@ cluster_target_socket_session_conn_event_handle(void *arg)
 			break;
 		case SOS_S4_XPRT_UP:
 			cluster_target_socket_session_conn_s4_xprt_up(tssp, smc);
+			break;
+		case SOS_S5_IN_EPIPE:
+			cluster_target_socket_session_conn_s5_in_pipe(tssp, smc);
+			break;
+		case SOS_S6_IN_LOGOUT:
+			cluster_target_socket_session_conn_s6_in_logout(tssp, smc);
+			break;
+		case SOS_S7_CLEANUP:
+			cluster_target_socket_session_conn_s7_cleanup(tssp, smc);
 			break;
 	}
 
@@ -992,16 +1043,18 @@ cluster_target_socket_session_smfini(cluster_target_session_socket_t *tsso)
 }
 
 static void
-cluster_target_socket_session_clean_tssp(cluster_target_session_socket_t *tsso)
+cluster_target_socket_session_clean_tssp(cluster_target_session_socket_t *tsso,
+	cluster_target_socket_session_sm_ctx_t *smc)
 {
 	int idx = 0;
 	cluster_target_session_socket_conn_t *tssp;
 	
 	mutex_enter(&tsso->tsso_mtx);
 	for (; idx < tsso->tsso_tssp_cnt; idx++) {
-		if ((tssp = tsso->tsso_tssp[idx]) != NULL)
+		if ((tssp = tsso->tsso_tssp[idx]) != NULL) {
 			cluster_target_socket_session_conn_sm_event(tssp,
 				SOE_TSSO_IN_CLEANUP, NULL, CTSO_FTAG);
+		}
 	}
 	mutex_exit(&tsso->tsso_mtx);
 }
@@ -1052,8 +1105,6 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 		case SSS_S4_IN_TSSP_CLEAN:
 			tssp = smc->smc_extinfo;
 			mutex_enter(&tsso->tsso_mtx);
-			cmn_err(CE_NOTE, "tssp(%p) idx(%d) of tsso(%s) to free",
-				tssp, tssp->tssp_tsso_idx, tsso->tsso_ipaddr);
 			tsso->tsso_tssp_idx = 0;
 			tsso->tsso_s4_cnt = 0;
 			if (tsso->tsso_tssp[tssp->tssp_tsso_idx] != NULL) {
@@ -1068,10 +1119,15 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 						taskq_dispatch(clustersan->cs_async_taskq, 
 							cts_link_up_to_down_handle, 
 							tsso->tsso_cts, TQ_SLEEP);
-					} else 
+					} else  {
 						cluster_target_session_rele(tsso->tsso_cts, "up2down evt");
+						/*
+						 * wake up active connect fail, user process wait it.
+						 */
+						cv_signal(&tsso->tsso_sm_cv);
+					}
 				}
-			}
+			}	
 			mutex_exit(&tsso->tsso_mtx);
 			break;
 		case SSS_S5_CLEANUP:
@@ -1079,7 +1135,7 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 			 * wake up active connect fail, user process wait it.
 			 */
 			cv_signal(&tsso->tsso_sm_cv);
-			cluster_target_socket_session_clean_tssp(tsso);
+			cluster_target_socket_session_clean_tssp(tsso, smc);
 			/* FALLTHROUGH */
 		case SSS_S6_COMPLETE:
 			
@@ -1123,7 +1179,9 @@ cluster_target_socket_session_s2_ready_wait(cluster_target_session_socket_t *tss
 			if (tssp->tssp_connect_status != CLUSTER_STATUS_SUCCESS)
 				tsso->tsso_status = tssp->tssp_connect_status;
 			mutex_exit(&tsso->tsso_mtx);
-			/* FALLTHROUGH */
+			cluster_target_socket_session_new_state(tsso, 
+				SSS_S4_IN_TSSP_CLEAN, smc);
+			break;
 		case SSE_TPSO_COMPLETE:
 			cluster_target_socket_session_new_state(tsso, 
 				SSS_S5_CLEANUP, smc);

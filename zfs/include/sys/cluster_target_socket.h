@@ -12,8 +12,8 @@
 #define CTSO_CONN_NUM	4
 #define CTSO_SRV_PORT	1866
 
-#define TSSO_SM_AUDIT_DEPTH		64
-#define CTSO_REFAUDIT_MAX_RECORD	64
+#define TSSO_SM_AUDIT_DEPTH		512
+#define CTSO_REFAUDIT_MAX_RECORD	512
 
 #define CTSO_CONNECT_TIMEOUT	2
 
@@ -120,7 +120,6 @@ typedef enum cluster_target_socket_session_conn_state {
 	SOS_S1_FREE,
 	SOS_S2_XPRT_WAIT,
 	SOS_S3_CONN_SND,
-	SOS_S4_WAIT_PRPORT,
 	SOS_S4_XPRT_UP,
 	SOS_S5_IN_EPIPE,
 	SOS_S6_IN_LOGOUT,
