@@ -721,8 +721,9 @@ zpool_do_add(int argc, char **argv)
 		return (1);
 	}
 
-	if (!zfs_check_raidz_aggre_valid(config, nvroot)) {
-		(void) fprintf(stderr, gettext("pool '%s' check raidz aggre failed\n"),
+	if (!zfs_check_raidz_aggre_valid(nvroot)) {
+		(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
+			"configuration as metadata device\n"),
 			poolname);
 		zpool_close(zhp);
 		nvlist_free(nvroot);

@@ -1257,8 +1257,7 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object, uint64_t txg,
 	ms->ms_id = id;
 	ms->ms_start = id << vd->vdev_ms_shift;
 	ms->ms_size = 1ULL << vd->vdev_ms_shift;
-	/* TODO: */
-	raidz_aggre_metaslab_align(vd, &ms->ms_start, &ms->ms_size);
+	/* raidz_aggre_metaslab_align(vd, &ms->ms_start, &ms->ms_size); */
 
 	/*
 	 * We only open space map objects that already exist. All others
@@ -2225,7 +2224,7 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	uint64_t asize;
 	uint64_t distance;
 
-    int again = 0;
+	int again = 0;
 	int space_skip = 0;
 	ASSERT(!DVA_IS_VALID(&dva[d]));
 

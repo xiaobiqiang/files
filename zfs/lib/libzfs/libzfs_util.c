@@ -4582,81 +4582,27 @@ zfs_start_lun_migrate(libzfs_handle_t *hdl, const char *dst, char *pool, char *g
 }
 
 boolean_t
-zfs_check_raidz_aggre_valid(nvlist_t *config, nvlist_t *nv)
+zfs_check_raidz_aggre_valid(nvlist_t *nv)
 {
-	nvlist_t *nvroot, **child, **leaf_child;
-	uint_t c, children, leaf_children;
-	char *type;
-	uint64_t nparity;
+	nvlist_t **child;
+	uint_t c, children;
 	uint64_t is_meta;
-	int align_size = 1 << 19;
-	int aggre_parity = 0;
-	int aggre_num = 0;
-	boolean_t valid = B_TRUE;
-	boolean_t has_meta = B_FALSE;
-	boolean_t has_raidz = B_FALSE;
-	boolean_t has_raidz_aggre = B_FALSE;
-
-	if (config) {
-		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		    &nvroot) == 0);
-		verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-		    &child, &children) == 0);
-		for (c = 0; c < children; c++) {
-			if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
-				verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-	    			&leaf_child, &leaf_children) == 0);
-				verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-					&nparity) == 0);
-				aggre_parity = nparity;
-				aggre_num = leaf_children - nparity;
-				break;
-			}
-		}
-	}
+	char *type;
 	
-	verify(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
+	if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) != 0)
+		return (B_TRUE);
 
 	for (c = 0; c < children; c++) {
 		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE, &type) == 0);
-		if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
-			has_raidz = B_TRUE;
-		} else if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
-			has_raidz_aggre = B_TRUE;
-			verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-	    		&leaf_child, &leaf_children) == 0);
-			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-				&nparity) == 0);
-			if (aggre_parity == 0)
-				aggre_parity = nparity;
-
-			if (aggre_num == 0)
-				aggre_num = leaf_children - nparity;
-
-			if (nparity != aggre_parity ||
-				leaf_children - nparity != aggre_num ||
-				leaf_children - nparity <= 0 ||
-				(leaf_children - nparity) % 2 != 0 || 
-				align_size % (leaf_children - nparity)) {
-				valid = B_FALSE;
-				break;
-			}
-		} else if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-			is_meta = 0;
+		if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
+			/* can't use raidz_aggre configuration as metadata device */
 			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
 			if (is_meta)
-				has_meta = B_TRUE;
-		}
-
-		if (has_raidz && has_raidz_aggre) {
-			valid = B_FALSE;
-			break;
+				return (B_FALSE);
 		}
 	}
 
-	if (has_raidz_aggre) 
-		return (valid && has_meta);
-
-	return (B_TRUE);
+	return (B_TRUE);	
 }
+

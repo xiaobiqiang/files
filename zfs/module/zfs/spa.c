@@ -2937,7 +2937,6 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
 
-	cmn_err(CE_WARN, "%s raidz_aggre_map_open %s  ",__func__,spa->spa_name );
 	error = raidz_aggre_map_open(spa);
 	if (error != 0)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, EIO));
@@ -4514,7 +4513,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	dmu_tx_commit(tx);
 
 	spa->spa_sync_on = B_TRUE;
-	spa->spa_map_manager.mm_active_obj_index = 0;
 	txg_sync_start(spa->spa_dsl_pool);
 
 	/*
@@ -4536,12 +4534,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	mutex_exit(&spa_namespace_lock);
 	
-	cmn_err(CE_WARN,"%s raidz_aggre_map_open %s", __func__,spa->spa_name);
-	
-	spa->spa_map_manager.mm_active_obj_index = 0;
 	start_space_reclaim_thread(spa);
 	
-	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 	return (0);
 }
 
@@ -4790,7 +4784,6 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	
 	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa_is_raidz_aggre(spa));
 	start_space_reclaim_thread(spa);
-	spa->spa_space_reclaim_state |= SPACE_RECLAIM_RUN;
 
 	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa_is_raidz_aggre(spa));
 	mutex_exit(&spa_namespace_lock);

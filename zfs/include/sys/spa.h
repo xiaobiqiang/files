@@ -837,7 +837,6 @@ extern void spa_set_rootblkptr(spa_t *spa, const blkptr_t *bp);
 extern void spa_altroot(spa_t *, char *, size_t);
 extern int spa_sync_pass(spa_t *spa);
 extern char *spa_name(spa_t *spa);
-extern boolean_t spa_isaggre(spa_t *spa);
 extern uint64_t spa_guid(spa_t *spa);
 extern uint64_t spa_load_guid(spa_t *spa);
 extern uint64_t spa_last_synced_txg(spa_t *spa);
