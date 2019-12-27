@@ -753,21 +753,25 @@ cluster_target_socket_session_conn_new_state(cluster_target_session_socket_conn_
 				/*
 				 * peer port offline
 				 */
-				if (rval == -ECONNREFUSED) {
-					cmn_err(CE_NOTE, "peer(%s) port offline, wait it now...",
-						tssp->tssp_ipaddr);
-					cluster_target_socket_session_conn_sm_event(tssp,
-						SOE_PRPORT_OFFLINE, NULL, CTSO_FTAG);
-				} else {
-					cmn_err(CE_NOTE, "%s connect ip(%s) error(%d)",
-						__func__, tssp->tssp_ipaddr, rval);
-					
-					mutex_enter(&tssp->tssp_sm_mtx);
-					tssp->tssp_connect_status = rval;
-					cv_signal(&tssp->tssp_sm_cv);
-					mutex_exit(&tssp->tssp_sm_mtx);
-					cluster_target_socket_session_conn_sm_event(tssp,
-						SOE_CONNECT_ERROR, NULL, CTSO_FTAG);
+				switch (rval) {
+					case -ECONNREFUSED:
+					case -ECONNRESET:
+						cmn_err(CE_NOTE, "peer(%s) port offline, wait it now...",
+							tssp->tssp_ipaddr);
+						cluster_target_socket_session_conn_sm_event(tssp,
+							SOE_PRPORT_OFFLINE, NULL, CTSO_FTAG);
+						break;
+					default:
+						cmn_err(CE_NOTE, "%s connect ip(%s) error(%d)",
+							__func__, tssp->tssp_ipaddr, rval);
+						
+						mutex_enter(&tssp->tssp_sm_mtx);
+						tssp->tssp_connect_status = rval;
+						cv_signal(&tssp->tssp_sm_cv);
+						mutex_exit(&tssp->tssp_sm_mtx);
+						cluster_target_socket_session_conn_sm_event(tssp,
+							SOE_CONNECT_ERROR, NULL, CTSO_FTAG);
+						break;
 				}
 			}
 			break;
