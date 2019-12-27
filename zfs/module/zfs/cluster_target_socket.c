@@ -192,7 +192,7 @@ cluster_target_socket_refcnt_wait_ref(cluster_target_socket_refcnt_t *refcnt, vo
 	while (refcnt->tr_nref != 0) {
 		cv_timedwait(&refcnt->tr_cv, &refcnt->tr_mtx,
 			ddi_get_lbolt() + drv_usectohz(3000 * 1000));
-		cluster_target_socket_refcnt_print_track(refcnt);
+//		cluster_target_socket_refcnt_print_track(refcnt);
 	}
 	mutex_exit(&refcnt->tr_mtx);
 }
