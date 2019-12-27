@@ -868,4 +868,29 @@ MODULE_PARM_DESC(zfs_vdev_sync_write_max_active,
 module_param(zfs_vdev_sync_write_min_active, int, 0644);
 MODULE_PARM_DESC(zfs_vdev_sync_write_min_active,
 	"Min active sync write I/Os per vdev");
+
+module_param(zfs_vdev_aggregation_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_aggregation_limit_default,
+	"zfs_vdev_aggregation_limit_default");
+
+module_param(zfs_vdev_read_gap_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_read_gap_limit_default,
+	"zfs_vdev_read_gap_limit_default");
+
+module_param(zfs_vdev_write_gap_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_write_gap_limit_default,
+	"zfs_vdev_write_gap_limit_default");
+
+module_param(zfs_vdev_aggregation_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_aggregation_limit_raidz_aggre,
+	"zfs_vdev_aggregation_limit_raidz_aggre");
+
+module_param(zfs_vdev_read_gap_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_read_gap_limit_raidz_aggre,
+	"zfs_vdev_read_gap_limit_raidz_aggre");
+
+module_param(zfs_vdev_write_gap_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_write_gap_limit_raidz_aggre,
+	"zfs_vdev_write_gap_limit_raidz_aggre");
+
 #endif

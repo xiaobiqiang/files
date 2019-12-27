@@ -7964,4 +7964,7 @@ module_param(zio_taskq_batch_pct, uint, 0444);
 MODULE_PARM_DESC(zio_taskq_batch_pct,
 	"Percentage of CPUs to run an IO worker thread");
 
+module_param(spa_use_together_lock, int, 0644);
+MODULE_PARM_DESC(spa_use_together_lock, "spa_use_together_lock");
+
 #endif

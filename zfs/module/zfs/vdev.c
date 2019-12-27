@@ -3559,4 +3559,11 @@ module_param(metaslabs_per_vdev, int, 0644);
 MODULE_PARM_DESC(metaslabs_per_vdev,
 	"Divide added vdev into approximately (but no more than) this number "
 	"of metaslabs");
+
+module_param(vdev_alloc_ratio_thresh1, int, 0644);
+MODULE_PARM_DESC(vdev_alloc_ratio_thresh1, "vdev_alloc_ratio_thresh1");
+
+module_param(vdev_alloc_ratio_thresh2, int, 0644);
+MODULE_PARM_DESC(vdev_alloc_ratio_thresh2, "vdev_alloc_ratio_thresh2");
+
 #endif
