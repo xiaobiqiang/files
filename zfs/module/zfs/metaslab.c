@@ -129,6 +129,11 @@ int metaslab_debug_load = 0;
 int metaslab_debug_unload = 0;
 
 /*
+ * For Raidz-Aggre, Metaslab shouldn't evict, set metaslab_evict_enable = 0.
+ */
+int metaslab_evict_enable = 0;
+
+/*
  * Minimum size which forces the dynamic allocator to change
  * it's allocation strategy.  Once the space map cannot satisfy
  * an allocation of this size then it switches to using more
@@ -2046,7 +2051,7 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 			    msp->ms_alloctree[(txg + t) & TXG_MASK]));
 		}
 
-		if (!metaslab_debug_unload)
+		if (!metaslab_debug_unload && metaslab_evict_enable)
 			metaslab_unload(msp);
 	}
 
@@ -2776,6 +2781,8 @@ module_param(zfs_metaslab_fragmentation_threshold, int, 0644);
 module_param(metaslab_fragmentation_factor_enabled, int, 0644);
 module_param(metaslab_lba_weighting_enabled, int, 0644);
 module_param(metaslab_bias_enabled, int, 0644);
+module_param(metaslab_evict_enable, int, 0644);
+
 
 MODULE_PARM_DESC(metaslab_aliquot,
 	"allocation granularity (a.k.a. stripe size)");
@@ -2799,4 +2806,7 @@ MODULE_PARM_DESC(metaslab_lba_weighting_enabled,
 	"prefer metaslabs with lower LBAs");
 MODULE_PARM_DESC(metaslab_bias_enabled,
 	"enable metaslab group biasing");
+MODULE_PARM_DESC(metaslab_evict_enable,
+	"enable metaslab evict");
+
 #endif /* _KERNEL && HAVE_SPL */
