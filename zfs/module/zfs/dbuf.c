@@ -3906,4 +3906,12 @@ EXPORT_SYMBOL(dmu_buf_set_user_ie);
 EXPORT_SYMBOL(dmu_buf_get_user);
 EXPORT_SYMBOL(dmu_buf_freeable);
 EXPORT_SYMBOL(dmu_buf_get_blkptr);
+
+module_param(dbuf_aggre_ctl, int, 0644);
+MODULE_PARM_DESC(dbuf_aggre_ctl, "dbuf_aggre_ctl");
+
+module_param(rand_ratio_bit, int, 0644);
+MODULE_PARM_DESC(rand_ratio_bit, "rand_ratio_bit");
+
+
 #endif

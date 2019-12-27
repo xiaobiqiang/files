@@ -1363,4 +1363,13 @@ MODULE_PARM_DESC(raidz_avail_map_thresh, "raidz avail map threshold");
 module_param(raidz_reclaim_count, int, 0644);
 MODULE_PARM_DESC(raidz_reclaim_count, "raidz reclaim count");
 
+module_param(raidz_filled_timeout, int, 0644);
+MODULE_PARM_DESC(raidz_filled_timeout, "raidz filled timeout");
+
+module_param(raidz_cleared_timeout, int, 0644);
+MODULE_PARM_DESC(raidz_cleared_timeout, "raidz cleared timeout");
+
+module_param(hole_adjust, int, 0644);
+MODULE_PARM_DESC(hole_adjust, "raidz aggre map hole adjust param");
+
 #endif

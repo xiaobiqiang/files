@@ -167,9 +167,19 @@ int zfs_vdev_async_write_active_max_dirty_percent = 60;
  * we include spans of optional I/Os to aid aggregation at the disk even when
  * they aren't able to help us aggregate at this level.
  */
-int zfs_vdev_aggregation_limit = SPA_OLD_MAXBLOCKSIZE;
+int zfs_512k_blocksize = 1 << 19;
+
+int zfs_vdev_aggregation_limit = zfs_512k_blocksize;
 int zfs_vdev_read_gap_limit = 32 << 10;
 int zfs_vdev_write_gap_limit = 4 << 10;
+
+int zfs_vdev_aggregation_limit_default = zfs_512k_blocksize;
+int zfs_vdev_read_gap_limit_default = 32 << 10;
+int zfs_vdev_write_gap_limit_default = 4 << 10;
+
+int zfs_vdev_aggregation_limit_raidz_aggre = zfs_512k_blocksize * 2;
+int zfs_vdev_read_gap_limit_raidz_aggre = 32 << 10;
+int zfs_vdev_write_gap_limit_raidz_aggre = 4 << 10;
 
 int
 vdev_queue_offset_compare(const void *x1, const void *x2)
@@ -512,6 +522,7 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 	avl_tree_t *t = vdev_queue_type_tree(vq, zio->io_type);
 	enum zio_flag flags = zio->io_flags & ZIO_FLAG_AGG_INHERIT;
 	void *buf;
+	vdev_t *vdev_parent = NULL;
 
 	if (zio->io_flags & ZIO_FLAG_DONT_AGGREGATE)
 		return (NULL);
@@ -520,6 +531,17 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 	 * Prevent users from setting the zfs_vdev_aggregation_limit
 	 * tuning larger than SPA_MAXBLOCKSIZE.
 	 */
+	vdev_parent = zio->io_vd->vdev_parent;
+
+	if (vdev_parent && vdev_parent->vdev_ops == &vdev_raidz_aggre_ops) {
+		zfs_vdev_aggregation_limit = zfs_vdev_aggregation_limit_raidz_aggre;
+		zfs_vdev_read_gap_limit = zfs_vdev_read_gap_limit_raidz_aggre;
+		zfs_vdev_write_gap_limit = zfs_vdev_write_gap_limit_raidz_aggre;
+	} else {
+		zfs_vdev_aggregation_limit = zfs_vdev_aggregation_limit_default;
+		zfs_vdev_read_gap_limit = zfs_vdev_read_gap_limit_default;
+		zfs_vdev_write_gap_limit = zfs_vdev_write_gap_limit_default;
+	}
 	zfs_vdev_aggregation_limit =
 	    MIN(zfs_vdev_aggregation_limit, SPA_MAXBLOCKSIZE);
 
@@ -846,4 +868,29 @@ MODULE_PARM_DESC(zfs_vdev_sync_write_max_active,
 module_param(zfs_vdev_sync_write_min_active, int, 0644);
 MODULE_PARM_DESC(zfs_vdev_sync_write_min_active,
 	"Min active sync write I/Os per vdev");
+
+module_param(zfs_vdev_aggregation_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_aggregation_limit_default,
+	"zfs_vdev_aggregation_limit_default");
+
+module_param(zfs_vdev_read_gap_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_read_gap_limit_default,
+	"zfs_vdev_read_gap_limit_default");
+
+module_param(zfs_vdev_write_gap_limit_default, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_write_gap_limit_default,
+	"zfs_vdev_write_gap_limit_default");
+
+module_param(zfs_vdev_aggregation_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_aggregation_limit_raidz_aggre,
+	"zfs_vdev_aggregation_limit_raidz_aggre");
+
+module_param(zfs_vdev_read_gap_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_read_gap_limit_raidz_aggre,
+	"zfs_vdev_read_gap_limit_raidz_aggre");
+
+module_param(zfs_vdev_write_gap_limit_raidz_aggre, int, 0644);
+MODULE_PARM_DESC(zfs_vdev_write_gap_limit_raidz_aggre,
+	"zfs_vdev_write_gap_limit_raidz_aggre");
+
 #endif

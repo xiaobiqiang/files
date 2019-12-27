@@ -1964,7 +1964,7 @@ uint64_t
 bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
-    int d;
+	int d;
 	for (d = 0; d < BP_GET_NDVAS(bp); d++)
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 	
@@ -1982,7 +1982,7 @@ uint64_t
 bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
-    int d;
+	int d;
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
 	for (d = 0; d < BP_GET_NDVAS(bp); d++)

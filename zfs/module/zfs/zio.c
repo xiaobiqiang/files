@@ -872,7 +872,7 @@ zio_write_override(zio_t *zio, blkptr_t *bp, int copies, boolean_t nopwrite)
 void
 zio_free(spa_t *spa, uint64_t txg, const blkptr_t *bp)
 {
-	if (BP_IS_TOGTHER(bp))
+	if (BP_IS_TOGTHER(bp) && !BP_GET_FREEFLAG(bp))
 		return;
 
 	/*
@@ -905,6 +905,9 @@ zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 {
 	zio_t *zio;
 	enum zio_stage stage = ZIO_FREE_PIPELINE;
+
+	if (BP_IS_TOGTHER(bp) && !BP_GET_FREEFLAG(bp))
+		return (NULL);
 
 	ASSERT(!BP_IS_HOLE(bp));
 	ASSERT(spa_syncing_txg(spa) == txg);
@@ -1587,6 +1590,8 @@ int
 zio_wait(zio_t *zio)
 {
 	int error;
+	if (!zio)
+		return (0);
 
 	ASSERT(zio->io_stage == ZIO_STAGE_OPEN);
 	ASSERT(zio->io_executor == NULL);
@@ -1609,6 +1614,9 @@ zio_wait(zio_t *zio)
 void
 zio_nowait(zio_t *zio)
 {
+	if (!zio)
+		return; 
+
 	ASSERT(zio->io_executor == NULL);
 
 	if (zio->io_child_type == ZIO_CHILD_LOGICAL &&
@@ -2106,7 +2114,7 @@ zio_write_gang_block(zio_t *pio)
 
 	error = metaslab_alloc(spa, spa_normal_class(spa), SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
-	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER,1);
+	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER, 1);
 	if (error) {
 		pio->io_error = error;
 		return (ZIO_PIPELINE_CONTINUE);
@@ -3567,6 +3575,7 @@ zio_done(zio_t *zio)
 		metaslab_fastwrite_unmark(zio->io_spa, zio->io_bp);
 	}
 
+	#if 0
 	if (zio->io_bp != NULL && zio->io_aggre_io != NULL && zio->io_aggre_root) {
 		if (zio->io_type == ZIO_TYPE_WRITE && BP_IS_TOGTHER(zio->io_bp) 
 			 && zio->io_aggre_io->ai_syncdone == 0) {
@@ -3577,6 +3586,7 @@ zio_done(zio_t *zio)
 			mutex_exit(&zio->io_aggre_io->ai_synclock);
 		}
 	}
+	#endif
 	
 	/*
 	 * It is the responsibility of the done callback to ensure that this
