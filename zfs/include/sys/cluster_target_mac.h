@@ -10,21 +10,20 @@
 /*
  * Message block descriptor
  */
-typedef struct	msgb {
-	struct	msgb	*b_next;
+typedef struct msgb {
+	struct  msgb	*b_next;
 	struct  msgb	*b_prev;
-	struct	msgb	*b_cont;
-#ifdef SOLARIS
-	unsigned char	*b_rptr;
-	unsigned char	*b_wptr;
-	struct datab 	*b_datap;
-	unsigned char	b_band;
-	unsigned char	b_tag;
-	unsigned short	b_flag;
-	queue_t		*b_queue;	/* for sync queues */
-#else
-	struct sk_buff* skb;
-#endif
+	struct  msgb	*b_cont;
+	cluster_tran_data_origin_t *origin_data;
+	boolean_t	is_sgl;
+	boolean_t	is_first;
+	uint32_t	fc_tx_len;
+	uint32_t	fc_rx_len;
+	void 		*dst;
+	uint64_t	fragment_offset;
+	uint64_t	fragment_len;
+	char		*fragment_data;
+	struct sk_buff *skb;	/* recv skb */
 } mblk_t;
 
 typedef struct cluster_target_mac_tran_data {

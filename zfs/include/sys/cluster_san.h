@@ -129,6 +129,7 @@ typedef struct cluster_target_tran_node{
 	list_node_t node;
 	void *fragmentation;
 	int wait;
+	int need_wait;
 	kcondvar_t *cv;
 	kmutex_t *mtx;
 	int ret;

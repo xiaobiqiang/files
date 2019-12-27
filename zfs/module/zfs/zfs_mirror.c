@@ -1563,6 +1563,8 @@ zfs_mirror_rx_cb(cs_rx_data_t *cs_data, void *arg)
 {
 	zfs_mirror_msg_header_t *msg_head;
 	msg_head = cs_data->ex_head;
+	uint64_t *mirror_data;
+
 #ifdef LC_DEBUG
 	if (msg_head->msg_type != ZFS_MIRROR_SPA_TXG)
 		cmn_err(CE_WARN, "recv mirror msg [msg_type = %d]", msg_head->msg_type);
@@ -1597,6 +1599,8 @@ zfs_mirror_rx_cb(cs_rx_data_t *cs_data, void *arg)
 			zfs_mirror_rx_spa_txg_handle((void *)cs_data);
 			break;
 		case ZFS_MIRROR_SPEED_TEST:
+			mirror_data = (uint64_t *)cs_data->data;
+			cmn_err(CE_WARN, "ZFS_MIRROR_SPEED_TEST recv %llu", *mirror_data);
 			csh_rx_data_free(cs_data, B_TRUE);
 			/* FIXME */
 			break;

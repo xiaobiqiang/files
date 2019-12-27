@@ -138,6 +138,18 @@ typedef struct spa_quantum {
 	quantum_proc_state_t spa_quantum_state;
 } spa_quantum_t;
 
+typedef struct vdev_raidz_aggre_conf {
+	list_node_t node;
+	int ndata;
+	int nparity;
+	int groups;
+} vdev_raidz_aggre_conf_t;
+
+typedef struct together_item {
+	int together;
+	int state;
+} together_item_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -313,16 +325,24 @@ struct spa {
 	uint64_t	spa_map_obj_arr[AGGRE_MAP_MAX_OBJ_NUM];
 	aggre_map_t *spa_aggre_map_arr[AGGRE_MAP_MAX_OBJ_NUM];
 	aggre_map_manager_t spa_map_manager;
+	/*
 	boolean_t	spa_raidz_aggre;
 	uint32_t	spa_raidz_aggre_num;
 	uint32_t	spa_raidz_aggre_nparity;
-	uint32_t	spa_raidz_ashift;
+	uint32_t    spa_raidz_ashift;
+	*/
 	clist_t 	spa_aggre_maplist[TXG_SIZE];
-	map_pos_t	spa_map_process_pos[TXG_SIZE];
-	uint64_t		sap_map_pos_last;
+	reclaim_state_t	spa_aggre_reclaim_state[TXG_SIZE];
 
-	taskq_t 	*spa_space_reclaim_tq;
-	int 		spa_space_reclaim_state;
+	list_t		spa_raidz_aggre_config;
+	int			spa_raidz_aggre_mixed;
+	krwlock_t	spa_together_lock;
+	together_item_t *spa_together_arr;
+	int			spa_together_arr_num;
+	int			spa_together_index;
+	
+	taskq_t		*spa_space_reclaim_tq;
+	int			spa_space_reclaim_state;
 	kmutex_t	spa_space_reclaim_lock;
 	kcondvar_t	spa_space_reclaim_cv;	
 };

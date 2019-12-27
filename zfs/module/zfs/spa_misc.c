@@ -581,9 +581,17 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	for (t = 0; t < TXG_SIZE; t++) {
 		bplist_create(&spa->spa_free_bplist[t]);
 		clist_create(&spa->spa_aggre_maplist[t]);
-		mutex_init(&spa->spa_map_process_pos[t].mtx, NULL, MUTEX_DEFAULT, NULL);
-		spa->spa_map_process_pos[t].pos = 0;
-		spa->spa_map_process_pos[t].valid = B_FALSE;		
+		mutex_init(&spa->spa_aggre_reclaim_state[t].mtx, NULL, MUTEX_DEFAULT, NULL);
+		spa->spa_aggre_reclaim_state[t].map_index = MAP_INDEX_INVALID;
+		spa->spa_aggre_reclaim_state[t].state = MAP_RECLAIM_INVALID;
+		spa->spa_aggre_reclaim_state[t].pos = MAP_POS_INVALID;
+		spa->spa_aggre_reclaim_state[t].flag = 0;
+				
+		#if 0
+		bplist_expand_create(&spa->spa_tgdva_map_bplist[t],	
+			sizeof (bplist_expand_entry_t), offsetof(bplist_expand_entry_t, bpee_node));
+		bplist_create(&spa->spa_freetg_bplist[t]);
+		#endif
 	}
 
 	(void) strlcpy(spa->spa_name, name, sizeof (spa->spa_name));
@@ -655,6 +663,13 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	for (i = 0; i < SPA_FEATURES; i++) {
 		spa->spa_feat_refcount_cache[i] = SPA_FEATURE_DISABLED;
 	}
+	list_create(&spa->spa_raidz_aggre_config, sizeof (vdev_raidz_aggre_conf_t),
+	    offsetof(vdev_raidz_aggre_conf_t, node));
+	rw_init(&spa->spa_together_lock, NULL, RW_DEFAULT, NULL);
+	spa->spa_raidz_aggre_mixed = 0;
+	spa->spa_together_arr = NULL;
+	spa->spa_together_arr_num = 0;
+	spa->spa_together_index = 0;
 
 	spa->spa_space_reclaim_state = 0;
 	mutex_init(&spa->spa_space_reclaim_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -674,6 +689,7 @@ void
 spa_remove(spa_t *spa)
 {
 	spa_config_dirent_t *dp;
+	vdev_raidz_aggre_conf_t *conf;
 	int t;
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
@@ -709,12 +725,30 @@ spa_remove(spa_t *spa)
 	spa_stats_destroy(spa);
 	spa_config_lock_destroy(spa);
 
+	while (!list_is_empty(&spa->spa_raidz_aggre_config)) {
+		conf = list_remove_head(&spa->spa_raidz_aggre_config);
+		kmem_free(conf, sizeof(vdev_raidz_aggre_conf_t));
+	}
+	list_destroy(&spa->spa_raidz_aggre_config);
+	rw_destroy(&spa->spa_together_lock);
+	if (spa->spa_together_arr)
+		kmem_free(spa->spa_together_arr, sizeof(together_item_t) * spa->spa_together_arr_num);
+	spa->spa_raidz_aggre_mixed = 0;
+	spa->spa_together_arr_num = 0;
+	spa->spa_together_index = 0;
 	for (t = 0; t < TXG_SIZE; t++) {
 		bplist_destroy(&spa->spa_free_bplist[t]);
 		clist_destroy(&spa->spa_aggre_maplist[t]);
-		mutex_destroy(&spa->spa_map_process_pos[t].mtx);
-		spa->spa_map_process_pos[t].pos = 0;
-		spa->spa_map_process_pos[t].valid = B_FALSE;
+		mutex_destroy(&spa->spa_aggre_reclaim_state[t].mtx);
+		spa->spa_aggre_reclaim_state[t].map_index = MAP_INDEX_INVALID;
+		spa->spa_aggre_reclaim_state[t].state = MAP_RECLAIM_INVALID;
+		spa->spa_aggre_reclaim_state[t].pos = MAP_POS_INVALID;
+		spa->spa_aggre_reclaim_state[t].flag = 0;
+		
+		#if 0
+		bplist_destroy(&spa->spa_tgdva_map_bplist[t]);
+		bplist_destroy(&spa->spa_freetg_bplist[t]);
+		#endif
 	}
 
 	cv_destroy(&spa->spa_async_cv);
@@ -1697,12 +1731,6 @@ spa_name(spa_t *spa)
 	return (spa->spa_name);
 }
 
-boolean_t
-spa_isaggre(spa_t *spa)
-{
-	return (spa->spa_raidz_aggre);
-}
-
 uint64_t
 spa_guid(spa_t *spa)
 {
@@ -1937,14 +1965,14 @@ bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
 	int d;
-
 	for (d = 0; d < BP_GET_NDVAS(bp); d++)
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
-
+	
 	if (BP_IS_TOGTHER(bp)) {
-		if (spa->spa_raidz_aggre_num) {
-			dsize /= spa->spa_raidz_aggre_num;
-		}
+		int aggre_num = BP_GET_AGGRENUM(bp);
+		ASSERT(aggre_num > 1);
+		if (aggre_num)
+			dsize /= aggre_num;
 	}
 
 	return (dsize);
@@ -1955,16 +1983,16 @@ bp_get_dsize(spa_t *spa, const blkptr_t *bp)
 {
 	uint64_t dsize = 0;
 	int d;
-
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
 	for (d = 0; d < BP_GET_NDVAS(bp); d++)
 		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
 
 	if (BP_IS_TOGTHER(bp)) {
-		if (spa->spa_raidz_aggre_num) {
-			dsize /= spa->spa_raidz_aggre_num;
-		}
+		int aggre_num = BP_GET_AGGRENUM(bp);
+		ASSERT(aggre_num > 1);
+		if (aggre_num)
+			dsize /= aggre_num;
 	}
 
 	spa_config_exit(spa, SCL_VDEV, FTAG);
