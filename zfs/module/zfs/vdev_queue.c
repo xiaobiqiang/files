@@ -169,15 +169,15 @@ int zfs_vdev_async_write_active_max_dirty_percent = 60;
  */
 int zfs_512k_blocksize = 1 << 19;
 
-int zfs_vdev_aggregation_limit = zfs_512k_blocksize;
+int zfs_vdev_aggregation_limit = 1 << 19;
 int zfs_vdev_read_gap_limit = 32 << 10;
 int zfs_vdev_write_gap_limit = 4 << 10;
 
-int zfs_vdev_aggregation_limit_default = zfs_512k_blocksize;
+int zfs_vdev_aggregation_limit_default = 1 << 19;
 int zfs_vdev_read_gap_limit_default = 32 << 10;
 int zfs_vdev_write_gap_limit_default = 4 << 10;
 
-int zfs_vdev_aggregation_limit_raidz_aggre = zfs_512k_blocksize * 2;
+int zfs_vdev_aggregation_limit_raidz_aggre = (1 << 19)* 2;
 int zfs_vdev_read_gap_limit_raidz_aggre = 32 << 10;
 int zfs_vdev_write_gap_limit_raidz_aggre = 4 << 10;
 
