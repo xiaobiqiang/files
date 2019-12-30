@@ -389,6 +389,7 @@ typedef struct cluster_target_port {
 	cluster_target_tran_data_fragment_t f_tran_fragment;
 	cluster_target_tran_data_fragment_t f_tran_fragment_sgl;
 	cts_tran_start_t f_session_tran_start;
+	cts_tran_start_t f_session_tran_sgl_start;
 	cluster_target_session_init_t f_session_init;
 	cluster_target_session_fini_t f_session_fini;
 	cts_rxmsg_to_fragment_t f_rxmsg_to_fragment;

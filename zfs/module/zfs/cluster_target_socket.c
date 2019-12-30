@@ -334,6 +334,10 @@ cluster_target_socket_session_tx_process(cluster_target_socket_tran_data_t *tdt)
 	cluster_target_session_socket_conn_t *tssp = tdt->tdt_tssp;
 	
 	mutex_enter(&tssp->tssp_tx_mtx);
+	if (!tssp->tssp_tx_running) {
+		mutex_exit(&tssp->tssp_tx_mtx);
+		return -EOFFLINE;
+	}
 	list_insert_tail(&tssp->tssp_tx_wait_list, tdt);
 	cv_signal(&tssp->tssp_tx_cv);
 	mutex_exit(&tssp->tssp_tx_mtx);
@@ -350,19 +354,12 @@ cluster_target_socket_session_tran_start(
 	cluster_target_socket_tran_data_t tdt_struct;
 	cluster_target_socket_tran_data_t *tdt = &tdt_struct;
 	cluster_target_msg_header_t *ct_head;
-	cluster_evt_header_t *evt_header;
-	kmutex_t mtx;
-	kcondvar_t cv;
-
-	mutex_init(&mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&cv, NULL, CV_DRIVER, NULL);
 	
-//	tdt = kmem_cache_alloc(ctso->ctso_tx_data_cache, KM_NOSLEEP);
 	bzero(&tdt->tdt_sohdr, sizeof(struct msghdr));
+	mutex_init(&tdt->tdt_mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tdt->tdt_cv, NULL, CV_DRIVER, NULL);
 	tdt->tdt_tssp = tsso->tsso_tssp[origin_data->index % tsso->tsso_tssp_cnt];
 	tdt->tdt_waiting = B_TRUE;
-	tdt->tdt_mtx = &mtx;
-	tdt->tdt_cv = &cv;
 
 /*	cmn_err(CE_NOTE, "idx(%llu) msg_type(%02x) hlen(%04x) dlen(%x)",
 		origin_data->index, origin_data->msg_type, 
@@ -385,58 +382,77 @@ cluster_target_socket_session_tran_start(
 	
 	tdt->tdt_iov[0].iov_base = &tdt->tdt_ct_head;
 	tdt->tdt_iov[0].iov_len = sizeof(cluster_target_msg_header_t);
-
 	tdt->tdt_iov[1].iov_base = origin_data->header;
 	tdt->tdt_iov[1].iov_len = origin_data->header_len;
-
 	tdt->tdt_iov[2].iov_base = origin_data->data;
 	tdt->tdt_iov[2].iov_len = origin_data->data_len;
-
-/*	if (origin_data->header_len) {
-		tdt->tdt_iov[1].iov_base = kmem_alloc(origin_data->header_len);
-		bcopy(origin_data->header, tdt->tdt_iov[1].iov_base, 
-			origin_data->header_len);
-		tdt->tdt_iov[1].iov_len = origin_data->header_len;
-	} else {
-		tdt->tdt_iov[1].iov_base = NULL;
-		tdt->tdt_iov[1].iov_len = 0;
-	}
-
-	if (origin_data->data_len) {
-		tdt->tdt_iov[2].iov_base = vmalloc(origin_data->data_len);
-		bcopy(origin_data->data, tdt->tdt_iov[2].iov_base, origin_data->data_len);
-		tdt->tdt_iov[2].iov_len = origin_data->data_len;
-	} else {
-		tdt->tdt_iov[2].iov_base = NULL;
-		tdt->tdt_iov[2].iov_len = 0;
-	} */
-
 	tdt->tdt_iovlen = 3;
 	tdt->tdt_iovbuflen = sizeof(cluster_target_msg_header_t) + 
 		origin_data->header_len + origin_data->data_len;
-
-	mutex_enter(&tsso->tsso_sm_mtx);
-	if (tsso->tsso_curr_state != SSS_S3_READY) {
-		mutex_exit(&tsso->tsso_sm_mtx);
-		return -EOFFLINE;
-	}
-	mutex_exit(&tsso->tsso_sm_mtx);
+	tdt->tdt_issgl = B_FALSE;
 	
-	cluster_target_socket_session_tx_process(tdt);
+	if ((rval = cluster_target_socket_session_tx_process(
+			tdt)) != CLUSTER_STATUS_SUCCESS)
+		return rval;
 
 	mutex_enter(tdt->tdt_mtx);
 	while (tdt->tdt_waiting)
 		cv_wait(tdt->tdt_cv, tdt->tdt_mtx);
 	mutex_exit(tdt->tdt_mtx);
-/*	kmem_cache_free(ctso->ctso_tx_data_cache, tdt);
-	mutex_enter(&tssp->tssp_sm_mtx);
-	if (tssp->tssp_curr_state != SOS_S4_XPRT_UP) {
-		mutex_exit(&tssp->tssp_sm_mtx);
-		return -ECONNABORTED;
-	}
-	mutex_exit(&tssp->tssp_sm_mtx); */
 
-	return CLUSTER_STATUS_SUCCESS;	
+	return tdt->tdt_status;	
+}
+
+static cluster_status_t
+cluster_target_socket_session_tran_sgl_start(
+	cluster_target_session_t *cts, void *fragment)
+{
+	cluster_status_t rval;
+	cluster_tran_data_origin_t *origin_data = fragment;
+	struct sg_table *sgtb = origin_data->data;
+	cluster_tran_data_origin_t *origin_data = fragment;
+	cluster_target_session_socket_t *tsso = cts->sess_target_private;
+	cluster_target_session_socket_conn_t *tssp;
+	cluster_target_socket_tran_data_t tdt_struct;
+	cluster_target_socket_tran_data_t *tdt = &tdt_struct;
+	cluster_target_msg_header_t *ct_head;
+
+	bzero(&tdt->tdt_sohdr, sizeof(struct msghdr));
+	mutex_init(&tdt->tdt_mtx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&tdt->tdt_cv, NULL, CV_DRIVER, NULL);
+	tdt->tdt_tssp = tsso->tsso_tssp[origin_data->index % tsso->tsso_tssp_cnt];
+	tdt->tdt_waiting = B_TRUE;
+
+	ct_head = &tdt->tdt_ct_head;
+	ct_head->ex_len = origin_data->header_len;
+	ct_head->index = origin_data->index;
+	ct_head->len = origin_data->data_len;
+	ct_head->msg_type = origin_data->msg_type;
+	ct_head->need_reply = origin_data->need_reply;
+	ct_head->offset = 0;
+	ct_head->total_len = origin_data->data_len;
+
+	tdt->tdt_iov[0].iov_base = &tdt->tdt_ct_head;
+	tdt->tdt_iov[0].iov_len = sizeof(cluster_target_msg_header_t);
+	tdt->tdt_iov[1].iov_base = origin_data->header;
+	tdt->tdt_iov[1].iov_len = origin_data->header_len;
+	tdt->tdt_iovlen = 2;
+	tdt->tdt_iovbuflen = sizeof(cluster_target_msg_header_t) + 
+			origin_data->header_len;
+	tdt->tdt_issgl = B_TRUE;
+	tdt->tdt_sgtab = sgtb;	
+	tdt->tdt_sgbuflen = origin_data->data_len;
+	
+	if ((rval = cluster_target_socket_session_tx_process(
+			tdt)) != CLUSTER_STATUS_SUCCESS)
+		return rval;
+
+	mutex_enter(tdt->tdt_mtx);
+	while (tdt->tdt_waiting)
+		cv_wait(tdt->tdt_cv, tdt->tdt_mtx);
+	mutex_exit(tdt->tdt_mtx);
+
+	return tdt->tdt_status;
 }
 
 static void
@@ -483,6 +499,62 @@ cluster_target_socket_session_conn_free(cluster_target_session_socket_conn_t *ts
 	cluster_target_socket_session_rele(tssp->tssp_tsso, CTSO_FTAG);
 	tssp->tssp_tsso = NULL;
 	kmem_free(tssp, sizeof(cluster_target_session_socket_conn_t));
+}
+
+static cluster_status_t 
+cluster_target_socket_session_conn_tx_iov(cluster_target_socket_tran_data_t *tdt)
+{
+	cluster_status_t rval;
+	cluster_target_session_socket_conn_t *tssp = tdt->tdt_tssp;
+	
+	if ((rval = kernel_sendmsg(tssp->tssp_so, &tdt->tdt_sohdr, tdt->tdt_iov, 
+			tdt->tdt_iovlen, tdt->tdt_iovbuflen)) != tdt->tdt_iovbuflen) {
+		if (rval < 0)
+			return rval;
+		if (rval == 0)
+			return -EPIPE;
+		return -EIO;
+	}
+
+	return CLUSTER_STATUS_SUCCESS;
+}
+
+static cluster_status_t 
+cluster_target_socket_session_conn_tx_sgl(cluster_target_socket_tran_data_t *tdt)
+{
+	cluster_status_t rval;
+	struct msghdr *sohdr = &tdt->tdt_sohdr;
+	cluster_target_session_socket_conn_t *tssp = tdt->tdt_tssp;
+	struct sg_table *sgt = tdt->tdt_sgtab;
+	struct scatterlist *sg;
+	uint32_t pglen = PAGE_SIZE, remain = tdt->tdt_sgbuflen;
+	int idx, flags = MSG_MORE;
+	
+	if (tdt->tdt_sgbuflen)
+		sohdr->msg_flags |= flags;
+
+	if ((rval = cluster_target_socket_session_conn_tx_iov(
+			tdt)) != CLUSTER_STATUS_SUCCESS) 
+		return rval;
+
+	for_each_sg(sgt->sgl, sg, sgt->nents, idx) {
+		if (remain <= PAGE_SIZE) {
+			pglen = remain;
+			flags = MSG_EOR;
+		}
+		remain -= pglen;
+		
+		if ((rval = kernel_sendpage(tssp->tssp_so, sg_page(sg), 
+				0, pglen, flags)) != pglen) {
+			if (rval < 0)
+				return rval;
+			if (rval == 0)
+				return -EPIPE;
+			return -EIO;
+		}
+	}
+
+	return CLUSTER_STATUS_SUCCESS;
 }
 
 static void
@@ -596,12 +668,15 @@ cluster_target_socket_session_conn_tx(cluster_target_session_socket_conn_t *tssp
 		mutex_exit(&tssp->tssp_tx_mtx);
 		
 		while ((tdt = list_remove_head(&tssp->tssp_tx_live_list)) != NULL) {
-			rval = kernel_sendmsg(tssp->tssp_so, &tdt->tdt_sohdr, 
-				tdt->tdt_iov, tdt->tdt_iovlen, tdt->tdt_iovbuflen);
-			mutex_enter(tdt->tdt_mtx);
+			if (!tdt->tdt_issgl)
+				rval = cluster_target_socket_session_conn_tx_iov(tdt);
+			else 
+				rval = cluster_target_socket_session_conn_tx_sgl(tdt)
+			mutex_enter(&tdt->tdt_mtx);
 			tdt->tdt_waiting = B_FALSE;
-			cv_signal(tdt->tdt_cv);
-			mutex_exit(tdt->tdt_mtx);
+			tdt->tdt_status = rval;
+			cv_signal(&tdt->tdt_cv);
+			mutex_exit(&tdt->tdt_mtx);
 		}
 
 		mutex_enter(&tssp->tssp_tx_mtx);
@@ -1999,6 +2074,7 @@ int cluster_target_socket_port_init(cluster_target_port_t *ctp,
 	ctp->f_tran_free = cluster_target_socket_port_tran_free;
 	ctp->f_tran_fragment = cluster_target_socket_session_tran_fragment;
 	ctp->f_session_tran_start = cluster_target_socket_session_tran_start;
+	ctp->f_session_tran_sgl_start = cluster_target_socket_session_tran_sgl_start;
 	ctp->f_session_init = cluster_target_socket_session_init;
 	ctp->f_session_fini = cluster_target_socket_session_destroy;
 	ctp->f_rxmsg_to_fragment = cluster_target_socket_port_rxframe_to_fragment;

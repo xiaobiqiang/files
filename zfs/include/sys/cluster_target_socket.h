@@ -270,22 +270,32 @@ struct cluster_target_session_socket_conn {
 typedef struct cluster_target_socket_tran_data {
 	list_node_t tdt_node;
 	cluster_target_session_socket_conn_t *tdt_tssp;
+	
+	cluster_target_msg_header_t tdt_ct_head;
+	struct msghdr tdt_sohdr;
 	/*
 	 * iov[0] = ct_head
 	 * iov[1] = ex_head
 	 * iov[2] = data
 	 */
-	cluster_target_msg_header_t tdt_ct_head;
-	struct msghdr tdt_sohdr;
 	struct kvec tdt_iov[3];
 	uint32_t tdt_iovlen;
 	uint32_t tdt_iovbuflen;
+
+	/*
+	 * tran sgl
+	 */
+	struct sg_table *tdt_sgtab;
+	uint32_t tdt_sgbuflen;
 	
-	kmutex_t *tdt_mtx;
-	kcondvar_t *tdt_cv;
+	cluster_status_t tdt_status;
+	
+	kmutex_t tdt_mtx;
+	kcondvar_t tdt_cv;
 	boolean_t tdt_waiting;
 
 	uint32_t tdt_tran_idx;
+	boolean_t tdt_issgl;
 } cluster_target_socket_tran_data_t;
 
 int cluster_target_socket_port_init(

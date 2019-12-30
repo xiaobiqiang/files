@@ -4849,6 +4849,14 @@ int cluster_target_session_send_sgl(cluster_target_session_t *cts,
 	}
 	ctp = cts->sess_port_private;
 
+	if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
+	    ret = ctp->f_session_tran_sgl_start(cts, origin_data);
+		if ((ret == 0) && (origin_data->need_reply != 0)) {
+			cts_reply_notify(cts->sess_host_private, origin_data->index);
+		}
+        return (ret);
+	}
+
 	ret = ctp->f_tran_fragment_sgl(ctp->target_private, cts->sess_target_private,
 		origin_data, &data_array, &fragment_cnt);	
 
@@ -5004,6 +5012,8 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	boolean_t is_replyed;
 	int retry_cnt = 0;
 	int ret;
+
+	need_reply = B_FALSE;
 
 	if (cshi == NULL) {
 		return (-1);
