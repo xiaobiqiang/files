@@ -167,7 +167,7 @@ int zfs_vdev_async_write_active_max_dirty_percent = 60;
  * we include spans of optional I/Os to aid aggregation at the disk even when
  * they aren't able to help us aggregate at this level.
  */
-int zfs_512k_blocksize = 1 << 19;
+#define zfs_512k_blocksize (1 << 19)
 
 int zfs_vdev_aggregation_limit = zfs_512k_blocksize;
 int zfs_vdev_read_gap_limit = 32 << 10;

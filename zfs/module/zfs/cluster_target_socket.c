@@ -671,7 +671,7 @@ cluster_target_socket_session_conn_tx(cluster_target_session_socket_conn_t *tssp
 			if (!tdt->tdt_issgl)
 				rval = cluster_target_socket_session_conn_tx_iov(tdt);
 			else 
-				rval = cluster_target_socket_session_conn_tx_sgl(tdt)
+				rval = cluster_target_socket_session_conn_tx_sgl(tdt);
 			mutex_enter(&tdt->tdt_mtx);
 			tdt->tdt_waiting = B_FALSE;
 			tdt->tdt_status = rval;
