@@ -373,7 +373,7 @@ get_usage(zfs_help_t idx)
 			"\t    -c: disable the cluster san include all target\n"
 			"\tclustersan rpcto hostname=... hostid=... ip=... port=... \n"
 			"\t        priority=... rdma=<on/off>\n"
-			"\tclustersan socket hostname=... hostid=... ip=...port=...\n"
+			"\tclustersan socket hostname=... hostid=... ip=... port=... local=...\n"
 			"\tclustersan state\n"
 			"\tclustersan set [failover=<loadbalance|roundrobin>]\n"
 			"\t    [ipmi=<on/off>]\n"
@@ -7710,7 +7710,7 @@ zfs_do_speed_test(int argc, char **argv)
 	int c;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:n:r")) != -1) {
+	while ((c = getopt(argc, argv, "s:n:r:")) != -1) {
 		switch (c) {
 		case 's':
 			end = NULL;
@@ -7729,7 +7729,8 @@ zfs_do_speed_test(int argc, char **argv)
 			}
 			break;
 		case 'r':
-			need_reply = 1;
+			end = NULL;
+			need_reply = strtol(optarg, &end, 10);
 			break;
 		default:
 			fprintf(stderr, "invalid option\n");
@@ -7738,7 +7739,7 @@ zfs_do_speed_test(int argc, char **argv)
 		}
 	}
 
-	if ((bs == 0) || (cnt == 0)) {
+	if ((bs == 0) || (cnt == 0) || (need_reply == 0)) {
 		usage(B_FALSE);
 		return -EINVAL;
 	}
@@ -7882,23 +7883,7 @@ static int zfs_do_clustersan_enable(int argc, char **argv)
             ret = 1;
             goto out;
         }
-        portstr = strchr(ipaddr, ':');
-        if (portstr != NULL) {
-            *portstr = '\0';
-            portstr++;
-            port = atoi(portstr);
-            if (port < 0 || port > 65535)
-                goto out;
-        } else {
-            port = 1866;
-        }
         if (nvlist_add_string(nvl_conf, "ipaddr", ipaddr) != 0) {
-            (void) fprintf(stderr,
-					gettext("internal error: out of memory\n"));
-            ret = 1;
-            goto out;
-        }
-        if (nvlist_add_int32(nvl_conf, "port", port) != 0) {
             (void) fprintf(stderr,
 					gettext("internal error: out of memory\n"));
             ret = 1;
@@ -8428,6 +8413,7 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
     uint32_t hostid = 0;
     char *ip = NULL;
     char *name;
+	char *local;
     char *value;
     int link_pri = 0;
     int port = 1866;
@@ -8448,12 +8434,6 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 			hostname = value;
 		} else if (strcmp(name, "hostid") == 0) {
 			hostid = atoi(value);
-		} else if (strcmp(name, "port") == 0) {
-			port = atoi(value);
-            if (port < 0 || port > 65535) {
-                printf("port should > 0 and < 65536");
-                usage(B_FALSE);
-            }
 		} else if (strcmp(name, "ip") == 0) {
 			ip = value;
 		} else if (strcmp(name, "priority") == 0) {
@@ -8461,6 +8441,8 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 			if (link_pri < 0) {
 				link_pri = 0;
 			}
+		} else if (strcmp(name, "local") == 0) {
+			local = value;
 		} else {
 			(void) fprintf(stderr, gettext("don't support: "
 				"%s=%s\n"), name, value);
@@ -8480,7 +8462,11 @@ static int zfs_do_clustersan_socket(int argc, char **argv)
 		(void) fprintf(stderr, gettext("must specify ip address\n"));
 		usage(B_FALSE);
 	}
-    ret = zfs_cluster_socket_do(g_zfs, hostname, hostid, ip, link_pri, port);
+	if (local == NULL) {
+		(void) fprintf(stderr, gettext("must specify local ip address\n"));
+		usage(B_FALSE);
+	}
+    ret = zfs_cluster_socket_do(g_zfs, local, hostname, hostid, ip, link_pri, port);
 	return (ret);
 }
 

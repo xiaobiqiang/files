@@ -2629,6 +2629,9 @@ debug_mirror_io_addr(uint64_t hash_key)
 {
 }
 
+/*
+ * a big memory allocated can cause low performance.
+ */
 os_mirror_blkptr_list_t *
 dmu_objset_clear_mirror_io(objset_t *os, uint64_t txg)
 {

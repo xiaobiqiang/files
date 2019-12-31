@@ -102,8 +102,8 @@ typedef struct cluster_target_msg_header {
 } cluster_target_msg_header_t;
 
 typedef struct cluster_evt_header {
-	uint32_t msg_type;
-	uint8_t pad[4];
+	uint8_t msg_type;
+	uint8_t pad[7];
 	uint64_t msg_id;
 } cluster_evt_header_t;
 
@@ -161,6 +161,7 @@ typedef struct cluster_target_tran_worker {
 	uint32_t state;
 	uint32_t node_numbers;
 	void *tran_target_private;
+	uint32_t idx;
 } cluster_target_tran_worker_t;
 
 typedef struct cts_rx_worker {
@@ -388,6 +389,7 @@ typedef struct cluster_target_port {
 	cluster_target_tran_data_fragment_t f_tran_fragment;
 	cluster_target_tran_data_fragment_t f_tran_fragment_sgl;
 	cts_tran_start_t f_session_tran_start;
+	cts_tran_start_t f_session_tran_sgl_start;
 	cluster_target_session_init_t f_session_init;
 	cluster_target_session_fini_t f_session_fini;
 	cts_rxmsg_to_fragment_t f_rxmsg_to_fragment;
@@ -502,6 +504,7 @@ int cts_rx_hook_add(uint32_t msg_type, cs_rx_cb_t rx_cb, void *arg);
 int cts_rx_hook_remove(uint32_t msg_type);
 int csh_rx_hook_add(uint32_t msg_type, cs_rx_cb_t rx_cb, void *arg);
 int csh_rx_hook_remove(uint32_t msg_type);
+cs_rx_data_t *cts_rx_data_alloc(uint64_t len);
 void csh_rx_data_free(cs_rx_data_t *cs_data, boolean_t csh_hold);
 int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	void *data, uint64_t len, void *header, uint64_t header_len,
@@ -550,6 +553,9 @@ int cluster_get_host_ipmi_ip(uint32_t hostid, char *ipmi_ipaddr);
 
 void zfs_mirror_cancel_check_spa_txg(uint32_t hostid);
 void csh_rx_data_free_ext(cs_rx_data_t *cs_data);
+void cluster_san_host_rx_handle(
+        cs_rx_data_t *cs_data);
 
 #endif/* #ifndef	_SYS_CLUSTER_SAN_H */
+
 

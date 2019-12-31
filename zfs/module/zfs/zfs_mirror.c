@@ -2012,7 +2012,9 @@ zfs_mirror_tx_speed_data(char *buf, size_t len, boolean_t need_reply)
     zfs_mirror_msg_header_t msg_head;
     int ret;
 
-    rw_enter(&zfs_mirror_mac_port->mirror_host_rwlock, RW_READER);
+	cshi = zfs_mirror_mac_port->mirror_failover_host->cshi;
+
+/*    rw_enter(&zfs_mirror_mac_port->mirror_host_rwlock, RW_READER);
     if (zfs_mirror_mac_port->mirror_failover_host == NULL) {
 	    ret = -EIO;
 	    rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
@@ -2029,13 +2031,13 @@ zfs_mirror_tx_speed_data(char *buf, size_t len, boolean_t need_reply)
     }
 
     cluster_san_hostinfo_hold(cshi);
-    rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock);
+    rw_exit(&zfs_mirror_mac_port->mirror_host_rwlock); */
 
     msg_head.msg_type = ZFS_MIRROR_SPEED_TEST;
     ret = cluster_san_host_send(cshi, (void *)buf, len, &msg_head,
 		    sizeof(zfs_mirror_msg_header_t),
 		    CLUSTER_SAN_MSGTYPE_ZFS_MIRROR, 0, need_reply, 0);
-    cluster_san_hostinfo_rele(cshi);
+//    cluster_san_hostinfo_rele(cshi);
 
     return ret;
 }
