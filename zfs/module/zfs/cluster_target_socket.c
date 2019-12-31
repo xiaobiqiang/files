@@ -395,10 +395,10 @@ cluster_target_socket_session_tran_start(
 			tdt)) != CLUSTER_STATUS_SUCCESS)
 		return rval;
 
-	mutex_enter(tdt->tdt_mtx);
+	mutex_enter(&tdt->tdt_mtx);
 	while (tdt->tdt_waiting)
-		cv_wait(tdt->tdt_cv, tdt->tdt_mtx);
-	mutex_exit(tdt->tdt_mtx);
+		cv_wait(&tdt->tdt_cv, &tdt->tdt_mtx);
+	mutex_exit(&tdt->tdt_mtx);
 
 	return tdt->tdt_status;	
 }
@@ -410,7 +410,6 @@ cluster_target_socket_session_tran_sgl_start(
 	cluster_status_t rval;
 	cluster_tran_data_origin_t *origin_data = fragment;
 	struct sg_table *sgtb = origin_data->data;
-	cluster_tran_data_origin_t *origin_data = fragment;
 	cluster_target_session_socket_t *tsso = cts->sess_target_private;
 	cluster_target_session_socket_conn_t *tssp;
 	cluster_target_socket_tran_data_t tdt_struct;
@@ -447,10 +446,10 @@ cluster_target_socket_session_tran_sgl_start(
 			tdt)) != CLUSTER_STATUS_SUCCESS)
 		return rval;
 
-	mutex_enter(tdt->tdt_mtx);
+	mutex_enter(&tdt->tdt_mtx);
 	while (tdt->tdt_waiting)
-		cv_wait(tdt->tdt_cv, tdt->tdt_mtx);
-	mutex_exit(tdt->tdt_mtx);
+		cv_wait(&tdt->tdt_cv, &tdt->tdt_mtx);
+	mutex_exit(&tdt->tdt_mtx);
 
 	return tdt->tdt_status;
 }
@@ -645,9 +644,7 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 	mutex_exit(&tssp->tssp_rx_mtx);
 }
 
-/*
- * not complete
- */
+
 static void
 cluster_target_socket_session_conn_tx(cluster_target_session_socket_conn_t *tssp)
 {
@@ -659,8 +656,10 @@ cluster_target_socket_session_conn_tx(cluster_target_session_socket_conn_t *tssp
 	tssp->tssp_tx_running = B_TRUE;
 	cv_signal(&tssp->tssp_tx_cv);
 
-	while (tssp->tssp_tx_running) {
-		if (list_is_empty(&tssp->tssp_tx_wait_list)) {
+	while (tssp->tssp_tx_running || 
+			!list_is_empty(&tssp->tssp_tx_wait_list)) {
+		if (tssp->tssp_tx_running &&
+				list_is_empty(&tssp->tssp_tx_wait_list)) {
 			cv_wait(&tssp->tssp_tx_cv, &tssp->tssp_tx_mtx);
 		}
 
