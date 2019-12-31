@@ -3490,8 +3490,7 @@ static void cts_hb_fini(cluster_target_session_t *cts)
 }
 
 static int cts_tran_start(cluster_target_session_t *cts,
-	cluster_target_tran_node_t *tran_node, 
-	cluster_target_tran_worker_t *tran_work)
+	cluster_target_tran_node_t *tran_node)
 {
 	cluster_target_port_t *ctp = cts->sess_port_private;
 	int ret;
@@ -3501,10 +3500,6 @@ static int cts_tran_start(cluster_target_session_t *cts,
 		return (-1);
 	}
 
-	if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
-		cluster_target_socket_tran_data_t *tdt = tran_node->fragmentation;
-		tdt->tdt_tran_idx = tran_work->idx;
-	}
 	ret = ctp->f_session_tran_start(cts, tran_node->fragmentation);
 
 	ctp_tx_rele(ctp);
@@ -3611,13 +3606,8 @@ static void cts_tran_worker_init(cluster_target_session_t *cts)
 
 	if (cluster_target_session_ntranwork == 0) {
 		cts->sess_tran_worker_n = num_online_cpus();
-<<<<<<< HEAD
-	} else if (ctp->target_type == CLUSTER_TARGET_SOCKET){
-		cts->sess_tran_worker_n = 3;
-=======
 		cmn_err(CE_NOTE, "zjn %s num_online_cpus %d", __func__, 
 			cts->sess_tran_worker_n);
->>>>>>> a37fe5e86b51d5f158f6900b0d187fa739374492
 	} else {
 		cts->sess_tran_worker_n = cluster_target_session_ntranwork;
 		cmn_err(CE_NOTE, "zjn %s sess_tran_worker_n %d", __func__,
