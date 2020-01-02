@@ -3477,7 +3477,7 @@ sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg, uint32_t proxy_reg_arg_len,
 
 			if (sl->sl_access_state == SBD_LU_ACTIVE) {
 				sl->sl_trans_op = SL_OP_NONE;
-				cmn_err(CE_PANIC, "%s: lu(%s)'s sl_access_state is active,"
+				cmn_err(CE_WARN, "%s: lu(%s)'s sl_access_state is active,"
 					" can't change to standby directly",
 					__func__, sl->sl_name);
 				stret = STMF_FAILURE;
