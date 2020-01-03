@@ -645,7 +645,7 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 {
 	sbd_zvol_io_t *zvio = dbuf->db_lu_private;
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
-	int ret;
+	int ret, write_ret = 0;
 	int scmd_err, scmd_xfer_done;
 	stmf_status_t xfer_status = dbuf->db_xfer_status;
 	uint32_t data_size = dbuf->db_data_size;
@@ -684,8 +684,8 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 			 */
 			rw_exit(&sl->sl_access_state_lock);
 			scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
-			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_WRITE_ERROR);
+/*			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_WRITE_ERROR); */
 			return;
 		}
 	}
@@ -725,7 +725,7 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		else
 			zvio->zvio_flags = 0;
 		/* write the data */
-		ret = sbd_zvol_rele_write_bufs(sl, dbuf);
+		ret = write_ret = sbd_zvol_rele_write_bufs(sl, dbuf);
 	}
 
 	/* finalize accounting */
@@ -787,8 +787,9 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 			if (scmd->nbufs == 0) {
 				scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
-				stmf_scsilib_send_status(task, STATUS_CHECK,
-				    STMF_SAA_WRITE_ERROR);
+				if (!write_ret)
+					stmf_scsilib_send_status(task, STATUS_CHECK,
+				    	STMF_SAA_WRITE_ERROR);
 			}
 			/*
 			 * Leave the command active until last dbuf completes.
@@ -1501,7 +1502,7 @@ sbd_handle_active_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t laddr;
 	uint32_t buflen, iolen;
-	int ndx;
+	int ndx, wr_ret = 0;
 
 	if (scmd->nbufs > 0) {
 		/*
@@ -1580,8 +1581,8 @@ WRITE_XFER_DONE:
 		scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
 
 		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
-			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_WRITE_ERROR);
+		/*	stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_WRITE_ERROR); */
 		} else {
 			/*
 			 * If SYNC_WRITE flag is on then we need to flush

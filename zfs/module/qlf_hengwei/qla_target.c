@@ -7330,10 +7330,11 @@ ddi_dma_mem_alloc(ddi_dma_handle_t dma_handle, size_t length,
 
 	for(i=0; i<dma_handle->number; i++)
 	{
-		dma_handle->ptrarr[i] = dma_alloc_coherent(&dma_handle->dev->dev, length, &dma_handle->dma_handle_arr[i], GFP_KERNEL);
+		dma_handle->ptrarr[i] = dma_alloc_coherent(&dma_handle->dev->dev, length, 
+			&dma_handle->dma_handle_arr[i], GFP_KERNEL);
 		if (dma_handle->ptrarr[i] == NULL) {
 			kfree(*handle);
-			printk("%s %d error\n", __func__, __LINE__);
+			printk("%s %d length(%llu) error\n", __func__, __LINE__, length);
 			return (-1);
 		}
 	}
