@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- type : FAULT | EVENT | LOG -->
+<!-- level: CRITICAL | MAJOR | MINOR | TRIVIAL -->
+<!-- is_disable: TRUE | FALSE -->
+<alarms>
+
+    <!-- disk lost and recover -->
+    <alarm id="1" type="EVENT" level="MAJOR" param_num="5" param_match="1" is_disable="FALSE" />
+    <alarm id="2" type="EVENT" level="MINOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+
+    <!-- slow disk -->
+    <alarm id="21" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- derr disk -->
+    <alarm id="22" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- merr disk -->
+    <alarm id="23" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- noresponse disk -->
+    <alarm id="24" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- predicture disk -->
+    <alarm id="25" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- over-temperature disk -->
+    <alarm id="26" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- self-test failure disk -->
+    <alarm id="27" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+
+    <!-- psu -->
+    <alarm id="28" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    <!-- fan -->
+    <alarm id="29" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    <!-- link -->
+    <alarm id="30" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+
+    <!-- cpu temp -->
+    <alarm id="31" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+    <!-- cpu core -->
+    <alarm id="32" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+    <!-- cpu dimm -->
+    <alarm id="33" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+    <!-- sys temp -->
+    <alarm id="34" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+
+    <!-- p_dimm -->
+    <alarm id="35" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+
+    <!-- fc link -->
+    <alarm id="36" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    <!-- eth link -->
+    <alarm id="37" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    <!-- heart link -->
+    <alarm id="38" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    <!-- pool -->
+    <alarm id="40" type="FAULT" level="MAJOR" param_num="4" param_match="0,1" is_disable="FALSE" />
+
+    <!-- user quota -->
+    <alarm id="41" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- quota -->
+    <alarm id="42" type="FAULT" level="MAJOR" param_num="4" param_match="0,1" is_disable="FALSE" />
+    <!-- pool thin lun -->
+    <alarm id="43" type="FAULT" level="MAJOR" param_num="4" param_match="0,1" is_disable="FALSE" />
+    <!-- zfs thin lun -->
+    <alarm id="44" type="FAULT" level="MAJOR" param_num="5" param_match="0,1" is_disable="FALSE" />
+    <!-- avs -->
+    <alarm id="45" type="FAULT" level="MAJOR" param_num="4" param_match="0,1" is_disable="FALSE" />
+
+    <alarm id="47" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+    
+    <alarm id="51" type="FAULT" level="MAJOR" param_num="2" param_match="" is_disable="FALSE" />
+    
+    <alarm id="52" type="FAULT" level="MAJOR" param_num="1" param_match="0" is_disable="TRUE" />
+    
+    <alarm id="53" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="TRUE" />
+
+    <alarm id="54" type="EVENT" level="TRIVIAL" param_num="2" param_match="0,1" is_disable="FALSE" />
+
+    <!--  node offline -->
+    <alarm id="10000000" type="FAULT" level="MAJOR" param_num="1" param_match="0" is_disable="FALSE" />
+    
+    <alarm id="10000010" type="FAULT" level="MAJOR" param_num="2" param_match="0" is_disable="FALSE" />
+    <alarm id="10000011" type="FAULT" level="MAJOR" param_num="2" param_match="0" is_disable="FALSE" />
+    <!--  ntp  -->
+    <alarm id="10000012" type="FAULT" level="MAJOR" param_num="1" param_match="" is_disable="TRUE" />
+	
+    <!-- storage(pool/nas/lun) -->
+    <alarm id="10000014" type="FAULT" level="MAJOR" param_num="3" param_match="0,1" is_disable="FALSE" />
+
+    <alarm id="10000015" type="FAULT" level="MAJOR" param_num="3" param_match="0" is_disable="FALSE" />
+    <alarm id="10000016" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="FALSE" />
+
+    <!-- EVENTS -->
+    <alarm id="40000000" type="EVENT" level="TRIVIAL" param_num="1" param_match="" is_disable="FALSE" />
+    <alarm id="40000001" type="EVENT" level="MINOR" param_num="1" param_match="" is_disable="FALSE" />
+    <alarm id="40000002" type="EVENT" level="MAJOR" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="40000003" type="EVENT" level="MAJOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="40000004" type="EVENT" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG NAS-->
+    <alarm id="80000000" type="LOG" level="TRIVIAL" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000001" type="LOG" level="MINOR" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000002" type="LOG" level="TRIVIAL" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000003" type="LOG" level="MINOR" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000004" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000005" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000006" type="LOG" level="TRIVIAL" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000007" type="LOG" level="MINOR" param_num="16" param_match="" is_disable="FALSE" />
+    <alarm id="80000008" type="LOG" level="TRIVIAL" param_num="14" param_match="" is_disable="FALSE" />
+    <alarm id="80000009" type="LOG" level="MINOR" param_num="14" param_match="" is_disable="FALSE" />
+    <alarm id="80000010" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000011" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG CLUSTER-->
+    <alarm id="80000012" type="LOG" level="TRIVIAL" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000013" type="LOG" level="MINOR" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000014" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000015" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000016" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000017" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG NODE-->
+    <alarm id="80000018" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000019" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000020" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000021" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000022" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000023" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000024" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000025" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000026" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000027" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG SNAPSHOT_BACKUP-->
+    <alarm id="80000028" type="LOG" level="TRIVIAL" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000029" type="LOG" level="MINOR" param_num="7" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG TASK-->
+    <alarm id="80000030" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000031" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG SNAPSHOT_CLONE-->
+    <alarm id="80000032" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000033" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG LUNMIRROR-->
+    <alarm id="80000034" type="LOG" level="TRIVIAL" param_num="12" param_match="" is_disable="FALSE" />
+    <alarm id="80000035" type="LOG" level="MINOR" param_num="12" param_match="" is_disable="FALSE" />
+    <alarm id="80000036" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000037" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG LUNBACKUP-->
+    <alarm id="80000038" type="LOG" level="TRIVIAL" param_num="13" param_match="" is_disable="FALSE" />
+    <alarm id="80000039" type="LOG" level="MINOR" param_num="13" param_match="" is_disable="FALSE" />
+    <alarm id="80000040" type="LOG" level="TRIVIAL" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000041" type="LOG" level="MINOR" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000042" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000043" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG ALARM_CFG-->
+    <alarm id="80000044" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000045" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+
+    <!-- LOG SYSTIME-->
+    <alarm id="80000046" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000047" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG PMM_CFG-->
+    <alarm id="80000048" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000049" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+
+    <!-- LOG ADMIN-->
+    <alarm id="80000050" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000051" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000052" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000053" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000054" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000055" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG DISK-->
+    <alarm id="80000056" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000057" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    
+    <!-- LOG USER-->
+    <alarm id="80000100" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000101" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000102" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000103" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000104" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000105" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+
+    <!-- LOG QUOTA-->
+    <alarm id="80000106" type="LOG" level="TRIVIAL" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000107" type="LOG" level="MINOR" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000108" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000109" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+
+    <!-- LOG IPSHIFT-->
+    <alarm id="80000110" type="LOG" level="TRIVIAL" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000111" type="LOG" level="MINOR" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000112" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000113" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+
+    <!-- LOG ROUTE-->
+    <alarm id="80000114" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000115" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000116" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000117" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+
+    <!-- LOG PHYS_IP-->
+    <alarm id="80000118" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000119" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000120" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000121" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+
+    <!-- LOG MIGRATE-->
+    <alarm id="80000122" type="LOG" level="TRIVIAL" param_num="9" param_match="" is_disable="FALSE" />
+    <alarm id="80000123" type="LOG" level="MINOR" param_num="9" param_match="" is_disable="FALSE" />
+    <alarm id="80000124" type="LOG" level="TRIVIAL" param_num="9" param_match="" is_disable="FALSE" />
+    <alarm id="80000125" type="LOG" level="MINOR" param_num="9" param_match="" is_disable="FALSE" />
+
+    <!-- LOG AGGR-->
+    <alarm id="80000126" type="LOG" level="TRIVIAL" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000127" type="LOG" level="MINOR" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000128" type="LOG" level="TRIVIAL" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000129" type="LOG" level="MINOR" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000130" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000131" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+
+    <!-- LOG NAS_SHADOW-->
+    <alarm id="80000132" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000133" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000134" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000135" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000136" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000137" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+	
+    <alarm id="80000138" type="LOG" level="TRIVIAL" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000139" type="LOG" level="MINOR" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000140" type="LOG" level="TRIVIAL" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000141" type="LOG" level="MINOR" param_num="11" param_match="" is_disable="FALSE" />
+	
+    <alarm id="80000200" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000201" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000202" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000203" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+   
+    <alarm id="80000204" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000205" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000206" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000207" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000208" type="LOG" level="TRIVIAL" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000209" type="LOG" level="MINOR" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000210" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000211" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000212" type="LOG" level="TRIVIAL" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000213" type="LOG" level="MINOR" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000214" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000215" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000216" type="LOG" level="TRIVIAL" param_num="1" param_match="" is_disable="FALSE" />
+    <alarm id="80000217" type="LOG" level="MINOR" param_num="1" param_match="" is_disable="FALSE" />
+    <alarm id="80000218" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000219" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000220" type="LOG" level="TRIVIAL" param_num="0" param_match="" is_disable="FALSE" />
+    <alarm id="80000221" type="LOG" level="MINOR" param_num="0" param_match="" is_disable="FALSE" />
+    <alarm id="80000222" type="LOG" level="TRIVIAL" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000223" type="LOG" level="MINOR" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000226" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000227" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000228" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000229" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000230" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000231" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG NFS-->
+    <alarm id="80000300" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000301" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000302" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000303" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <!-- LOG NAS_DUALLIVE-->
+    <alarm id="80000304" type="LOG" level="TRIVIAL" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000305" type="LOG" level="MINOR" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000306" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000307" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG NAS_BACKUP-->
+    <alarm id="80000308" type="LOG" level="TRIVIAL" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000309" type="LOG" level="MINOR" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000310" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000311" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG SERVICE-->
+    <alarm id="80000312" type="LOG" level="TRIVIAL" param_num="11" param_match="" is_disable="FALSE" />
+    <alarm id="80000313" type="LOG" level="MINOR" param_num="11" param_match="" is_disable="FALSE" />
+    <!-- LOG DIRQUOTA-->
+    <alarm id="80000314" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000315" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000316" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000317" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG POOL-->
+    <alarm id="80000318" type="LOG" level="TRIVIAL" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000319" type="LOG" level="MINOR" param_num="7" param_match="" is_disable="FALSE" />
+    <alarm id="80000320" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000321" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000322" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000323" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG DISK_POOL-->
+    <alarm id="80000324" type="LOG" level="TRIVIAL" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000325" type="LOG" level="MINOR" param_num="8" param_match="" is_disable="FALSE" />
+    <alarm id="80000326" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000327" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <!-- LOG SNAPSHAT-->
+    <alarm id="80000328" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000329" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000330" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000331" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000332" type="LOG" level="TRIVIAL" param_num="5" param_match="" is_disable="FALSE" />
+    <alarm id="80000333" type="LOG" level="MINOR" param_num="5" param_match="" is_disable="FALSE" />
+    <!-- LOG SNAPSHAT_BACKUP-->
+    <alarm id="80000334" type="LOG" level="TRIVIAL" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000335" type="LOG" level="MINOR" param_num="10" param_match="" is_disable="FALSE" />
+    <alarm id="80000336" type="LOG" level="TRIVIAL" param_num="9" param_match="" is_disable="FALSE" />
+    <alarm id="80000337" type="LOG" level="MINOR" param_num="9" param_match="" is_disable="FALSE" />
+    <alarm id="80000338" type="LOG" level="TRIVIAL" param_num="3" param_match="" is_disable="FALSE" />
+    <alarm id="80000339" type="LOG" level="MINOR" param_num="3" param_match="" is_disable="FALSE" />
+    <!-- LOG SNAPSHAT_CLONE-->
+    <alarm id="80000340" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000341" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000342" type="LOG" level="TRIVIAL" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000343" type="LOG" level="MINOR" param_num="6" param_match="" is_disable="FALSE" />
+    <alarm id="80000344" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000345" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG DOMAIN_USER-->
+    <alarm id="80000346" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000347" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000348" type="LOG" level="TRIVIAL" param_num="4" param_match="" is_disable="FALSE" />
+    <alarm id="80000349" type="LOG" level="MINOR" param_num="4" param_match="" is_disable="FALSE" />
+    <!-- LOG DNS-->
+    <alarm id="80000350" type="LOG" level="TRIVIAL" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000351" type="LOG" level="MINOR" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000352" type="LOG" level="TRIVIAL" param_num="2" param_match="" is_disable="FALSE" />
+    <alarm id="80000353" type="LOG" level="MINOR" param_num="2" param_match="" is_disable="FALSE" />
+</alarms>
+
