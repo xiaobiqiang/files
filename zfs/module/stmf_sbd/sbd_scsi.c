@@ -4350,11 +4350,11 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 			mutex_exit(&sl->sl_lock);
 			delay(drv_usectohz((clock_t)10000));
 		}
+		sl->sl_trans_op = SL_OP_NONE;
 		
 		if (sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
 			sbd_try_transition_to_active_lu(sl, STMF_RECV_LINK_DOWN);
 		}
-		sl->sl_trans_op = SL_OP_NONE;
 		break;
 	}
 }

@@ -718,9 +718,9 @@ void stmf_cs_link_evt_cb(void *private,
 			lu_state = kmem_zalloc(sizeof(stmf_lu_state_desc_t), KM_SLEEP);
 			lu_state->lu_access_state = SBD_LU_TRANSITION_TO_ACTIVE;
 			lu_state->lu_sess = (void *)cshi;
-/*			taskq_dispatch(pppt_conn.ic_cs_asyn_taskq,
+			taskq_dispatch(pppt_conn.ic_cs_asyn_taskq,
 				stmf_clustersan_set_lu_state,
-				(void *)lu_state, TQ_SLEEP); */
+				(void *)lu_state, TQ_SLEEP);
 			taskq_dispatch(pppt_conn.ic_cs_asyn_taskq,
 				stmf_clustersan_reset_pppt_lport,
 				(void *)cshi, TQ_SLEEP);

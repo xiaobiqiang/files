@@ -2090,13 +2090,12 @@ sbd_transition_to_active_lu(char *data_fname)
 	if (sret == SBD_SUCCESS) {
 		cmn_err(CE_NOTE, "%s: access_state(%d), lu(%s)",
 			__func__, sl->sl_access_state, data_fname);
-		/*
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
 			cmn_err(CE_PANIC, "%s: lu can't be standby, data_fname=%s",
 				__func__, data_fname);
 			sl->sl_trans_op = SL_OP_NONE;
 			return (EIO);
-		}*/
+		}
 
 		if (sl->sl_access_state == SBD_LU_ACTIVE) {
 			sl->sl_trans_op = SL_OP_NONE;
