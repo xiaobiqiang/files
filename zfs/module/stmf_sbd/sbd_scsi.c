@@ -787,6 +787,11 @@ sbd_handle_sgl_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		if (scmd->flags & SBD_SCSI_CMD_XFER_FAIL) {
 			if (scmd->nbufs == 0) {
 				scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+				/*
+				 * mirror write error mostly,don't return write_error code,
+				 * just abort this task and let host retry or 
+				 * return another error code.
+				 */
 				if (!write_ret)
 					stmf_scsilib_send_status(task, STATUS_CHECK,
 				    	STMF_SAA_WRITE_ERROR);
