@@ -1499,7 +1499,7 @@ sint32 cm_cnm_alarm_common_init(void)
         return;
     }
 
-    cm_exec_tmout(hostname,sizeof(hostname),CM_CMT_REQ_TMOUT,"hostname|awk '{printf}'");
+    cm_exec_tmout(hostname,sizeof(hostname),CM_CMT_REQ_TMOUT,"hostname|awk '{printf $1}'");
 
     if(memory < cm_cnm_alarm_memory)
     {
