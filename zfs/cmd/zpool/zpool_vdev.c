@@ -1671,6 +1671,62 @@ is_grouping(const char *type, int *mindev, int *maxdev)
 	return (NULL);
 }
 
+static int verify_disk_company_mark(char *path)
+{
+	int fd, ret = -1,len;
+	uint64_t stamp_offset = 0;	
+	zpool_stamp_t *stamp;
+	char tmp_path[1024];
+	stamp = malloc(sizeof(zpool_stamp_t));
+	if (strncmp(path, "/dev/dsk/", 9) == 0){
+		path += 9;
+		sprintf(tmp_path, "/dev/rdsk/%s", path);
+	}
+	else if (strncmp(path, "/devices", 8) == 0){
+		sprintf(tmp_path, "%s", path);
+	}
+	else if (strncmp(path, "/dev/rdsk/", 10) == 0){
+		sprintf(tmp_path, "%s", path);
+	}
+	else{
+		sprintf(tmp_path, "/dev/rdsk/%s", path);
+	}
+
+	len = strlen(tmp_path);
+	if (*(tmp_path + len - 2) == 'p') {
+		*(tmp_path + len -2) = '\0';
+	}
+
+	fd = open(tmp_path, O_RDONLY|O_NDELAY);
+	if (fd > 0) {
+		syslog(LOG_ERR,"open the disk is %s",tmp_path);
+		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
+			syslog(LOG_ERR, "read stamp, get stamp offset failed");
+			close(fd);
+			return (ret);
+		}
+		stamp_offset += stamp_offset/STAMP_OFFSET;
+		if (pread(fd, stamp, sizeof(zpool_stamp_t), stamp_offset)
+			== sizeof(zpool_stamp_t)) {
+			if (stamp->para.company_name == COMPANY_NAME) {
+				ret = 0;
+			} else {
+				syslog(LOG_ERR, "the disk:%s, pool company name check failed:0x%x", 
+tmp_path, stamp->para.company_name);
+			}
+		} else {
+			syslog(LOG_ERR, "read stamp failed");
+		}
+		close(fd);
+				
+	}
+	else{
+		syslog(LOG_ERR,"can not open the disk is %s",tmp_path);
+		}
+	return (ret);
+}
+
+
 /*
  * Construct a syntactically valid vdev specification,
  * and ensure that all devices and files exist and can be opened.
@@ -1687,7 +1743,8 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 	boolean_t seen_logs;
 	boolean_t seen_metas;
 	boolean_t seen_lows;
-
+	char *typetmp;
+	
 	top = NULL;
 	toplevels = 0;
 	spares = NULL;
@@ -1874,6 +1931,14 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
 					zpool_no_memory();
+
+				ret = verify_disk_company_mark(argv[c]);
+				if(ret == -1){
+					(void) fprintf(stderr, gettext("The disk %s "
+					    "is not ceresdata company\n"), argv[c]);	
+					return (NULL);
+				}
+				
 				if ((nv = make_leaf_vdev(props, argv[c],
 				    B_FALSE, is_meta, is_spare, is_low, is_mirrorspare)) == NULL)
 					return (NULL);
@@ -1952,6 +2017,17 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 			if ((nv = make_leaf_vdev(props, argv[0],
 			    is_log, is_meta, 0, is_low, 0)) == NULL)
 				return (NULL);
+
+			verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &typetmp) == 0);
+			if (strcmp(typetmp, VDEV_TYPE_DISK) == 0) {
+				ret = verify_disk_company_mark(argv[0]);
+				if(ret == -1){
+					(void) fprintf(stderr, gettext("The disk %s "
+						    "is not ceresdata company\n"), argv[0]);
+					return (NULL);
+				}
+			}
+			
 			if (is_log)
 				nlogs++;
 			argc--;
