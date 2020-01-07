@@ -4187,7 +4187,7 @@ sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 void
 sbd_send_status_done(struct scsi_task *task)
 {
-	cmn_err(CE_PANIC,
+	cmn_err(CE_WARN,
 	    "sbd_send_status_done: task=%p this should not have been called",
 	    task);
 }
