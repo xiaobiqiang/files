@@ -490,6 +490,17 @@ static sint32 cm_cmd_count(const sint8 **ppParam, uint32 ParamNum, void **ppAckD
 }
 
 
+#ifdef __linux__
+static sint32 cm_cmd_setuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
+{
+    return CM_OK;
+}
+
+static sint32 cm_cmd_getuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
+{
+    return CM_OK;
+}  
+#else
 static sint32 cm_cmd_update_utmpx_bak(int size,time_t u_time)
 {
     const char* file = "/var/adm/utmpx";
@@ -529,17 +540,6 @@ static sint32 cm_cmd_update_utmpx_bak(int size,time_t u_time)
 	return CM_OK;
 }
 
-#ifdef __linux__
-static sint32 cm_cmd_setuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
-{
-    return CM_OK;
-}
-
-static sint32 cm_cmd_getuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
-{
-    return CM_OK;
-}  
-#else
 static sint32 cm_cmd_setuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
 {
     time_t u_time;
