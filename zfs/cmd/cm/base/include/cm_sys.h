@@ -30,9 +30,15 @@
 typedef pthread_mutex_t cm_mutex_t;
 typedef sem_t cm_sem_t;
 typedef pthread_t cm_thread_t;
-typedef hrtime_t cm_hrtime_t;
 
+#ifdef __unix__
+typedef hrtime_t cm_hrtime_t;
 #define CM_GET_HRTIME() gethrtime()
+#else
+typedef long long cm_hrtime_t;
+#define CM_GET_HRTIME() (long long(time())*1000000000)
+#endif
+
 #define CM_HRTIME_TO_MS(x) ((x)/1000000)
 #define CM_HRTIME_TO_S(x) ((x)/1000000000)
 
@@ -66,6 +72,8 @@ extern void cm_mem_free(void *p,const char* func, int line);
 #define CM_SEM_DESTROY(p) sem_destroy(p)
 #define CM_SEM_WAIT(p) sem_wait(p)
 #define CM_SEM_POST(p) sem_post(p)
+
+#ifdef __unix__
 #define CM_SEM_WAIT_TIMEOUT(p,s,res) \
     do{ \
        timespec_t tm; \
@@ -73,6 +81,16 @@ extern void cm_mem_free(void *p,const char* func, int line);
        tm.tv_sec += (s)+1; \
        (res) = sem_timedwait((p),&tm); \
     }while(0)
+#else
+#define CM_SEM_WAIT_TIMEOUT(p,s,res) \
+    do{ \
+       struct timespec tm; \
+       gettimeofday(&tm, NULL); \
+       tm.tv_sec += (s)+1; \
+       (res) = sem_timedwait((p),&tm); \
+    }while(0)
+
+#endif
 
 #define CM_THREAD_CREATE(h, func, arg) pthread_create((h), NULL,(func), (arg))
 #define CM_THREAD_DETACH(h) pthread_detach(h)
