@@ -78,6 +78,7 @@
 #include <sys/vtoc.h>
 #include <sys/mntent.h>
 #include <uuid/uuid.h>
+#include <syslog.h>
 #ifdef HAVE_LIBBLKID
 #include <blkid/blkid.h>
 #else
@@ -1688,6 +1689,9 @@ static int verify_disk_company_mark(char *path)
 	else if (strncmp(path, "/dev/rdsk/", 10) == 0){
 		sprintf(tmp_path, "%s", path);
 	}
+	else if (strncmp(path, "/dev/disk/by-id/", 16) == 0){
+		sprintf(tmp_path, "%s", path);
+	}
 	else{
 		sprintf(tmp_path, "/dev/rdsk/%s", path);
 	}
@@ -1696,10 +1700,9 @@ static int verify_disk_company_mark(char *path)
 	if (*(tmp_path + len - 2) == 'p') {
 		*(tmp_path + len -2) = '\0';
 	}
-
+	
 	fd = open(tmp_path, O_RDONLY|O_NDELAY);
 	if (fd > 0) {
-		syslog(LOG_ERR,"open the disk is %s",tmp_path);
 		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
 			syslog(LOG_ERR, "read stamp, get stamp offset failed");
 			close(fd);
@@ -1711,16 +1714,17 @@ static int verify_disk_company_mark(char *path)
 			if (stamp->para.company_name == COMPANY_NAME) {
 				ret = 0;
 			} else {
-				syslog(LOG_ERR, "the disk:%s, pool company name check failed:0x%x", 
-tmp_path, stamp->para.company_name);
+				syslog(LOG_ERR, "the disk:%s, pool company name check failed:0x%x", tmp_path, stamp->para.company_name);
 			}
 		} else {
+			(void) fprintf(stderr, gettext("read stamp failed"));
 			syslog(LOG_ERR, "read stamp failed");
 		}
 		close(fd);
 				
 	}
 	else{
+		(void) fprintf(stderr, gettext("can not open the disk is %s"),tmp_path);
 		syslog(LOG_ERR,"can not open the disk is %s",tmp_path);
 		}
 	return (ret);
@@ -1744,6 +1748,7 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 	boolean_t seen_metas;
 	boolean_t seen_lows;
 	char *typetmp;
+	int ret;
 	
 	top = NULL;
 	toplevels = 0;
