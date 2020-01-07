@@ -1290,7 +1290,7 @@ sint32 cm_node_add(const sint8* ipaddr, uint32 sbbid)
     }
     
     /* 检查节点连通性 */
-    if(CM_OK != cm_system("ping %s 1 2>/dev/null",ipaddr))
+    if(CM_OK != cm_cnm_exec_ping(ipaddr))
     {
         CM_LOG_ERR(CM_MOD_NODE,"ping %s fail",ipaddr);
         return CM_ERR_CONN_FAIL;

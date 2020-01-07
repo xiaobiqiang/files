@@ -12,6 +12,7 @@
 
 #include "cm_omi_types.h"
 #include "cm_sync_types.h"
+#include "cm_cnm_common.h"
 
 extern sint32 cm_cnm_node_init(void);
 
