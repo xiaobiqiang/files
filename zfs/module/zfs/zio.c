@@ -872,7 +872,7 @@ zio_write_override(zio_t *zio, blkptr_t *bp, int copies, boolean_t nopwrite)
 void
 zio_free(spa_t *spa, uint64_t txg, const blkptr_t *bp)
 {
-	if (BP_IS_TOGTHER(bp))
+	if (BP_IS_TOGTHER(bp) && !BP_GET_FREEFLAG(bp))
 		return;
 
 	/*
@@ -905,6 +905,9 @@ zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 {
 	zio_t *zio;
 	enum zio_stage stage = ZIO_FREE_PIPELINE;
+
+	if (BP_IS_TOGTHER(bp) && !BP_GET_FREEFLAG(bp))
+		return (NULL);
 
 	ASSERT(!BP_IS_HOLE(bp));
 	ASSERT(spa_syncing_txg(spa) == txg);
@@ -1587,6 +1590,8 @@ int
 zio_wait(zio_t *zio)
 {
 	int error;
+	if (!zio)
+		return (0);
 
 	ASSERT(zio->io_stage == ZIO_STAGE_OPEN);
 	ASSERT(zio->io_executor == NULL);
@@ -1609,6 +1614,9 @@ zio_wait(zio_t *zio)
 void
 zio_nowait(zio_t *zio)
 {
+	if (!zio)
+		return; 
+
 	ASSERT(zio->io_executor == NULL);
 
 	if (zio->io_child_type == ZIO_CHILD_LOGICAL &&
@@ -2106,7 +2114,7 @@ zio_write_gang_block(zio_t *pio)
 
 	error = metaslab_alloc(spa, spa_normal_class(spa), SPA_GANGBLOCKSIZE,
 	    bp, gbh_copies, txg, pio == gio ? NULL : gio->io_bp,
-	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER);
+	    METASLAB_HINTBP_FAVOR | METASLAB_GANG_HEADER, 1);
 	if (error) {
 		pio->io_error = error;
 		return (ZIO_PIPELINE_CONTINUE);
@@ -2655,11 +2663,14 @@ zio_dva_allocate(zio_t *zio)
 
 	if (zio->io_aggre_io) {
 		mutex_enter(&zio->io_aggre_io->ai_lock);
+		aggre_num = zio->io_aggre_io->ai_together;
+		ASSERT(aggre_num > 1);
 						
 		if (zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_SUCC) {
 			memcpy(&bp->blk_dva[0], &zio->io_aggre_io->ai_dva[0], sizeof(dva_t));
 			BP_SET_BIRTH(bp, zio->io_txg, zio->io_txg);
 			BP_SET_APPMETA(bp, prop_p->zp_app_meta);
+			BP_SET_AGGRENUM(bp, zio->io_aggre_io->ai_together);
 			mutex_exit(&zio->io_aggre_io->ai_lock);
 			return (ZIO_PIPELINE_CONTINUE);
 		} else if (zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_FAIL) {
@@ -2667,14 +2678,13 @@ zio_dva_allocate(zio_t *zio)
 			mutex_exit(&zio->io_aggre_io->ai_lock);
 			return (ZIO_PIPELINE_CONTINUE);
 		}
-		aggre_num = zio->io_spa->spa_raidz_aggre_num;
-		ASSERT(aggre_num > 1);
+		
 		ASSERT(zio->io_aggre_io->ai_dvaalloc_stat == TGDVA_ALLOC_WAITSTART);
 	}
 
 space_alloc:    
 	error = metaslab_alloc(spa, mc, zio->io_size * aggre_num, bp,
-	    zio->io_prop.zp_copies, zio->io_txg, NULL, flags);
+	    zio->io_prop.zp_copies, zio->io_txg, NULL, flags, aggre_num);
 
 	if (error) {
 		if ((error == ENOSPC) && (mc != spa->spa_low_class)) {
@@ -2700,20 +2710,14 @@ space_alloc:
 		zio->io_error = error;
 	}
 	BP_SET_APPMETA(bp, prop_p->zp_app_meta);
-	BP_SET_APPLOW(bp, prop_p->zp_app_low);
-
-	if (zio->io_aggre_io) {
-		if (!error) {
-			/*
-			if (DVA_GET_OFFSET(&bp->blk_dva[0]) % (2048*dcols)) {
-				cmn_err(CE_WARN,"%s the tgdva is not divided", __func__);
-				metaslab_free_dva(spa, &bp->blk_dva[0], zio->io_txg, B_TRUE);
-				goto space_alloc;
-			}*/
+	
+	if (zio->io_aggre_io != NULL) {
+		if(!error) {
+			BP_SET_AGGRENUM(bp, zio->io_aggre_io->ai_together);
 			zio->io_aggre_io->ai_dvaalloc_stat = TGDVA_ALLOC_SUCC;
-			/*DVA_SET_ASIZE(&bp->blk_dva[0], zio->io_size);*/
 			memcpy(&zio->io_aggre_io->ai_dva[0], &bp->blk_dva[0], sizeof(dva_t));
 			memcpy(&zio->io_aggre_io->ai_map.tgm_dva ,&bp->blk_dva[0], sizeof(dva_t));
+			
 		} else {
 			zio->io_error = error;
 			zio->io_aggre_io->ai_ioerror = error;
@@ -2722,7 +2726,7 @@ space_alloc:
 		}
 		mutex_exit(&zio->io_aggre_io->ai_lock);
 	}
-
+	BP_SET_APPLOW(bp, prop_p->zp_app_low);
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
@@ -2789,13 +2793,13 @@ zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp, uint64_t size,
 	if (use_slog) {
 		error = metaslab_alloc(spa, spa_log_class(spa), size,
 		    new_bp, 1, txg, NULL,
-		    METASLAB_FASTWRITE | METASLAB_GANG_AVOID);
+		    METASLAB_FASTWRITE | METASLAB_GANG_AVOID, 1);
 	}
 
 	if (error) {
 		error = metaslab_alloc(spa, spa_normal_class(spa), size,
 		    new_bp, 1, txg, NULL,
-		    METASLAB_FASTWRITE);
+		    METASLAB_FASTWRITE, 1);
 	}
 
 	if (error == 0) {
@@ -3571,6 +3575,7 @@ zio_done(zio_t *zio)
 		metaslab_fastwrite_unmark(zio->io_spa, zio->io_bp);
 	}
 
+	#if 0
 	if (zio->io_bp != NULL && zio->io_aggre_io != NULL && zio->io_aggre_root) {
 		if (zio->io_type == ZIO_TYPE_WRITE && BP_IS_TOGTHER(zio->io_bp) 
 			 && zio->io_aggre_io->ai_syncdone == 0) {
@@ -3581,6 +3586,7 @@ zio_done(zio_t *zio)
 			mutex_exit(&zio->io_aggre_io->ai_synclock);
 		}
 	}
+	#endif
 	
 	/*
 	 * It is the responsibility of the done callback to ensure that this
@@ -3601,14 +3607,6 @@ zio_done(zio_t *zio)
 		zio_notify_parent(pio, zio, ZIO_WAIT_DONE);
 	}
 
-#ifdef _KERNEL
-	if(ddi_get_time()-zio->io_stamp1 >10){
-		cmn_err(CE_WARN, "%s , zio_timeout=%d nows=%ld %ld", __func__, 
-			ddi_get_time()-zio->io_stamp1,(long)ddi_get_time(),(long)zio->io_stamp1);
-		cmn_err(CE_WARN, "%s ,zio=%p type=%d txg=%ld size=%ld io_vd=%p ", __func__, 
-			zio ,zio->io_type, zio->io_txg,zio->io_spa->spa_name,zio->io_size ,zio->io_vd);
-	}
-#endif
 	raidz_aggre_zio_done(zio);
 	if (zio->io_waiter != NULL) {
 		mutex_enter(&zio->io_lock);

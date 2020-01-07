@@ -721,8 +721,9 @@ zpool_do_add(int argc, char **argv)
 		return (1);
 	}
 
-	if (!zfs_check_raidz_aggre_valid(config, nvroot)) {
-		(void) fprintf(stderr, gettext("pool '%s' check raidz aggre failed\n"),
+	if (!zfs_check_raidz_aggre_valid(nvroot)) {
+		(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
+			"configuration as metadata device\n"),
 			poolname);
 		zpool_close(zhp);
 		nvlist_free(nvroot);
@@ -2872,6 +2873,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	nvlist_t *nvroot;
 	zpool_stamp_t *stamp;
 	int stamp_ok;
+	zfs_cmd_t *zc;
+	int ret;
 
 	stamp = malloc(sizeof(zpool_stamp_t));
 	if (stamp == NULL) {
@@ -2972,6 +2975,24 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		(void) zpool_write_stamp(nvroot, stamp, SPA_NUM_OF_QUANTUM);
 	}
 	free(stamp);
+
+	zc = malloc(sizeof(zfs_cmd_t));
+	if (zc == NULL) {
+		syslog(LOG_NOTICE, "%s: not wait pool(%s)'s zvol create minor done",
+			__func__, name);
+		return ;
+	}
+	bzero(zc, sizeof(zfs_cmd_t));
+	assert(zc->zc_nvlist_src_size == 0);
+	strcpy(zc->zc_name, name);
+	ret = zfs_ioctl(g_zfs, ZFS_IOC_ZVOL_CREATE_MINOR_DONE_WAIT, zc);
+	if (ret != 0) {
+		syslog(LOG_NOTICE, "%s: failed wait pool(%s)'s zvol create minor done",
+			__func__, name);
+	}
+	free(zc);
+
+	syslog(LOG_NOTICE, "%s: all volume create minor finished, start to import lu", __func__);
 	zfs_import_all_lus(g_zfs, name);
 	zfs_enable_avs(g_zfs, name, 1);
 	zpool_close(zhp);
@@ -7614,7 +7635,7 @@ zpool_do_release(int argc, char **argv)
 	int sharenfs = 0, sharesmb = 0;
 
 	/* check options */
-	bzero(&cb, sizeof(status_cbdata_t));
+	bzero(&cb, sizeof(release_cbdata_t));
 	while ((c = getopt(argc, argv, "avcs:")) != -1) {
 		switch (c) {
 		case 'v':

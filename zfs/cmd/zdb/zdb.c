@@ -1636,6 +1636,8 @@ dump_raidz_aggre_map(objset_t *os, uint64_t object, void *data, size_t size)
 	printf("\t\t total_count %llu\n", header.total_count);
 	printf("\t\t avail_count %llu\n", header.avail_count);
 	printf("\t\t process_index %llu\n", header.process_index);
+	printf("\t\t state %u\n", header.state);
+	printf("\t\t time %s\n", ctime((time_t *)&header.time));
 
 	blk_per_record = header.blksize / header.recsize;
 	printf("\t map elem:\n");
@@ -1658,9 +1660,9 @@ dump_raidz_aggre_map(objset_t *os, uint64_t object, void *data, size_t size)
 			
 			elem = (aggre_map_elem_t *)((char *)db->db_data + (i % blk_per_record) * header.recsize);
 		}
-		
-		printf("\t\t [%d] txg %llu timestamp %llu objsetid %llu objectid %llu\n",
-			i, elem->txg, elem->timestamp, elem->objsetid, elem->objectid);
+	
+		printf("\t\t [%d] txg %llu timestamp %llu objsetid %llu objectid %llu valid_num %llu\n",
+			i, elem->txg, elem->timestamp, elem->objsetid, elem->objectid, elem->valid_num);	
 		BP_ZERO(&bp);
 		memcpy(&bp.blk_dva[0], &elem->dva, sizeof (dva_t));
 		BP_SET_BIRTH(&bp, elem->txg, elem->txg);
@@ -1668,7 +1670,7 @@ dump_raidz_aggre_map(objset_t *os, uint64_t object, void *data, size_t size)
 		printf("\t\t      bp: %s\n", blkbuf);
 		printf("\t\t      blkid: ");
 
-		for (j = 0; j < header.aggre_num; j++) {
+		for (j = 0; j < elem->valid_num; j++) {
 			printf("%llu ", elem->blkid[j]);
 		}
 

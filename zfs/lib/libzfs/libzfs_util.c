@@ -2159,7 +2159,7 @@ int zfs_cluster_rdma_rpc_clnt_ioc(libzfs_handle_t *hdl, int cmd, void *arg)
 	return (err);
 }
 
-int zfs_cluster_socket_do (libzfs_handle_t *hdl,
+int zfs_cluster_socket_do (libzfs_handle_t *hdl, char *local,
 	char *hostname, uint32_t hostid, char *ip,
 	int pri, int port)
 {
@@ -2169,6 +2169,7 @@ int zfs_cluster_socket_do (libzfs_handle_t *hdl,
     zc.zc_cookie = ZFS_CLUSTERSAN_IOC_SOCKET;
     strcpy(zc.zc_value, hostname);
     strcpy(zc.zc_string, ip);
+	strcpy(zc.zc_top_ds, local);
     zc.zc_guid = hostid;
     zc.zc_obj = pri;
     zc.zc_history_offset = port;
@@ -2717,6 +2718,7 @@ zfs_import_pool_call_back(zfs_handle_t *zhp, void *data)
 {
 	zfs_ilu_ctx_t *zicp = (zfs_ilu_ctx_t *)data;
 	syslog(LOG_DEBUG, "%s: zfs_name:%s", __func__, zfs_get_name(zhp));
+	
 	if (strcmp(zfs_get_name(zhp), zicp->pool_name) == 0) {
 		zfs_iter_filesystems(zhp, zfs_get_lus_call_back, data);
 	}
@@ -2737,6 +2739,7 @@ void* zfs_import_lu(void *arg)
 	ret = stmfImportLu(STMF_DISK, dev_buf, &createdGuid);
 	if (ret == 0) {
 		stmfOnlineLogicalUnit(&createdGuid);
+		stmfNotifyLuActive(dev_buf);
 		syslog(LOG_INFO, " import lu success, %s", lu_name);
  	} else {
  		syslog(LOG_ERR, " import lu failed, %s, ret:0x%x", lu_name, ret);
@@ -2810,22 +2813,6 @@ zfs_import_all_lus(libzfs_handle_t *hdl, char *data)
 			pthread_join(lu_list->tid, NULL);
 		free(lu_list);
 	}
-	
-	zc = malloc(sizeof(zfs_cmd_t));
-	if (zc == NULL) {
-		syslog(LOG_NOTICE, "%s: not wait pool(%s)'s zvol create minor done",
-			__func__, data);
-		return ;
-	}
-	bzero(zc, sizeof(zfs_cmd_t));
-	assert(zc->zc_nvlist_src_size == 0);
-	strcpy(zc->zc_name, data);
-	ret = zfs_ioctl(hdl, ZFS_IOC_ZVOL_CREATE_MINOR_DONE_WAIT, zc);
-	if (ret != 0) {
-		syslog(LOG_NOTICE, "%s: failed wait pool(%s)'s zvol create minor done",
-			__func__, data);
-	}
-	free(zc);
 }
 
 int 
@@ -2908,7 +2895,7 @@ zfs_standby_lu_access(char *dataset, void *data)
 }
 
 int 
-zfs_standby_lu_access_callback(zfs_handle_t *zhp, void *data)
+zfs_standby_pool_lu_access(zfs_handle_t *zhp, void *data)
 {
 	zfs_standby_ilu_ctx_t *zicp = (zfs_standby_ilu_ctx_t *)data;
 	if (strcmp(zhp->zpool_hdl->zpool_name, zicp->pool_name) == 0 &&
@@ -2922,7 +2909,7 @@ zfs_standby_lu_access_callback(zfs_handle_t *zhp, void *data)
 int 
 zfs_standby_pool_call_back(zfs_handle_t *zhp, void *data)
 {
-	zfs_iter_filesystems(zhp, zfs_standby_lu_access_callback, data);
+	zfs_iter_filesystems(zhp, zfs_standby_pool_lu_access, data);
 	return (0);
 }
 void 
@@ -4596,81 +4583,27 @@ zfs_start_lun_migrate(libzfs_handle_t *hdl, const char *dst, char *pool, char *g
 }
 
 boolean_t
-zfs_check_raidz_aggre_valid(nvlist_t *config, nvlist_t *nv)
+zfs_check_raidz_aggre_valid(nvlist_t *nv)
 {
-	nvlist_t *nvroot, **child, **leaf_child;
-	uint_t c, children, leaf_children;
-	char *type;
-	uint64_t nparity;
+	nvlist_t **child;
+	uint_t c, children;
 	uint64_t is_meta;
-	int align_size = 1 << 19;
-	int aggre_parity = 0;
-	int aggre_num = 0;
-	boolean_t valid = B_TRUE;
-	boolean_t has_meta = B_FALSE;
-	boolean_t has_raidz = B_FALSE;
-	boolean_t has_raidz_aggre = B_FALSE;
-
-	if (config) {
-		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		    &nvroot) == 0);
-		verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-		    &child, &children) == 0);
-		for (c = 0; c < children; c++) {
-			if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
-				verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-	    			&leaf_child, &leaf_children) == 0);
-				verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-					&nparity) == 0);
-				aggre_parity = nparity;
-				aggre_num = leaf_children - nparity;
-				break;
-			}
-		}
-	}
+	char *type;
 	
-	verify(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
+	if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) != 0)
+		return (B_TRUE);
 
 	for (c = 0; c < children; c++) {
 		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE, &type) == 0);
-		if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
-			has_raidz = B_TRUE;
-		} else if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
-			has_raidz_aggre = B_TRUE;
-			verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-	    		&leaf_child, &leaf_children) == 0);
-			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-				&nparity) == 0);
-			if (aggre_parity == 0)
-				aggre_parity = nparity;
-
-			if (aggre_num == 0)
-				aggre_num = leaf_children - nparity;
-
-			if (nparity != aggre_parity ||
-				leaf_children - nparity != aggre_num ||
-				leaf_children - nparity <= 0 ||
-				(leaf_children - nparity) % 2 != 0 || 
-				align_size % (leaf_children - nparity)) {
-				valid = B_FALSE;
-				break;
-			}
-		} else if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-			is_meta = 0;
+		if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
+			/* can't use raidz_aggre configuration as metadata device */
 			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
 			if (is_meta)
-				has_meta = B_TRUE;
-		}
-
-		if (has_raidz && has_raidz_aggre) {
-			valid = B_FALSE;
-			break;
+				return (B_FALSE);
 		}
 	}
 
-	if (has_raidz_aggre) 
-		return (valid && has_meta);
-
-	return (B_TRUE);
+	return (B_TRUE);	
 }
+

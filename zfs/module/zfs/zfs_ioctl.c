@@ -5336,6 +5336,41 @@ extern void zfs_mirror_stop_watchdog_thread(void);
 extern void cluster_san_hb_stop(void);
 extern int zfs_mirror_tx_speed_data(char *buf, size_t len, boolean_t need_reply);
 
+typedef struct {
+	uint64_t block;
+	uint64_t cnt;
+	boolean_t need_reply;
+	boolean_t is_running;
+	kmutex_t mtx;
+	kcondvar_t cv;
+} zfs_mirror_speed_test_t;
+
+static void
+zfs_mirror_speed_send_thread(zfs_mirror_speed_test_t *sp)
+{
+	void *buf;
+	int i, ret;
+	
+	buf = kmalloc(sp->block, GFP_KERNEL);
+
+	printk("%s: start to send data\n", __func__);
+	
+	for (i = 0; i < sp->cnt; i++) {
+		/* FIXME: send msg */
+		ret = zfs_mirror_tx_speed_data(buf, sp->block, sp->need_reply);
+		if (ret) {
+			printk("%s: send data failed: %d\n", __func__, ret);
+			break;
+		}
+	}
+
+	kfree(buf);
+	mutex_enter(&sp->mtx);
+	sp->is_running = B_FALSE;
+	cv_signal(&sp->cv);
+	mutex_exit(&sp->mtx);
+}
+
 static int
 zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 {
@@ -5345,41 +5380,41 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 	uint64_t *index;
 	uint64_t i;
 	int ret = 0;
-
+	zfs_mirror_speed_test_t *arg[128];
+	
 	/* block size */
 	bs = zc->zc_guid;
 	/* block cnt */
 	cnt = zc->zc_cookie;
-	/* need reply */
+	/* send thread num, max 128 */
 	need_reply = zc->zc_simple;
 
 	if (bs > 1048576) {
 		printk("%s: bs too big\n", __func__);
 		return -EINVAL;
 	}
-
-	buf = kmalloc(bs, GFP_KERNEL);
-	if (!buf) {
-		printk("%s: nomem\n", __func__);
-		return -ENOMEM;
-	}
-
-	cluster_san_hb_stop();
+	
+//	cluster_san_hb_stop();
 	zfs_mirror_stop_watchdog_thread();
 
-	printk("%s: start to send data\n", __func__);
-	index = (uint64_t *)buf;
-	for (i = 0; i < cnt; i++) {
-		*index = i;
-		/* FIXME: send msg */
-		ret = zfs_mirror_tx_speed_data(buf, bs, need_reply);
-		if (ret) {
-			printk("%s: send data failed: %d\n", __func__, ret);
-			break;
-		}
+	for (i = 0; i < need_reply; i++) {
+		arg[i] = kmem_zalloc(sizeof(zfs_mirror_speed_test_t), KM_SLEEP);
+		arg[i]->block = bs;
+		arg[i]->cnt = cnt;
+		arg[i]->need_reply = need_reply;
+		arg[i]->is_running = B_TRUE;
+		cv_init(&arg[i]->cv, NULL, CV_DRIVER, NULL);
+		mutex_init(&arg[i]->mtx, NULL, MUTEX_DEFAULT, NULL);
+		kthread_run(zfs_mirror_speed_send_thread, arg[i], 
+			"zfs_mirror_speed_send_thread_%d", i);
 	}
 
-	kfree(buf);
+	for (i = 0; i < need_reply; i++) {
+		mutex_enter(&arg[i]->mtx);
+		while (arg[i]->is_running)
+			cv_wait(&arg[i]->cv, &arg[i]->mtx);
+		mutex_exit(&arg[i]->mtx);
+	}
 
 	return ret;
 }
@@ -5527,8 +5562,7 @@ int cluster_socket_config(zfs_cmd_t *zc)
         sizeof(cluster_target_socket_param_t), GFP_KERNEL);
     param->hostid = zc->zc_guid;
     strcpy(param->hostname, zc->zc_value);
-    printk("%s zc->zc_sendobj=%d\n", __func__, zc->zc_history_offset);
-    param->port = zc->zc_history_offset;
+	strcpy(param->local, zc->zc_top_ds);
     strcpy(param->ipaddr, zc->zc_string);
     param->priority = zc->zc_obj;
 

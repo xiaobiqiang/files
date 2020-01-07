@@ -61,17 +61,17 @@ cluster_san_t *clustersan = NULL;
 uint32_t cluster_target_tran_work_ndefault = 0;
 uint64_t cluster_target_broadcast_index = 0;
 
-uint32_t cluster_target_session_ntranwork = 1;
+unsigned int cluster_target_session_ntranwork = 16;
 uint32_t cluster_target_session_count = 0;
-uint32_t cluster_target_session_nrxworker = 1;
-uint32_t cluster_san_host_nrxworker = 16;
+unsigned int cluster_target_session_nrxworker = 16;
+unsigned int cluster_san_host_nrxworker = 16;
 
 #define	CLUSTER_SESSION_SEL_ROUNDROBIN			0x1
 #define	CLUSTER_SESSION_SEL_LOADBALANCING		0x2
 
 uint32_t cluster_session_select_strategy = CLUSTER_SESSION_SEL_ROUNDROBIN;
 
-volatile uint64_t cts_reply_timeout = 3000; /* ms */
+volatile uint64_t cts_reply_timeout = 600; /* ms */
 
 volatile uint64_t cs_wd_polltime = 10; /* s */
 volatile uint64_t cts_expired_handle_time = 10; /* s */
@@ -593,7 +593,7 @@ int cs_addr_valid(void *addr, const char *name)
 	return (ok);
 }
 
-static cs_rx_data_t *cts_rx_data_alloc(uint64_t len)
+cs_rx_data_t *cts_rx_data_alloc(uint64_t len)
 {
 	cs_rx_data_t *cs_data;
 
@@ -653,7 +653,10 @@ void csh_rx_data_free(cs_rx_data_t *cs_data, boolean_t csh_hold)
 			kmem_free(cs_data->data, cs_data->data_len);
 		}
 #else
-		cs_kmem_free(cs_data->data, cs_data->data_len);
+		if (cs_data->data_len > 1024 * 1024)
+			vfree(cs_data->data);
+		else
+			cs_kmem_free(cs_data->data, cs_data->data_len);
 #endif
 	}
 	if ((cs_data->ex_head != NULL) && (cs_data->ex_len != 0)) {
@@ -1101,6 +1104,7 @@ int cluster_san_init()
 	zfs_hbx_init();
 	/* cluster_target_rpc_rdma_svc_init(); */
 	/* cluster_target_rpc_rdma_clnt_init(); */
+	cluster_target_socket_init();
 
 #ifdef COMM_TEST
 	init_waitqueue_head(&comm_st.wait_queue);
@@ -2508,7 +2512,7 @@ cluster_target_session_worker_handle(void *arg)
 	atomic_dec_32(&cts->sess_rx_worker_n);
 }
 
-static void cluster_san_host_rx_handle(cs_rx_data_t *cs_data);
+void cluster_san_host_rx_handle(cs_rx_data_t *cs_data);
 static cs_rx_data_t *cluster_san_host_fragment_handle(cluster_san_hostinfo_t *cshi, cts_fragment_data_t *fragment);
 
 void
@@ -3074,7 +3078,7 @@ static void cluster_san_rx_clusterevt_handle(cs_rx_data_t *cs_data)
 	}
 }
 
-static void cluster_san_host_rx_handle(
+void cluster_san_host_rx_handle(
 	cs_rx_data_t *cs_data)
 {
 	/* cluster_san_hostinfo_t *cshi = cs_data->cs_private; */
@@ -3508,7 +3512,10 @@ static void cts_tran_worker_thread(void *arg)
 	cluster_target_tran_worker_t *tran_work = (cluster_target_tran_worker_t *)arg;
 	cluster_target_session_t *cts = tran_work->tran_target_private;
 	cluster_target_tran_node_t *tran_node;
-	int ret;
+	int ret = 0;
+	int ret_normal = 0;
+	int ret_pri = 0;
+	boolean_t b_pri = B_FALSE;
 
 	atomic_inc_32(&cts->sess_tran_running_n);
 
@@ -3524,15 +3531,45 @@ static void cts_tran_worker_thread(void *arg)
 
 			if (tran_node == NULL) {
 				tran_node = list_remove_head(tran_work->queue_r);
+				b_pri = B_FALSE;
+			} else {
+				b_pri = B_TRUE;
 			}
 
 			if (tran_node != NULL) {
 				atomic_dec_32(&tran_work->node_numbers);
- 				ret = cts_tran_start(cts, tran_node);
-				if (tran_node->wait != 0) {
+				if (tran_node->need_wait) {
+					if (b_pri && ret_pri != 0) {
+						/* skip */
+					} else if (!b_pri && ret_normal != 0) {
+						/* skip */
+					} else {
+						ret = cts_tran_start(cts, tran_node);
+					}
+				} else {
+					ret = cts_tran_start(cts, tran_node);
+				}
+				
+				if (tran_node->need_wait) {
+					if (b_pri) {
+						if (ret_pri == 0)
+							ret_pri = ret;
+					} else {
+						if (ret_normal == 0)
+							ret_normal = ret;
+					}
+				}
+				
+				if (tran_node->need_wait && tran_node->wait != 0) {
 					mutex_enter(tran_node->mtx);
 					tran_node->wait = 0;
-					tran_node->ret = ret;
+					if (b_pri) {
+						tran_node->ret = ret_pri;
+						ret_pri = 0;
+					} else {
+						tran_node->ret = ret_normal;
+						ret_normal = 0;
+					}
 					cv_signal(tran_node->cv);
 					mutex_exit(tran_node->mtx);
 				} else {
@@ -3565,11 +3602,16 @@ static void cts_tran_worker_thread(void *arg)
 static void cts_tran_worker_init(cluster_target_session_t *cts)
 {
 	int i;
+	cluster_target_port_t *ctp = cts->sess_port_private;
 
 	if (cluster_target_session_ntranwork == 0) {
 		cts->sess_tran_worker_n = num_online_cpus();
+		cmn_err(CE_NOTE, "zjn %s num_online_cpus %d", __func__, 
+			cts->sess_tran_worker_n);
 	} else {
 		cts->sess_tran_worker_n = cluster_target_session_ntranwork;
+		cmn_err(CE_NOTE, "zjn %s sess_tran_worker_n %d", __func__,
+			cts->sess_tran_worker_n);
 	}
 	cts->sess_tran_worker = (cluster_target_tran_worker_t *)kmem_zalloc(
 		sizeof(cluster_target_tran_worker_t) * cts->sess_tran_worker_n, KM_SLEEP);
@@ -3589,6 +3631,7 @@ static void cts_tran_worker_init(cluster_target_session_t *cts)
 		tran_work->queue_pri = &tran_work->queue3;
 		tran_work->state = 0;
 		tran_work->tran_target_private = cts;
+		tran_work->idx = i;
 		tran_work->th = thread_create(NULL, 0, cts_tran_worker_thread,
 			(void*)tran_work, 0, &p0, TS_RUN, minclsyspri);
 	}
@@ -3675,6 +3718,13 @@ int cts_send_wait(cluster_target_session_t *cts,
 	cv_destroy(&cv);
 
 	return (ret);
+}
+
+int cts_send_nowait(cluster_target_session_t *cts,
+	cluster_target_tran_data_t *data_array, int cnt, int pri)
+{
+	cts_tran_entry(cts, data_array, cnt, pri, 0, NULL, NULL);
+	return 0;
 }
 
 static void cts_remove(cluster_target_session_t *cts)
@@ -3877,9 +3927,6 @@ cluster_target_session_t *cluster_target_session_add(
 		atomic_inc_64(&ctp->ref_count); /* hold "cts_init" */
 		cts->sess_port_private = (void *)ctp;
 		cts->sess_pri = ctp->pri;
-
-		ctp->f_session_init(cts, phy_head);
-
 		if ((ctp->protocol & TARGET_PROTOCOL_CLUSTER) != 0) {
 			cts->sess_flags |= CLUSTER_TARGET_SESS_FLAG_SAN;
 		}
@@ -3889,11 +3936,15 @@ cluster_target_session_t *cluster_target_session_add(
 		cluster_san_hostinfo_hold(cshi);
 		cts->sess_host_private = cshi;
 		cts->sess_id = atomic_inc_32_nv(&cluster_target_session_count);
+
+		ctp->f_session_init(cts, phy_head);
+
 		if (ctp->target_type == CLUSTER_TARGET_RPC_RDMA) {
 			/* cts_rpc_rdma_hb_init(cts); */
 		} else if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
 		    /* todo: heart beat */
-            cts_socket_hb_init(cts);
+//            cts_socket_hb_init(cts);
+			cts_tran_worker_init(cts);
 		} else {
 			cts_tran_worker_init(cts);
 			cluster_target_session_worker_init(cts);
@@ -4129,7 +4180,10 @@ static void cluster_target_tran_worker_thread(void *arg)
 	cluster_target_tran_worker_t *tran_work = (cluster_target_tran_worker_t *)arg;
 	cluster_target_port_t * ctp = tran_work->tran_target_private;
 	cluster_target_tran_node_t *tran_node;
-	int ret;
+	int ret = 0;
+	int ret_normal = 0;
+	int ret_pri = 0;
+	boolean_t b_pri = B_FALSE;
 
 	atomic_inc_32(&ctp->tran_running_n);
 
@@ -4145,15 +4199,46 @@ static void cluster_target_tran_worker_thread(void *arg)
 
 			if (tran_node == NULL) {
 				tran_node = list_remove_head(tran_work->queue_r);
+				b_pri = B_FALSE;
+			} else {
+				b_pri = B_TRUE;
 			}
 
 			if (tran_node != NULL) {
 				atomic_dec_32(&tran_work->node_numbers);
-				ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
-				if (tran_node->wait != 0) {
+				if (tran_node->need_wait) {
+					if (b_pri && ret_pri != 0) {
+						/* skip */
+					} else if (!b_pri && ret_normal != 0) {
+						/* skip */
+					} else {
+						ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
+					}
+				} else {
+					ret = ctp->f_send_msg(ctp, tran_node->fragmentation);
+				}
+				
+				if (tran_node->need_wait) {
+					if (b_pri) {
+						if (ret_pri == 0)
+							ret_pri = ret;
+					} else {
+						if (ret_normal == 0)
+							ret_normal = ret;
+					}
+				}
+				
+				if (tran_node->need_wait && tran_node->wait != 0) {
 					mutex_enter(tran_node->mtx);
 					tran_node->wait = 0;
-					tran_node->ret = ret;
+
+					if (b_pri) {
+						tran_node->ret = ret_pri;
+						ret_pri = 0;
+					} else {
+						tran_node->ret = ret_normal;
+						ret_normal = 0;
+					}
 					cv_signal(tran_node->cv);
 					mutex_exit(tran_node->mtx);
 				} else {
@@ -4485,6 +4570,8 @@ static void cluster_target_port_destroy(cluster_target_port_t *ctp)
 	} else if (ctp->target_type == CLUSTER_TARGET_RPC_RDMA) {
 		/* cluster_rdma_target_port = NULL; */
 		/* cluster_target_rpc_rdma_destroy(ctp); */
+	} else if (ctp->target_type == CLUSTER_TARGET_SOCKET){
+
 	} else {
 		cmn_err(CE_WARN, "%s: unkonwn target: %d", __func__, ctp->target_type);
 	}
@@ -4510,8 +4597,10 @@ static int cluster_target_tran_worker_entry(
 	for (i = 0; i < cnt; i++) {
 		tran_node = kmem_zalloc(sizeof(cluster_target_tran_node_t), KM_SLEEP);
 		tran_node->fragmentation= data_array[i].fragmentation;
+		tran_node->need_wait = wait;
 		data_array[i].fragmentation = NULL;
 		if ((wait != 0) && ((i + 1) == cnt)) {
+			/* last one && wait */
 			tran_node->wait = wait;
 			tran_node->mtx = mtx;
 			tran_node->cv = cv;
@@ -4725,6 +4814,8 @@ int cluster_target_session_send(cluster_target_session_t *cts,
 			}
 		}
 		kmem_free(data_array, sizeof(cluster_target_tran_data_t) * fragment_cnt);
+		if ((ctp->target_type == CLUSTER_TARGET_SOCKET) && origin_data->need_reply)
+			cts_reply_notify(cts->sess_host_private, origin_data->index);
 	}
 
 	return (ret);
@@ -4747,6 +4838,14 @@ int cluster_target_session_send_sgl(cluster_target_session_t *cts,
 		return (-1);
 	}
 	ctp = cts->sess_port_private;
+
+	if (ctp->target_type == CLUSTER_TARGET_SOCKET) {
+	    ret = ctp->f_session_tran_sgl_start(cts, origin_data);
+		if ((ret == 0) && (origin_data->need_reply != 0)) {
+			cts_reply_notify(cts->sess_host_private, origin_data->index);
+		}
+        return (ret);
+	}
 
 	ret = ctp->f_tran_fragment_sgl(ctp->target_private, cts->sess_target_private,
 		origin_data, &data_array, &fragment_cnt);	
@@ -4831,9 +4930,15 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
+	/*
+	 * avoid wait reply cause low performance
+	 */
+	need_reply = B_FALSE;
+
 	if (cshi == NULL) {
 		return (-1);
 	}
+		
 	/* retry and reply */
 	tx_index = atomic_inc_64_nv(&cshi->host_tx_index);
 	if (need_reply) {
@@ -4897,6 +5002,8 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	boolean_t is_replyed;
 	int retry_cnt = 0;
 	int ret;
+
+	need_reply = B_FALSE;
 
 	if (cshi == NULL) {
 		return (-1);
@@ -5750,6 +5857,15 @@ clustersan_vsas_set_levent_callback(cs_vsas_rx_cb_t rx_cb, void *arg)
     return 0;
 }
 
+module_param(cluster_target_session_ntranwork, uint, 0644);
+MODULE_PARM_DESC(cluster_target_session_ntranwork, "cluster_target_session_ntranwork");
+
+module_param(cluster_target_session_nrxworker, uint, 0644);
+MODULE_PARM_DESC(cluster_target_session_nrxworker, "cluster_target_session_nrxworker");
+
+module_param(cluster_san_host_nrxworker, uint, 0644);
+MODULE_PARM_DESC(cluster_san_host_nrxworker, "cluster_san_host_nrxworker");
+
 EXPORT_SYMBOL(clustersan_vsas_set_levent_callback);
 EXPORT_SYMBOL(cluster_san_hostinfo_rele);
 EXPORT_SYMBOL(cts_link_up_to_down_handle);
@@ -5768,3 +5884,4 @@ EXPORT_SYMBOL(cluster_san_host_send_sgl);
 EXPORT_SYMBOL(csh_rx_data_free_ext);
 EXPORT_SYMBOL(cs_kmem_alloc);
 EXPORT_SYMBOL(cluster_san_host_sync_send_msg);
+

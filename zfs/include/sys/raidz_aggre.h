@@ -10,6 +10,9 @@
 #define SPACE_RECLAIM_STOP		4
 #define SPACE_RECLAIM_PAUSE		8
 
+#define RAIDZ_AGGRE_DIFF_CONFIG	1
+#define RAIDZ_AGGRE_MIX_NORMAL	2
+
 typedef enum {
 	ELEM_STATE_FREE = 0,
 	ELEM_STATE_REWRITE,
@@ -27,12 +30,11 @@ typedef struct aggre_map_hdr {
 	int aggre_num;
 	int recsize;
 	int blksize;
-	uint64_t total_count;	/* always increment, provide map_index */
-	uint64_t avail_count;	/* current available count, start from process_index */
-	uint64_t process_index;	/* always increment, provide space recovery start index */
-	uint64_t free_index;
-	uint64_t aggre_map_filltime;
-	int aggre_map_state;
+	int state;
+	uint64_t total_count;
+	uint64_t avail_count;
+	uint64_t process_index;
+	uint64_t time;
 } aggre_map_hdr_t;
 
 typedef struct aggre_map_manager {
@@ -45,26 +47,44 @@ typedef struct aggre_map_elem {
 	uint64_t objsetid;
 	uint64_t objectid;
 	dva_t	 dva;
+	uint64_t valid_num;
 	uint64_t blkid[1];
 } aggre_map_elem_t;
 
 typedef struct aggre_map {
 	aggre_map_hdr_t *hdr;
+	int index;
 	objset_t *os;
 	uint64_t object;
 	dmu_buf_t *dbuf_hdr;
 	dmu_buf_t **dbuf_array;
 	int dbuf_num;
 	int dbuf_size;
+	int dbuf_rehold;
 	uint64_t dbuf_id;
+	uint64_t free_txg;
 	kmutex_t aggre_lock;
 } aggre_map_t;
 
-typedef struct map_pos {
+#define	MAP_INDEX_INVALID	-1
+
+#define	MAP_RECLAIM_INVALID	-1
+#define	MAP_RECLAIM_START	0
+#define	MAP_RECLAIM_END		1
+
+#define	MAP_POS_INVALID		-1
+
+#define MAP_STATE_FLAG		1
+#define	MAP_POS_FLAG		2
+
+typedef struct reclaim_state_raidz {
 	kmutex_t	mtx;
+	int			map_index;
+	int			state;
+	uint64_t	cur_time;
 	uint64_t	pos;
-	boolean_t	valid;
-} map_pos_t;
+	int			flag;
+} reclaim_state_t;
 
 typedef struct free_map {
 	objset_t *os;
@@ -160,6 +180,7 @@ typedef struct aggre_io {
 	int ai_ioerror;
     kmutex_t ai_lock;
     dva_t   ai_dva[SPA_DVAS_PER_BP];
+	int		ai_together;
     void *ai_buf_array[TG_MAX_DISK_NUM];
 	tgdva_map_t ai_map;
 	int ai_syncdone;
@@ -184,13 +205,15 @@ typedef struct tg_freebp_entry {
 	an_cur_io->ai_map.tgm_dnodeid = object; \
 }
 
-#define BP_GET_BLKID(bp)	BF64_GET(bp->blk_pad[1], 0, 7)
-#define BP_SET_BLKID(bp,blkid)	BF64_SET(bp->blk_pad[1], 0, 7, blkid);
-#define	BP_SET_NTOGTHER(bp)	(bp->blk_pad[1] = 0x00) 
-
-#define	BP_SET_TOGTHER(bp)	(bp->blk_pad[1] |= 0x8000) 
-#define BP_IS_TOGTHER(bp)   (((bp)->blk_pad[1] & 0x8000) != 0)
-#define BP_SET_CKSUMID(bp,ckid)	BF64_SET(bp->blk_pad[1], 32, 8, ckid);
+#define BP_SET_BLKID(bp, blkid)	BF64_SET((bp)->blk_pad[1], 0, 8, blkid)
+#define BP_GET_BLKID(bp)		BF64_GET((bp)->blk_pad[1], 0, 8)
+#define BP_SET_AGGRENUM(bp, aggre_num)	BF64_SET((bp)->blk_pad[1], 8, 6, aggre_num)
+#define BP_GET_AGGRENUM(bp)		BF64_GET((bp)->blk_pad[1], 8, 6)
+#define BP_SET_FREEFLAG(bp, free)	BF64_SET((bp)->blk_pad[1], 14, 1, free)
+#define BP_GET_FREEFLAG(bp)		BF64_GET((bp)->blk_pad[1], 14, 1)
+#define	BP_SET_TOGTHER(bp)		BF64_SET((bp)->blk_pad[1], 15, 1, 1)
+#define BP_IS_TOGTHER(bp)		BF64_GET((bp)->blk_pad[1], 15, 1)
+#define BP_SET_CKSUMID(bp,ckid)	BF64_SET((bp)->blk_pad[1], 32, 8, ckid)
 
 /*void dbuf_aggre_leaf(list_t * plist_together, uint8_t ntogether);*/
 void dbuf_aggre_leaf(void **drarray, uint8_t ntogether);
@@ -216,9 +239,10 @@ void update_aggre_map_process_pos(spa_t *spa, uint64_t pos, dmu_tx_t *tx);
 void update_aggre_map_free_range(spa_t *spa, dmu_tx_t *tx);
 extern int raidz_aggre_init(void);
 extern void raidz_aggre_fini(void);
-aggre_map_t *raidz_aggre_map_current(spa_t *spa);
-void raidz_aggre_map_free_range_all(spa_t *spa, dmu_tx_t *tx);
-void raidz_aggre_map_free_1open(spa_t *spa, dmu_tx_t *tx);
+aggre_map_t *raidz_aggre_map_current(spa_t *spa, dmu_tx_t *tx);
+void update_reclaim_map(spa_t *spa, dmu_tx_t *tx);
+
+uint64_t raidz_aggre_get_astart(const vdev_t *vd, const uint64_t start);
 
 #endif
 

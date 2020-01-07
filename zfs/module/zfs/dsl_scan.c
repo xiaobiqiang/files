@@ -1817,8 +1817,13 @@ dsl_scan_scrub_cb(dsl_pool_t *dp,
 		 * Keep track of how much data we've examined so that
 		 * zpool(1M) status can make useful progress reports.
 		 */
-		scn->scn_phys.scn_examined += DVA_GET_ASIZE(&bp->blk_dva[d]);
-		spa->spa_scan_pass_exam += DVA_GET_ASIZE(&bp->blk_dva[d]);
+		if (BP_IS_TOGTHER(bp)) {
+			scn->scn_phys.scn_examined += DVA_GET_ASIZE(&bp->blk_dva[d]) / BP_GET_AGGRENUM(bp);
+			spa->spa_scan_pass_exam += DVA_GET_ASIZE(&bp->blk_dva[d]) / BP_GET_AGGRENUM(bp);
+		} else {
+			scn->scn_phys.scn_examined += DVA_GET_ASIZE(&bp->blk_dva[d]);
+			spa->spa_scan_pass_exam += DVA_GET_ASIZE(&bp->blk_dva[d]);
+		}
 
 		/* if it's a resilver, this may not be in the target range */
 		if (!needs_io) {

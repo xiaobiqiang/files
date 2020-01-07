@@ -1,13 +1,16 @@
 [Unit]
-Description=Start stmf service
+Description=Stmf Management Service
 DefaultDependencies=no
-After=zfs.target
+After=stmf-boot.service
+After=pppt-boot.service
+After=configd.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=sleep 2
+ExecStartPre=/usr/bin/sleep 5
 ExecStart=@sbindir@/stmfsvc start
+ExecStop=@sbindir@/stmfsvc stop
 
 [Install]
 WantedBy=multi-user.target

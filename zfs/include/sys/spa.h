@@ -837,7 +837,6 @@ extern void spa_set_rootblkptr(spa_t *spa, const blkptr_t *bp);
 extern void spa_altroot(spa_t *, char *, size_t);
 extern int spa_sync_pass(spa_t *spa);
 extern char *spa_name(spa_t *spa);
-extern boolean_t spa_isaggre(spa_t *spa);
 extern uint64_t spa_guid(spa_t *spa);
 extern uint64_t spa_load_guid(spa_t *spa);
 extern uint64_t spa_last_synced_txg(spa_t *spa);
@@ -976,6 +975,11 @@ extern int spa_mode_global;			/* mode, e.g. FREAD | FWRITE */
 extern uint64_t spa_get_ios(spa_t *spa);
 extern uint64_t spa_import_flags(spa_t *spa);
 extern boolean_t spa_get_group_flags(spa_t *spa);
+
+extern boolean_t spa_is_raidz_aggre(spa_t *spa);
+extern void spa_update_raidz_aggre_vdev_state(spa_t *spa, 
+	int aggre_num, int state);
+extern int spa_raidz_aggre_vdev_state(spa_t * spa, int aggre_num);
 
 #ifdef	__cplusplus
 }

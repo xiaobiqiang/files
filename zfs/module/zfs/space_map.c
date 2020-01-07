@@ -74,12 +74,10 @@ space_map_load(space_map_t *sm, range_tree_t *rt, maptype_t maptype)
 	bufsize = MAX(sm->sm_blksz, SPA_MINBLOCKSIZE);
 	entry_map = zio_buf_alloc(bufsize);
 
-	mutex_exit(sm->sm_lock);
 	if (end > bufsize) {
 		dmu_prefetch(sm->sm_os, space_map_object(sm), bufsize,
 		    end - bufsize);
 	}
-	mutex_enter(sm->sm_lock);
 
 	for (offset = 0; offset < end; offset += bufsize) {
 		size = MIN(end - offset, bufsize);
@@ -90,10 +88,8 @@ space_map_load(space_map_t *sm, range_tree_t *rt, maptype_t maptype)
 		dprintf("object=%llu  offset=%llx  size=%llx\n",
 		    space_map_object(sm), offset, size);
 
-		mutex_exit(sm->sm_lock);
 		error = dmu_read(sm->sm_os, space_map_object(sm), offset, size,
 		    entry_map, DMU_READ_PREFETCH);
-		mutex_enter(sm->sm_lock);
 		if (error != 0)
 			break;
 
@@ -298,11 +294,9 @@ space_map_write(space_map_t *sm, range_tree_t *rt, maptype_t maptype,
 			run_len = MIN(size, SM_RUN_MAX);
 
 			if (entry == entry_map_end) {
-				mutex_exit(rt->rt_lock);
 				dmu_write(os, space_map_object(sm),
 				    sm->sm_phys->smp_objsize, sm->sm_blksz,
                     entry_map, tx, B_FALSE);
-				mutex_enter(rt->rt_lock);
 				sm->sm_phys->smp_objsize += sm->sm_blksz;
 				entry = entry_map;
 			}
@@ -319,10 +313,8 @@ space_map_write(space_map_t *sm, range_tree_t *rt, maptype_t maptype,
 
 	if (entry != entry_map) {
 		size = (entry - entry_map) * sizeof (uint64_t);
-		mutex_exit(rt->rt_lock);
 		dmu_write(os, space_map_object(sm), sm->sm_phys->smp_objsize,
             size, entry_map, tx, B_FALSE);
-		mutex_enter(rt->rt_lock);
 		sm->sm_phys->smp_objsize += size;
 	}
 	ASSERT3U(expected_entries, ==, actual_entries);

@@ -1059,6 +1059,8 @@ idm_so_tgt_svc_online(idm_svc_t *is)
 
 		(void) kernel_setsockopt(so_svc->is_so, SOL_SOCKET,
 		    SO_REUSEADDR, (char *)&on, sizeof (on));
+		(void) kernel_setsockopt(so_svc->is_so, SOL_SOCKET,
+		    SO_REUSEPORT, (char *)&on, sizeof (on));
 		/*
 		 * Turn off SO_MAC_EXEMPT so future sobinds succeed
 		 */

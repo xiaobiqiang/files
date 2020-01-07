@@ -2608,7 +2608,7 @@ dmu_objset_replay_all_cache(objset_t *os)
             zfs_mirror_get_all_buf(os);
             zil_replay_all_data(os);
             zfs_mirror_rele();
-        }
+        } 
         os->os_breplaying = B_FALSE;
     }
 }
@@ -2629,6 +2629,9 @@ debug_mirror_io_addr(uint64_t hash_key)
 {
 }
 
+/*
+ * a big memory allocated can cause low performance.
+ */
 os_mirror_blkptr_list_t *
 dmu_objset_clear_mirror_io(objset_t *os, uint64_t txg)
 {

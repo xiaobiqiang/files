@@ -2120,8 +2120,9 @@ split_mirror_vdev(zpool_handle_t *zhp, char *newname, nvlist_t *props,
 			return (NULL);
 		}
 
-		if (!zfs_check_raidz_aggre_valid(NULL, newroot)) {
-			(void) fprintf(stderr, gettext("split_mirror_vdev check raidz aggre failed\n"));
+		if (!zfs_check_raidz_aggre_valid(newroot)) {
+			(void) fprintf(stderr, gettext("can't use raidz_aggre "
+				"configuration as metadata device\n"));
 			nvlist_free(newroot);
 			return (NULL);
 		}
@@ -2190,8 +2191,9 @@ make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force, int check_rep,
 		return (NULL);
 	}
 
-	if (!zfs_check_raidz_aggre_valid(NULL, newroot)) {
-		(void) fprintf(stderr, gettext("make_root_vdev check raidz aggre failed\n"));
+	if (!zfs_check_raidz_aggre_valid(newroot)) {
+		(void) fprintf(stderr, gettext("can't use raidz_aggre "
+			"configuration as metadata device\n"));
 		nvlist_free(newroot);
 		return (NULL);
 	}

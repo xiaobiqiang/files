@@ -17,14 +17,14 @@
 #define	PROC_DISKSTATS	"/proc/diskstats"
 
 struct per_disk_stat {
-	char name[32];
-	uint32_t reads;
-	uint32_t writes;
-	uint32_t nread;
-	uint32_t nwritten;
-    uint32_t millisec;
-    uint32_t rtime;
-    uint32_t wtime;
+	char name[64];
+	uint64_t reads;
+	uint64_t writes;
+	uint64_t nread;
+	uint64_t nwritten;
+    uint64_t millisec;
+    uint64_t rtime;
+    uint64_t wtime;
 /**
 Field  1 -- # of reads completed                                        
     This is the total number of reads completed successfully.          /1.读IOPS/
@@ -204,7 +204,7 @@ store_disk_stat_history(struct disk_stat_snapshot *old_snap, struct disk_stat_sn
 	xmlNodePtr disk_node, time_node, unique_node, name_node,
 		reads_node, writes_node, nread_node, nwritten_node,await_node,util_node;
 	struct per_disk_stat *p0, *p1;
-	char buf[32];
+	char buf[64];
 	char path[128];
 	uint32_t elapse;
 
@@ -217,7 +217,7 @@ store_disk_stat_history(struct disk_stat_snapshot *old_snap, struct disk_stat_sn
 	for (p0 = old_snap->head, p1 = snap->head; p0 != NULL && p1 != NULL;) {
 		int cmp = strcmp(p0->name, p1->name);
 		if (cmp == 0) {
-			uint32_t diff_r, diff_w,millisec,wtime,rtime,diff_sum,time_sum;
+			uint64_t diff_r, diff_w, millisec, wtime, rtime, diff_sum, time_sum;
 			double rps, wps, rbps, wbps,util,await;
 
 		    /*assert(p0->stat[0] <= p1->stat[0]);
@@ -245,7 +245,7 @@ store_disk_stat_history(struct disk_stat_snapshot *old_snap, struct disk_stat_sn
             }
             else
             {
-                await = 0;  /*响应时间*/
+                await = 0.0;  /*响应时间*/
             }
 			disk_node = xmlNewChild(root_node, NULL, (xmlChar *)"disk", NULL);
 			time_node = xmlNewChild(disk_node, NULL, (xmlChar *)"time", NULL);
@@ -322,7 +322,7 @@ perf_stat_disk(void)
 	snap->timestamp = time(NULL);
 	for (buf = result->head; buf; buf = buf->next) {
 		struct per_disk_stat *stat;
-		unsigned long int ul;
+		unsigned long long int ull;
 		if (buf->bufc < 13)
 			continue;
 		if (strncmp(buf->bufv[2], "sd", 2) != 0)
@@ -334,49 +334,49 @@ perf_stat_disk(void)
 			syslog(LOG_ERR, "alloc per_disk_stat failed");
 			goto failed;
 		}
-        strcpy(stat->name,buf->bufv[2]);
-		if ((ul = str2ul(buf->bufv[3])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[3]);
+        sprintf(stat->name, "%s", buf->bufv[2]);
+		if ((ull = str2ull(buf->bufv[3])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[3]);
 			free(stat);
 			goto failed;
 		}
-		stat->reads = ul;
-		if ((ul = str2ul(buf->bufv[5])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[5]);
+		stat->reads = ull;
+		if ((ull = str2ull(buf->bufv[5])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[5]);
 			free(stat);
 			goto failed;
 		}
-		stat->nread = ul;
-        if ((ul = str2ul(buf->bufv[6])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[6]);
+		stat->nread = ull;
+        if ((ull = str2ull(buf->bufv[6])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[6]);
 			free(stat);
 			goto failed;
 		}
-		stat->rtime = ul;
-        if ((ul = str2ul(buf->bufv[7])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[7]);
+		stat->rtime = ull;
+        if ((ull = str2ull(buf->bufv[7])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[7]);
 			free(stat);
 			goto failed;
 		}
-		stat->writes = ul;
-		if ((ul = str2ul(buf->bufv[9])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[9]);
+		stat->writes = ull;
+		if ((ull = str2ull(buf->bufv[9])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[9]);
 			free(stat);
 			goto failed;
 		}
-		stat->nwritten = ul;
-		if ((ul = str2ul(buf->bufv[10])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[10]);
+		stat->nwritten = ull;
+		if ((ull = str2ull(buf->bufv[10])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[10]);
 			free(stat);
 			goto failed;
 		}
-		stat->wtime = ul;
-        if ((ul = str2ul(buf->bufv[12])) == INVAL_UL) {
-			syslog(LOG_ERR, "str2ul: invalid number: %s", buf->bufv[12]);
+		stat->wtime = ull;
+        if ((ull = str2ull(buf->bufv[12])) == INVAL_UL) {
+			syslog(LOG_ERR, "str2ull: invalid number: %s", buf->bufv[12]);
 			free(stat);
 			goto failed;
 		}
-		stat->millisec = ul;
+		stat->millisec = ull;
         
 		stat->next = snap->head;
 		snap->head = stat;

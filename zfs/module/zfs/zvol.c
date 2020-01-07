@@ -126,6 +126,7 @@ typedef struct {
 
 #define	ZVOL_RDONLY	0x1
 #define	ZVOL_WCE	0x8
+#define	ZVOL_WANT_REMOVE	0x10
 
 static int zvol_wait_create_done(zvol_state_t *zv);
 static void zvol_objset_replay_all_cache(void *arg);
@@ -160,7 +161,8 @@ zvol_replay_rawdata(objset_t *os, char *data,
    dmu_tx_hold_write(tx, object,  offset, len);
    error = dmu_tx_assign(tx, TXG_WAIT);
    if (error) {
-       dmu_tx_abort(tx);
+		printk(KERN_WARNING "%s error:%d", __func__, error);
+       	dmu_tx_abort(tx);
    } else {
        dmu_write(os, object, offset, len, data,
            tx, B_FALSE);
@@ -1201,14 +1203,20 @@ zvol_open(struct block_device *bdev, fmode_t flag)
 		error = -ENXIO;
 		goto out_mutex;
 	}
+	if (zv->zv_flags & ZVOL_WANT_REMOVE) {
+		cmn_err(CE_WARN, "[SPA_REF] zvol_open %p %s want remove", zv, zv->zv_name);
+		error = -ENXIO;
+		goto out_mutex;
+	}
 
     mutex_enter(&zv->zv_state_lock);
 	drop_state_lock = 1;
+#if	0
 	if (drop_mutex) {
 		mutex_exit(&zvol_state_lock);
 		drop_mutex = 0;
 	}
-
+#endif
 	if (zv->zv_open_count == 0) {
 		error = zvol_first_open(zv);
 		if (error) {
@@ -1233,11 +1241,10 @@ out_open_count:
 		zvol_last_close(zv);
 
 out_mutex:
-	if (drop_mutex)
-		mutex_exit(&zvol_state_lock);
-
     if (drop_state_lock)
        mutex_exit(&zv->zv_state_lock);
+	if (drop_mutex)
+		mutex_exit(&zvol_state_lock);
 
 	return (SET_ERROR(error));
 }
@@ -1834,11 +1841,13 @@ zvol_create_minor_impl(const char *name)
 
 	/* replay */
 	mutex_enter(&zv->zv_state_lock);
+#if	0
 	replay_th = thread_create(NULL, 0,
 		zvol_objset_replay_all_cache, (void*)zv,
 		0, &p0, TS_RUN, minclsyspri);
 	
 	if (replay_th == NULL)
+#endif
 		zvol_objset_replay_all_cache((void*)zv);
 
 out_doi:
@@ -2008,6 +2017,20 @@ zvol_create_minors_impl(const char *name)
 	return (SET_ERROR(error));
 }
 
+static void
+zvol_release_force(zvol_state_t *zv)
+{
+	ASSERT(mutex_owned(&zvol_state_lock));
+	mutex_enter(&zv->zv_state_lock);
+	cmn_err(CE_WARN, "[SPA_REF] zvol_release_force %s open count %lu",
+		zv->zv_name, (ulong_t)zv->zv_open_count);
+	if (zv->zv_open_count > 0) {
+		zv->zv_open_count = 0;
+		zvol_last_close(zv);
+	}
+	mutex_exit(&zv->zv_state_lock);
+}
+
 /*
  * Remove minors for specified dataset including children and snapshots.
  */
@@ -2025,6 +2048,16 @@ zvol_remove_minors_impl(const char *name)
 	printk(KERN_WARNING "%s %s begin", __func__, name);
 
 	mutex_enter(&zvol_state_lock);
+
+	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
+		zv_next = list_next(&zvol_state_list, zv);
+		if (name == NULL || strcmp(zv->zv_name, name) == 0 ||
+		    (strncmp(zv->zv_name, name, namelen) == 0 &&
+		    (zv->zv_name[namelen] == '/' ||
+		    zv->zv_name[namelen] == '@'))) {
+		    zv->zv_flags |= ZVOL_WANT_REMOVE;
+	    }
+	}
 	
 	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
 		zv_next = list_next(&zvol_state_list, zv);
@@ -2041,13 +2074,28 @@ zvol_remove_minors_impl(const char *name)
 			printk(KERN_WARNING "%s %s", __func__, zv->zv_name);
 			while (zv->zv_open_count && count > 0) {
 				cv_timedwait(&zv->zv_rele_cv, &zvol_state_lock, 
-					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 1000));
+					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 10));
 				count--;
 			}
-			
+
+			if (zv->zv_open_count == 0) {
+				zvol_remove(zv);
+				zvol_free(zv);
+			}
+		}
+	}
+
+	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
+		zv_next = list_next(&zvol_state_list, zv);
+
+		if (name == NULL || strcmp(zv->zv_name, name) == 0 ||
+		    (strncmp(zv->zv_name, name, namelen) == 0 &&
+		    (zv->zv_name[namelen] == '/' ||
+		    zv->zv_name[namelen] == '@'))) {
+		    zvol_release_force(zv);
 			zvol_remove(zv);
 			zvol_free(zv);
-		}
+	    }
 	}
 
 	mutex_exit(&zvol_state_lock);
