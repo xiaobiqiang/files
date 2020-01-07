@@ -959,7 +959,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 			/* wait a moment, then check index of quantum disk */
 			pthread_mutex_lock(&cluster_failover_state->th_mtx);
 			(void) gettimeofday(&tp, NULL);
-			to.tv_sec = tp.tv_sec + 2;
+			to.tv_sec = tp.tv_sec + 1;
 			to.tv_nsec = tp.tv_usec * 1000;
 			pthread_cond_timedwait(&cluster_failover_state->th_cond,
 				&cluster_failover_state->th_mtx, &to);
@@ -975,7 +975,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 				c_log(LOG_WARNING, "pool(%s) in use, wait a moment, check again", poolname);
 				pthread_mutex_lock(&cluster_failover_state->th_mtx);
 				(void) gettimeofday(&tp, NULL);
-				to.tv_sec = tp.tv_sec + 5;
+				to.tv_sec = tp.tv_sec + 1;
 				to.tv_nsec = tp.tv_usec * 1000;
 				pthread_cond_timedwait(&cluster_failover_state->th_cond,
 					&cluster_failover_state->th_mtx, &to);
@@ -1990,20 +1990,22 @@ excute_cmd_result(const char *cmd, char **result)
 	struct stat sb;
 	ssize_t nread;
 
-	cmdlen = strlen(cmd);
-	pid = getpid();
-	tid = pthread_self();
-	buf = (char *) malloc(cmdlen + 64);
-	if (buf) {
-		snprintf(buf, cmdlen + 64,
-			"%s > /tmp/clusterd.%d.%d.stderr 2>&1",
-			cmd, (int) pid, (int) tid);
-	} else {
-		c_log(LOG_ERR, "out of memory");
+	if (result) {
+		cmdlen = strlen(cmd);
+		pid = getpid();
+		tid = pthread_self();
+		buf = (char *) malloc(cmdlen + 64);
+		if (buf) {
+			snprintf(buf, cmdlen + 64,
+				"%s > /tmp/clusterd.%d.%d.stderr 2>&1",
+				cmd, (int) pid, (int) tid);
+		} else {
+			c_log(LOG_ERR, "out of memory");
+		}
 	}
 
-	c_log(LOG_WARNING, "system('%s')", buf);
-	ret = system(buf);
+	c_log(LOG_WARNING, "system('%s')", cmd);
+	ret = system(buf ? buf : cmd);
 
 	if (ret == -1) {
 		c_log(LOG_ERR,
@@ -2014,6 +2016,9 @@ excute_cmd_result(const char *cmd, char **result)
 	} else {
 		ret = WEXITSTATUS(ret);
 	}
+
+	if (result == NULL || buf == NULL)
+		return (ret);
 
 	snprintf(buf, cmdlen+64, "/tmp/clusterd.%d.%d.stderr",
 		(int) pid, (int) tid);
@@ -2043,7 +2048,6 @@ excute_cmd_result(const char *cmd, char **result)
 				(*result)[nread-1] = '\0';
 			else
 				(*result)[nread] = '\0';
-			c_log(LOG_WARNING, "%s", *result);
 		}
 	}
 
@@ -2061,49 +2065,11 @@ excute_cmd_common(const char *cmd, boolean_t dup2log)
 {
 	int ret;
 	char *buf = NULL;
-	size_t cmdlen;
-	pid_t pid;
-	pthread_t tid;
 
-	if (dup2log) {
-		cmdlen = strlen(cmd);
-		pid = getpid();
-		tid = pthread_self();
-		buf = (char *) malloc(cmdlen + 64);
-		if (buf) {
-			snprintf(buf, cmdlen + 64,
-				"%s > /tmp/clusterd.%d.%d.stderr 2>&1",
-				cmd, (int) pid, (int) tid);
-		} else {
-			c_log(LOG_ERR, "out of memory");
-		}
-	}
+	ret = excute_cmd_result(cmd, dup2log ? &buf : NULL);
 
-	c_log(LOG_WARNING, "system('%s')", cmd);
-	if (buf) {
-		ret = system(buf);
-	} else {
-		ret = system(cmd);
-	}
-	if (ret == -1) {
-		c_log(LOG_ERR,
-			"system(): create child failed or cannot receive status of child");
-	} else if (!WIFEXITED(ret)) {
-		c_log(LOG_ERR,
-			"system(): shell could not be executed in the child process");
-	} else {
-		ret = WEXITSTATUS(ret);
-	}
-
-	if (buf) {
-		snprintf(buf, cmdlen + 64,
-			"cat /tmp/clusterd.%d.%d.stderr | logger -p daemon.notice -t clusterd",
-			(int) pid, (int) tid);
-		(void) system(buf);
-		snprintf(buf, cmdlen + 64,
-			"unlink /tmp/clusterd.%d.%d.stderr",
-			(int) pid, (int) tid);
-		(void) system(buf);
+	if (dup2log && buf != NULL) {
+		c_log(LOG_WARNING, "%s", buf);
 		free(buf);
 	}
 
@@ -2818,16 +2784,172 @@ clusternas_failover_ctl(const void *buffer, int bufsize)
 }
 #endif
 
+static void *
+cluster_task_event_handler(void *arg)
+{
+	uint32_t hostid;
+	cluster_event_t *event = arg;
+
+	pthread_detach(pthread_self());
+
+	switch (event->event) {
+	case EVT_CHANGE_POOL_OWNER:
+		cluster_change_pool_owner(event->data, event->size);
+		break;
+	case EVT_UPDATE_PARTNER_NIC_CONFIG:
+		c_log(LOG_ERR, "cluster update nic, size:%d", event->size);
+		/*cluster_update_partner_nic(event->data, event->size);*/
+		break;
+	case EVT_UPDATE_KEYFILE:
+		cluster_update_keyfile(event->data, event->size);
+		break;
+	case EVT_UPDATE_KEYPATH:
+		cluster_update_keyfile_path(event->data, event->size);
+		break;
+	case EVT_UPDATE_RCMD:
+		cluster_update_remote_cmd(event->data, event->size);
+		break;
+	case EVT_REMOTE_HOST_UP:
+		hostid = *((uint32_t *)event->data);
+		c_log(LOG_ERR, "cluster event remote host:%d up", hostid);
+		hbx_do_cluster_cmd(event->data, event->size, ZFS_HBX_SYNC_POOL);
+		cluster_remote_hbx_recover(hostid);
+		pthread_cond_broadcast(&cluster_import_replicas_cv);
+		break;
+	case EVT_REMOTE_HOST_DOWN:
+		hostid = *((uint32_t *)event->data);
+		c_log(LOG_ERR, "cluster event remote host:%d down", hostid);
+		cluster_remote_hbx_timeout(hostid);
+		break;
+
+	case EVT_SYNCKEY_RESULT: {
+		int fifo_fd;
+		char recv_ID[16];		/* recv the synckey pid */
+		char fifo_name[512];
+		char fifo_buffer[16];	/* save fail or success infor */
+
+		bzero(recv_ID, 16);
+		bzero(fifo_buffer, 16);
+
+		strncpy(recv_ID, event->data, MAX_ID_BYTE);
+
+		/* send the synckey result to synckey-process */
+		bzero(fifo_name, 512);
+		sprintf(fifo_name, "/tmp/synckeyrebak%s", recv_ID);
+		fifo_fd = open(fifo_name, O_WRONLY);
+			if (fifo_fd != -1) {
+				strcpy(fifo_buffer, event->data + MAX_ID_BYTE);
+				write(fifo_fd, fifo_buffer, sizeof(fifo_buffer));
+				close(fifo_fd);				
+			} else {
+				c_log(LOG_ERR, "open FIFO fail");
+			}
+		}
+		break;
+	case EVT_MAC_STATE: {
+		mac_state_param_t mac_state, *msp;
+		int i;
+		
+		if (event->size != sizeof(mac_state_param_t)) {
+			c_log(LOG_ERR, "EVT_MAC_STATE: invalid data");
+		} else {
+			msp = (mac_state_param_t *)event->data;
+			if (msp->flag == FLAG_MAC_STATE_REMOTE_STATE)
+				cluster_failover_conf_handler(FLAG_CF_RESPONSE, event->data);
+			else if (msp->flag == FLAG_MAC_STATE_GET_REMOTE) {
+				mac_state.flag = FLAG_MAC_STATE_REMOTE_STATE;
+				mac_state.mac_num = msp->mac_num;
+				for (i = 0; i < msp->mac_num; i++) {
+					if (cluster_link_state(msp->mac_list[i]) != ils_up) {
+						c_log(LOG_WARNING, "link %s dwon", msp->mac_list[i]);
+						mac_state.mac_num = 0;
+						break;
+					}
+					strlcpy(mac_state.mac_list[i], msp->mac_list[i], MAXLINKNAMELEN);
+					mac_state.linkstate[i] = ils_up;
+				}
+				hbx_do_cluster_cmd_ex((char *)&mac_state, 
+					sizeof(mac_state_param_t), ZFS_HBX_MAC_STAT, msp->hostid);
+			} else if (msp->flag == FLAG_MAC_STATE_IP_RELEASED) {
+				/* remote released the IPs, we do ip failover now */
+				/* old ip failover */
+			}
+		}
+		break;
+	}
+	case EVT_MAC_OFFLINE:
+#if	0
+		if (event->size != MAXLINKNAMELEN)
+			c_log(LOG_ERR, "EVT_MAC_OFFLINE: invalid data");
+		else
+			ret = cluster_failover_conf_handler(FLAG_CF_MAC_OFFLINE, event->data);
+#endif
+		break;
+	case EVT_SPA_REMOTE_HUNG:
+		hostid = *((uint32_t *)event->data);
+		cluster_remote_spa_hung(hostid);
+		break;
+	case EVT_SPA_REMOTE_NORESPONSE:
+		cluster_remote_spa_noresponse();
+		break;
+	case EVT_SPA_REMOTE_RESPONSE:
+		cluster_remote_spa_response();
+		break;
+	case EVT_IPMI_EXCHANGE_IP:
+		ipmi_send_local_ip(0);
+		break;
+	case EVT_IPMI_ADD_ROUTE:
+		ipmi_route_add(event->data);
+		break;
+	case EVT_HBX_CLOSED:
+		cluster_hbx_closed();
+		break;
+	case EVT_RELEASE_POOLS:
+		handle_release_pools_event(event->data, event->size);
+		break;
+	case EVT_CLUSTERSAN_SYNC_CMD:
+		cluster_do_remote_cmd(event->data, event->size);
+		break;
+	case EVT_CLUSTER_IMPORT:
+		cluster_import_event_handler(event->data, event->size);
+		break;
+	case EVT_POWEROFF_REMOTEHOST:
+		cluster_poweroff_remote_event_handler(event->data, event->size);
+		break;
+	case EVT_POWERON_REMOTEHOST:
+		cluster_poweron_remote_event_handler(event->data, event->size);
+		break;
+	case EVT_CLUSTERNAS_FAILOVER_CTL:
+		/*clusternas_failover_ctl(event->data, event->size);*/
+		break;
+	case EVT_CLUSTER_CLOSE_RDMA_RPC: {
+#if	0
+			int rpc_upid = *((int *)event->data);
+			c_log(LOG_ERR, "cluster event close rpc process, pid:%d",
+				rpc_upid);
+			if (rpc_upid != 0) {
+				kill(rpc_upid, SIGKILL);
+			}
+			break;
+#endif
+		}
+	default:
+		break;
+	}
+
+	cluster_clear_hbx_event(event);
+	return (NULL);
+}
+
 static void
 cluster_task_wait_event(void)
 {
-	/*int ret;*/
+	int ret;
 	boolean_t wait = B_TRUE;
-	/*cluster_state_t cls_state = CLUSTER_INIT;*/
 	cluster_event_t *event = NULL;
-	uint32_t hostid;
+	pthread_t tid;
 
-	c_log(LOG_ERR, "cluster task wait event");
+	c_log(LOG_WARNING, "cluster task wait event");
 	/*
 	 * do process according to the change of hbx state, should never exit
 	 */
@@ -2838,154 +2960,13 @@ cluster_task_wait_event(void)
 		}
 		pthread_mutex_unlock(&cls_thread.cls_mutex);
 
-		c_log(LOG_INFO, "cluster event is %d", event->event);
-		/*cls_state = cluster_get_sys_state();*/
-		switch (event->event) {
-		case EVT_CHANGE_POOL_OWNER:
-			cluster_change_pool_owner(event->data, event->size);
-			break;
-		case EVT_UPDATE_PARTNER_NIC_CONFIG:
-			c_log(LOG_ERR, "cluster update nic, size:%d", event->size);
-			/*cluster_update_partner_nic(event->data, event->size);*/
-			break;
-		case EVT_UPDATE_KEYFILE:
-			cluster_update_keyfile(event->data, event->size);
-			break;
-		case EVT_UPDATE_KEYPATH:
-			cluster_update_keyfile_path(event->data, event->size);
-			break;
-		case EVT_UPDATE_RCMD:
-			cluster_update_remote_cmd(event->data, event->size);
-			break;
-		case EVT_REMOTE_HOST_UP:
-			hostid = *((uint32_t *)event->data);
-			c_log(LOG_ERR, "cluster event remote host:%d up", hostid);
-			hbx_do_cluster_cmd(event->data, event->size, ZFS_HBX_SYNC_POOL);
-			cluster_remote_hbx_recover(hostid);
-			pthread_cond_broadcast(&cluster_import_replicas_cv);
-			break;
-		case EVT_REMOTE_HOST_DOWN:
-			hostid = *((uint32_t *)event->data);
-			c_log(LOG_ERR, "cluster event remote host:%d down", hostid);
-			cluster_remote_hbx_timeout(hostid);
-			break;
-
-		case EVT_SYNCKEY_RESULT: {
-			int fifo_fd;
-			char recv_ID[16];		/* recv the synckey pid */
-			char fifo_name[512];
-			char fifo_buffer[16];	/* save fail or success infor */
-
-			bzero(recv_ID, 16);
-			bzero(fifo_buffer, 16);
-
-			strncpy(recv_ID, event->data, MAX_ID_BYTE);
-
-			/* send the synckey result to synckey-process */
-			bzero(fifo_name, 512);
-			sprintf(fifo_name, "/tmp/synckeyrebak%s", recv_ID);
-			fifo_fd = open(fifo_name, O_WRONLY);
-				if (fifo_fd != -1) {
-					strcpy(fifo_buffer, event->data + MAX_ID_BYTE);
-					write(fifo_fd, fifo_buffer, sizeof(fifo_buffer));
-					close(fifo_fd);				
-				} else {
-					c_log(LOG_ERR, "open FIFO fail");
-				}
-			}
-			break;
-		case EVT_MAC_STATE: {
-			mac_state_param_t mac_state, *msp;
-			int i;
-			
-			if (event->size != sizeof(mac_state_param_t)) {
-				c_log(LOG_ERR, "EVT_MAC_STATE: invalid data");
-			} else {
-				msp = (mac_state_param_t *)event->data;
-				if (msp->flag == FLAG_MAC_STATE_REMOTE_STATE)
-					cluster_failover_conf_handler(FLAG_CF_RESPONSE, event->data);
-				else if (msp->flag == FLAG_MAC_STATE_GET_REMOTE) {
-					mac_state.flag = FLAG_MAC_STATE_REMOTE_STATE;
-					mac_state.mac_num = msp->mac_num;
-					for (i = 0; i < msp->mac_num; i++) {
-						if (cluster_link_state(msp->mac_list[i]) != ils_up) {
-							c_log(LOG_WARNING, "link %s dwon", msp->mac_list[i]);
-							mac_state.mac_num = 0;
-							break;
-						}
-						strlcpy(mac_state.mac_list[i], msp->mac_list[i], MAXLINKNAMELEN);
-						mac_state.linkstate[i] = ils_up;
-					}
-					hbx_do_cluster_cmd_ex((char *)&mac_state, 
-						sizeof(mac_state_param_t), ZFS_HBX_MAC_STAT, msp->hostid);
-				} else if (msp->flag == FLAG_MAC_STATE_IP_RELEASED) {
-					/* remote released the IPs, we do ip failover now */
-					/* old ip failover */
-				}
-			}
-			break;
+		c_log(LOG_WARNING, "cluster event is %d", event->event);
+		ret = pthread_create(&tid, NULL, cluster_task_event_handler, event);
+		if (ret != 0) {
+			c_log(LOG_ERR,
+				"handle event %d failed: pthread_create error %d %s",
+				event->event, ret, strerror(ret));;
 		}
-		case EVT_MAC_OFFLINE:
-#if	0
-			if (event->size != MAXLINKNAMELEN)
-				c_log(LOG_ERR, "EVT_MAC_OFFLINE: invalid data");
-			else
-				ret = cluster_failover_conf_handler(FLAG_CF_MAC_OFFLINE, event->data);
-#endif
-			break;
-		case EVT_SPA_REMOTE_HUNG:
-			hostid = *((uint32_t *)event->data);
-			cluster_remote_spa_hung(hostid);
-			break;
-		case EVT_SPA_REMOTE_NORESPONSE:
-			cluster_remote_spa_noresponse();
-			break;
-		case EVT_SPA_REMOTE_RESPONSE:
-			cluster_remote_spa_response();
-			break;
-		case EVT_IPMI_EXCHANGE_IP:
-			ipmi_send_local_ip(0);
-			break;
-		case EVT_IPMI_ADD_ROUTE:
-			ipmi_route_add(event->data);
-			break;
-		case EVT_HBX_CLOSED:
-			cluster_hbx_closed();
-			break;
-		case EVT_RELEASE_POOLS:
-			handle_release_pools_event(event->data, event->size);
-			break;
-		case EVT_CLUSTERSAN_SYNC_CMD:
-			cluster_do_remote_cmd(event->data, event->size);
-			break;
-		case EVT_CLUSTER_IMPORT:
-			cluster_import_event_handler(event->data, event->size);
-			break;
-		case EVT_POWEROFF_REMOTEHOST:
-			cluster_poweroff_remote_event_handler(event->data, event->size);
-			break;
-		case EVT_POWERON_REMOTEHOST:
-			cluster_poweron_remote_event_handler(event->data, event->size);
-			break;
-		case EVT_CLUSTERNAS_FAILOVER_CTL:
-			/*clusternas_failover_ctl(event->data, event->size);*/
-			break;
-		case EVT_CLUSTER_CLOSE_RDMA_RPC: {
-#if	0
-				int rpc_upid = *((int *)event->data);
-				c_log(LOG_ERR, "cluster event close rpc process, pid:%d",
-					rpc_upid);
-				if (rpc_upid != 0) {
-					kill(rpc_upid, SIGKILL);
-				}
-				break;
-#endif
-			}
-		default:
-			break;
-		}
-
-		cluster_clear_hbx_event(event);
 	}
 }
 
@@ -4593,17 +4574,19 @@ cluster_check_sessions(void)
 		return;
 	}
 
-	while (trys < check_try_times) {
+	while (trys++ < check_try_times) {
+		sleep(5);
+
 		state = zfs_clustersan_get_nvlist(libzfs, ZFS_CLUSTERSAN_STATE, NULL, 0);
 		if (state == NULL) {
 			c_log(LOG_ERR, "get clustersan state failed");
-			break;
+			continue;
 		}
 
 		verify(nvlist_lookup_uint32(state, CS_NVL_STATE, &cs_state) == 0);
 		if (cs_state == 0) {
 			c_log(LOG_WARNING, "clustersan disabled");
-			break;
+			continue;
 		}
 
 		session_count = 0;
@@ -4634,8 +4617,6 @@ cluster_check_sessions(void)
 			c_log(LOG_WARNING, "%d sessions connected", session_count);
 			break;
 		}
-		trys++;
-		sleep(1);
 	}
 
 	libzfs_fini(libzfs);
@@ -6392,6 +6373,15 @@ handle_release_message(cluster_mq_message_t *mq_message)
 	return (ret);
 }
 
+static int
+handle_export_pool_message(cluster_mq_message_t *mq_message)
+{
+	uint32_t hostid = 0;
+
+	hbx_do_cluster_cmd((char *) &hostid, sizeof (hostid), ZFS_HBX_SYNC_POOL);
+	return (0);
+}
+
 struct mq_message_args {
 	void *buf;
 	ssize_t nr;
@@ -6418,12 +6408,30 @@ handle_mq_message_thread(void *arg)
 		return (NULL);
 	}
 
-	if (msg.msgtype == cluster_msgtype_release) {
+	switch (msg.msgtype) {
+	case cluster_msgtype_mount:
+	case cluster_msgtype_umount:
+	case cluster_msgtype_set_failover:
+	case cluster_msgtype_remove_failover:
+		handle_failover_set(&msg);
+		break;
+
+	case cluster_msgtype_release:
 		pthread_mutex_lock(&handle_release_lock);
 		handle_release_message(&msg);
 		pthread_mutex_unlock(&handle_release_lock);
-	} else
-		handle_failover_set(&msg);
+		break;
+
+	case cluster_msgtype_import:
+	case cluster_msgtype_export:
+		(void) handle_export_pool_message(&msg);
+		break;
+
+	default:
+		c_log(LOG_ERR, "Invalid message type %d", msg.msgtype);
+		break;
+	}
+
 	return (NULL);
 }
 
