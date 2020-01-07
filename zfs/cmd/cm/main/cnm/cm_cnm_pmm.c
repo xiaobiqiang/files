@@ -320,8 +320,12 @@ void cm_pmm_nas_cal_data(void* olddata,void* newdata,void* data)
 
 sint32 cm_pmm_nas_current_mem(const void *pDecode,void **ppAckData, uint32 *pAckLen)
 {
-    cm_pmm_decode_t *pmm_nas_data = (cm_pmm_decode_t *)pDecode;;
+    cm_pmm_decode_t *pmm_nas_data = (cm_pmm_decode_t *)pDecode;
+    #ifdef __linux__
+    struct statvfs fs_info;
+    #else
     struct statvfs64 fs_info;
+    #endif
     sint8 name[256] = {0};
     uint32 iRet = CM_OK;
     if( NULL == pmm_nas_data)

@@ -1028,7 +1028,7 @@ static uint32 cm_cnm_explorer_get_type(uint32 mode)
     }else if(S_ISLNK(mode))
     {
         return 5;
-    }else if(S_ISSOCK(mode))
+    }else
     {
         return 6;
     }

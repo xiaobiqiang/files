@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <fcntl.h>
+
 
 #define CM_TASK_MAX_TASK_NUM 64
 
