@@ -40,3 +40,6 @@ fi
 if [ ! -f /usr/sbin/cm_topo ]; then
     ln -s /var/cm/script/cm_topo.sh /usr/sbin/cm_topo
 fi
+
+chmod 755 ./build/makeam.sh
+./build/makeam.sh
