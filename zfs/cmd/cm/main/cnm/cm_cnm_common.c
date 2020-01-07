@@ -1136,6 +1136,9 @@ sint32 cm_cnm_exec_ping(sint8 *ipaddr)
 {
     sint32 iRet;
     sint8 buf[CM_STRING_32] = {0};
+#ifdef __linux__
+    return cm_system("ping %s -c 1 2>/dev/null 1>/dev/null",ipaddr);
+#else
     iRet = cm_exec_tmout(buf, CM_STRING_32, CM_CNM_PING_TMOUT+1,
                          "ping %s %d 2>/dev/null | awk '{printf $3}'", ipaddr, CM_CNM_PING_TMOUT);
     if(CM_OK != iRet)
@@ -1143,5 +1146,6 @@ sint32 cm_cnm_exec_ping(sint8 *ipaddr)
         return CM_FAIL;
     }
     return strcmp("alive", buf);
+#endif
 }
 
