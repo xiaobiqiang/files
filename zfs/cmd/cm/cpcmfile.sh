@@ -6,10 +6,10 @@ fi
 
 if [ ! -d /var/cm/script ]; then
     mkdir -p /var/cm/script 2>/dev/null
-    cp -rf ./script_linux/* /var/cm/script
-    cp -rf ./script_py2/* /var/cm/script
-    chmod 755 /var/cm/script/*
 fi
+cp -rf ./script_linux/* /var/cm/script
+cp -rf ./script_py2/* /var/cm/script
+chmod 755 /var/cm/script/*
 
 if [ ! -d /var/cm/static ]; then
     mkdir -p /var/cm/static

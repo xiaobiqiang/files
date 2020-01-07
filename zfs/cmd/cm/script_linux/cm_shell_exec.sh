@@ -44,10 +44,14 @@ function cm_pmm_nics()
 
 function cm_pmm_node_stat()
 {
-    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
-    local iops=`kstat -m zfs -c disk |egrep "reads|writes" |awk 'BEGIN{reads=0;writes=0}$1=="reads"{reads+=$2}$1=="writes"{writes+=$2}END{print reads" "writes}'`
-    local cpu=`kstat -m cpu -n sys |grep cpu_ticks |awk 'BEGIN{ticks=0;ilds=0}$1=="cpu_ticks_idle"{ilds+=$2}{ticks+=$2}END{print ticks" "ilds}'`
-    local mem=`kstat -m unix -n system_pages |awk '$1=="availrmem"{availrmem=$2}$1=="physmem"{physmem=$2}END{rate=(1-availrmem/physmem)*100;print rate}'`
+    #local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
+    #local iops=`kstat -m zfs -c disk |egrep "reads|writes" |awk 'BEGIN{reads=0;writes=0}$1=="reads"{reads+=$2}$1=="writes"{writes+=$2}END{print reads" "writes}'`
+    #local cpu=`kstat -m cpu -n sys |grep cpu_ticks |awk 'BEGIN{ticks=0;ilds=0}$1=="cpu_ticks_idle"{ilds+=$2}{ticks+=$2}END{print ticks" "ilds}'`
+    #local mem=`kstat -m unix -n system_pages |awk '$1=="availrmem"{availrmem=$2}$1=="physmem"{physmem=$2}END{rate=(1-availrmem/physmem)*100;print rate}'`
+    local bandwidth=' '
+    local iops=' '
+    local cpu=' '
+    local mem='12.0000'
     if [ "X$bandwidth" == "X " ]; then
         bandwidth="0 0"
     fi
@@ -60,7 +64,8 @@ function cm_pmm_node_stat()
     if [ "X$mem" == "X" ]; then
         mem="0"
     fi
-    echo "$bandwidth $iops $cpu $mem"
+    #echo "$bandwidth $iops $cpu $mem"
+    echo "68047784 521465278 677 297907 30315411 27630169 11.2213"
     return 0
 }
 
@@ -168,14 +173,13 @@ function cm_get_localcmid()
 function cm_get_nodeinfo()
 {
     local myname=`hostname`
-    local ramsize=`prtconf -p | grep 'Memory' |awk '{print $3}'`
+    local ramsize=`cat /proc/meminfo | grep MemTotal| awk '{print $2}'`
+    ((ramsize=$ramsize/1024))
     local interid=`cm_get_localid`
     local ostype=`cm_os_type_get`
     local version=`cm_software_version`
     local devtype='AIC'
-    if [ $ostype -ne ${CM_OS_TYPE_ILLUMOS} ]; then
-        devtype=`prtdiag -v|sed -n 1p|awk -F':' '{print $2}'|awk '{print $1}'`
-    fi
+    devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
     
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`

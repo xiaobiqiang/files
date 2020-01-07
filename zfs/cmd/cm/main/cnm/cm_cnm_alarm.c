@@ -1486,9 +1486,12 @@ sint32 cm_cnm_alarm_common_init(void)
 
     cm_cnm_alarm_common_get();
     cm_system("%s init",cm_cnm_alarm_sas_py);
-
+    #ifdef __linux__
+    memory = cm_exec_int("cat /proc/meminfo | grep MemTotal| awk '{print $2}'");
+    memory /= 1024;
+    #else
     memory = cm_exec_int("prtconf -p | grep 'Memory' |awk '{printf $3}'");
-
+    #endif
     if(cm_cnm_alarm_memory == 0)
     {
         cm_ini_set_ext_uint32(cm_cnm_alarm_config_file,"config","memory",memory);

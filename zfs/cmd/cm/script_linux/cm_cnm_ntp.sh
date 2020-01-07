@@ -1,10 +1,11 @@
 #!/bin/bash
 function cm_cnm_ntp_server()
 {
-	cp /etc/inet/ntp.server /etc/inet/ntp.conf
-	echo "server 127.127.1.0" >>  /etc/inet/ntp.conf
-	svcadm disable ntp
-	svcadm enable ntp
+    #cp /etc/inet/ntp.server /etc/inet/ntp.conf
+    #echo "server 127.127.1.0" >>  /etc/inet/ntp.conf
+    #svcadm disable ntp
+    #svcadm enable ntp
+    return 0
 }
 
 function cm_cnm_ntp_client()
