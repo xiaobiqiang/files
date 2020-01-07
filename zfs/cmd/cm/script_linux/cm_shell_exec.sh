@@ -65,7 +65,7 @@ function cm_pmm_node_stat()
         mem="0"
     fi
     #echo "$bandwidth $iops $cpu $mem"
-    echo "68047784 521465278 677 297907 30315411 27630169 11.2213"
+    echo "68047784 521465278 677 297907 30315411 27630169 11"
     return 0
 }
 

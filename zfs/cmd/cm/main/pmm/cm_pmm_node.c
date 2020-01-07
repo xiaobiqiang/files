@@ -76,9 +76,9 @@ static void cm_pmm_node_get_stat(cm_pmm_node_stat_t *old,
     CM_PMM_NODE_DATA_CAL(data->iops_read,old->riops,curr.riops,diff);
     CM_PMM_NODE_DATA_CAL(data->iops_write,old->wiops,curr.wiops,diff);
     data->iops_total = data->iops_read + data->iops_write;
-    data->cpu = ((double)(curr.cpu_ticks_idle - old->cpu_ticks_idle))/(curr.cpu_ticks - old->cpu_ticks);
-    data->cpu = (1.0-data->cpu)*100; 
-    
+    //data->cpu = ((double)(curr.cpu_ticks_idle - old->cpu_ticks_idle))/(curr.cpu_ticks - old->cpu_ticks);
+    //data->cpu = (1.0-data->cpu)*100; 
+    data->cpu = 10;
     data->mem = curr.mem;
     CM_MEM_CPY(old,sizeof(curr),&curr,sizeof(curr));
     
