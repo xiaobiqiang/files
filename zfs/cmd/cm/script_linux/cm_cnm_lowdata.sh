@@ -295,12 +295,10 @@ function cm_cnm_lowdata_volume_stop()
     local stop=`cat $config 2>/dev/null|grep stop|awk '{print $3}'`
    
     if [ "X"$stop = "X" ]; then
-        echo "none"
         return 
     fi
     
     if [ $stop -eq 0 ]; then
-        echo "0"
         return
     fi
     
