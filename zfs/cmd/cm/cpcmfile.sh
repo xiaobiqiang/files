@@ -42,6 +42,4 @@ if [ ! -f /usr/sbin/cm_topo ]; then
 fi
 
 chmod 755 ./build/makeam.sh
-cd ./build
-./makeam.sh
-cd -
+./build/makeam.sh

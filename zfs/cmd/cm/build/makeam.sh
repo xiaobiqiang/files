@@ -1,16 +1,18 @@
 #!/bin/bash
-
-OPEN_DIR='../opensrc/'
-BASE_DIR='../base/'
-CLI_DIR='../cli/'
-CM_DIR='../main/'
-CMD_DIR='../cmd/'
-EXEC_DIR='../exec/'
-JNI_DIR='../jni/'
-BUILD_DIR='../build/'
-CFG_DIR='../config/'
-CM_DIR='../main/'
-JNI_DIR='../jni/'
+cd ../
+DIR=`pwd`
+cd -
+OPEN_DIR='$DIR/opensrc/'
+BASE_DIR='$DIR/base/'
+CLI_DIR='$DIR/cli/'
+CM_DIR='$DIR/main/'
+CMD_DIR='$DIR/cmd/'
+EXEC_DIR='$DIR/exec/'
+JNI_DIR='$DIR/jni/'
+BUILD_DIR='$DIR/build/'
+CFG_DIR='$DIR/config/'
+CM_DIR='$DIR/main/'
+JNI_DIR='$DIR/jni/'
 projects="open base cli cfg cmd exec cm jni"
 
 function make_am_include()
