@@ -156,7 +156,7 @@ function cm_get_localmanageport()
 {
     local cfgfile='/var/cm/data/node_config.ini'
     if [ ! -f ${cfgfile} ]; then
-        echo "igb0"
+        echo "eth0"
         return 0
     fi
     local mport=`grep '^mport' $cfgfile |sed 's/ //g' |awk -F'=' '{print $2}'`
@@ -164,21 +164,20 @@ function cm_get_localmanageport()
         echo $mport
         return 0
     fi
-    echo "igb0"
+    echo "eth0"
     return 0
 }
 
 function cm_get_localmanageip()
 {
-    local mport=`cm_get_localmanageport`
-    local cfgfile='/etc/hostname.'$mport
+    local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
+    local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
     
-    if [ ! -f ${cfgfile} ]; then
-        CM_LOG "[${FUNCNAME}:${LINENO}]$cfgfile not exist"
-        echo "0.0.0.0"
+    if [ ! -f ${cfgfile} ] || [`cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
+        ifconfig eth0|grep 'inet '|awk '{print $2}'
         return 0
     fi
-    sed -n 1p ${cfgfile}
+    cat $cfgfile|grep IPADDR |awk -F'=' '{print $2}'
     return 0
 }
 

@@ -19,7 +19,7 @@ function set_nas_rpc_nics
         mkdir -p /etc/fsgroup
     fi
     local mport=`cm_get_localmanageport`
-    local ipaddr=$(cat /etc/hostname.${mport} | awk 'NR==1')
+    local ipaddr=`cm_get_localmanageip`
     is_ipv4_dot_notation $ipaddr
     [ $? -ne 0 ]&&return 0
     [ -e /etc/fsgroup/rpc_port.conf ]&&return 0
@@ -164,11 +164,11 @@ function cm_node_cluster_init
             fi
             #cm_node_cluster_conf
             #[ $? -ne 0 ]&&return $CM_FAIL
-            local state=`svcs clusterd |sed 1d |awk '{print $1}'`
-            if [ "X$state" == 'Xdisabled' ]; then
-                svcadm enable clusterd
+            local state=`service  zfs-clusterd status|grep Active|awk '{print $2}'`
+            if [ "X$state" == 'Xinactive' ]; then
+                systemctl start zfs-clusterd
             else
-                svcadm restart clusterd
+                systemctl restart zfs-clusterd
             fi
             sleep 8
             /var/cm/script/cm_cnm.sh node_rdma_add
@@ -240,11 +240,11 @@ function cm_node_init_cluster_info
     cat /var/cm/zfs_clustersan_list_target_v.info |sed 's/ //g' |egrep 'Target|priority' |awk -F':' 'BEGIN{ni="";pr="";prt=""}$1=="Target"{ni=ni""$2", ";prt=""}$1=="priority"&&prt==""{pr=pr""$2", ";prt=$2}END{print "nic = "ni;print "priority = "pr}' |sed 's/, $//g' >> $CLUSTERCONF
     local dttime=`date '+%Y%m%d%H%M%S'`
     echo "time = $dttime" >> $CLUSTERCONF
-    val=`sed -n 1p /lib/release |awk '{print $5}' |sed 's/PRO//g'`
+    val='zfsonlinux'
     echo "version = $val" >> $CLUSTERCONF
-    val=`sed -n 1p /etc/hostname.${mport}`
+    val=`cm_get_localmanageip`
     echo "ip = $val" >> $CLUSTERCONF
-    sed -n 2p /etc/hostname.${mport} |sed 's/ / = /g' >> $CLUSTERCONF
+    ifconfig $mport|grep netmask|awk '{print $4}' >> $CLUSTERCONF
     val=`netstat -r |grep ^default |awk '{print $2}'`
     if [ "X$val" == "X" ]; then
         val=`sed -n 1p /etc/hostname.${mport} |awk -F'.' '{print $1"."$2"."$3".1"}'`

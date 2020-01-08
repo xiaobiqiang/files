@@ -430,7 +430,7 @@ function cm_cnm_node_rdma_checkaddlocal()
     for((index=0;index<$cnt;index++))
     do
         #获取远端节点集群通信IP
-        local rdmaip=`sed -n 1p /etc/hostname.${nics[$index]}`
+        local rdmaip=`ifconfig  ${nics[$index]} | grep 'inet '|awk '{print $2}'`
         if [ "X$rdmaip" == "X" ]; then
             CM_LOG "[${FUNCNAME}:${LINENO}]/etc/hostname.${nics[$index]} not config"
             echo $CM_ERR_NOT_EXISTS > $checkresultfile
@@ -504,7 +504,7 @@ function cm_cnm_node_rdma_checkadd()
     for((index=0;index<$cnt;index++))
     do
         #获取远端节点集群通信IP
-        local rdmaip=`ceres_exec $remoteip "sed -n 1p /etc/hostname.${nics[$index]}"`
+        local rdmaip=`ceres_exec $remoteip "ifconfig  ${nics[$index]} | grep 'inet '|awk '{print \$2}'"`
         if [ "X$rdmaip" == "X" ]; then
             CM_LOG "[${FUNCNAME}:${LINENO}] ip:$remoteip /etc/hostname.${nics[$index]} not config"
             echo $CM_ERR_NOT_EXISTS > $checkresultfile

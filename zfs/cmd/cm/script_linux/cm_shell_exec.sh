@@ -161,11 +161,7 @@ function cm_get_hoststrid()
 function cm_get_localcmid()
 {
     local mport=`cm_get_localmanageport`
-    if [ ! -f /etc/hostname.${mport} ]; then
-        echo "0"
-        return 0
-    fi
-    local interid=`sed -n 1p /etc/hostname.${mport} |awk -F'.' '{myid=$3*512+$4;print myid}'`
+    local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
     echo $interid
     return 0
 }
@@ -183,9 +179,7 @@ function cm_get_nodeinfo()
     
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`
-    if [ -f /etc/hostname.${mport} ]; then
-        myip=`sed -n 1p /etc/hostname.${mport}`
-    fi
+    myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
     local snum=16
     if [ "X$devtype" == "XAIC" ]; then
         devtype=1
