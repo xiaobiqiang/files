@@ -1451,6 +1451,9 @@ int cluster_change_failover_host(cluster_san_hostinfo_t *cshi)
 				__func__, cshi->hostid);
 			cluster_san_hostinfo_hold(cshi);
 			clustersan->cs_failover_host = cshi;
+		} else {
+			cmn_err(CE_WARN, "%s: change failover host %d error %d",
+				__func__, cshi->hostid, ret);
 		}
 	}
 	mutex_exit(&clustersan->cs_failover_host_lock);

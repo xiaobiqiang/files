@@ -1264,9 +1264,15 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 	}
 	else{
 		printk(KERN_WARNING "%s data_opened zv is null \n", __func__);
-		return;
+		goto out_release;
 	}
-	ASSERT(zv && zv->zv_open_count > 0);
+
+	if (zv->zv_open_count == 0 ||
+		zv->zv_disk == NULL ||
+		zv->zv_state == ZVOL_UNINITIALIZED) {
+		printk(KERN_WARNING "%s zvol %p freed\n", __func__, zv);
+		goto out_release;
+	}
 
 	if (!mutex_owned(&zvol_state_lock)) {
 		mutex_enter(&zvol_state_lock);
@@ -1284,8 +1290,11 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 	if (drop_mutex)
 		mutex_exit(&zvol_state_lock);
 
+out_release:
 #ifndef HAVE_BLOCK_DEVICE_OPERATIONS_RELEASE_VOID
 	return (0);
+#else
+	return;
 #endif
 }
 
@@ -1741,6 +1750,8 @@ zvol_free(zvol_state_t *zv)
 	del_gendisk(zv->zv_disk);
 	blk_cleanup_queue(zv->zv_queue);
 	put_disk(zv->zv_disk);
+	zv->zv_disk = NULL;
+	zv->zv_state = ZVOL_UNINITIALIZED;
 
 	mutex_destroy(&zv->zv_state_lock);
 	cv_destroy(&zv->zv_cv);
