@@ -174,7 +174,9 @@ int main(int argc, const char *argv[])
     struct tm pre;
     struct tm now;
     sint32 cnt = cm_exec_int("ps -ef|grep -w ceres_cm |grep -v grep |wc -l");
-
+    sint32 daemon_disable = 0;
+    sint32 c = 0;
+    
     if(1 < cnt)
     {
         printf("already run! cnt=%d\n",cnt);
@@ -183,10 +185,19 @@ int main(int argc, const char *argv[])
     (void)cm_system("/var/cm/script/cm_node.sh preinit");
     
     g_cm_sys_ver = cm_exec_int(CM_SHELL_EXEC" cm_systerm_version_get");
-    
-    if(0 != fork())
-    {
-        return 0;
+
+    while ((c = getopt(argc, argv, "d")) != EOF) {
+		switch (c) {
+		case 'd':
+			daemon_disable = 1;
+			break;
+		}
+	}
+    if(!daemon_disable){
+        if(0 != fork())
+        {
+            return 0;
+        }
     }
     signal(SIGPIPE,SIG_IGN);
     (void)cm_system("mkdir -p %s 2>/dev/null",CM_DATA_DIR);
