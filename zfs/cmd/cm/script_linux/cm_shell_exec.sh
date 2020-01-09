@@ -268,7 +268,7 @@ function cm_masterip_bind()
     fi
     
     local tmp=`grep -w 'ip' $cfgfile |sed 's/ //g' |awk -F'=' '{print $2}'`
-    ping $tmp 1 1>/dev/null 2>/dev/null
+    ping $tmp -c 1 1>/dev/null 2>/dev/null
     ret=$?
     if [ "X$ret" == "X0" ]; then
         return 0
@@ -278,7 +278,7 @@ function cm_masterip_bind()
         return 0
     fi    
     local mport=`cm_get_localmanageport`
-    ifconfig ${mport} addif $tmp netmask $ntmsk up 1>/dev/null 2>/dev/null
+    ifconfig ${mport} add $tmp netmask $ntmsk up 1>/dev/null 2>/dev/null
     ret=$?
     if [ "X$ret" != "X0" ]; then
         return 1
@@ -292,7 +292,7 @@ function cm_masterip_bind()
     if [ "X$tmp" != "X" ]; then
         return 0
     fi
-    route add default $tmp 1>/dev/null 2>/dev/null
+    route add default gw $tmp 1>/dev/null 2>/dev/null
     ret=$?
     return 0
 }

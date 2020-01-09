@@ -67,12 +67,16 @@ def recv_data(clientfd):
     return result.decode('utf-8').encode('gbk')
     
 def connect_server(ip,port,hostname,load):
-    
+    ret = 0
     clientfd = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    ret,_ = commands.getstatusoutput("ping "+ip+" 1")
+    system_name = platform.system()
+    if system_name == 'Linux':
+        ret,_ = commands.getstatusoutput("ping "+ip+" -c 1")
+    else:
+        ret,_ = commands.getstatusoutput("ping "+ip+" 1")
     if ret != 0:
         sys.stderr.write(hostname+" ping fail\n")
-        sys.exit(1)
+        return
     try:
         clientfd.connect((ip,port))
     except:

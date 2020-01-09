@@ -43,7 +43,12 @@ def recv_data(clientfd):
 def remote_cmd(hostname,ip,port,cmd):
     global timeout
     recv_len = 0
-    ret,_ = commands.getstatusoutput("ping "+ip+" 1")
+    ret = 0
+    system_name = platform.system()
+    if system_name == 'Linux':
+        ret,_ = commands.getstatusoutput("ping "+ip+" -c 1")
+    else:
+        ret,_ = commands.getstatusoutput("ping "+ip+" 1")
     if ret != 0:
         sys.stderr.write(hostname+" ping fail\n")
         return
