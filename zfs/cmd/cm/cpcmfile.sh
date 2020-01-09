@@ -41,4 +41,12 @@ if [ ! -f /usr/sbin/cm_topo ]; then
     ln -s /var/cm/script/cm_topo.sh /usr/sbin/cm_topo
 fi
 
+if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
+    cp -rf ./build/buildresult/ceres_cm.service /usr/lib/systemd/system/
+    cp -rf ./build/buildresult/cm_multi_server.service /usr/lib/systemd/system/
+    systemctl daemon-reload
+    systemctl enable ceres_cm
+    systemctl enable cm_multi_server
+fi
+
 chmod 755 ./build/makeam.sh

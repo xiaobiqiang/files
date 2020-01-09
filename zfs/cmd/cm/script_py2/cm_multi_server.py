@@ -129,26 +129,28 @@ class Server:
             
 
 if __name__ == '__main__':
-
-    pid = os.fork()
-    if pid:
-        sys.exit(0)
-    os.umask(0)
-    os.setsid()
-    c_pid = os.fork()
-    if c_pid:
-        sys.exit(0)
-    os.chdir('/')
-    sys.stdout.flush()
-    sys.stderr.flush()
+    if len(sys.argv) >1 and sys.argv[1] == "disable":
+        pass
+    else:
+        pid = os.fork()
+        if pid:
+            sys.exit(0)
+        os.umask(0)
+        os.setsid()
+        c_pid = os.fork()
+        if c_pid:
+            sys.exit(0)
+        os.chdir('/')
+        sys.stdout.flush()
+        sys.stderr.flush()
         
-    read_null = open('/dev/null')
-    write_null = open('/dev/null','w')
-    os.dup2(read_null.fileno(),sys.stdin.fileno())
-    os.dup2(write_null.fileno(),sys.stdout.fileno())
-    os.dup2(write_null.fileno(),sys.stderr.fileno())
-    read_null.close()
-    write_null.close()
+        read_null = open('/dev/null')
+        write_null = open('/dev/null','w')
+        os.dup2(read_null.fileno(),sys.stdin.fileno())
+        os.dup2(write_null.fileno(),sys.stdout.fileno())
+        os.dup2(write_null.fileno(),sys.stderr.fileno())
+        read_null.close()
+        write_null.close()
 
     port = 7795
     host = "0.0.0.0"
