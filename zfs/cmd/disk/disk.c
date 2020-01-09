@@ -414,6 +414,7 @@ int disk_restore_init(slice_req_t *);
 static int disk_check_inuse(const char *dev);
 static void print_slices(char *diskname, dmg_map_t map, dmg_lun_t *lun);
 static int disk_mark(slice_req_t *);
+static int disk_clear_mark(slice_req_t *);
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
 extern int disk_get_poolname(const char *dev,char *pool_name);
 
@@ -1068,6 +1069,8 @@ main(int argc, char **argv) {
 			return (status);
 		} else if (strcasecmp(subcommand, SUBC_MARK) == 0) {
 			status = disk_mark(&req_parms);
+		} else if (strcasecmp(subcommand, "Cmark") == 0) {
+			status = disk_clear_mark(&req_parms);
 		} else if (strcasecmp(subcommand, SUBC_RESTORE) == 0) {
 			if (disk_check_inuse(req_parms.disk_name) ==0)
 				status = disk_restore_init(&req_parms);
@@ -1694,4 +1697,107 @@ static int disk_mark(slice_req_t *req)
 	return (ret);
 	
 }
+
+int zpool_write_dev_stamp_clear_mark(char *path, zpool_stamp_t *stamp)
+{
+	int fd,ret = 1;
+	uint64_t stamp_offset;
+	zpool_stamp_t *stamp_tmp;
+	stamp_tmp = malloc(sizeof(zpool_stamp_t));
+	if (stamp_tmp != NULL) {
+		bzero(stamp_tmp, sizeof(zpool_stamp_t));
+	}
+	fd = open(path, O_RDWR|O_NDELAY|O_SYNC);
+	if (fd > 0) {
+		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
+			syslog(LOG_ERR, "write stamp, get offset <%s> failed", path);
+		} else {
+			stamp_offset += stamp_offset/STAMP_OFFSET;
+			if (pwrite(fd, stamp, sizeof(zpool_stamp_t), stamp_offset) != sizeof(zpool_stamp_t)) {
+				syslog(LOG_ERR, "write error, <%s>", path);
+			} else {
+				ret = 0;
+			}
+		}
+		close(fd);
+	} else {
+		syslog(LOG_ERR, "write stamp, open <%s> failed",path);
+	}
+    free(stamp_tmp);
+	return (ret);
+}
+
+
+static int disk_clear_mark(slice_req_t *req)
+{
+	int ret=0;
+	char buffer[256] = {"\0"};
+	zpool_stamp_t *stamp = NULL;
+	int fd;
+	char drv_opath[256] = {"\0"};
+	int slice_count = -1;
+	int i, len = 0;
+	struct dk_gpt *vtoc;
+	int err = -1;
+
+	ret = get_disk_name(req, SUBC_MARK);
+	if (ret)
+		return (ret);
+#if 0
+	strcpy(buffer, req->disk_name);
+	
+	len = strlen(buffer);
+	/*add by jbzhao 20151202 begin
+	 * for disk mark slice 0~6*/
+	if ( buffer[len -1] == '0' && buffer[len - 2] == 'd'){
+	/*add by jbzhao 20151202 end*/
+
+	/*
+	 *read EFI label and scan all slices,
+	 *if slices 0 ~ 7 p_size is 0,
+	 *shows this disk is free
+	 */
+		sprintf(drv_opath,"%s%s",buffer,"p0");
+#else
+	memcpy(drv_opath, req->disk_name, strlen(req->disk_name));
+#endif
+	if ((fd = open(drv_opath, O_RDONLY|O_NDELAY)) >= 0) {
+		if ((err = efi_alloc_and_read(fd, &vtoc)) >= 0) {
+			for(i = 0; i < vtoc->efi_nparts; i++){
+				if(vtoc->efi_parts[i].p_size != 0){
+					slice_count = i;
+					break;
+				}
+			}
+			efi_free(vtoc);
+		}
+		(void) close(fd);
+	}else {
+		ret = 1;
+		return (ret);
+	}
+
+	if(slice_count != 8){
+		printf("%s is not free,don't clear mark\n",buffer);
+		ret = 1;
+		return (ret);
+	}
+#if 0
+/*add by jbzhao 20151202 begin*/
+	}
+/*add by jbzhao 20151202 end */
+#endif
+	stamp = malloc(sizeof(zpool_stamp_t));
+	if (stamp != NULL) {
+		bzero(stamp, sizeof(zpool_stamp_t));
+		stamp->para.company_name = 0x87654321;
+		ret=zpool_write_dev_stamp_clear_mark(req->disk_name, stamp);
+		free(stamp);
+	}
+	if(ret)
+		printf("clear mark fail!\n");
+	return (ret);
+	
+}
+
 

@@ -21,6 +21,7 @@ extern "C" {
 #define	SUBC_GAPS		"Gaps"
 #define	SUBC_LED		"Led"
 #define	SUBC_MARK		"Mark"
+#define SUBC_CLEAR_MARK "Cmark"
 #define	SUBC_RESTORE		"restore"
 
 #define	SUBC_LIST_GAPS		"List-gaps"
