@@ -540,6 +540,7 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 		rm->rm_col[c].rc_error = 0;
 		rm->rm_col[c].rc_tried = 0;
 		rm->rm_col[c].rc_skipped = 0;
+		rm->rm_col[c].rc_need_try = 0;
 
 		if (c >= acols)
 			rm->rm_col[c].rc_size = 0;
