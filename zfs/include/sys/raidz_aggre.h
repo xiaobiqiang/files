@@ -142,6 +142,7 @@ typedef struct raidz_col {
 	int rc_error;			/* I/O error for this device */
 	uint8_t rc_tried;		/* Did we attempt this I/O column? */
 	uint8_t rc_skipped;		/* Did we skip this I/O column? */
+	uint8_t rc_need_try;
 } raidz_col_t;
 typedef struct raidz_map {
 	uint64_t rm_cols;		/* Regular column count */

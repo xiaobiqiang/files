@@ -389,6 +389,7 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 		rm->rm_col[c].rc_error = 0;
 		rm->rm_col[c].rc_tried = 0;
 		rm->rm_col[c].rc_skipped = 0;
+		rm->rm_col[c].rc_need_try = 0;
         rm->rm_col[c].rc_size = zio->io_size;
 
 		asize += rm->rm_col[c].rc_size;
@@ -514,8 +515,23 @@ void raidz_aggre_raidz_done(zio_t *zio, raidz_map_t ** rmp_old)
     vdev_t *cvd;
     uint64_t coff, col;
 
-    if ((*rmp_old)->rm_cols == dcols)
-    return;
+    if ((*rmp_old)->rm_cols == dcols) {
+		rm = *rmp_old;
+        for (c = 0; c < scols; c++) {
+	    	col = f + c;
+            if (col >= dcols) {
+				col -= dcols;
+            }
+            cvd = vd->vdev_child[col];
+            if (vdev_dtl_contains(cvd, DTL_MISSING, zio->io_txg, 1) &&
+				rm->rm_col[c].rc_need_try) {
+	        	rm->rm_col[c].rc_tried = 0;
+				rm->rm_col[c].rc_need_try = 0;
+            }
+		}
+		return;
+    }
+
 
     rm = kmem_zalloc(offsetof(raidz_map_t, rm_col[scols]), KM_SLEEP);
     rm->rm_cols = scols;
@@ -569,8 +585,8 @@ void raidz_aggre_raidz_done(zio_t *zio, raidz_map_t ** rmp_old)
                 rm->rm_missingparity++;
             rm->rm_col[c].rc_error = ESTALE;
             rm->rm_col[c].rc_skipped = 1;
-            rm->rm_col[c].rc_tried = 1;    /* don't even try */
-                
+            rm->rm_col[c].rc_tried = 1;
+			rm->rm_col[c].rc_need_try = 1;
             continue;
         }
     }

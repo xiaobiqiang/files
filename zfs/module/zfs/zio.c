@@ -3382,8 +3382,7 @@ zio_done(zio_t *zio)
 
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
-	if (zio->io_aggre_io == NULL || zio->io_aggre_root)
-		vdev_stat_update(zio, zio->io_size);
+	vdev_stat_update(zio, zio->io_size);
 
 	/*
 	 * If this I/O is attached to a particular vdev is slow, exceeding
