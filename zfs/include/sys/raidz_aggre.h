@@ -153,9 +153,11 @@ typedef struct raidz_map {
 	uint64_t rm_firstdatacol;	/* First data column/parity count */
 	uint64_t rm_nskip;		/* Skipped sectors for padding */
 	uint64_t rm_skipstart;	/* Column index of padding start */
-	void *rm_datacopy;		/* rm_asize-buffer of copied data */
+	void **rm_datacopy;		/* rm_asize-buffer of copied data */
+	uint32_t rm_datacopycount;
 	uintptr_t rm_reports;		/* # of referencing checksum reports */
     uint32_t  rm_aggre_col;
+	uint32_t  rm_aggre_doall;
 	uint8_t	rm_freed;		/* map no longer has referencing ZIO */
 	uint8_t	rm_ecksuminjected;	/* checksum error was injected */
 	raidz_col_t rm_col[1];		/* Flexible array of I/O columns */

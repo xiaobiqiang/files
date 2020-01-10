@@ -3367,7 +3367,12 @@ zio_done(zio_t *zio)
 
 			zio->io_cksum_report = zcr->zcr_next;
 			zcr->zcr_next = NULL;
-			zcr->zcr_finish(zcr, abuf);
+			if (zcr->zcr_together) {				
+				zcr->zcr_finish(zcr, zcr->zcr_good);
+			} else {
+				zcr->zcr_finish(zcr, abuf);
+			}
+			
 			zfs_ereport_free_checksum(zcr);
 
 			if (asize != zio->io_size)

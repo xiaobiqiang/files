@@ -338,6 +338,9 @@ struct zio_cksum_report {
 
 	/* internal use only */
 	struct zio_bad_cksum	*zcr_ckinfo;	/* information from failure */
+	int			zcr_together;
+	void			*zcr_io;
+	void			*zcr_good;
 };
 
 typedef void zio_vsd_cksum_report_f(zio_t *zio, zio_cksum_report_t *zcr,
