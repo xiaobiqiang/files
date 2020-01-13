@@ -342,6 +342,8 @@ check_file(const char *file, boolean_t force, boolean_t isspare)
 			return (0);
 
 		if (state == POOL_STATE_ACTIVE ||
+			state == POOL_STATE_EXPORTED ||
+			state == POOL_STATE_POTENTIALLY_ACTIVE ||
 		    state == POOL_STATE_SPARE || !force) {
 			switch (state) {
 			case POOL_STATE_SPARE:
