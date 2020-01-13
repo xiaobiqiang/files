@@ -2406,7 +2406,7 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 			 */
 			mutex_enter(&itask->it_idm_task->idt_mutex);
 			if ((itask->it_idm_task->idt_state == TASK_COMPLETE) ||
-			    (itask->it_idm_task->idt_state == TASK_IDLE)) {
+			    (itask->it_idm_task->idt_state == TASK_IDL)) {
 				/*
 				 * Task is complete, return "Task Does Not
 				 * Exist"
