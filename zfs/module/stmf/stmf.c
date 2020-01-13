@@ -4488,7 +4488,7 @@ stmf_set_lu_access(stmf_lu_t *lu, uint8_t access_state, boolean_t proxy_reg)
 		if (stmf_state.stmf_inventory_locked) {
 			mutex_exit(&stmf_state.stmf_lock);
 			retry--;
-			delay(2);
+			delay(20);
 			cmn_err(CE_NOTE, "%s wait stmf_state.stmf_inventory_locked, left retry count = %d", 
 				__func__, retry);
 		} else {

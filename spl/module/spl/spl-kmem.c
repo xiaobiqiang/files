@@ -44,7 +44,7 @@
  * allocations are quickly caught.  These warnings may be disabled by setting
  * the threshold to zero.
  */
-unsigned int spl_kmem_alloc_warn = MAX(8 * PAGE_SIZE, 32 * 1024);
+unsigned int spl_kmem_alloc_warn = MAX(128 * PAGE_SIZE, 32 * 1024);
 module_param(spl_kmem_alloc_warn, uint, 0644);
 MODULE_PARM_DESC(spl_kmem_alloc_warn,
 	"Warning threshold in bytes for a kmem_alloc()");
