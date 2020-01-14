@@ -636,6 +636,9 @@ cluster_do_import(const char *name, uint64_t guid)
 			c_log(LOG_WARNING, "import pool %llu error %d",
 				(unsigned long long)guid, ret);
 		}
+
+		snprintf(buf, 256, "%s import -ib", ZPOOL_CMD);
+		(void) excute_cmd_common(buf, B_TRUE);
 	}
 
 	return (ret);
@@ -656,6 +659,9 @@ cluster_do_export(const char *name)
 	}
 	if (ret) {
 		c_log(LOG_WARNING, "export pool %s error %d", name, ret);
+
+		snprintf(buf, 256, "%s status %s", ZPOOL_CMD, name);
+		(void) excute_cmd_common(buf, B_TRUE);
 	}
 
 	return (ret);
@@ -1013,7 +1019,9 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 		pthread_t tid;
 		failover_pool_import_state_t import_state;
 		compete_pool_param_t	param;
+		int import_trytimes = 10;
 
+_compete:
 		pthread_mutex_init(&import_state.mtx, NULL);
 		pthread_cond_init(&import_state.cond, NULL);
 		import_state.imported = B_FALSE;
@@ -1032,6 +1040,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 		if (import_state.imported) {
 			c_log(LOG_WARNING, "compete lost or error");
 			pthread_mutex_unlock(&import_state.mtx);
+			import_trytimes = 0;
 			goto wait_compete_thread;
 		}
 		pthread_mutex_unlock(&import_state.mtx);
@@ -1044,7 +1053,9 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 				zpool_remove_partner(hdl, poolname, cluster_failover_state->hostid);
 				libzfs_fini(hdl);
 			}
-		}
+			import_trytimes = 0;
+		} else
+			import_trytimes--;
 
 		import_state.imported = B_TRUE;
 
@@ -1054,6 +1065,14 @@ wait_compete_thread:
 exit_import:
 		pthread_mutex_destroy(&import_state.mtx);
 		pthread_cond_destroy(&import_state.cond);
+		if (import_trytimes > 0) {
+			c_log(LOG_WARNING, "failover type %d exit %d times %d",
+				cluster_failover_state->failover_type,
+				cluster_failover_state->thread_exit, import_trytimes);
+			if (cluster_failover_state->failover_type != FAILOVER_NORMAL &&
+				cluster_failover_state->thread_exit == 0)
+				goto _compete;
+		}
 	}
 	(void) gettimeofday(&elapsed_time2, NULL);
 	cluster_failover_time_diff(&elapsed_time1, &elapsed_time2, &diff_time1);
@@ -4039,6 +4058,8 @@ cluster_compete_pool(void *arg)
 	cluster_import_pool_t *cip = NULL;
 	timespec_t ts;
 	int check_replicas_trytimes = 0;
+	boolean_t is_failover = param->import_state != NULL;
+	boolean_t update_stamp_ok = B_FALSE;
 
 	if (!config) {
 		c_log(LOG_WARNING, "NULL config");
@@ -4134,12 +4155,12 @@ cluster_compete_pool(void *arg)
 		counter++;
 		sleep(5);
 	}
-	if (counter >= 20)
+	if (!is_failover && counter >= 20)
 		goto exit_thr;
 #endif
 
 check_remote:
-	if (cluster_pool_in_remote(0, NULL, guid)) {
+	if (!is_failover && cluster_pool_in_remote(0, NULL, guid)) {
 		c_log(LOG_WARNING, "pool '%s' in remote, exit", poolname);
 		goto exit_thr;
 	}
@@ -4216,35 +4237,37 @@ ready_import:
 	cluster_run_import(cip);
 	pthread_mutex_unlock(&cip->import_lock);
 
-	err = cluster_check_pool_replicas(guid, NULL, 0, NULL);
-	if (err == 0) {
-		c_log(LOG_WARNING, "pool '%s' not satisfy replicas", poolname);
-		if (check_replicas_trytimes >= 3)
+	if (!is_failover) {
+		err = cluster_check_pool_replicas(guid, NULL, 0, NULL);
+		if (err == 0) {
+			c_log(LOG_WARNING, "pool '%s' not satisfy replicas", poolname);
+			if (check_replicas_trytimes >= 3)
+				goto exit_thr;
+			check_replicas_trytimes++;
+			/*
+			 * If replicas not satisfied, we wait new node join cluster
+			 * or timeout; then we will re-compete.
+			 */
+			pthread_mutex_lock(&cluster_import_replicas_lock);
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_sec += 60;
+			pthread_cond_timedwait(&cluster_import_replicas_cv,
+				&cluster_import_replicas_lock, &ts);
+			pthread_mutex_unlock(&cluster_import_replicas_lock);
+
+			pthread_mutex_lock(&cip->import_lock);
+			pthread_mutex_lock(&cluster_import_poollist_lock);
+			list_remove(&cluster_import_poollist_run, cip);
+			list_insert_head(&cluster_import_poollist_ready, cip);
+			cip->import_state = CLUSTER_IMPORT_READY;
+			pthread_mutex_unlock(&cluster_import_poollist_lock);
+			pthread_mutex_unlock(&cip->import_lock);
+
+			goto check_remote;
+		} else if (err < 0) {
+			c_log(LOG_WARNING, "pool '%s' not exists or error", poolname);
 			goto exit_thr;
-		check_replicas_trytimes++;
-		/*
-		 * If replicas not satisfied, we wait new node join cluster
-		 * or timeout; then we will re-compete.
-		 */
-		pthread_mutex_lock(&cluster_import_replicas_lock);
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += 60;
-		pthread_cond_timedwait(&cluster_import_replicas_cv,
-			&cluster_import_replicas_lock, &ts);
-		pthread_mutex_unlock(&cluster_import_replicas_lock);
-
-		pthread_mutex_lock(&cip->import_lock);
-		pthread_mutex_lock(&cluster_import_poollist_lock);
-		list_remove(&cluster_import_poollist_run, cip);
-		list_insert_head(&cluster_import_poollist_ready, cip);
-		cip->import_state = CLUSTER_IMPORT_READY;
-		pthread_mutex_unlock(&cluster_import_poollist_lock);
-		pthread_mutex_unlock(&cip->import_lock);
-
-		goto check_remote;
-	} else if (err < 0) {
-		c_log(LOG_WARNING, "pool '%s' not exists or error", poolname);
-		goto exit_thr;
+		}
 	}
 
 	bzero(used_index1, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
@@ -4273,7 +4296,8 @@ ready_import:
 		stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
 		stamp->para.company_name = COMPANY_NAME;
 
-		(void) cluster_write_stamp(stamp, NULL, path);
+		if (cluster_write_stamp(stamp, NULL, path) > 0)
+			update_stamp_ok = B_TRUE;
 
 		pool_root = NULL;
 	} else {
@@ -4304,7 +4328,6 @@ ready_import:
 			stamp->para.pool_current_owener = hostid;
 			stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
 			stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
-			(void) cluster_write_stamp(stamp, pool_root, path);
 		} else {
 			bzero(stamp, sizeof (zpool_stamp_t));
 			stamp->para.pool_magic = ZPOOL_MAGIC;
@@ -4316,12 +4339,22 @@ ready_import:
 		}
 	}
 
+	if (!update_stamp_ok &&
+		(cluster_write_stamp(stamp, pool_root, path) > 0)) {
+		update_stamp_ok = B_TRUE;
+	}
+
 	counter = CONFLICT_DURATION;
 	conflict_cnt = 0;
 	while (counter--) {
 		usleep(UPDATE_STAMP_INTERVAL);
 
-		if (cluster_read_stamp(stamp, pool_root, path) == 0) {
+		if (!update_stamp_ok &&
+			(cluster_write_stamp(stamp, pool_root, path) > 0)) {
+			update_stamp_ok = B_TRUE;
+		}
+
+		if (update_stamp_ok && cluster_read_stamp(stamp, pool_root, path) == 0) {
 			if (stamp->para.pool_current_owener != hostid) {
 				conflict_cnt++;
 				if (conflict_cnt >= 3) {
