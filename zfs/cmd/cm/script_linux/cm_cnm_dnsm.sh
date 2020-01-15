@@ -1,7 +1,7 @@
 #!/bin/bash
 source '/var/cm/script/cm_types.sh'
 
-begin='/etc/inet/hosts'
+begin='/etc/hosts'
 dest='/var/cm/script/iptrans.tmp'
 #==================================================================================
 #                                  ĞŞ¸Ä¼ÇÂ¼
@@ -105,10 +105,7 @@ function cm_cnm_dns_count()
 	local ip_line
 	local last_line
 	cat $begin | grep -v "^$" | grep -v -w 'Prodigy'| grep -v -w 'localhost' >$dest
-	ip_line=`grep -n -w 'Internet host table' $dest | awk -F':' '{print $1}'`
-	((ip_line=$ip_line+1))
-	last_line=`cat $dest | wc -l |awk -F' ' '{print $1}'`
-	((num=$last_line-$ip_line))
+	num=`cat $begin | egrep -v '#|localhost'|wc -l`
 	echo $num
 	return $CM_OK
   
@@ -127,10 +124,7 @@ function cm_cnm_dns_getbatch()
 {
 	local line_num
 	cat $begin | grep -v "^$" | grep -v -w 'Prodigy' | grep -v -w 'localhost'>$dest
-	line_num=`grep -n -w 'Internet host table' $dest | awk -F':' '{print $1}'`
-	((ip_line=$line_num+2))
-	last_line=`cat $dest | wc -l |awk -F' ' '{print $1}'`
-	sed -n "$ip_line,$last_line p" $dest
+	cat $begin | egrep -v '#|localhost'
     return $CM_OK	
 }
 #==================================================================================
