@@ -76,15 +76,15 @@ function cm_cnm_numtoip()
 
 function cm_cnm_phys_ip_getbatch()
 {
-    ifconfig -a |grep -v ether |sed 'N;s/\n//g' \
-        |awk '{print $1" "$8" "$10}' |grep -v 'lo0' \
+     ifconfig -a|grep -B 1 'inet '|grep -v "-" \
+        | sed 'N;s/\n//g'|grep -v "lo"|awk '{print $1" "$6" "$8}'\
         |while read line
     do
         local info=($line)
         local name=${info[0]}
         name=${name%?}
         local ip=${info[1]}
-        local mask=`cm_cnm_numtoip "${info[2]}"`
+        local mask=${info[2]}
         echo "$name $ip $mask"
     done
     return $CM_OK
@@ -92,7 +92,7 @@ function cm_cnm_phys_ip_getbatch()
 
 function cm_cnm_phys_ip_count()
 {
-    local len=`ifconfig -a4|grep 'flags='|egrep -v 'lo0'|wc -l`
+    local len=`ifconfig -a|grep 'inet '|egrep -v "127.0.0.1"|wc -l`
     echo $len
     return $CM_OK
 }
@@ -102,24 +102,26 @@ function cm_cnm_phys_ip_create()
     local ip=$1
     local netmask=$2
     local interface=$3
+    local dir='/etc/sysconfig/network-scripts/ifcfg-'
     local iRet=$CM_OK
     check_ip $ip
     if [ $? -ne $CM_OK ];then
         return $CM_PARAM_ERR
     fi
-    echo $ip > /etc/hostname.$interface
-    if [ $netmask = 'null' ]; then
-        echo "netmask 255.255.255.0" >> /etc/hostname.$interface
-    else
-        echo "netmask $netmask" >> /etc/hostname.$interface
-    fi
+    #echo "DEVICE=$interface" > $dir$interface
+    #echo "ONBOOT=yes" >> $dir$interface
+    #echo "BOOTPROTO=static" >> $dir$interface
+    #echo "IPADDR=$ip" >> $dir$interface
+    #if [ $netmask = 'null' ]; then
+    #    echo "NETMASK=255.255.255.0" >> $dir$interface
+    #else
+    #    echo "NETMASK=$netmask" >> $dir$interface
+    #fi
 
-    echo up >> /etc/hostname.$interface
-
     if [ $netmask = 'null' ]; then
-        ifconfig $interface plumb $ip up
+        ifconfig $interface $ip 
     else
-        ifconfig $interface plumb $ip netmask $netmask up
+        ifconfig $interface $ip netmask $netmask 
     fi
     iRet=$?
 
@@ -135,8 +137,8 @@ function cm_cnm_phys_ip_delete()
     if [ "X$nic" == "X$mport" ]; then
         return $CM_ERR_NOT_SUPPORT
     fi
-    ifconfig -a |grep -v ether |sed 'N;s/\n//g' \
-        |awk '{print $1" "$8}' |grep -v 'lo0' \
+    ifconfig -a|grep -B 1 'inet '|grep -v "-" \
+        | sed 'N;s/\n//g'|grep -v "lo"|awk '{print $1" "$6}'\
         |while read line
     do
         local info=($line)
@@ -152,8 +154,8 @@ function cm_cnm_phys_ip_delete()
         if [ "X$nic" != "X" ] && [ "X$nic" != "X$name" ]; then
             continue
         fi
-        ifconfig $name unplumb
-        rm -f /etc/hostname.$name
+        ip addr del $ipaddr dev $name
+        #rm -f /etc/hostname.$name
     done
     return $CM_OK
 }

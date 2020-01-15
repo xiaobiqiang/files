@@ -641,7 +641,7 @@ sint32 cm_cnm_phys_ip_local_create(
         return CM_ERR_ALREADY_EXISTS;
     }
     
-    key = cm_exec_int("ifconfig -a | grep %s|wc -l",info->adapter);
+    key = cm_exec_int("ifconfig %s|grep 'inet '|wc -l",info->adapter);
     if(0 == key)
     {
         if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_PHYS_IP_NETMASK))
@@ -650,7 +650,7 @@ sint32 cm_cnm_phys_ip_local_create(
         }
         return cm_system("%s create %s null %s",cm_cnm_phys_ip_sh,info->ip,info->adapter);
     }
-
+    
     key = cm_exec_int("ifconfig -a|grep %s|awk -F':' 'NF==2{print $1}  NF==3{print $1\":\"$2}'|awk -F':' '{print $2}'|awk 'BEGIN {cut=0}{if($1-cut==1) cut=$1} END{printf cut}'",
         info->adapter);
     CM_VSPRINTF(adapter,sizeof(adapter),"%s:%u",info->adapter,key+1);
