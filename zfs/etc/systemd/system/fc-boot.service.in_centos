@@ -1,0 +1,16 @@
+[Unit]
+Description=Fibre Channel Kernel Module Loader Service
+DefaultDependencies=no
+After=stmf-boot.service
+After=pppt-boot.service
+After=stmf-svc.service
+After=zfs-clusterd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/sbin/rmmod qla2xxx
+ExecStart=/sbin/modprobe qlf
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,7 @@ DefaultDependencies=no
 After=stmf-boot.service
 After=pppt-boot.service
 After=stmf-svc.service
+After=zfs-clusterd.service
 
 [Service]
 Type=oneshot

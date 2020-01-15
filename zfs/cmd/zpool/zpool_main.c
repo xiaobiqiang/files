@@ -7509,7 +7509,6 @@ release_callback(zpool_handle_t *zhp, void *data)
 	config = zpool_get_config(zhp, NULL);
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
-	verify (zpool_read_stamp(nvroot, stamp) == 0);
 
 	host_id = get_system_hostid();
 

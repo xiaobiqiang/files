@@ -1685,17 +1685,14 @@ static int verify_disk_company_mark(char *path)
 		path += 9;
 		sprintf(tmp_path, "/dev/rdsk/%s", path);
 	}
-	else if (strncmp(path, "/devices", 8) == 0){
+	else if (strncmp(path, "/devices", 8) == 0 ||
+		strncmp(path, "/dev/rdsk/", 10) == 0 ||
+		strncmp(path, "/dev/disk/by-id/", 16) == 0 ||
+		strncmp(path, "/dev/", 5) == 0){
 		sprintf(tmp_path, "%s", path);
 	}
-	else if (strncmp(path, "/dev/rdsk/", 10) == 0){
-		sprintf(tmp_path, "%s", path);
-	}
-	else if (strncmp(path, "/dev/disk/by-id/", 16) == 0){
-		sprintf(tmp_path, "%s", path);
-	}
-	else{
-		sprintf(tmp_path, "/dev/rdsk/%s", path);
+	else {
+		sprintf(tmp_path, "/dev/disk/by-id/%s", path);
 	}
 
 	len = strlen(tmp_path);
