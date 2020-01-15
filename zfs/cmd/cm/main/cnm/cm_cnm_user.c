@@ -77,7 +77,7 @@ static void cm_cnm_user_encode_each(cm_omi_obj_t item,void* eachdata,void* arg)
     };
 
     cm_cnm_encode_str(item,field,cols_str,sizeof(cols_str)/sizeof(cm_cnm_map_value_str_t));
-    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_str_t));
+    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_num_t));
     return;
 }
 
@@ -621,7 +621,7 @@ static void cm_cnm_group_encode_each(cm_omi_obj_t item,void* eachdata,void* arg)
     };
 
     cm_cnm_encode_str(item,field,cols_str,sizeof(cols_str)/sizeof(cm_cnm_map_value_str_t));
-    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_str_t));
+    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_num_t));
     return;
 }
 

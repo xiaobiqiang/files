@@ -13,7 +13,7 @@
 #ifndef HAVE_DECL_ISINF
 # ifdef HAVE_DECL__FINITE
 #include <float.h>
-#define isinf(x) (!finite(x))
+#define isinf(x) isinf(x)
 # endif
 #endif
 
