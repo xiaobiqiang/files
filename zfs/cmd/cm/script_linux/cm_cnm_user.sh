@@ -7,14 +7,7 @@ function cm_cnm_user_insert_pwd()
 	local user=$1
 	local pwd=$2
 
-/usr/bin/expect<<-EOF
-spawn passwd $user
-expect "*Password:"
-send "$pwd\r"
-expect "*Password:"
-send "$pwd\r"
-expect eof
-EOF
+    echo $user:$pwd | chpasswd
 
 }
 
@@ -81,7 +74,7 @@ function cm_cnm_user_request_false()
 	
 	echo $passwd>>/etc/passwd
 	echo $shadow>>/etc/shadow
-	echo $smbpasswd >>/var/smb/smbpasswd
+	#echo $smbpasswd >>/var/smb/smbpasswd
 }
 
 function cm_cnm_user_request_true()
@@ -94,9 +87,9 @@ function cm_cnm_user_request_true()
 	echo "$shadow" >> /etc/shadow_copy
 	mv /etc/shadow_copy /etc/shadow
 	
-	sed "/$name:/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
-	echo "$smbpasswd" >> /var/smb/smbpasswd_copy
-	mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
+	#sed "/$name:/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
+	#echo "$smbpasswd" >> /var/smb/smbpasswd_copy
+	#mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
 }
 
 function cm_cnm_user_delete()
@@ -105,8 +98,8 @@ function cm_cnm_user_delete()
 	local uid=$1
 	local name=`cat /etc/passwd |grep "x:$uid:"|awk -F':' '{print $1}'`
 	
-	sed "/$name/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
-	mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
+	#sed "/$name/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
+	#mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
 	userdel $name
 	iRet=$?
 	
