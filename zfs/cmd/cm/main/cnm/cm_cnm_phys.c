@@ -188,7 +188,7 @@ sint32 cm_cnm_phys_local_get(
     }
 
     iRet = cm_cnm_exec_get_col(cm_cnm_phys_local_get_each,data,
-        "%s physgetbatch %s",cm_cnm_phys_ip_sh,info->name);
+        "%s physget %s",cm_cnm_phys_ip_sh,info->name);
     if(CM_OK != iRet)
     {
         CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]",iRet);
