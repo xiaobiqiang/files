@@ -160,5 +160,87 @@ function cm_cnm_phys_ip_delete()
     return $CM_OK
 }
 
+function cm_cnm_phys_ip_physgetbatch()
+{
+    local list=($( ip addr|grep -w mtu|grep -v lo|awk '{print $2" "$5" "$9}'))
+    local len=${#list[@]}
+    ((cols=$len/3))
+    
+    for (( i=0; i<$cols; i=i+1 ))
+    do
+        ((j=i*3))
+        local name=${list[j]}
+        name=${name%?}
+        local media="Ethernet"
+        local mtu=${list[((j=$j+1))]}
+        if [ "X" = "X"$mtu ]; then
+            mtu=0
+        fi
+        typeset -l state
+        state=${list[((j=$j+1))]}
+        typeset -l duplex
+        if [ ` ethtool $name | grep Full|wc -l` -ne 0 ]; then
+            duplex='full'
+        else
+            duplex='half'
+        fi
+        local speed=`mii-tool $name 2>/dev/null|grep baseT|awk '{print $3}'|sed 's/baseT-FD//g'`
+        if [ "X" = "X"$speed ]; then
+            speed=0
+        fi
+        local mac=`ifconfig $name 2>/dev/null|grep -w ether |awk '{printf $2}'`
+        if [ "X" = "X"$mac ]; then
+            mac='null'
+        fi
+        
+        echo "$name $media $state $speed $duplex $mtu $mac"
+    done
+}
+
+function cm_cnm_phys_ip_physget()
+{
+    local name=$1
+    local list=($(ip addr|grep -w mtu|grep -w eth0|grep -v lo|awk '{print $5" "$9}'))
+    local mtu=${list[0]}
+    typeset -l state
+    state=${list[1]}
+    local media="Ethernet"
+    typeset -l duplex
+    if [ ` ethtool $name | grep Full|wc -l` -ne 0 ]; then
+        duplex='full'
+    else
+        duplex='half'
+    fi
+    local speed=`mii-tool $name 2>/dev/null|grep baseT|awk '{print $3}'|sed 's/baseT-FD//g'`
+    if [ "X" = "X"$speed ]; then
+        speed=0
+    fi
+    local mac=`ifconfig $name 2>/dev/null|grep -w ether |awk '{printf $2}'`
+    if [ "X" = "X"$mac ]; then
+        mac='null'
+    fi
+    
+    
+    echo "$name $media $state $speed $duplex $mtu $mac"
+}
+
+function cm_cnm_phys_ip_physcount()
+{
+    ip addr|grep -w mtu|grep -v lo|wc -l
+}
+
+function cm_cnm_phys_ip_physupdate()
+{
+    local name=$1
+    local mtu=$2
+    
+    ifconfig $name mtu $mtu up
+    if [ $? -ne $CM_OK ]; then
+        return $CM_FAIL
+    fi
+    
+    return $CM_OK
+}
+
 cm_cnm_phys_ip_$*
 exit $?

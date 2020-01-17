@@ -20,6 +20,9 @@
 extern const cm_omi_map_enum_t CmOmiMapEnumPortStateType;
 extern const cm_omi_map_enum_t CmOmiMapEnumPortDuplexType;
 
+const sint8* cm_cnm_phys_ip_sh = "/var/cm/script/cm_cnm_phys_ip.sh";
+
+
 sint32 cm_cnm_phys_init(void)
 {
     return CM_OK;
@@ -114,7 +117,7 @@ sint32 cm_cnm_phys_update(const void *pDecodeParam,void **ppAckData, uint32 *pAc
 static sint32 cm_cnm_phys_local_get_each(void *arg, sint8 **cols, uint32 col_num)
 {
     cm_cnm_phys_info_t *info = arg;
-    const uint32 def_num = 6;
+    const uint32 def_num = 7;
     /*
     LINK         MEDIA                STATE      SPEED  DUPLEX    DEVICE
     ixgbe0       Ethernet             up         10000  full      ixgbe0
@@ -130,9 +133,14 @@ static sint32 cm_cnm_phys_local_get_each(void *arg, sint8 **cols, uint32 col_num
     info->state = cm_cnm_get_enum(&CmOmiMapEnumPortStateType,cols[2],CM_PORT_STATE_UNKNOW);
     info->speed = (uint32)atoi(cols[3]);
     info->duplex = cm_cnm_get_enum(&CmOmiMapEnumPortDuplexType,cols[4],CM_PORT_DUPLEX_UNKNOW);
-    info->mtu = (uint32)cm_exec_int("ifconfig %s 2>/dev/null |grep mtu|awk '{printf $4}'", info->name);
-    (void)cm_exec_tmout(info->mac,sizeof(info->mac),2,"ifconfig %s 2>/dev/null"
-            "|grep -w ether |awk '{printf $2}'",info->name);
+    if(atoi(cols[5]) != 0)
+    {
+        info->mtu = atoi(cols[5]);
+    }
+    if(strcmp(cols[6],"null") != 0)
+    {
+        CM_VSPRINTF(info->mac,sizeof(info->name),"%s",cols[6]);
+    }
     return CM_OK;        
 }
 
@@ -142,8 +150,10 @@ sint32 cm_cnm_phys_local_getbatch(
     void **ppAck, uint32 *pAckLen)
 {
     sint32 iRet = CM_OK;
-    
-    iRet = cm_cnm_exec_get_list("dladm show-phys 2>/dev/null |sed 1d",cm_cnm_phys_local_get_each,
+    sint8 cmd[CM_STRING_128] = {0};
+
+    CM_VSPRINTF(cmd,sizeof(cmd),"%s physgetbatch",cm_cnm_phys_ip_sh);
+    iRet = cm_cnm_exec_get_list(cmd,cm_cnm_phys_local_get_each,
         (uint32)offset,sizeof(cm_cnm_phys_info_t),ppAck,&total);
     if(CM_OK != iRet)
     {
@@ -176,8 +186,9 @@ sint32 cm_cnm_phys_local_get(
         CM_LOG_ERR(CM_MOD_CNM,"malloc fail");
         return CM_FAIL;
     }
+
     iRet = cm_cnm_exec_get_col(cm_cnm_phys_local_get_each,data,
-        "dladm show-phys %s 2>/dev/null |sed 1d",info->name);
+        "%s physgetbatch %s",cm_cnm_phys_ip_sh,info->name);
     if(CM_OK != iRet)
     {
         CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]",iRet);
@@ -194,7 +205,7 @@ sint32 cm_cnm_phys_local_count(
     uint64 offset, uint32 total, 
     void **ppAck, uint32 *pAckLen)
 {
-    uint64 cnt = cm_exec_int("dladm show-phys 2>/dev/null |sed 1d |wc -l");
+    uint64 cnt = cm_exec_int("%s physcount",cm_cnm_phys_ip_sh);
     return cm_cnm_ack_uint64(cnt,ppAck,pAckLen);
 }
 
@@ -205,28 +216,8 @@ sint32 cm_cnm_phys_local_update(
 {
     cm_cnm_decode_info_t *decode = param;
     cm_cnm_phys_info_t *info = (cm_cnm_phys_info_t *)decode->data;
-    sint32 iRet = CM_OK;
-    uint32 cut = 0;
 
-    iRet = cm_system("ifconfig %s mtu %u up",info->name,info->mtu);
-    if(CM_OK != iRet)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"update mtu fail");
-        return iRet;
-    }
-
-    cut = cm_exec_int("cat /etc/hostname.%s|grep mtu | wc -l",info->name);
-    if(0 == cut)
-    {
-        return cm_system("echo 'mtu %u' >> /etc/hostname.%s",info->mtu,info->name);
-    }else
-    {
-        cm_system("sed '/mtu/d' /etc/hostname.%s > /etc/hostnamecopy",info->name);
-        cm_system("echo 'mtu %u' >> /etc/hostnamecopy",info->mtu);
-        cm_system("mv /etc/hostnamecopy /etc/hostname.%s",info->name);
-    }
-
-    return CM_OK;
+    return cm_system("%s physupdate %s %d",cm_cnm_phys_ip_sh,info->name,info->mtu);
 }
 
 sint32 cm_cnm_phys_cbk_cmt(
@@ -469,7 +460,7 @@ void cm_cnm_route_oplog_delete(
 
 #define cm_cnm_phys_ip_req(cmd,param,ppAck,plen)\
     cm_cnm_request_comm(CM_OMI_OBJECT_PHYS_IP,cmd,sizeof(cm_cnm_phys_ip_info_t),param,ppAck,plen)
-const sint8* cm_cnm_phys_ip_sh = "/var/cm/script/cm_cnm_phys_ip.sh";
+//const sint8* cm_cnm_phys_ip_sh = "/var/cm/script/cm_cnm_phys_ip.sh";
 
 
 sint32 cm_cnm_phys_ip_init(void)
