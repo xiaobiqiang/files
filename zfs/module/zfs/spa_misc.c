@@ -2440,6 +2440,29 @@ spa_get_group_flags(spa_t *spa)
 	return (spa->spa_disable_group);
 }
 
+size_t
+sprintf_spa_refcount(spa_t *spa, char *buf, size_t len)
+{
+	size_t n;
+
+	n = snprintf(buf, len, "spa %s:", spa_name(spa));
+}
+
+void
+sprintf_all_spa_refcount(char *buf, size_t len)
+{
+	spa_t *spa = NULL;
+	size_t off = 0, n;
+
+	mutex_enter(&spa_namespace_lock);
+	while ((spa = spa_next(spa)) != NULL) {
+		n = sprintf_spa_refcount(spa, buf + off, len - off);
+		off += n;
+	}
+	mutex_exit(&spa_namespace_lock);
+	if (off == 0)
+		strncpy(buf, "no spa", len);
+}
 
 #if defined(_KERNEL) && defined(HAVE_SPL)
 /* Namespace manipulation */
