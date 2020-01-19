@@ -393,7 +393,17 @@ void cm_cnm_ntp_master_change(uint32 old_id, uint32 new_id)
 void cm_cnm_ntp_sync_thread(void)
 {
     sint32 iRet = CM_OK;
-    static int flag = 0; 
+    static sint32 flag = 0; 
+    static uint32 cut = 0;
+
+    cut++;
+    if(cut%5 != 0)
+    {
+        return;
+    }else
+    {
+        cut = 0;
+    }
 
     if(cm_node_get_id() != cm_node_get_master())
     {
@@ -442,7 +452,7 @@ sint32 cm_cnm_ntp_sync_delete(uint64 enid)
     (void)cm_ini_set_ext(CM_CLUSTER_INI, CM_CNM_CLUSTER_CFG_SECTION,
                          CM_CNM_CLUSTER_CFG_NTPSERVER, "\0");
     cm_cnm_ntp_ip[0] = '\0';
-    return CM_OK;
+    return cm_system("%s close",cm_cnm_ntp_sh);
 }
 
 

@@ -13,7 +13,15 @@ function cm_cnm_ntp_server()
 
 function cm_cnm_ntp_client()
 {
-    ip=`ceres_cmd master| grep node_ip|awk '{print $3}'`
+    while [ 1 ]
+    do
+        ip=`ceres_cmd master| grep node_ip|awk '{print $3}'`
+        if [ "X" = "X"$ip ]; then
+            sleep 1
+        else
+            break
+        fi
+    done
     if [ `tail -n 1 $cfgfile |grep server |wc -l` -ne 0 ]; then
         sed -i '$c server '$ip'' $cfgfile
     else
@@ -41,6 +49,9 @@ function cm_cnm_ntp_start()
 
 function cm_cnm_ntp_close()
 {
+    if [ `tail -n 1 $cfgfile |grep server |wc -l` -ne 0 ]; then
+        sed -i '$d' $cfgfile
+    fi
     systemctl stop ntpd
 }
 
