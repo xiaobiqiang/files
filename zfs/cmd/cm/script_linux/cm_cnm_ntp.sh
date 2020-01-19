@@ -1,20 +1,25 @@
 #!/bin/bash
+cfgfile='/etc/ntp.conf'
+
 function cm_cnm_ntp_server()
 {
-    #cp /etc/inet/ntp.server /etc/inet/ntp.conf
-    #echo "server 127.127.1.0" >>  /etc/inet/ntp.conf
-    #svcadm disable ntp
-    #svcadm enable ntp
-    return 0
+    if [ `tail -n 1 $cfgfile |grep server |wc -l` -ne 0 ]; then
+        sed -i '$c server 127.127.1.0' $cfgfile
+    else
+        echo 'server 127.127.1.0' >> $cfgfile
+    fi
+    systemctl restart ntpd
 }
 
 function cm_cnm_ntp_client()
 {
-	ip=`ceres_cmd master| grep node_ip|awk '{print $3}'`
-	cp /etc/inet/ntp.client /etc/inet/ntp.conf
-	echo "server $ip" >>  /etc/inet/ntp.conf
-	svcadm disable ntp
-	svcadm enable ntp
+    ip=`ceres_cmd master| grep node_ip|awk '{print $3}'`
+    if [ `tail -n 1 $cfgfile |grep server |wc -l` -ne 0 ]; then
+        sed -i '$c server '$ip'' $cfgfile
+    else
+        echo "server $ip" >> $cfgfile
+    fi
+    systemctl restart ntpd
 }
 
 function cm_cnm_ntp_start()
@@ -36,7 +41,7 @@ function cm_cnm_ntp_start()
 
 function cm_cnm_ntp_close()
 {
-	svcadm disable ntp
+    systemctl stop ntpd
 }
 
 case $1 in 
