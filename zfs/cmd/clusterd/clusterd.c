@@ -343,6 +343,8 @@ static int cluster_poweroff_remote_event_handler(const void *buffer,
 	int bufsize);
 static int cluster_poweron_remote_event_handler(const void *buffer,
 	int bufsize);
+static boolean_t cluster_pool_in_local(const char *poolname,
+	uint64_t pool_guid);
 
 static int cluster_get_eth_ip(char *eth_name, char *ip_buf)
 {
@@ -624,10 +626,14 @@ cluster_do_import(const char *name, uint64_t guid)
 	}
 
 	while ((ret = excute_cmd_common(buf, B_TRUE)) != 0) {
+		if (cluster_pool_in_local(name, guid)) {
+			ret = 0;
+			break;
+		}
 		if (retry >= cluster_do_import_retry_times)
 			break;
 		retry++;
-		sleep(1);
+		sleep(retry * 2);
 	}
 	if (ret) {
 		if (name) {
@@ -655,7 +661,7 @@ cluster_do_export(const char *name)
 		if (retry >= cluster_do_export_retry_times)
 			break;
 		retry++;
-		sleep(1);
+		sleep(retry * 2);
 	}
 	if (ret) {
 		c_log(LOG_WARNING, "export pool %s error %d", name, ret);
@@ -6241,7 +6247,12 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	/* step 2: import the pools */
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
-		if ((err = cluster_do_import(param->pool_name, 0)) != 0) {
+		for (i = 0; i < 10; i++) {
+			err = cluster_do_import(param->pool_name, 0);
+			if (err == 0)
+				break;
+		}
+		if (err != 0) {
 			err = -1;
 			unshielding_failover_poollist(pool_list);
 			goto exit_func;
@@ -6662,6 +6673,9 @@ main(int argc, char *argv[])
 	int c, error;
 	char *defval;
 	pthread_t tid;
+	char *log_path = NULL;
+	int log_level = 0;
+	int log_flags = 0;
 
 	/*
 	 * There is no check for non-global zone and Trusted Extensions.
@@ -6716,6 +6730,27 @@ main(int argc, char *argv[])
 			sprintf(zpool_export_cmd, "%s/zpool export -f", sbindir);
 			sprintf(clusterd_cmd, "%s/clusterd", sbindir);
 		}
+		if ((defval = defread("LOG_PATH=")) != NULL) {
+			log_path = strdup(defval);
+		}
+		if ((defval = defread("LOG_LEVEL=")) != NULL) {
+			long lvl;
+			errno = 0;
+			lvl = strtol(defval, (char **)NULL, 10);
+			if (errno != 0)
+				syslog(LOG_ERR, "Invalid LOG_LEVEL");
+			else
+				log_level = lvl;
+		}
+		if ((defval = defread("LOG_FLAG=")) != NULL) {
+			long val;
+			errno = 0;
+			val = strtol(defval, (char **)NULL, 10);
+			if (errno != 0)
+				syslog(LOG_ERR, "Invalid LOG_FLAG");
+			else
+				log_flags = val;
+		}
 
 		defopen(NULL);
 	}
@@ -6749,7 +6784,7 @@ main(int argc, char *argv[])
 
 	host_id = get_system_hostid();
 
-	cluster_log_init(MyName);
+	cluster_log_init(MyName, log_path, log_level, log_flags);
 	c_log(LOG_WARNING, "clusterd enabled.");
 	(void) signal(SIGHUP, warn_hup);
 
