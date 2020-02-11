@@ -124,6 +124,89 @@ JNIEXPORT jint JNICALL Java_cm_jni_logset
     return cm_log_level_set(CM_MOD_NONE, level);
 }
 
+/*
+ * Class:     cm_jni
+ * Method:    remote_connect
+ * Signature: (Ljava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_cm_jni_remote_1connect
+  (JNIEnv * Env, jobject Obj, jstring ipaddr)
+{
+    const sint8 *ip = NULL;
+    jboolean isCopy;
+    sint32 iret = -1;
+    
+    ip = (*Env)->GetStringUTFChars(Env,ipaddr,&isCopy);
+    if(NULL == ip)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"get string fail");
+        return -1;
+    }
+    iret = cm_omi_remote_connect(ip);
+    (*Env)->ReleaseStringUTFChars(Env,ipaddr,ip);
+    return iret;
+}
+
+/*
+ * Class:     cm_jni
+ * Method:    remote_request
+ * Signature: (ILjava/lang/String;I)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_cm_jni_remote_1request
+  (JNIEnv * Env, jobject Obj, jint handle, jstring Req, jint tmout)
+{
+    const sint8 *pReqData = NULL;
+    sint8 *pAckData = NULL;
+    uint32 AckLen = 0;
+    sint32 iRet = CM_OK;
+    jboolean isCopy;
+    jstring Ack;
+    cm_omi_obj_t root = NULL;
+
+    pReqData = (*Env)->GetStringUTFChars(Env,Req,&isCopy);
+    if(NULL == pReqData)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"get string fail");
+        return NULL;
+    }
+
+    iRet = cm_omi_remote_request(handle,pReqData,&pAckData,&AckLen,(uint32)tmout);
+    if(CM_OK != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"REQ:%s iRet[%u]",pReqData,iRet);
+    }
+	
+	(*Env)->ReleaseStringUTFChars(Env,Req,pReqData);
+	
+    if((CM_OK == iRet) && (NULL != pAckData))
+    {
+        Ack = (*Env)->NewStringUTF(Env,pAckData);
+        cm_omi_free(pAckData);
+        return Ack;
+    }
+
+    root = cm_omi_obj_new();
+    if(NULL == root)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"new obj fail");
+        return NULL;
+    }
+    (void)cm_omi_obj_key_set_s32(root,CM_OMI_KEY_RESULT,iRet);
+    Ack = (*Env)->NewStringUTF(Env,cm_omi_obj_tostr(root));
+    cm_omi_obj_delete(root);
+    return Ack;
+}
+
+/*
+ * Class:     cm_jni
+ * Method:    remote_close
+ * Signature: (I)I
+ */
+JNIEXPORT jint JNICALL Java_cm_jni_remote_1close
+  (JNIEnv * Env, jobject Obj, jint handle)
+{
+    return cm_omi_remote_close(handle);
+}
 
  
 

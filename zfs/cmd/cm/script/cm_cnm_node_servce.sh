@@ -174,6 +174,19 @@ function cm_cnm_servce_updata()
     return $CM_OK
 }
 
+function cm_cnm_server_iscsi_check()
+{
+    local sname='/network/iscsi/target'
+    local status=`svcs $sname |sed 1d |awk '{print $1}'`
+    if [ "X$status" == "Xonline" ]; then
+        return $CM_OK
+    fi
+    
+    CM_EXEC_CMD "svcadm disable $sname"
+    CM_EXEC_CMD "svcadm enable $sname"
+    return $?
+}
+
 function cm_cnm_servce_main()
 {
     local fun=$1
@@ -187,6 +200,12 @@ function cm_cnm_servce_main()
         update)
             cm_cnm_servce_updata $cmd
             iRet=$?
+        ;;
+        iscsi_check)
+            cm_cnm_server_iscsi_check
+            iRet=$?
+        ;;
+        *)
         ;;
     esac
     return $iRet

@@ -696,6 +696,7 @@ sint32 cm_cnm_domain_ad_get(const void * pDecodeParam,void **ppAckData,uint32 * 
         CM_LOG_ERR(CM_MOD_CNM,"malloc fail");
         return CM_FAIL;
     }
+    CM_MEM_ZERO(pdata,sizeof(cm_cnm_domain_ad_info_t));
     iRet = cm_cnm_exec_get_col(cm_cnm_domain_ad_local_get_each,pdata,
             "%s domain_ad_get",g_cm_domain_ad_script);    
     if(CM_OK != iRet)

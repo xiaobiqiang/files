@@ -1777,7 +1777,7 @@ static sint32 cm_cnm_pool_get_each(cm_node_info_t *pNode, void *pArg)
     return CM_FAIL;
 }
 
-uint32 cm_cnm_pool_getbydisk(const sint8* disk, sint8* pool, uint32 len)
+uint32 cm_cnm_pool_getbydisk(const sint8* disk, sint8* pool, uint32 len,uint32 *ptype)
 {
     cm_cnm_pool_list_param_t req;
     cm_cnm_req_param_t param;
@@ -1800,6 +1800,7 @@ uint32 cm_cnm_pool_getbydisk(const sint8* disk, sint8* pool, uint32 len)
     if(NULL != pAck)
     {
         CM_VSPRINTF(pool,len,"%s",pAck->name);
+        *ptype=pAck->status; 
         CM_FREE(pAck);
         return param.nid;
     }
@@ -1857,7 +1858,8 @@ sint32 cm_cnm_pool_local_get(
         cm_xml_free(xmlroot);
         return CM_FAIL;
     }
-    
+    /* 获取硬盘类型 */
+    info->status = cm_cnm_pooldisk_local_gettype(node);
     do
     {
         node = cm_xml_get_parent(node);        

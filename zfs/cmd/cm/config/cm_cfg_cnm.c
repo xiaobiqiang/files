@@ -69,6 +69,18 @@ const cm_omi_map_enum_t CmOmiMapEnumSwitchType =
     CmOmiMapSwitch
 };
 
+const cm_omi_map_cfg_t CmOmiMapDomain[] =
+{
+    {"everyone", CM_DOMAIN_EVERYONE},
+    {"LOCAL", CM_DOMAIN_LOCAL},
+    {"AD", CM_DOMAIN_AD},
+};
+
+const cm_omi_map_enum_t CmOmiMapEnumDomainType =
+{
+    sizeof(CmOmiMapDomain) / sizeof(cm_omi_map_cfg_t),
+    CmOmiMapDomain
+};
 
 const cm_omi_map_cfg_t CmOmiMapCmds[CM_OMI_CMD_BUTT] =
 {
@@ -274,7 +286,7 @@ extern const cm_omi_map_object_t CmCnmLowdataVolumeCfg;
 extern const cm_omi_map_object_t CmCnmMailsendCfg;
 extern const cm_omi_map_object_t CmCnmMailrecvCfg;
 extern const cm_omi_map_object_t CmCnmNascopyCfg;
-
+extern const cm_omi_map_object_t CmDomainUserCacheCfg;
 
 const cm_omi_map_object_t* CmOmiMap[CM_OMI_OBJECT_BUTT] =
 {
@@ -368,6 +380,7 @@ const cm_omi_map_object_t* CmOmiMap[CM_OMI_OBJECT_BUTT] =
 	&CmCnmMailsendCfg,
 	&CmCnmMailrecvCfg,
 	&CmCnmNascopyCfg,
+	&CmDomainUserCacheCfg,
 };
 
 const cm_omi_map_cfg_t CmCnmMapCommErr[] =

@@ -71,6 +71,9 @@
     <alarm id="53" type="FAULT" level="MAJOR" param_num="2" param_match="0,1" is_disable="TRUE" />
 
     <alarm id="54" type="EVENT" level="TRIVIAL" param_num="2" param_match="0,1" is_disable="FALSE" />
+	
+    <alarm id="55" type="FAULT" level="MAJOR" param_num="4" param_match="0,1" is_disable="FALSE" />
+
 
     <!--  node offline -->
     <alarm id="10000000" type="FAULT" level="MAJOR" param_num="1" param_match="0" is_disable="FALSE" />

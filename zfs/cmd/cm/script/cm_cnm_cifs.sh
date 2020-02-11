@@ -81,13 +81,17 @@ function cm_cnm_cifs_getbatch()
             permission=$CM_NAS_PERISSION_RW
             ;;
             "rwxpdDaARWc--s")
-            permission=$CM_NAS_PERISSION_RD
+            permission=$CM_NAS_PERISSION_RW
+            ;;
+            "rwxp--aARWcCos")
+            permission=$CM_NAS_PERISSION_RW
             ;;
             *)
             permission=$CM_NAS_PERISSION_RO
             ;;
         esac
-        echo "$index $domain $nametype $name $permission"
+        name=`/var/cm/script/cm_cnm_user.sh getnamebyid "$nametype" "$name"`
+        echo "$index $permission $name"
         ((index=$index+1))
     done
     return $CM_OK
@@ -197,9 +201,17 @@ function cm_cnm_cifs_add()
     local permission=$5
     local abe=$6
     local inherit=$7
-    local user=`cm_cnm_cifs_user_get $nametype "$name"`
-    #domain 预留
     
+    if [ $domain -eq $CM_DOMAIN_AD ]; then
+        #AD域用户场景，需要将用户名转换为UID
+        name=`/var/cm/script/cm_cnm_user.sh ad_getidbyname "$nametype" "$name"`
+        if [ "X$name" == "X" ]; then
+            return $CM_ERR_NOT_EXISTS
+        fi
+    fi
+    
+    local user=`cm_cnm_cifs_user_get $nametype "$name"`
+
     #检查是否存在
     local cnt=`ls -dV "$dir" 2>/dev/null |grep "${user}:" |wc -l`
     if [ $cnt -ne 0 ]; then
@@ -238,6 +250,15 @@ function cm_cnm_cifs_update()
     local abe=$6
     local inherit=$7
     local iRet=$CM_ERR_NOT_EXISTS
+    
+    if [ $domain -eq $CM_DOMAIN_AD ]; then
+        #AD域用户场景，需要将用户名转换为UID
+        name=`/var/cm/script/cm_cnm_user.sh ad_getidbyname "$nametype" "$name"`
+        if [ "X$name" == "X" ]; then
+            return $CM_ERR_NOT_EXISTS
+        fi
+    fi
+    
     local user=`cm_cnm_cifs_user_get $nametype "$name"`
     
     permission=`cm_cnm_cifs_permission_get $permission "$abe" "$inherit"`
@@ -277,6 +298,15 @@ function cm_cnm_cifs_delete()
     local domain=$2
     local nametype=$3
     local name=$4
+    
+    if [ $domain -eq $CM_DOMAIN_AD ]; then
+        #AD域用户场景，需要将用户名转换为UID
+        name=`/var/cm/script/cm_cnm_user.sh ad_getidbyname "$nametype" "$name"`
+        if [ "X$name" == "X" ]; then
+            return $CM_ERR_NOT_EXISTS
+        fi
+    fi
+    
     local user=`cm_cnm_cifs_user_get $nametype "$name"`
     local iRet=$CM_ERR_NOT_EXISTS
     
@@ -309,6 +339,13 @@ function cm_cnm_cifs_get()
     local domain=$2
     local nametype=$3
     local name=$4
+    if [ $domain -eq $CM_DOMAIN_AD ]; then
+        #AD域用户场景，需要将用户名转换为UID
+        name=`/var/cm/script/cm_cnm_user.sh ad_getidbyname "$nametype" "$name"`
+        if [ "X$name" == "X" ]; then
+            return $CM_ERR_NOT_EXISTS
+        fi
+    fi
     local user=`cm_cnm_cifs_user_get $nametype "$name"`
     local iRet=$CM_ERR_NOT_EXISTS
     
@@ -323,14 +360,14 @@ function cm_cnm_cifs_get()
         permission=$CM_NAS_PERISSION_RW
         ;;
         "rwxpdDaARWc--s")
-        permission=$CM_NAS_PERISSION_RD
+        permission=$CM_NAS_PERISSION_RW
         ;;
         *)
         permission=$CM_NAS_PERISSION_RO
         ;;
     esac
-    
-    echo "0 $domain $nametype $name $permission"
+    name=`/var/cm/script/cm_cnm_user.sh ad_getnamebyid "$nametype" "$name"`
+    echo "0 $permission $name"
     return $CM_OK
 }
 

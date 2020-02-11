@@ -60,5 +60,7 @@ extern cm_rpc_msg_info_t* cm_rpc_msg_new(cm_rpc_msg_e MsgType, uint32 DataLen);
 
 extern void cm_rpc_msg_delete(cm_rpc_msg_info_t *pMsg);
 
+extern const sint8* cm_rpc_get_ipaddr(cm_rpc_handle_t Handle);
+
 
 #endif /* BASE_RPC_CM_RPC_H_ */

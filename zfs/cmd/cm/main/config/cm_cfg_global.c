@@ -91,7 +91,7 @@ const cm_sync_config_t g_cm_sync_config[CM_SYNC_OBJ_BUTT] =
     },
     {
         CM_SYNC_OBJ_ALARM_RECORD,
-        CM_SYNC_FLAG_MASTER_DOMAIN | CM_SYNC_FLAG_MULTI_RECORD,
+        CM_SYNC_FLAG_MASTER_DOMAIN | CM_SYNC_FLAG_MULTI_RECORD | CM_SYNC_FLAG_ALWAYLS,
         cm_alarm_cbk_sync_request,
         cm_alarm_cbk_sync_get,
         cm_alarm_cbk_sync_delete
@@ -493,6 +493,8 @@ const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_explorer[] =
     {CM_OMI_CMD_GET_BATCH, cm_cnm_explorer_local_getbatch},
     {CM_OMI_CMD_COUNT, cm_cnm_explorer_local_count},
     {CM_OMI_CMD_ADD, cm_cnm_explorer_local_create},
+    {CM_OMI_CMD_DELETE, cm_cnm_explorer_local_delete},
+    {CM_OMI_CMD_MODIFY, cm_cnm_explorer_local_modify},
 };
 
 const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_ipf[] =
@@ -564,6 +566,13 @@ const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_upgrade[] =
     {CM_OMI_CMD_GET_BATCH, cm_cnm_upgrade_local_getbatch},
     {CM_OMI_CMD_COUNT, cm_cnm_upgrade_local_count},
     {CM_OMI_CMD_ADD, cm_cnm_upgrade_local_insert},
+};
+
+const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_ucache[] =
+{
+    {CM_OMI_CMD_GET_BATCH, cm_cnm_ucache_local_getbatch},
+    {CM_OMI_CMD_COUNT, cm_cnm_ucache_local_count},
+    {CM_OMI_CMD_TEST, cm_cnm_ucache_local_test},
 };
 
 const cm_cnm_cfg_obj_t g_cm_cnm_cfg_array[] =
@@ -833,6 +842,13 @@ const cm_cnm_cfg_obj_t g_cm_cnm_cfg_array[] =
         sizeof(cm_cnm_upgrade_info_t),sizeof(cm_cnm_decode_info_t)+sizeof(cm_cnm_upgrade_info_t),
         sizeof(g_cm_cnm_local_cmd_upgrade)/sizeof(cm_cnm_cfg_cmd_t),
         g_cm_cnm_local_cmd_upgrade
+    },
+
+    {
+        CM_OMI_OBJECT_UCACHE,
+        sizeof(cm_cnm_ucache_info_t),sizeof(cm_cnm_decode_info_t)+sizeof(cm_cnm_ucache_info_t),
+        sizeof(g_cm_cnm_local_cmd_ucache)/sizeof(cm_cnm_cfg_cmd_t),
+        g_cm_cnm_local_cmd_ucache
     },
     /* 下面是最后一个，一直保留，新配置放前面 */
     {CM_OMI_OBJECT_DEMO, 0, 0, 0, NULL}

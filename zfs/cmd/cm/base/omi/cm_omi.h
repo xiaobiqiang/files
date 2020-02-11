@@ -102,4 +102,12 @@ extern void cm_omi_make_select_cond(
 extern sint32 cm_omi_check_permission(uint32 obj, uint32 cmd);    
 extern sint32 cm_omi_check_permission_obj(uint32 obj);
 
+extern sint32 cm_omi_remote_connect(const sint8* ipaddr);
+
+extern sint32 cm_omi_remote_request(sint32 handle,const sint8 *pReq, 
+    sint8 **ppAckData, uint32 *pAckLen, uint32 timeout);
+
+extern sint32 cm_omi_remote_connect(sint32 handle);
+
+
 #endif /* BASE_OMI_CM_OMI_H_ */

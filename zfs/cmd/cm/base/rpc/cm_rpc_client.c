@@ -65,6 +65,18 @@ static uint32 cm_rpc_new_msgid(void)
     return id;
 }
 
+
+const sint8* cm_rpc_get_ipaddr(cm_rpc_handle_t Handle)
+{
+    cm_rpc_client_t *pClient = (cm_rpc_client_t*)Handle;
+
+    if(NULL == pClient)
+    {
+        return NULL;
+    }
+    return pClient->ip_addr;
+}
+
 #ifndef CM_RPC_USE_NANOMSG
 
 sint32 cm_rpc_connent(

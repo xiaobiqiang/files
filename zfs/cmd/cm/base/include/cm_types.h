@@ -168,12 +168,10 @@ typedef enum
 typedef enum
 {
     CM_DOMAIN_EVERYONE = 0,
-    CM_DOMAIN_LOCAL,
-#if 0 /* Ô¤Áô */   
+    CM_DOMAIN_LOCAL,  
     CM_DOMAIN_AD,
     CM_DOMAIN_LDAP,
-    CM_DOMAIN_NIS,
-#endif    
+    CM_DOMAIN_NIS,  
     CM_DOMAIN_BUTT
 }cm_domain_type_e;
 

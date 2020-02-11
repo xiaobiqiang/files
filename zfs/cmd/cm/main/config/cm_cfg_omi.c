@@ -1621,6 +1621,16 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmExplorer[] =
         cm_cnm_explorer_decode, cm_cnm_explorer_create, NULL,
         NULL
     },
+    {
+        CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
+        cm_cnm_explorer_decode, cm_cnm_explorer_delete, NULL,
+        NULL
+    },
+    {
+        CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
+        cm_cnm_explorer_decode, cm_cnm_explorer_modify, NULL,
+        NULL
+    },
 };
 
 const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgIpf[] =
@@ -2111,6 +2121,30 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmNascopy[] =
     },
 };
 
+const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmUcache[] =
+{
+    /* getbatch */
+    {
+        CM_OMI_CMD_GET_BATCH, CM_OMI_PERMISSION_ALL,
+        cm_cnm_ucache_decode, cm_cnm_ucache_getbatch, cm_cnm_ucache_encode
+    },
+   
+    /* count */
+    {
+        CM_OMI_CMD_COUNT, CM_OMI_PERMISSION_ALL,
+        cm_cnm_ucache_decode, cm_cnm_ucache_count, cm_omi_encode_count,
+        NULL
+    },
+
+    /* test */
+    {
+        CM_OMI_CMD_TEST, CM_OMI_PERMISSION_ALL,
+        cm_cnm_ucache_decode, cm_cnm_ucache_test,NULL,
+        NULL
+    },
+};
+
+
 #define CM_OMI_OBJ_CFG(id,cfg,init) \
     {(id),sizeof(cfg)/sizeof(cm_omi_object_cmd_cfg_t),(cfg),(init)}
 
@@ -2246,6 +2280,9 @@ const cm_omi_object_cfg_t g_CmOmiObjectCfg[CM_OMI_OBJECT_BUTT] =
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_MAILSEND,g_CmOmiObjectCfgCnmMailsend,cm_cnm_mailsend_init),
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_MAILRECV,g_CmOmiObjectCfgCnmMailrecv,cm_cnm_mailrecv_init),
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_NASCOPY,g_CmOmiObjectCfgCnmNascopy,cm_cnm_nas_copy_init),
+	
+	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_UCACHE,g_CmOmiObjectCfgCnmUcache,NULL),
+	
   /*mem*/
 
 };

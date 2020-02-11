@@ -749,7 +749,7 @@ static sint32 cm_cnm_cifs_decode_ext(
         {CM_OMI_FIELD_CIFS_DOMAIN,sizeof(info->domain_type),&info->domain_type,cm_cnm_cifs_decode_check_domain},
         {CM_OMI_FIELD_CIFS_PERMISSION,sizeof(info->permission),&info->permission,cm_cnm_cifs_decode_check_permission},
     };
-
+    info->domain_type = CM_DOMAIN_LOCAL; /*default*/
     iRet = cm_cnm_decode_str(ObjParam,param_str,
         sizeof(param_str)/sizeof(cm_cnm_decode_param_t),set);
     if(iRet != CM_OK)
@@ -783,7 +783,7 @@ static void cm_cnm_cifs_encode_each(cm_omi_obj_t item,void *eachdata,void *arg)
     cm_cnm_map_value_num_t cols_num[] = 
     {
         {CM_OMI_FIELD_CIFS_NAME_TYPE,     (uint32)info->name_type},
-        /*{CM_OMI_FIELD_CIFS_DOMAIN,        (uint32)info->domain_type},ÔÝ²»Ö§³Ö*/
+        {CM_OMI_FIELD_CIFS_DOMAIN,        (uint32)info->domain_type},
         {CM_OMI_FIELD_CIFS_PERMISSION,    (uint32)info->permission},
     };
     
@@ -900,15 +900,19 @@ static sint32 cm_cnm_cifs_local_get_each(void *arg, sint8 **cols, uint32 col_num
     const uint32 def_num = 5;  
     
     /* index domain nametype name permission */
-    if(def_num != col_num)
+    if(def_num > col_num)
     {
         CM_LOG_WARNING(CM_MOD_CNM,"col_num[%u] def_num[%u]",col_num,def_num);
         return CM_FAIL;
     }
-    info->domain_type = (uint8)atoi(cols[1]);
-    info->name_type = (uint8)atoi(cols[2]);
-    CM_VSPRINTF(info->name,sizeof(info->name),"%s",cols[3]);
-    info->permission = (uint8)atoi(cols[4]);
+    info->domain_type = (uint8)atoi(cols[2]);
+    info->name_type = (uint8)atoi(cols[3]);    
+    info->permission = (uint8)atoi(cols[1]);
+    CM_VSPRINTF(info->name,sizeof(info->name),"%s",cols[4]);
+    for(cols+=def_num,col_num-=def_num;col_num>0;col_num--,cols++)
+    {
+        CM_SNPRINTF_ADD(info->name,sizeof(info->name)," %s",*cols);
+    }
     return CM_OK;
 }
 

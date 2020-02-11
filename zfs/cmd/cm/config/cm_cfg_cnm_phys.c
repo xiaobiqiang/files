@@ -203,11 +203,6 @@ const cm_omi_map_object_field_t CmOmiMapPhys_ipFields[] =
     {{"netmask", CM_OMI_FIELD_PHYS_IP_NETMASK}, "-netmask", {CM_OMI_DATA_STRING, CM_NAME_LEN, {IP_FORMAT}}},
 };
 
-const cm_omi_map_object_field_t* CmOmiMapPhys_ipCmdParamsCount[] =
-{
-    &CmOmiMapPhys_ipFields[CM_OMI_FIELD_PHYS_IP_NID],
-};
-
 const cm_omi_map_object_field_t* CmOmiMapPhys_ipCmdParamsInsert[] = 
 {
     &CmOmiMapPhys_ipFields[CM_OMI_FIELD_PHYS_IP_NID],
@@ -244,7 +239,7 @@ const cm_omi_map_object_cmd_t CmOmiMapPhys_ipCmds[] =
     {
         &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
         1,
-        CmOmiMapPhys_ipCmdParamsCount,
+        CmOmiMapPhys_ipCmdParamsInsert,
         3,
         CmOmiMapPhys_ipCmdParamsGetBatch
     },
@@ -252,9 +247,9 @@ const cm_omi_map_object_cmd_t CmOmiMapPhys_ipCmds[] =
     {
         &CmOmiMapCmds[CM_OMI_CMD_COUNT],
         1,
-        CmOmiMapPhys_ipCmdParamsCount,
-        0,
-        NULL
+        CmOmiMapPhys_ipCmdParamsInsert,
+        1,
+        CmOmiMapPhys_ipCmdParamsDelete_opt
     },
     /*insert*/
     {

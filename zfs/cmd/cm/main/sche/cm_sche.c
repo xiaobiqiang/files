@@ -95,6 +95,9 @@ sint32 cm_sche_init(void)
             "minute TINYINT,"
             "hours INT,"
             "days INT)";
+    const sint8* lastexec = "CREATE TABLE IF NOT EXISTS last_t ("
+            "id BIGINT,"
+            "dt INT)";
 
     iRet = cm_db_open_ext(CM_SCHE_DB_FILE,&g_cm_sche_db_handle);
     if(CM_OK != iRet)
@@ -108,6 +111,7 @@ sint32 cm_sche_init(void)
         CM_LOG_ERR(CM_MOD_SCHE,"create table fail[%d]",iRet);
         return iRet;
     }
+    (void)cm_db_exec_ext(g_cm_sche_db_handle,lastexec);
     iRet = CM_THREAD_CREATE(&handle,cm_sche_thread,g_cm_sche_db_handle);
     if(CM_OK != iRet)
     {
@@ -334,6 +338,8 @@ sint32 cm_sche_cbk_sync_get(uint64 data_id, void **pdata, uint32 *plen)
 
 sint32 cm_sche_cbk_sync_delete(uint64 data_id)
 {
+    (void)cm_db_exec_ext(g_cm_sche_db_handle,
+            "DELETE FROM last_t WHERE id=%llu",data_id);
     return cm_db_exec_ext(g_cm_sche_db_handle,
             "DELETE FROM record_t WHERE id=%llu",data_id);
 }
@@ -392,6 +398,8 @@ static cm_sche_cbk_t cm_sche_exec_cbk(uint32 obj)
 static void cm_sche_exec(cm_sche_info_t *info, uint32 cnt)
 {
     cm_sche_cbk_t cbk = NULL;
+    cm_time_t now = 0;
+    uint64 last=0;
     
     for(;cnt>0;cnt--,info++)
     {
@@ -401,7 +409,26 @@ static void cm_sche_exec(cm_sche_info_t *info, uint32 cnt)
             CM_LOG_WARNING(CM_MOD_SCHE,"obj[%u] cbk null",info->obj);
             continue;
         }
+        last=0;
+        (void)cm_db_exec_get_count(g_cm_sche_db_handle,&last,
+            "SELECT dt FROM last_t WHERE id=%llu ORDER BY dt DESC LIMIT 1",info->id);
+        now = cm_get_time()-(cm_time_t)last;
+        if(now < 60)
+        {
+            CM_LOG_WARNING(CM_MOD_SCHE,"%llu, obj[%u] last[%lu]",info->id,info->obj,now);
+            continue;
+        }
         (void)cbk(info->name,info->param);
+        if (0 == last)
+        {
+            (void)cm_db_exec_ext(g_cm_sche_db_handle,"INSERT INTO last_t VALUES"
+                "(%llu,%lu)", info->id, cm_get_time());
+        }
+        else
+        {
+            (void)cm_db_exec_ext(g_cm_sche_db_handle,"UPDATE last_t SET"
+                " dt=%lu WHERE id=%llu",cm_get_time(), info->id);
+        }        
     }
     return;
 }

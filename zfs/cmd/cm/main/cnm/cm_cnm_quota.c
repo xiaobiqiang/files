@@ -16,7 +16,6 @@
 
 #define cm_cnm_quota_req(cmd,param,ppAck,plen) \
     cm_cnm_request_comm(CM_OMI_OBJECT_QUOTA,cmd,sizeof(cm_cnm_quota_info_t),param,ppAck,plen)
-const sint8* cm_cnm_quota_sh = "/var/cm/script/cm_cnm_quota.sh";
 
 sint32 cm_cnm_quota_init(void)
 {
@@ -42,7 +41,10 @@ static sint32 cm_cnm_quota_decode_ext(const cm_omi_obj_t ObjParam, void* data, c
     {
         {CM_OMI_FIELD_QUOTA_NID, sizeof(nid), &nid, NULL},
         {CM_OMI_FIELD_QUOTA_USERTYPE, sizeof(info->usertype), &info->usertype, NULL},
+        {CM_OMI_FIELD_QUOTA_DOMAIN, sizeof(info->domain), &info->domain, NULL},
     };
+
+    info->domain = CM_DOMAIN_LOCAL;
     iRet = cm_cnm_decode_str(ObjParam, param_str,
                              sizeof(param_str) / sizeof(cm_cnm_decode_param_t), set);
 
@@ -93,7 +95,15 @@ static void cm_cnm_quota_encode_each(cm_omi_obj_t item, void* eachdata, void* ar
         {CM_OMI_FIELD_QUOTA_USED, info->used},
     };
 
+    cm_cnm_map_value_num_t cols_num[] = 
+    {
+        {CM_OMI_FIELD_QUOTA_USERTYPE,     (uint32)info->usertype},
+        {CM_OMI_FIELD_QUOTA_DOMAIN,        (uint32)info->domain},
+    };
+    
+
     cm_cnm_encode_str(item, field, cols_str, sizeof(cols_str) / sizeof(cm_cnm_map_value_str_t));
+    cm_cnm_encode_num(item, field, cols_num, sizeof(cols_num) / sizeof(cm_cnm_map_value_num_t));
     return;
 }
 
@@ -227,7 +237,7 @@ static sint32 cm_cnm_quota_get_each(void *arg, sint8 **cols, uint32 col_num)
     CM_VSPRINTF(info->space, sizeof(info->space), "%s", cols[2]);
     CM_VSPRINTF(info->softspace, sizeof(info->softspace), "%s", cols[3]);
     CM_VSPRINTF(info->used, sizeof(info->used), "%s", cols[4]);
-
+    info->domain = CM_DOMAIN_LOCAL;
     return CM_OK;
 }
 
@@ -246,7 +256,9 @@ sint32 cm_cnm_quota_local_getbatch(
         return CM_PARAM_ERR;
     }
 
-    CM_VSPRINTF(cmd, CM_STRING_256, "%s getbatch %u %s", cm_cnm_quota_sh, info->usertype, info->filesystem);
+    CM_VSPRINTF(cmd, CM_STRING_256, CM_SCRIPT_DIR
+        "cm_cnm_quota.sh getbatch '%u' '%s' '%u'", 
+        info->usertype, info->filesystem,info->domain);
     iRet = cm_cnm_exec_get_list(cmd, cm_cnm_quota_get_each, offset, sizeof(cm_cnm_quota_info_t), ppAck, &total);
 
     if(CM_OK != iRet)
@@ -267,6 +279,8 @@ sint32 cm_cnm_quota_local_update(
     cm_cnm_decode_info_t* decode = param;
     const cm_cnm_quota_info_t *info = (const cm_cnm_quota_info_t*)decode->data;
     uint32 cut = 0;
+    const sint8* pquota="null";
+    const sint8* psoftquota="null";
 
     if(info->usertype != CM_NAME_USER && info->usertype != CM_NAME_GROUP)
     {
@@ -278,39 +292,18 @@ sint32 cm_cnm_quota_local_update(
         return CM_PARAM_ERR;
     }
 
-    if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_NAME))
+    if(info->space[0] != '\0')
     {
-        if(CM_NAME_USER == info->usertype)
-        {
-            cut = cm_exec_int("grep '^%s:' /etc/passwd |wc -l", info->name);
-        }
-        else
-        {
-            cut = cm_exec_int("grep '^%s:' /etc/group |wc -l", info->name);
-        }
-
-        if(0 == cut)
-        {
-            return CM_PARAM_ERR;
-        }
-    }
-    
-    if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_HARDSPACE) && CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_SOFTSPACE))
-    {
-        return cm_system("%s update %u %s %s %s %s", cm_cnm_quota_sh, info->usertype, info->name, info->filesystem, info->space, info->softspace);
+        pquota=info->space;
     }
 
-    if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_HARDSPACE) && !CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_SOFTSPACE))
+    if(info->softspace[0] != '\0')
     {
-        return cm_system("%s update %u %s %s %s null", cm_cnm_quota_sh, info->usertype, info->name, info->filesystem, info->space);
+        psoftquota=info->softspace;
     }
 
-    if(!CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_HARDSPACE) && CM_OMI_FIELDS_FLAG_ISSET(&decode->set, CM_OMI_FIELD_QUOTA_SOFTSPACE))
-    {
-        return cm_system("%s update %u %s %s null %s", cm_cnm_quota_sh, info->usertype, info->name, info->filesystem, info->softspace);
-    }
-
-    return CM_OK;
+    return cm_system(CM_SCRIPT_DIR"cm_cnm_quota.sh update '%u' '%s' '%s' '%s' '%s' '%u'", 
+        info->usertype, info->name, info->filesystem, pquota, psoftquota,info->domain);
 }
 
 sint32 cm_cnm_quota_local_delete(
@@ -336,7 +329,8 @@ sint32 cm_cnm_quota_local_delete(
         return CM_PARAM_ERR;
     }
 
-    return cm_system("%s delete %u %s %s", cm_cnm_quota_sh, info->usertype, info->name, info->filesystem);
+    return cm_system(CM_SCRIPT_DIR"cm_cnm_quota.sh delete '%u' '%s' '%s' '%u'", 
+        info->usertype, info->name, info->filesystem, info->domain);
 }
 
 sint32 cm_cnm_quota_local_count(
@@ -347,7 +341,8 @@ sint32 cm_cnm_quota_local_count(
     cm_cnm_decode_info_t* decode = param;
     const cm_cnm_quota_info_t *info = (const cm_cnm_quota_info_t*)decode->data;
     uint64 cut = 0;
-    cut = cm_exec_int("%s count %u %s", cm_cnm_quota_sh, info->usertype, info->filesystem);
+    cut = cm_exec_int(CM_SCRIPT_DIR"cm_cnm_quota.sh count '%u' '%s' '%u'", 
+        info->usertype, info->filesystem,info->domain);
 
     return  cm_cnm_ack_uint64(cut, ppAck, pAckLen);
 }

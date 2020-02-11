@@ -652,7 +652,7 @@ static void cm_cnm_cluster_stat_disk(cm_cnm_cluster_stat_t *stat)
 
     if(CM_OK != iRet)
     {
-        CM_LOG_ERR(CM_MOD_CNM, "open %s fail", iRet);
+        CM_LOG_ERR(CM_MOD_CNM, "open %s fail", CM_CNM_DISK_FILE);
         return;
     }
 

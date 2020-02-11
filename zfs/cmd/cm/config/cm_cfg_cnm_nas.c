@@ -158,7 +158,7 @@ const cm_omi_map_object_field_t CmOmiMapFieldsCifs[] =
     {{"name", CM_OMI_FIELD_CIFS_NAME}, "-name",{CM_OMI_DATA_STRING, CM_NAME_LEN_POOL, {"[0-9a-zA-Z_@]{1,63}"}}},
     {{"nametype", CM_OMI_FIELD_CIFS_NAME_TYPE}, "-ntype",{CM_OMI_DATA_ENUM, 4, {&CmOmiMapCifsNameTypeCfg}}},    
     {{"permission", CM_OMI_FIELD_CIFS_PERMISSION}, "-perm",{CM_OMI_DATA_ENUM, 4, {&CmOmiMapCifsPermissionTypeCfg}}},
-    /*{{"domain", CM_OMI_FIELD_CIFS_DOMAIN}, "-dm",{CM_OMI_DATA_ENUM, 4, {NULL}}},*/
+    {{"domain", CM_OMI_FIELD_CIFS_DOMAIN}, "-domain",{CM_OMI_DATA_ENUM, 4, {&CmOmiMapEnumDomainType}}},
 };
 
 const cm_omi_map_object_field_t* CmOmiMapCifsCmdParamsGetBatch[]=
@@ -176,7 +176,14 @@ const cm_omi_map_object_field_t* CmOmiMapCifsCmdParamsAdd[]=
     &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_NAME_TYPE], /*nametype*/
     &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_NAME], /*name*/    
     &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_PERMISSION],
+    &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_DOMAIN],
 };
+
+const cm_omi_map_object_field_t* CmOmiMapCifsCmdParamsAddOpt[]=
+{
+    &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_DOMAIN],
+};
+
 const cm_omi_map_object_field_t* CmOmiMapCifsCmdParamsUpdate[]=
 {
     &CmOmiMapFieldsCifs[CM_OMI_FIELD_CIFS_PERMISSION],
@@ -206,16 +213,16 @@ const cm_omi_map_object_cmd_t CmOmiMapCifsCmds[] =
         &CmOmiMapCmds[CM_OMI_CMD_ADD],
         5,
         CmOmiMapCifsCmdParamsAdd,
-        0,
-        NULL,
+        1,
+        CmOmiMapCifsCmdParamsAddOpt,
     },
     /* modify */
     {
         &CmOmiMapCmds[CM_OMI_CMD_MODIFY],        
         5,
         CmOmiMapCifsCmdParamsAdd,
-        0,
-        NULL,
+        1,
+        CmOmiMapCifsCmdParamsAddOpt,
     },
 
     /* delete */
@@ -223,16 +230,16 @@ const cm_omi_map_object_cmd_t CmOmiMapCifsCmds[] =
         &CmOmiMapCmds[CM_OMI_CMD_DELETE],        
         4,
         CmOmiMapCifsCmdParamsAdd,
-        0,
-        NULL
+        1,
+        CmOmiMapCifsCmdParamsAddOpt
     },
     /* get */
     {
         &CmOmiMapCmds[CM_OMI_CMD_GET],        
         4,
         CmOmiMapCifsCmdParamsAdd,
-        0,
-        NULL
+        1,
+        CmOmiMapCifsCmdParamsAddOpt
     },
 };
 

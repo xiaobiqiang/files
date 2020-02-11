@@ -108,9 +108,12 @@ typedef enum
     CM_OMI_OBJECT_POOLEXT,
     CM_OMI_OBJECT_UPGRADE,
     CM_OMI_OBJECT_LOWDATA_VOLUME,
-    CM_OMI_OBJECT_MAILSEND,
+    CM_OMI_OBJECT_MAILSEND=80,
+    
     CM_OMI_OBJECT_MAILRECV,
     CM_OMI_OBJECT_NASCOPY,
+    CM_OMI_OBJECT_UCACHE,
+    
     CM_OMI_OBJECT_BUTT
 } cm_omi_object_e;
 
@@ -319,6 +322,7 @@ typedef enum
     CM_OMI_FIELD_DISK_POOL,
     CM_OMI_FIELD_DISK_LED,
     CM_OMI_FIELD_DISK_ISLOCAL,
+    CM_OMI_FIELD_DISK_TYPE,
 } cm_omi_field_disk_e;
 
 typedef enum
@@ -540,6 +544,7 @@ typedef enum
     CM_OMI_FIELD_QUOTA_HARDSPACE,
     CM_OMI_FIELD_QUOTA_SOFTSPACE,
     CM_OMI_FIELD_QUOTA_USED,
+    CM_OMI_FIELD_QUOTA_DOMAIN,
 } cm_omi_field_quota_e;
 
 typedef enum

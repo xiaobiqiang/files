@@ -817,5 +817,85 @@ function cm_cnm_snapshot_rollback()
     return $iret
 }
 
-${CM_MOD_NAME}"_"$*
+function cm_cnm_filedir_create()
+{
+    local ftype=$2
+    local parentdir=$1
+    local fname=$3
+    local fperm=$4
+    
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$ftype" == "X" ] || [ "X$fname" == "X" ] || [ "X$ftype" != "X1" ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$ftype:$fname err"
+        return $CM_PARAM_ERR
+    fi
+    mkdir "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    local iRet=$?
+    if [ $iRet -eq $CM_OK ] && [ "X$fperm" != "X" ] && [ $fperm -gt 0 ]; then
+        chmod $fperm "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    fi
+    if [ $iRet -eq 2 ]; then
+        iRet=$CM_ERR_ALREADY_EXISTS
+    fi
+    return $iRet
+}
+
+function cm_cnm_filedir_update()
+{
+    local nname=$4
+    local parentdir=$1
+    local fname=$2
+    local fperm=$3
+    local iRet=$CM_OK
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$fname" == "X" ] ; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$fname err"
+        return $CM_PARAM_ERR
+    fi
+    if [ "X$fperm" != "X" ] && [ $fperm -gt 0 ]; then
+        chmod $fperm "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X$nname" == "X" ]; then
+        mv "${parentdir}"/"${fname}" "${parentdir}"/"${nname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    return $iRet
+}
+
+function cm_cnm_filedir_delete()
+{
+    local parentdir=$1
+    local fname=$2
+    local iRet=$CM_OK
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$fname" == "X" ] ; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$fname err"
+        return $CM_PARAM_ERR
+    fi
+    rm -rf "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    iRet=$?
+    return $iRet
+}
+
+${CM_MOD_NAME}"_$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
 exit $?

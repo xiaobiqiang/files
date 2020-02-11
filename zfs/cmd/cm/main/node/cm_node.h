@@ -82,4 +82,8 @@ extern sint32 cm_node_reboot(uint32 nid);
 
 extern sint32 cm_node_check_all_online(void);
 
+extern uint32 cm_node_count(void);
+extern uint32 cm_node_subcount(uint32 SubDomainId);
+
+
 #endif /* MAIN_NODE_CM_NODE_H_ */

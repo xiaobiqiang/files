@@ -524,7 +524,8 @@ static sint32 cm_sync_request_master(uint32 obj_id, uint64 data_id,void *pdata, 
     }
     
     cm_htbt_get_local_node(&query.max,&query.index);
-    if((query.index <= (query.max >> 1)) && (cfg->mask & CM_SYNC_FLAG_REAL_TIME_ONLY))
+    if((query.index <= (query.max >> 1)) && !(cfg->mask & CM_SYNC_FLAG_REAL_TIME_ONLY)
+        && !(cfg->mask & CM_SYNC_FLAG_ALWAYLS))
     {
         CM_LOG_ERR(CM_MOD_SYNC,"tatal[%u] online[%u]",query.max,query.index);
         return CM_FAIL;
@@ -560,7 +561,8 @@ static sint32 cm_sync_request_master(uint32 obj_id, uint64 data_id,void *pdata, 
        (cm_node_trav_func_t)cm_sync_request_each_node, &query, CM_FALSE);
     CM_MUTEX_UNLOCK(&pglobal->mutex);
 	
-    if((query.index <= (query.max >> 1)) && (cfg->mask & CM_SYNC_FLAG_REAL_TIME_ONLY))
+    if((query.index <= (query.max >> 1)) && !(cfg->mask & CM_SYNC_FLAG_REAL_TIME_ONLY)
+        && !(cfg->mask & CM_SYNC_FLAG_ALWAYLS))
     {
         CM_FREE(pReq);
         CM_LOG_ERR(CM_MOD_SYNC,"reqnum[%u] oknum[%u]",query.max,query.index);

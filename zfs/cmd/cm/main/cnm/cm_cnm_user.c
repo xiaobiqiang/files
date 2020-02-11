@@ -781,7 +781,10 @@ sint32 cm_cnm_group_delete(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         return CM_ERR_NOT_EXISTS;
     }
     id = (uint64)cm_exec_int("cat /etc/group | grep '^%s:' | awk -F':' '{printf $3}'",info->name);
-    
+    if(id<100||id>1000)
+    {
+        return CM_PARAM_ERR;
+    }
     
     return cm_sync_delete(CM_SYNC_OBJ_GROUP,id);
 }
@@ -880,11 +883,14 @@ static sint32 cm_cnm_explorer_decode_ext(const cm_omi_obj_t ObjParam, void* data
         {CM_OMI_FIELD_EXPLORER_DIR, sizeof(info->dir), info->dir, NULL},
         {CM_OMI_FIELD_EXPLORER_FIND, sizeof(info->find), info->find, NULL},
         {CM_OMI_FIELD_EXPLORER_FLAG, sizeof(info->flag), info->flag, NULL},
+        {CM_OMI_FIELD_EXPLORER_NAME, sizeof(info->name), info->name, NULL},
     };
  
     cm_cnm_decode_param_t param_num[] =
     {
         {CM_OMI_FIELD_EXPLORER_NID, sizeof(info->nid), &info->nid, NULL},
+        {CM_OMI_FIELD_EXPLORER_PERMISSION, sizeof(info->permission), &info->permission, NULL},
+        {CM_OMI_FIELD_EXPLORER_TYPE, sizeof(info->type), &info->type, NULL},
     };
     iRet = cm_cnm_decode_str(ObjParam, param_str,
         sizeof(param_str) / sizeof(cm_cnm_decode_param_t), set);
@@ -1078,13 +1084,17 @@ static sint32 cm_cnm_explorer_get_each(void* ptemp,const sint8* dir,const sint8*
         "getent passwd %u|awk -F':' '{printf $1}'",buf.st_uid);
     if(0 == strlen(info->user))
     {
-        CM_VSPRINTF(info->user,sizeof(info->user),"%u",buf.st_uid);
+        (void)cm_exec_tmout(info->user,sizeof(info->user),CM_CMT_REQ_TMOUT,
+            CM_SCRIPT_DIR"cm_cnm_user.sh getnamebyid_ad '%u' '%lu'",
+            CM_NAME_USER,buf.st_uid);
     }
     (void)cm_exec_tmout(info->group,sizeof(info->group),CM_CMT_REQ_TMOUT,
         "getent group %u|awk -F':' '{printf $1}'",buf.st_gid);
     if(0 == strlen(info->group))
     {
-        CM_VSPRINTF(info->group,sizeof(info->group),"%u",buf.st_gid);
+        (void)cm_exec_tmout(info->group,sizeof(info->group),CM_CMT_REQ_TMOUT,
+            CM_SCRIPT_DIR"cm_cnm_user.sh getnamebyid_ad '%u' '%lu'",
+            CM_NAME_GROUP,buf.st_gid);
     }
     info->atime = buf.st_atime;
     info->mtime = buf.st_mtime;
@@ -1348,17 +1358,67 @@ sint32 cm_cnm_explorer_local_create(
     cm_cnm_explorer_info_t *info = decode->data;
     sint32 iRet = CM_OK;
 
-    sint8 tmpname[CM_STRING_256] = {0};
-    cm_cnm_explorer_get_tmpname(tmpname,sizeof(tmpname),info->dir,info->find);
-    iRet = cm_system("%s explorer_create %s %s %s",cm_cnm_user_sh,info->dir,tmpname,info->find);
-    if(iRet != CM_OK)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"create fail");
-        return CM_FAIL;
+    if(info->find[0] != '\0')
+    {    
+        sint8 tmpname[CM_STRING_256] = {0};
+        cm_cnm_explorer_get_tmpname(tmpname,sizeof(tmpname),info->dir,info->find);
+        iRet = cm_system("%s explorer_create '%s' '%s' '%s'",cm_cnm_user_sh,info->dir,tmpname,info->find);
+        if(iRet != CM_OK)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"create fail");
+            return CM_FAIL;
+        }
+        return CM_OK;
     }
-    return CM_OK;
+
+    if(info->name[0] == '\0')
+    {
+        return CM_OK;
+    }
+    /* cm_cnm.sh filedir_create <dir> <ftype> <fname> <perm> */
+    return cm_system(CM_SCRIPT_DIR"cm_cnm.sh filedir_create '%s' '%u' '%s' '%u'",
+        info->dir,info->type,info->name,info->permission);
 }
 
+sint32 cm_cnm_explorer_delete(
+    const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    return cm_cnm_request_comm(CM_OMI_OBJECT_EXPLORER,CM_OMI_CMD_DELETE,sizeof(cm_cnm_explorer_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
+sint32 cm_cnm_explorer_local_delete(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_explorer_info_t *info = decode->data;
+
+    /* cm_cnm.sh filedir_delete <dir> <fname>*/
+    return cm_system(CM_SCRIPT_DIR"cm_cnm.sh filedir_delete '%s' '%s'",
+        info->dir,info->name);
+}
+
+sint32 cm_cnm_explorer_modify(
+    const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    return cm_cnm_request_comm(CM_OMI_OBJECT_EXPLORER,CM_OMI_CMD_MODIFY,sizeof(cm_cnm_explorer_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
+sint32 cm_cnm_explorer_local_modify(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_explorer_info_t *info = decode->data;
+
+    /* cm_cnm.sh filedir_update <dir> <fname> <perm> [newname]*/
+    return cm_system(CM_SCRIPT_DIR"cm_cnm.sh filedir_update '%s' '%s' '%u' '%s'",
+        info->dir,info->name,info->permission,info->find);
+}
 
 
 /*************domain   user*****************/
@@ -1562,5 +1622,172 @@ void cm_cnm_domain_user_oplog_create(
     cm_cnm_domain_user_oplog_report(sessionid,pDecodeParam,alarmid);
     return;
 }
+
+
+static sint32 cm_cnm_ucache_decode_ext(const cm_omi_obj_t ObjParam, void* data, cm_omi_field_flag_t *set)
+{
+    sint32 iRet = CM_OK;
+    cm_cnm_ucache_info_t* info = data;
+  
+    cm_cnm_decode_param_t param_num[] =
+    {
+        {CM_OMI_FIELD_UCACHE_TYPE, sizeof(info->type), &info->type, NULL},
+        {CM_OMI_FIELD_UCACHE_DOMAIN, sizeof(info->domain), &info->domain, NULL},
+    };
+    cm_cnm_decode_param_t param_str[] = 
+    {
+        {CM_OMI_FIELD_UCACHE_NAME,sizeof(info->name),info->name,NULL},
+    };
+
+    iRet = cm_cnm_decode_str(ObjParam,param_str,
+        sizeof(param_str)/sizeof(cm_cnm_decode_param_t),set);
+    if(iRet != CM_OK)
+    {
+        return iRet;
+    }
+    iRet = cm_cnm_decode_num(ObjParam, param_num,
+        sizeof(param_num) / sizeof(cm_cnm_decode_param_t), set);
+    if(CM_OK != iRet)
+    {
+        return iRet;
+    }
+    
+    return CM_OK;
+}
+
+sint32 cm_cnm_ucache_decode(
+    const cm_omi_obj_t  ObjParam,void** ppDecodeParam)
+{
+    return cm_cnm_decode_comm(ObjParam, sizeof(cm_cnm_ucache_info_t), 
+        cm_cnm_ucache_decode_ext, ppDecodeParam);
+}
+
+static void cm_cnm_ucache_encode_each(cm_omi_obj_t item,void* eachdata,void* arg)
+{
+    cm_omi_field_flag_t *field = arg;
+    cm_cnm_ucache_info_t *info = eachdata;
+    cm_cnm_map_value_str_t cols_str[] = 
+    {
+        {CM_OMI_FIELD_UCACHE_NAME,info->name},
+        {CM_OMI_FIELD_UCACHE_ID,info->id},
+    };
+    cm_cnm_encode_str(item,field,cols_str,sizeof(cols_str)/sizeof(cm_cnm_map_value_str_t));
+    return;
+}
+
+cm_omi_obj_t cm_cnm_ucache_encode(const void *pDecodeParam,void *pAckData,uint32 AckLen)
+{
+    return cm_cnm_encode_comm_ext(pDecodeParam,pAckData,AckLen,
+        sizeof(cm_cnm_ucache_info_t),cm_cnm_ucache_encode_each);
+}
+
+sint32 cm_cnm_ucache_getbatch(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen)
+{
+    const cm_cnm_decode_info_t *decode = pDecodeParam;
+
+    if((NULL == decode) || (decode->nid == 0))
+    {
+        return CM_PARAM_ERR;
+    }
+    return cm_cnm_request_comm(CM_OMI_OBJECT_UCACHE,CM_OMI_CMD_GET_BATCH,sizeof(cm_cnm_ucache_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
+sint32 cm_cnm_ucache_count(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen)
+{
+    const cm_cnm_decode_info_t *decode = pDecodeParam;
+
+    if((NULL == decode) || (decode->nid == 0))
+    {
+        return CM_PARAM_ERR;
+    }
+    return cm_cnm_request_comm(CM_OMI_OBJECT_UCACHE,CM_OMI_CMD_COUNT,sizeof(cm_cnm_ucache_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
+sint32 cm_cnm_ucache_local_count(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_ucache_info_t *info = decode->data;
+    
+    uint64 cnt=cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh cache_count %u %u",
+        info->domain,info->type);
+    return cm_cnm_ack_uint64(cnt, ppAck, pAckLen);
+}
+
+static sint32 cm_cnm_ucache_local_get_each(void *arg, sint8 **cols, uint32 col_num)
+{
+    cm_cnm_ucache_info_t *info=arg;
+    if(col_num < 2)
+    {
+        return CM_FAIL;
+    }
+    CM_MEM_ZERO(info,sizeof(cm_cnm_ucache_info_t));
+    CM_SNPRINTF_ADD(info->id,sizeof(info->id),"%s",cols[0]);
+    CM_SNPRINTF_ADD(info->name,sizeof(info->name),"%s",cols[1]);
+    for(cols+=2,col_num-=2;col_num>0;col_num--,cols++)
+    {
+        CM_SNPRINTF_ADD(info->name,sizeof(info->name)," %s",*cols);
+    }
+    return CM_OK;
+}
+
+sint32 cm_cnm_ucache_local_getbatch(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    sint32 iRet = CM_OK;
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_ucache_info_t *info = decode->data;
+    
+    iRet = cm_exec_get_list(cm_cnm_ucache_local_get_each,
+        (uint32)offset,sizeof(cm_cnm_ucache_info_t),ppAck,&total,
+        CM_SCRIPT_DIR"cm_cnm_user.sh cache_getbatch %u %u",
+        info->domain,info->type);
+    if(CM_OK != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]",iRet);
+        return iRet;
+    }
+    *pAckLen = total * sizeof(cm_cnm_ucache_info_t);
+    return CM_OK;
+}
+
+sint32 cm_cnm_ucache_test(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen)
+{
+    const cm_cnm_decode_info_t *decode = pDecodeParam;
+
+    if((NULL == decode) || (decode->nid == 0))
+    {
+        return CM_PARAM_ERR;
+    }
+    return cm_cnm_request_comm(CM_OMI_OBJECT_UCACHE,CM_OMI_CMD_TEST,sizeof(cm_cnm_ucache_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
+sint32 cm_cnm_ucache_local_test(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    sint32 iRet = CM_OK;
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_ucache_info_t *info = decode->data;
+
+    if(info->name[0] == '\0')
+    {
+        return CM_PARAM_ERR;
+    }
+    return cm_system(CM_SCRIPT_DIR"cm_cnm_user.sh test '%u' '%u' '%s'",
+        info->domain,info->type,info->name);
+}
+
 
 

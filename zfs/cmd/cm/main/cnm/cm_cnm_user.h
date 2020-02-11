@@ -165,6 +165,23 @@ extern sint32 cm_cnm_explorer_local_create(
     uint64 offset, uint32 total, 
     void **ppAck, uint32 *pAckLen);
 
+extern sint32 cm_cnm_explorer_delete(
+    const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_explorer_local_delete(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);
+
+extern sint32 cm_cnm_explorer_modify(
+    const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_explorer_local_modify(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);
+
+
 /*************domian  user**************/
 
 typedef struct
@@ -202,6 +219,46 @@ extern void cm_cnm_domain_user_oplog_delete(
 
 extern void cm_cnm_domain_user_oplog_create(
     const sint8* sessionid, const void *pDecodeParam, sint32 Result);
+
+
+typedef struct
+{
+    uint32 domain;
+    uint32 type;
+    sint8 id[CM_STRING_32];
+    sint8 name[CM_NAME_LEN];
+}cm_cnm_ucache_info_t;
+
+extern sint32 cm_cnm_ucache_decode(
+    const cm_omi_obj_t  ObjParam,void** ppDecodeParam);
+
+extern cm_omi_obj_t cm_cnm_ucache_encode(
+    const void* pDecodeParam,void* pAckData,uint32 AckLen);
+
+extern sint32 cm_cnm_ucache_getbatch(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen);
+
+extern sint32 cm_cnm_ucache_count(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen);
+
+extern sint32 cm_cnm_ucache_local_count(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);
+
+extern sint32 cm_cnm_ucache_local_getbatch(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);
+
+extern sint32 cm_cnm_ucache_test(
+    const void* pDecodeParam,void** ppAckData,uint32* pAckLen);
+
+extern sint32 cm_cnm_ucache_local_test(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);
+
 
 
 #endif /* MAIN_USER_H */

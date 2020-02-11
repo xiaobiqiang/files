@@ -406,7 +406,8 @@ static void cm_htbt_recv_local(cm_htbt_runtime_info_t *pGlobal,cm_htbt_local_inf
 
         /* TODO: 0号子域上报节点加入之类的 */
         (void)cm_node_set_state(pGlobal->subdomain.info.id,pData->id,CM_NODE_STATE_NORMAL);
-        if(pLocal->id == pLocal->sub_master_id)
+        if((pLocal->id == pLocal->sub_master_id)
+            || (CM_ALARM_FAULT_NODE_OFFLINE == pLocal->sub_master_id))
         {
             CM_ALARM_RECOVERY(CM_ALARM_FAULT_NODE_OFFLINE,cm_node_get_name(pData->id));
         }
@@ -510,7 +511,8 @@ static void cm_htbt_local_check(cm_htbt_runtime_info_t *pGlobal, cm_htbt_node_t 
         pNode->state = CM_HTBT_NODE_OFFLINE;
 
         (void)cm_node_set_state(pGlobal->subdomain.info.id,pNode->id,CM_NODE_STATE_OFFLINE);
-        if(pLocal->id == pLocal->sub_master_id)
+        if((pLocal->id == pLocal->sub_master_id)
+            || (CM_NODE_ID_NONE == pLocal->sub_master_id))
         {
             /* TODO: 0号子域上报节点退出之类的 */
             CM_ALARM_REPORT(CM_ALARM_EVENT_NODE_OUT,cm_node_get_name(pNode->id));
@@ -519,7 +521,8 @@ static void cm_htbt_local_check(cm_htbt_runtime_info_t *pGlobal, cm_htbt_node_t 
     }
 
     if ((pNode->lost_cnt == CM_HTBT_OFFLINE_LONG_NUM)
-        && (pLocal->id == pLocal->sub_master_id))
+        && ((pLocal->id == pLocal->sub_master_id)
+            ||(CM_NODE_ID_NONE == pLocal->sub_master_id)))
     {
         CM_ALARM_REPORT(CM_ALARM_FAULT_NODE_OFFLINE,cm_node_get_name(pNode->id));
     }

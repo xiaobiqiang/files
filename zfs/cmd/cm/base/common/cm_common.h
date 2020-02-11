@@ -76,7 +76,7 @@ extern sint32 cm_exec_get_subpid(const sint8 *cmd, uint32 *subPID);
         va_end(args_); \
     }while(0)
 
-#define cm_check_char(c) ((c)>='!' && (c)<='~')
+#define cm_check_char(c) (((c)>='!' && (c)<='~') || ((c)&0x80))
 
 extern sint32 cm_thread_start(cm_thread_func_t thread, void* arg);
 

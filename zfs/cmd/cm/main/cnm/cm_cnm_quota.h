@@ -16,6 +16,7 @@
 typedef struct
 {	
 	uint8 usertype;
+	uint8 domain;
     uint32 nid;
 	sint8 name[CM_NAME_LEN];
 	sint8 filesystem[CM_NAME_LEN];

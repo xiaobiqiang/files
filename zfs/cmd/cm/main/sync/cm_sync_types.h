@@ -26,6 +26,9 @@ typedef sint32 (*cm_sync_delete_cbk_t)(uint64 data_id);
 /* 默认支持非实时同步，设置之后仅支持实时同步 */
 #define CM_SYNC_FLAG_REAL_TIME_ONLY 4
 
+/* 始终执行 */
+#define CM_SYNC_FLAG_ALWAYLS 8
+
 typedef struct
 {
     uint32 obj_id;

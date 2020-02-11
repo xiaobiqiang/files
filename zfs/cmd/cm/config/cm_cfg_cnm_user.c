@@ -192,6 +192,14 @@ const cm_omi_map_object_field_t* CmOmiMapExplorerCmdParamsCount[]=
     &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_FLAG],
 };
 
+const cm_omi_map_object_field_t* CmOmiMapExplorerCmdParamsAddOpt[]=
+{
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_NAME],    
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_FIND],
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_TYPE],
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_PERMISSION],
+};
+
 
 const cm_omi_map_object_cmd_t CmOmiMapExplorerCmds[] =
 {
@@ -214,10 +222,26 @@ const cm_omi_map_object_cmd_t CmOmiMapExplorerCmds[] =
     /* insert */
     {
         &CmOmiMapCmds[CM_OMI_CMD_ADD],
-        3,
+        2,
         CmOmiMapExplorerCmdParamsGetBatch,
-        0,
-        NULL,
+        4,
+        CmOmiMapExplorerCmdParamsAddOpt,
+    },
+    /* delete */
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_DELETE],
+        2,
+        CmOmiMapExplorerCmdParamsGetBatch,
+        1,
+        CmOmiMapExplorerCmdParamsAddOpt,
+    },
+    /* update */
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_MODIFY],
+        2,
+        CmOmiMapExplorerCmdParamsGetBatch,
+        4,
+        CmOmiMapExplorerCmdParamsAddOpt,
     },
 };
 
@@ -299,6 +323,62 @@ const cm_omi_map_object_t CmDomainUserCfg =
     sizeof(CmOmiMapDomainUserCmds)/sizeof(cm_omi_map_object_cmd_t),
     CmOmiMapDomainUserCmds
 };
+
+extern const cm_omi_map_enum_t CmOmiMapCifsNameTypeCfg;
+const cm_omi_map_object_field_t CmOmiMapFieldsUserCache[]=
+{
+    {{"id", CM_OMI_FIELD_UCACHE_ID}, "-i",{CM_OMI_DATA_STRING, CM_NAME_LEN, {NULL}}},
+    {{"nid", CM_OMI_FIELD_UCACHE_NID}, "-nid",{CM_OMI_DATA_INT, 4, {NULL}}},
+    {{"name", CM_OMI_FIELD_UCACHE_NAME}, "-n",{CM_OMI_DATA_STRING, CM_STRING_64, {NULL}}},
+    {{"type", CM_OMI_FIELD_UCACHE_TYPE}, "-type",{CM_OMI_DATA_ENUM, 4, {&CmOmiMapCifsNameTypeCfg}}},
+    {{"domain", CM_OMI_FIELD_UCACHE_DOMAIN}, "-domain",{CM_OMI_DATA_ENUM, 4, {&CmOmiMapEnumDomainType}}},
+};
+
+const cm_omi_map_object_field_t* CmOmiMapDomainUserCacheCmdParams[]=
+{
+    &CmOmiMapFieldsUserCache[CM_OMI_FIELD_UCACHE_NID],
+    &CmOmiMapFieldsUserCache[CM_OMI_FIELD_UCACHE_DOMAIN],
+    &CmOmiMapFieldsUserCache[CM_OMI_FIELD_UCACHE_TYPE],
+    &CmOmiMapFieldsUserCache[CM_OMI_FIELD_UCACHE_NAME],
+};
+
+
+const cm_omi_map_object_cmd_t CmOmiMapDomainUserCacheCmds[] =
+{
+    /* getbatch */
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
+        3,
+        CmOmiMapDomainUserCacheCmdParams,
+        2,
+        CmOmiMapDomainUserCmdParamsGetBatch,
+    },
+    /* count */
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_COUNT],
+        3,
+        CmOmiMapDomainUserCacheCmdParams,
+        0,
+        NULL,
+    },
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_TEST],
+        4,
+        CmOmiMapDomainUserCacheCmdParams,
+        0,
+        NULL,
+    },
+};
+
+const cm_omi_map_object_t CmDomainUserCacheCfg =
+{
+    {"user_cache",CM_OMI_OBJECT_UCACHE},
+    sizeof(CmOmiMapFieldsUserCache)/sizeof(cm_omi_map_object_field_t),
+    CmOmiMapFieldsUserCache,
+    sizeof(CmOmiMapDomainUserCacheCmds)/sizeof(cm_omi_map_object_cmd_t),
+    CmOmiMapDomainUserCacheCmds
+};
+
 
 
 

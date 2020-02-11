@@ -15,11 +15,9 @@ source '/var/cm/script/cm_common.sh'
 function stmfadm_list_all_luns()
 {
     stmfadm list-lu -v 2>/dev/null |sed 's/ //g' \
-        |egrep "LUName|OperationalStatus|Alias|DataFile|AccessState" \
-        |awk -F':' '$1=="LUName"{print ""}{printf $2" "}END{print ""}' \
-        |sed '/^$/d' \
-        |awk '{if(($2=="Online")){if(($5=="Active")){print $1" "$4}else{print $1" "$3}}}' \
-        |awk -F'/' '{print $1$(NF-1)"/"$NF}'
+        |awk -F':' '$1=="LUName"{printf "\n"$2" "}($1=="Alias")||($1=="DataFile")||($1=="AccessState"){printf $2" "}END{print ""}' \
+        |awk 'NF!=4{continue}$4=="Active"{print $1" "$3;continue}{print $1" "$2}' \
+        |sed 's/\/dev\/zvol\/rdsk\///g'
     return $?
 }
 
@@ -204,6 +202,8 @@ function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
+    
+    /var/cm/script/cm_cnm_node_servce.sh iscsi_check
     return 0
 }
 
@@ -392,7 +392,7 @@ function cm_zfs_set()
         CM_LOG "[${FUNCNAME}:${LINENO}]set $name $prop $val same"
         return $CM_OK
     fi
-    zfs set $prop=$val $name
+    CM_EXEC_CMD "zfs set $prop=$val $name"
     local res=$?
     CM_LOG "[${FUNCNAME}:${LINENO}]set $name $prop $val res=$res"
     return $res

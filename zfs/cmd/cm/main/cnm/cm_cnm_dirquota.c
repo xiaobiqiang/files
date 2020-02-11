@@ -195,7 +195,7 @@ sint32 cm_cnm_dirquota_local_getbatch(
     void **ppAck, uint32 *pAckLen)
 {
     sint32 iRet = CM_OK;
-    sint8 cmd[CM_STRING_128] = {0};
+    sint8 cmd[CM_STRING_1K] = {0};
     cm_cnm_decode_info_t * req = param;
     const cm_cnm_dirquota_info_t * dirquota_info = NULL;
     
@@ -236,7 +236,7 @@ sint32 cm_cnm_dirquota_local_count(
     void **ppAck, uint32 *pAckLen)
 {
     uint64 cnt = 0;
-    sint8 cmd[CM_STRING_128] = {0};
+    sint8 cmd[CM_STRING_1K] = {0};
     const cm_cnm_decode_info_t * req = param;
     const cm_cnm_dirquota_info_t * dirquota_info = NULL;
     if(NULL == req)
@@ -269,9 +269,9 @@ sint32 cm_cnm_dirquota_local_add(
     cm_cnm_decode_info_t* req = param;
     const cm_cnm_dirquota_info_t *dirquota_info = NULL;	
     sint32 iRet = CM_OK;
-    sint8 cmd[CM_STRING_128] = {0};
-    sint8 nas[CM_STRING_128] = {0};
-    sint8 dir[CM_STRING_128] = {0};
+    sint8 cmd[CM_STRING_1K] = {0};
+    sint8 nas[CM_STRING_256] = {0};
+    sint8 dir[CM_STRING_256] = {0};
     if(NULL == req)
     {
         return CM_OK;
@@ -299,8 +299,8 @@ sint32 cm_cnm_dirquota_local_get(
     cm_cnm_decode_info_t* req = param;
     const cm_cnm_dirquota_info_t *dirquota_info = NULL;
     sint32 iRet = CM_OK;
-    sint8 cmd[CM_STRING_128] = {0};
-    sint8 nas[CM_STRING_128] = {0};
+    sint8 cmd[CM_STRING_1K] = {0};
+    sint8 nas[CM_STRING_256] = {0};
     if(NULL == req)
     {
         return CM_OK;
@@ -332,9 +332,9 @@ sint32 cm_cnm_dirquota_local_delete(
     cm_cnm_decode_info_t* req = param;
     const cm_cnm_dirquota_info_t *dirquota_info = NULL;	
     sint32 iRet = CM_OK;
-    sint8 cmd[CM_STRING_128] = {0};
-    sint8 nas[CM_STRING_128] = {0};
-    sint8 dir[CM_STRING_128] = {0};
+    sint8 cmd[CM_STRING_1K] = {0};
+    sint8 nas[CM_STRING_256] = {0};
+    sint8 dir[CM_STRING_256] = {0};
     if(NULL == req)
     {
         return CM_OK;

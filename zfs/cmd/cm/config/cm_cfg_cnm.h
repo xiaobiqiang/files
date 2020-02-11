@@ -15,5 +15,6 @@
 extern const cm_omi_map_enum_t CmCnmMapCommErrCfg;
 extern const cm_omi_map_enum_t CmOmiMapCmdsType;
 extern const cm_omi_map_enum_t CmOmiMapAclInheritType;
+extern const cm_omi_map_enum_t CmOmiMapEnumDomainType;
 
 #endif /* CLI_CONFIG_CM_CFG_CNM_H_ */

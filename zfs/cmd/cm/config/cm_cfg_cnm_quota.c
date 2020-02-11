@@ -22,10 +22,13 @@ const cm_omi_map_object_field_t CmOmiMapFieldsQuota[] =
     {{"hardspace", CM_OMI_FIELD_QUOTA_HARDSPACE}, "-hardspace", {CM_OMI_DATA_STRING, CM_STRING_32, {"[0-9]{1,10}[.]{0,1}[0-9]{0,3}[KMTGPkmtgp]{1}"}}},
     {{"softspace", CM_OMI_FIELD_QUOTA_SOFTSPACE}, "-softspace", {CM_OMI_DATA_STRING, CM_STRING_32, {"[0-9]{1,10}[.]{0,1}[0-9]{0,3}[KMTGPkmtgp]{1}"}}},
     {{"used", CM_OMI_FIELD_QUOTA_USED}, "-used", {CM_OMI_DATA_STRING, CM_STRING_32, {"[0-9a-zA-Z_]{1,32}"}}},
+    {{"domain", CM_OMI_FIELD_QUOTA_DOMAIN}, "-domain", {CM_OMI_DATA_ENUM, 4, {&CmOmiMapEnumDomainType}}},
 };
 
 const cm_omi_map_object_field_t* CmOmiMapQuotaCmdParamsGetBatch[] =
-{
+{    
+    &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_DOMAIN],
+    &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_USERTYPE],
     &CmOmiMapCommFields[1], /*offset*/
     &CmOmiMapCommFields[2], /*total*/
 };
@@ -35,8 +38,9 @@ const cm_omi_map_object_field_t* CmOmiMapQuotaCmdParamsGet[] =
 {
     &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_NID],
     &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_FILESYSTEM],
+    &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_DOMAIN],
     &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_USERTYPE],
-    &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_NAME],
+    &CmOmiMapFieldsQuota[CM_OMI_FIELD_QUOTA_NAME], 
 };
 
 const cm_omi_map_object_field_t* CmOmiMapQuotaCmdParamsModify[] =
@@ -50,15 +54,15 @@ const cm_omi_map_object_cmd_t CmOmiMapQuotaCmds[] =
     /* getbatch */
     {
         &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
-        3,
-        CmOmiMapQuotaCmdParamsGet,
         2,
+        CmOmiMapQuotaCmdParamsGet,
+        4,
         CmOmiMapQuotaCmdParamsGetBatch,
     },
     /* get */
     {
         &CmOmiMapCmds[CM_OMI_CMD_GET],
-        4,
+        5,
         CmOmiMapQuotaCmdParamsGet,
         0,
         NULL,
@@ -66,15 +70,15 @@ const cm_omi_map_object_cmd_t CmOmiMapQuotaCmds[] =
     /* count */
     {
         &CmOmiMapCmds[CM_OMI_CMD_COUNT],
-        3,
+        2,
         CmOmiMapQuotaCmdParamsGet,
-        0,
-        NULL,
+        2,
+        CmOmiMapQuotaCmdParamsGetBatch,
     },
     /* update */
     {
         &CmOmiMapCmds[CM_OMI_CMD_MODIFY],
-        4,
+        5,
         CmOmiMapQuotaCmdParamsGet,
         2,
         CmOmiMapQuotaCmdParamsModify
@@ -82,7 +86,7 @@ const cm_omi_map_object_cmd_t CmOmiMapQuotaCmds[] =
     /* delete */
     {
         &CmOmiMapCmds[CM_OMI_CMD_DELETE],
-        4,
+        5,
         CmOmiMapQuotaCmdParamsGet,
         0,
         NULL,

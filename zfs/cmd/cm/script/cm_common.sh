@@ -89,10 +89,11 @@ function cm_systerm_version_get()
         local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
         if [ "X$versions" == "Xv7.r16" ]; then
             echo $CM_SYS_VER_SOLARIS_V7R16
-            return;
+            return 0
         fi
     fi
     echo $CM_SYS_VER_DEFAULT
+    return 0
 }
 
 function cm_os_type_get()

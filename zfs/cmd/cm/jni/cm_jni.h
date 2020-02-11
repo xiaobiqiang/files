@@ -39,7 +39,29 @@ JNIEXPORT jint JNICALL Java_cm_jni_close
 JNIEXPORT jint JNICALL Java_cm_jni_logset
   (JNIEnv *, jobject, jint);
 
+/*
+ * Class:     cm_jni
+ * Method:    remote_connect
+ * Signature: (Ljava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_cm_jni_remote_1connect
+  (JNIEnv *, jobject, jstring);
 
+/*
+ * Class:     cm_jni
+ * Method:    remote_request
+ * Signature: (ILjava/lang/String;I)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_cm_jni_remote_1request
+  (JNIEnv *, jobject, jint, jstring, jint);
+
+/*
+ * Class:     cm_jni
+ * Method:    remote_close
+ * Signature: (I)I
+ */
+JNIEXPORT jint JNICALL Java_cm_jni_remote_1close
+  (JNIEnv *, jobject, jint);
 
 #ifdef __cplusplus
 }

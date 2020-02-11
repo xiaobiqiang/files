@@ -38,7 +38,7 @@ const sint8* g_cm_disk_fields[] = {
 #define CM_CNM_DISK_LED_STATE_LOCATE 2
 #define CM_CNM_DISK_LED_STATE_UNKNOWN 3
 
-extern uint32 cm_cnm_pool_getbydisk(const sint8* disk, sint8* pool, uint32 len);
+extern uint32 cm_cnm_pool_getbydisk(const sint8* disk, sint8* pool, uint32 len, uint32 *ptype);
 extern void* cm_cnm_disk_update_thread(void* arg);
 
 sint32 cm_cnm_disk_get_sn(const sint8* id,sint8* sn, uint32 len)
@@ -419,15 +419,16 @@ cm_omi_obj_t cm_cnm_disk_encode(const void *pDecodeParam, void *pAckData, uint32
         }
         if(CM_OMI_FIELDS_FLAG_ISSET(pfield,CM_OMI_FIELD_DISK_POOL))
         {
+            uint32 type=0;
             if((2 == pData->status) && ('\0' != pData->sn[0])) /* busy */
             {
-                nid = cm_cnm_pool_getbydisk(pData->sn,pData->pool,sizeof(pData->pool));
+                nid = cm_cnm_pool_getbydisk(pData->sn,pData->pool,sizeof(pData->pool),&type);
                 if(CM_NODE_ID_NONE == nid)
                 {
                     nid = pData->nid;
                 }
             }          
-            
+            (void)cm_omi_obj_key_set_u32_ex(item,CM_OMI_FIELD_DISK_TYPE,type);
             (void)cm_omi_obj_key_set_str_ex(item,CM_OMI_FIELD_DISK_POOL,pData->pool);
         }
         if(CM_OMI_FIELDS_FLAG_ISSET(pfield,CM_OMI_FIELD_DISK_NID))

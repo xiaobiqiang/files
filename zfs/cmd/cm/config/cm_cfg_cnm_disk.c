@@ -39,7 +39,7 @@ const cm_omi_map_enum_t CmOmiMapEnumDiskLedType =
     CmOmiMapDiskLedType
 };
 
-
+extern const cm_omi_map_enum_t CmCnmPoolMapDiskTypeUserCfg;
 const cm_omi_map_object_field_t CmOmiMapDiskFields[] =
 {
     {{"id", CM_OMI_FIELD_DISK_ID}, "-i",{CM_OMI_DATA_STRING, 64, {"[0-9a-zA-Z_]{1,63}"}}},
@@ -54,6 +54,7 @@ const cm_omi_map_object_field_t CmOmiMapDiskFields[] =
     {{"pool", CM_OMI_FIELD_DISK_POOL},"-pool", {CM_OMI_DATA_STRING, 64, {"[0-9a-zA-Z_]{1,63}"}}},
     {{"led", CM_OMI_FIELD_DISK_LED},"-led", {CM_OMI_DATA_ENUM, 4, {&CmOmiMapEnumDiskLedType}}},
     {{"islocal", CM_OMI_FIELD_DISK_ISLOCAL},"-islocal", {CM_OMI_DATA_ENUM, 4, {&CmOmiMapEnumBoolType}}},
+    {{"type", CM_OMI_FIELD_DISK_TYPE},"-type", {CM_OMI_DATA_ENUM, 4, {&CmCnmPoolMapDiskTypeUserCfg}}},
 };
 
 const cm_omi_map_object_field_t* CmOmiMapDiskCmdParamsGet[]=

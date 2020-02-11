@@ -92,7 +92,13 @@ function cm_cnm_phys_ip_getbatch()
 
 function cm_cnm_phys_ip_count()
 {
-    local len=`ifconfig -a4|grep 'flags='|egrep -v 'lo0'|wc -l`
+    local port=$1
+    local len=0
+    if [ "X$port" == "X" ]; then
+        len=`ifconfig -a4|grep 'flags='|egrep -v 'lo0'|wc -l`
+    else
+        len=`ifconfig -a4 |grep -v ether |sed 'N;s/\n//g' |grep -w $port |wc -l`
+    fi
     echo $len
     return $CM_OK
 }
@@ -158,74 +164,5 @@ function cm_cnm_phys_ip_delete()
     return $CM_OK
 }
 
-function cm_cnm_phys_ip_physgetbatch()
-{
-    local list=($(dladm show-phys 2>/dev/null |sed 1d))
-    local len=${#list[@]}
-    ((cols=$len/6))
-    
-    for (( i=0; i<$cols; i=i+1 ))
-    do
-        ((j=i*6))
-        local name=${list[j]}
-        local media=${list[((j=$j+1))]}
-        local state=${list[((j=$j+1))]}
-        local speed=${list[((j=$j+1))]}
-        local duplex=${list[((j=$j+1))]}
-        local mtu=`ifconfig $name 2>/dev/null |grep mtu|awk '{printf $4}'`
-        if [ "X" = "X"$mtu ]; then
-            mtu=0
-        fi
-        local mac=`ifconfig $name 2>/dev/null|grep -w ether |awk '{printf $2}'`
-        if [ "X" = "X"$mac ]; then
-            mac='null'
-        fi
-        
-        echo "$name $media $state $speed $duplex $mtu $mac"
-    done
-}
-
-function cm_cnm_phys_ip_physget()
-{
-    local name=$1
-    local list=`dladm show-phys $name 2>/dev/null |sed 1d|awk '{print $1" "$2" "$3" "$4" "$5}'`
-    local mtu=`ifconfig $name 2>/dev/null |grep mtu|awk '{printf $4}'`
-    if [ "X" = "X"$mtu ]; then
-        mtu=0
-    fi
-    local mac=`ifconfig $name 2>/dev/null|grep -w ether |awk '{printf $2}'`
-    if [ "X" = "X"$mac ]; then
-        mac='null'
-    fi
-    
-    echo "$list $mtu $mac"
-}
-
-function cm_cnm_phys_ip_physcount()
-{
-    dladm show-phys 2>/dev/null |sed 1d |wc -l
-}
-
-function cm_cnm_phys_ip_physupdate()
-{
-    local name=$1
-    local mtu=$2
-    
-    ifconfig $name mtu $mtu up
-    if [ $? -ne $CM_OK ]; then
-        return $CM_FAIL
-    fi
-    
-    cut=`cat /etc/hostname.$name|grep mtu | wc -l`
-    if [ $cut -eq 0 ]; then
-        echo 'mtu %u' >> /etc/hostname.$name
-    else
-        sed '/mtu/d' /etc/hostname.$name > /etc/hostnamecopy
-        echo "mtu $mtu" >> /etc/hostnamecopy
-        mv /etc/hostnamecopy /etc/hostname.$name
-    fi
-    
-    return $CM_OK
-}
 cm_cnm_phys_ip_$*
 exit $?
