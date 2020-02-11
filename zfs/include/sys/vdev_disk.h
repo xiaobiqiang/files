@@ -37,5 +37,13 @@ typedef struct vdev_disk {
 	struct block_device	*vd_bdev;
 } vdev_disk_t;
 
+enum {
+    SAS_EVT_DEV_ADD,
+    SAS_EVT_DEV_REMOVE,
+    SAS_EVT_DEV_NORESP,
+    SAS_EVT_BUTT
+};
+
+
 #endif /* _KERNEL */
 #endif /* _SYS_VDEV_DISK_H */

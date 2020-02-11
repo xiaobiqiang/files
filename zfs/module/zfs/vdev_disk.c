@@ -34,9 +34,17 @@
 #include <sys/zio.h>
 #include <sys/sunldi.h>
 
+#include <linux/genhd.h>
+
 char *zfs_vdev_scheduler = VDEV_SCHEDULER;
 static void *zfs_vdev_holder = VDEV_HOLDER;
 
+/* here is double linked list. if there are too many disks, we may need hash table. */
+LIST_HEAD(vdev_ev_mgt_list);
+DEFINE_SPINLOCK(vdev_ev_mgt_lock);
+
+#define WWN_LEN   (16)
+#define WWN_STRLEN (WWN_LEN + 1)
 /*
  * Virtual device vector for disks.
  */
@@ -47,6 +55,146 @@ typedef struct dio_request {
 	int			dr_bio_count;	/* Count of bio's */
 	struct bio		*dr_bio[0];	/* Attached bio's */
 } dio_request_t;
+
+typedef struct vdev_ev_mgt {
+    struct list_head list;
+    vdev_t      *vd;
+    char		*vdev_path;
+    char        wwn_str[WWN_STRLEN];
+    u64         wwn;
+}vdev_ev_mgt_t;
+
+static int vdev_ev_mgt_register(vdev_t *vd)
+{
+    vdev_ev_mgt_t *vdev_ev = NULL;
+    vdev_disk_t *vdisk = NULL;
+    struct block_device *bdev = NULL;
+    char *wwn_key = "scsi-3";
+    char *wwn_pos = NULL;
+
+    wwn_pos = strstr(vd->vdev_path, wwn_key);
+    if(wwn_pos == NULL) {
+        printk(KERN_ERR "wwn key word[scsi-3] not found in disk:%s\n", vd->vdev_path);
+        return -1;
+    }
+
+    vdisk = vd->vdev_tsd;
+    bdev = vdisk->vd_bdev;
+
+    //vdev_ev = kzalloc(sizeof (vdev_ev_mgt_t), GFP_KERNEL);
+    vdev_ev = kmem_zalloc(sizeof (vdev_ev_mgt_t), KM_SLEEP);
+    vdev_ev->vd = vd;
+    vdev_ev->vdev_path = spa_strdup(vd->vdev_path);
+
+    wwn_pos += strlen(wwn_key);
+    strncpy(vdev_ev->wwn_str, wwn_pos, WWN_LEN);
+    if(sscanf(vdev_ev->wwn_str, "%llx", &vdev_ev->wwn) == 0) {
+        printk(KERN_ERR "invalid vdev_path for event management:%s\n", vd->vdev_path);
+        spa_strfree(vdev_ev->vdev_path);
+        kmem_free(vdev_ev, sizeof (vdev_ev_mgt_t));
+        return -1;
+    }
+
+    spin_lock(&vdev_ev_mgt_lock);
+    list_add_tail(&vdev_ev->list, &vdev_ev_mgt_list);
+    spin_unlock(&vdev_ev_mgt_lock);
+
+    printk(KERN_ERR "register vdev:%s, wwn:%s[%s]\n", vd->vdev_path, vdev_ev->wwn_str, __func__);
+
+    return 0;
+}
+
+static int vdev_ev_mgt_unregister(vdev_t *vd)
+{
+    vdev_ev_mgt_t *vdev_ev = NULL;
+    int found = FALSE;
+
+    spin_lock(&vdev_ev_mgt_lock);
+    list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
+        if(vdev_ev->vd == vd) {
+            list_del_init(&vdev_ev->list);
+            found = TRUE;
+            break;
+        }
+    }
+    spin_unlock(&vdev_ev_mgt_lock);
+
+    if(found == FALSE)
+        return -1;
+
+    printk(KERN_ERR "unregister vdev:%s[%s]\n", vd->vdev_path, __func__);
+
+    spa_strfree(vdev_ev->vdev_path);
+    kmem_free(vdev_ev, sizeof (vdev_ev_mgt_t));
+
+    return 0;
+}
+
+static int wwnstr_match(char *s1, char *s2)
+{
+    char c1, c2;
+
+    if(strncmp(s1, s2, WWN_LEN - 1) == 0) {
+        c1 = s1[WWN_LEN - 1];
+        c2 = s2[WWN_LEN - 1];
+
+        if(c1 <= 'f' && c1 >= 'a')
+            c1 = c1 - 'a' + 10;
+        else if (c1 <= '9' && c1 >= '0')
+            c1 = c1 - '0';
+        else 
+            return FALSE;
+
+        if(c2 <= 'f' && c2 >= 'a')
+            c2 = c2 - 'a' + 10;
+        else if (c2 <= '9' && c2 >= '0')
+            c2 = c2 - '0';
+        else 
+            return FALSE;
+
+        if (c1 > c2) {
+           return ((c1 - c2) < 4);
+        } else {
+            return ((c2 - c1) < 4);
+        }
+    }
+
+    return FALSE;
+}
+
+static int wwn_match(u64 mgt_wwn, u64 tgt_wwn)
+{
+    if(mgt_wwn > tgt_wwn)
+        return (mgt_wwn - tgt_wwn) < 4;
+
+    return (tgt_wwn - mgt_wwn) < 4;
+}
+
+
+static vdev_t* find_vdev_by_sas_addr(u64 sas_addr)
+{
+    vdev_ev_mgt_t *vdev_ev = NULL;
+    vdev_t  *ret = NULL;
+    /*char sas_wwn_str[WWN_STRLEN] = {0};
+
+    sprintf(sas_wwn_str, "%016llx", sas_addr);
+    printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);*/
+    printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);
+
+    spin_lock(&vdev_ev_mgt_lock);
+    list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
+        /*printk(KERN_ERR "iterate sas wwn:%s\n", vdev_ev->wwn_str);
+        if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {*/
+        printk(KERN_ERR "iterate sas wwn:%llx\n", vdev_ev->wwn);
+        if(wwn_match(vdev_ev->wwn, sas_addr)) {
+            ret = vdev_ev->vd;
+            break;
+        }
+    }
+    spin_unlock(&vdev_ev_mgt_lock);
+
+    return ret;
+}
 
 
 #ifdef HAVE_OPEN_BDEV_EXCLUSIVE
@@ -243,6 +391,7 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	struct block_device *bdev = ERR_PTR(-ENXIO);
 	vdev_disk_t *vd;
 	int count = 0, mode, block_size;
+    char bdev_name[BDEVNAME_SIZE];
 
 	/* Must have a pathname and it must be absolute. */
 	if (v->vdev_path == NULL || v->vdev_path[0] != '/') {
@@ -311,6 +460,14 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	v->vdev_tsd = vd;
 	vd->vd_bdev = bdev;
 
+#if 0
+    printk(KERN_ERR "%s: [vdev_path:%s]\n",   __func__, v->vdev_path);
+    printk(KERN_ERR "%s: [bdev name:%s]\n", __func__, bdevname(bdev, bdev_name));
+    printk(KERN_ERR "%s: [device name:%s]\n", __func__, dev_name(disk_to_dev(bdev->bd_disk)));
+#endif
+
+    vdev_ev_mgt_register(v);
+
 skip_open:
 	/*  Determine the physical block size */
 	block_size = vdev_bdev_block_size(vd->vd_bdev);
@@ -350,6 +507,7 @@ vdev_disk_close(vdev_t *v)
 
 	kmem_free(vd, sizeof (vdev_disk_t));
 	v->vdev_tsd = NULL;
+    vdev_ev_mgt_unregister(v);  /* NOTICE: We need to check whether it should be unregistered. */
 }
 
 static dio_request_t *
@@ -799,6 +957,41 @@ vdev_ops_t vdev_disk_ops = {
 	VDEV_TYPE_DISK,		/* name of this vdev type */
 	B_TRUE			/* leaf vdev */
 };
+
+#include <linux/notifier.h>
+
+static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
+			      void *args)
+{
+	unsigned long evt_type = val;
+    u64	sas_address = *(u64 *)args;
+    vdev_t *vd= NULL;
+
+    vd = find_vdev_by_sas_addr(sas_address);
+    if(vd == NULL) {
+        printk( "event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
+                    evt_type, sas_address, __FILE__, __LINE__);
+        return NOTIFY_DONE;     /* Don't care */
+    }
+
+	switch(val) {
+    case SAS_EVT_DEV_REMOVE:
+        printk( "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
+                    evt_type, sas_address, vd->vdev_path, __FILE__, __LINE__);
+        zfs_post_remove(vd->vdev_spa, vd);
+        break;
+
+    default :
+        break;
+    }
+
+	return NOTIFY_OK;       /* Suits me */
+}
+
+struct notifier_block vdev_disk_notifier = {
+	.notifier_call = vdev_disk_event,
+};
+
 
 module_param(zfs_vdev_scheduler, charp, 0644);
 MODULE_PARM_DESC(zfs_vdev_scheduler, "I/O scheduler");
