@@ -1061,6 +1061,16 @@ typedef enum
     CM_OMI_FIELD_NASCOPY_NID,
     CM_OMI_FIELD_NASCOPY_NUM,  
 }cm_omi_field_cnm_nascopy_e;
+
+typedef enum
+{
+    CM_OMI_FIELD_UCACHE_ID = 0,
+    CM_OMI_FIELD_UCACHE_NID,
+    CM_OMI_FIELD_UCACHE_NAME,
+    CM_OMI_FIELD_UCACHE_TYPE,
+    CM_OMI_FIELD_UCACHE_DOMAIN,
+}cm_omi_field_cnm_usercache_e;
+
 extern const uint32 *g_CmOmiObjCmdNoCheckPtr;
 extern const cm_omi_map_cfg_t CmOmiMapCmds[CM_OMI_CMD_BUTT];
 
