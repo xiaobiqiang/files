@@ -5,6 +5,7 @@ DefaultDependencies=no
 [Service]
 ExecStart=/usr/local/bin/ceres_cm -d 2>/dev/null
 Restart=on-failure
+StartLimitInterval=1
 
 [Install]
 WantedBy=multi-user.target

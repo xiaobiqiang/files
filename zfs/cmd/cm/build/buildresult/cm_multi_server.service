@@ -5,6 +5,7 @@ DefaultDependencies=no
 [Service]
 ExecStart=/var/cm/script/cm_multi_server.py disable  2>/dev/null
 Restart=on-failure
+StartLimitInterval=1
 
 [Install]
 WantedBy=multi-user.target
