@@ -72,14 +72,19 @@ static void cm_pmm_node_get_stat(cm_pmm_node_stat_t *old,
     data->bw_read /= 1024;
     data->bw_write /= 1024;
     data->bw_total = data->bw_read + data->bw_write;
-    
+#ifdef __linux__
+    data->iops_read = (double)curr.riops;
+    data->iops_write = (double)curr.wiops;
+    data->iops_total = data->iops_read + data->iops_write;
+    data->cpu = (double)curr.cpu_ticks;
+#else
     CM_PMM_NODE_DATA_CAL(data->iops_read,old->riops,curr.riops,diff);
     CM_PMM_NODE_DATA_CAL(data->iops_write,old->wiops,curr.wiops,diff);
     data->iops_total = data->iops_read + data->iops_write;
-    //data->cpu = ((double)(curr.cpu_ticks_idle - old->cpu_ticks_idle))/(curr.cpu_ticks - old->cpu_ticks);
-    //data->cpu = (1.0-data->cpu)*100; 
-    data->cpu = 10;
+    data->cpu = ((double)(curr.cpu_ticks_idle - old->cpu_ticks_idle))/(curr.cpu_ticks - old->cpu_ticks);
+    data->cpu = (1.0-data->cpu)*100;     
     data->mem = curr.mem;
+#endif
     CM_MEM_CPY(old,sizeof(curr),&curr,sizeof(curr));
     
     return;

@@ -29,29 +29,26 @@ function stmfadm_list_all_luns()
 #==============================================================================
 function cm_pmm_nics()
 {
-    dladm show-phys |sed 1d |awk '{print $1}' |while read portname
+    cat /proc/net/dev|grep ':'|egrep -v 'lo:'|awk '{print $1" "$2" "$10}'|while read line
     do
-        local chk=`grep -v '^#' /var/cm/data/cm_cluster.ini |grep -w $portname`
-        if [ "X$chk" != "X" ]; then
-            continue
-        fi
-        printf $portname
-        kstat -m link -n $portname |awk '$1=="obytes64"{ob=$2}$1=="rbytes64"{rb=$2}END{print " "ob" "rb}'
+        local info=($line)
+        local name=${info[0]}
+        name=${name%?}
+        local read=${info[1]}
+        local write=${info[2]}
+        
+        echo "$name $read $write"
     done
-    kstat -m stmf -n stmf_tgt_io_* |egrep "nread |nwritten " |awk 'BEGIN{nr=0;nw=0}$1=="nread"{nr+=$2}$1=="nwritten"{nw+=$2}END{print "fc "nr" "nw}'
     return 0
 }
 
 function cm_pmm_node_stat()
 {
-    #local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
-    #local iops=`kstat -m zfs -c disk |egrep "reads|writes" |awk 'BEGIN{reads=0;writes=0}$1=="reads"{reads+=$2}$1=="writes"{writes+=$2}END{print reads" "writes}'`
-    #local cpu=`kstat -m cpu -n sys |grep cpu_ticks |awk 'BEGIN{ticks=0;ilds=0}$1=="cpu_ticks_idle"{ilds+=$2}{ticks+=$2}END{print ticks" "ilds}'`
-    #local mem=`kstat -m unix -n system_pages |awk '$1=="availrmem"{availrmem=$2}$1=="physmem"{physmem=$2}END{rate=(1-availrmem/physmem)*100;print rate}'`
-    local bandwidth=' '
-    local iops=' '
-    local cpu=' '
-    local mem='12.0000'
+    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
+    local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs" "ws}'`
+    local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print $1+$3" "$6}'`
+    local mem=`free -t|grep Mem|awk '{print $3/$2*100}'`
+    
     if [ "X$bandwidth" == "X " ]; then
         bandwidth="0 0"
     fi
@@ -64,8 +61,7 @@ function cm_pmm_node_stat()
     if [ "X$mem" == "X" ]; then
         mem="0"
     fi
-    #echo "$bandwidth $iops $cpu $mem"
-    echo "68047784 521465278 677 297907 30315411 27630169 11"
+    echo "$bandwidth $iops $cpu $mem"
     return 0
 }
 
