@@ -45,8 +45,9 @@ function cm_pmm_nics()
 function cm_pmm_node_stat()
 {
     local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
-    local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs" "ws}'`
-    local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print $1+$3" "$6}'`
+    #*100是为了uint64取值，之后会/100取得正确结果
+    local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs*100" "ws*100}'`
+    local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print ($1+$3)*100" "$6*100}'`
     local mem=`free -t|grep Mem|awk '{print $3/$2*100}'`
     
     if [ "X$bandwidth" == "X " ]; then
