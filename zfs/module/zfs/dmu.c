@@ -2714,8 +2714,6 @@ dmu_data_newer(objset_t *os, uint64_t data_object,
     return (b_newer);
 }
 
-#endif
-
 int 
 dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
 {
@@ -2771,6 +2769,7 @@ dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
 
 	return (result);
 }
+#endif
 
 void
 dmu_mirror_init(void)
@@ -2789,7 +2788,7 @@ void dmu_mirror_lock(int rw)
 	rw_enter(&mirror_lock, rw);
 }
 
-void dmu_mirror_unlock()
+void dmu_mirror_unlock(void)
 {
 	rw_exit(&mirror_lock);
 }

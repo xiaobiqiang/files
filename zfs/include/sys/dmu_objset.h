@@ -296,8 +296,8 @@ struct objset {
 	uint64_t	os_last_master_spa;
 	boolean_t	os_will_be_master;
 	wrc_data_t	os_wrc;
-	krwlock_t	mirror_record_lock;
 #endif
+	krwlock_t	mirror_record_lock;
 };
 
 typedef struct mirror_tree_data
