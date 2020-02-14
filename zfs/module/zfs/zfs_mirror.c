@@ -34,6 +34,8 @@
 #include <sys/cluster_san.h>
 #include <sys/zil_impl.h>
 
+static boolean_t zfs_mirror_performace_flag = B_FALSE;
+
 /* DEBUG */
 int debug_msg = 0;
 int zfs_mirror_new_debug_yc = 0;
@@ -2519,12 +2521,12 @@ zfs_replay_worker(data_replay_para_t *para)
     kmem_free(para, sizeof(data_replay_para_t));
 }
 
-void zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
+int zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
 {
     objset_t	*os = NULL;
     lr_t	*lrp = NULL;
     uint64_t	txtype = 0;
-    int			err;
+    int			err = 0;
     int			retry = 0;
     int			retry_max = 3;
 
@@ -2545,9 +2547,11 @@ void zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
     kmem_free(meta_para->data, meta_para->len);
     #endif
     kmem_free(meta_para, sizeof(data_replay_para_t));
+
+	return (err);
 }
 
-void zfs_replay_cache_data(objset_t *os,
+int zfs_replay_cache_data(objset_t *os,
     zfs_mirror_cache_data_t *cache_data)
 {
     uint64_t offset;
@@ -3831,3 +3835,12 @@ static int zfs_mirror_os_io_expired_handle(void)
     list_destroy(&clean_list);
     return (cnt);
 }
+
+boolean_t zfs_mirror_mdata_enable()
+{
+	return (zfs_mirror_enable() && zfs_mirror_performace_flag);
+}
+EXPORT_SYMBOL(zfs_mirror_mdata_enable);
+
+
+

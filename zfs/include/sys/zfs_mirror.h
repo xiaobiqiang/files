@@ -354,7 +354,7 @@ void zfs_mirror_log_clean(objset_t *os,
     uint64_t blk_id, zfs_mirror_data_type_t data_type);
 void zfs_mirror_get_all_buf(objset_t *os) ;
 struct dbuf_mirror_io  *zfs_mirror_create(void);
-void zfs_replay_cache_data(objset_t *os, zfs_mirror_cache_data_t *cache_data);
+int zfs_replay_cache_data(objset_t *os, zfs_mirror_cache_data_t *cache_data);
 void zfs_mirror_destroy(struct dbuf_mirror_io  *mirror_io);
 uint64_t zfs_mirror_located_keygen(
 	uint64_t object_id, uint64_t blk_id, uint64_t offset);
@@ -366,6 +366,10 @@ int zfs_mirror_get_updated_spa(uint32_t hostid, nvlist_t **nv_ptr);
 #if defined(__sw_64)
 char *zfs_mirror_candidate_hosts_show(char * buf, uint32_t len);
 #endif
+
+boolean_t zfs_mirror_mdata_enable();
+uint64_t zfs_mirror_spa_os_keygen(uint64_t spa_id, uint64_t os_id);
+
 
 #endif
 #ifdef	__cplusplus

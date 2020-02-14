@@ -68,6 +68,8 @@ krwlock_t os_lock;
  */
 int dmu_find_threads = 0;
 
+mirror_lun_list_t *g_mirror_data = NULL;
+
 static void dmu_objset_find_dp_cb(void *arg);
 
 void
@@ -994,6 +996,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	mutex_init(&os->os_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&os->os_obj_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&os->os_user_ptr_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&os->mirror_record_lock, NULL, RW_DEFAULT, NULL);
 
 	dnode_special_open(os, &os->os_phys->os_meta_dnode,
 	    DMU_META_DNODE_OBJECT, &os->os_meta_dnode);
@@ -1330,6 +1333,8 @@ dmu_objset_evict_done(objset_t *os)
 	mutex_destroy(&os->os_lock);
 	mutex_destroy(&os->os_obj_lock);
 	mutex_destroy(&os->os_user_ptr_lock);
+	rw_destroy(&os->mirror_record_lock);
+	
 	spa_evicting_os_deregister(os->os_spa, os);
 	kmem_free(os, sizeof (objset_t));
 }
@@ -2592,8 +2597,141 @@ dmu_fsname(const char *snapname, char *buf)
 }
 
 #ifdef _KERNEL
+
+int
+mirror_compare(const void *x1, const void *x2)
+{
+	mirror_tree_data_t *comp_mirror_data = (mirror_tree_data_t *)x1;
+	mirror_tree_data_t *base_mirror_data = (mirror_tree_data_t *)x2;
+
+	uint64_t base_start = base_mirror_data->start_addr;
+	uint64_t base_end = base_start + base_mirror_data->data_len;
+	uint64_t comp_start = comp_mirror_data->start_addr;
+	uint64_t comp_end = comp_start + comp_mirror_data->data_len;
+	uint8_t type = comp_mirror_data->type;
+
+	// check
+	if (0 == type) {
+		if (base_end < comp_start)
+			return 1;
+		if (base_start > comp_end)
+			return -1;
+
+		if ((comp_start >= base_start && comp_start < base_end)
+			|| (comp_end > base_start && comp_end <= base_end)
+			|| (comp_start <= base_start && comp_end >= base_end))
+			return 0;
+	}
+
+	//find for remove
+	if (1 == type) {
+		if (base_end < comp_start)
+			return 1;
+		else if (base_start > comp_end)
+			return -1;
+		else if (base_start < comp_start && base_end > comp_start)
+			return 1;
+		else if (base_start > comp_start && base_start < comp_end)
+			return -1;
+		else if (base_start == comp_start && base_end == comp_end)
+			return 0;
+
+		return -2;
+	}
+
+	return -2;
+}
+
+void dmu_mirror_add_tree(mirror_tree_t *record)
+{
+	avl_index_t where;
+	zil_data_record_t *data_record;
+	void *data;
+	dnode_t *mdn;
+	objset_t *os = record->list_os;
+
+	mdn = DMU_META_DNODE(os);
+
+	for (data_record = list_head(&os->os_zil_list); NULL != data_record;
+		data_record = list_next(&os->os_zil_list, data_record)) {
+		if (data_record->data_type != R_CACHE_DATA)
+			continue;
+
+		mirror_tree_data_t *mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+		bzero(mirror_data, sizeof(mirror_tree_data_t));
+
+		zfs_mirror_cache_data_t *cache_data = (zfs_mirror_cache_data_t *)data_record->data;
+		zfs_mirror_msg_mirrordata_header_t *header = cache_data->cs_data->ex_head;
+
+		mirror_data->start_addr = mdn->dn_datablkszsec * header->blk_offset;
+		mirror_data->data_len = header->len;
+		mirror_data->count = 0;
+		mirror_data->type = 1; 
+
+		data = avl_find(&record->record_tree, mirror_data, &where);
+		if (NULL != data) {
+			mirror_tree_data_t *repeat_data = (mirror_tree_data_t *)data;
+			repeat_data->count++;
+			kmem_free(mirror_data, sizeof(mirror_tree_data_t));
+		} else {
+			avl_add(&record->record_tree, mirror_data);
+		}
+	}
+}
+
+void dmu_mirror_data(objset_t *os, kcondvar_t *zv_cp, uint8_t *zv_cp_state, int type)
+{
+	mirror_tree_t *cur, *record;
+	uint64_t hash_key, spa_id, os_id;
+	char lun[MIRROR_NAME_LEN] = {0};
+
+	strcat(lun, os->os_spa->spa_name);
+	strcat(lun, os->os_dsl_dataset->ds_dir->dd_myname);
+
+	if (NULL != list_head(&os->os_zil_list)) {
+		cmn_err(CE_WARN, "%s line %d mirror copy start, name=%s", __func__, __LINE__, lun);
+		dmu_mirror_lock(RW_WRITER);
+		if (NULL == g_mirror_data) {
+			g_mirror_data = kmem_alloc(sizeof(mirror_lun_list_t), KM_SLEEP);
+	
+			list_create(&g_mirror_data->mirror_data_list, sizeof(mirror_tree_t), offsetof(mirror_tree_t, data_node));
+			g_mirror_data->list_num = 0;
+			cmn_err(CE_WARN, "%s line %d mirror alloc success", __func__, __LINE__);
+		}
+
+		record = kmem_alloc(sizeof(mirror_tree_t), KM_SLEEP);
+		bzero(record, sizeof(mirror_tree_t));
+
+		spa_id = spa_guid(os->os_spa);
+		os_id = os->os_dsl_dataset->ds_object;
+		hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+
+		record->hash_key = hash_key;
+		record->list_os = os;
+		avl_create(&record->record_tree, mirror_compare, sizeof(mirror_tree_data_t),
+			offsetof(mirror_tree_data_t, data_link));
+		dmu_mirror_add_tree(record);
+
+		cur = list_head(&g_mirror_data->mirror_data_list);
+		if (NULL != cur)
+			list_insert_after(&g_mirror_data->mirror_data_list, cur, record);
+		else
+			list_insert_head(&g_mirror_data->mirror_data_list, record);
+		g_mirror_data->list_num++;
+
+		dmu_mirror_unlock();
+	}
+
+	if (NULL != zv_cp) {
+		cmn_err(CE_WARN, "%s line %d replay mirror copye end", __func__, __LINE__);
+		*zv_cp_state = ZVOL_COPYED;
+		cv_broadcast(zv_cp); 
+	}
+}
+
 void
-dmu_objset_replay_all_cache(objset_t *os)
+dmu_objset_replay_all_cache(objset_t *os, kcondvar_t *zv_cp, 
+	uint8_t *zv_cp_state, int type)
 {
     void *user_data;
 
@@ -2606,7 +2744,10 @@ dmu_objset_replay_all_cache(objset_t *os)
         zil_replay(os, user_data, os->os_replay);
         if (zfs_mirror_hold() == 0) {
             zfs_mirror_get_all_buf(os);
-            zil_replay_all_data(os);
+			if (zfs_mirror_mdata_enable() && (B_TRUE == type))
+				dmu_mirror_data(os, zv_cp, zv_cp_state, type);
+			
+            zil_replay_all_data(os, type);
             zfs_mirror_rele();
         } 
         os->os_breplaying = B_FALSE;

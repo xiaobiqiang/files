@@ -51,6 +51,8 @@
 #include <sys/stmf_sbd.h>
 #include <sys/stmf_impl.h>
 #include <sys/sbd_impl.h>
+#include <sys/dbuf.h>
+#include <sys/zfs_mirror.h>
 
 #define	SCSI2_CONFLICT_FREE_CMDS(cdb)	( \
 	/* ----------------------- */                                      \
@@ -949,8 +951,13 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	int fast_path = 0;
+	int flag = 0;
 
-	sbd_zvol_mirror_replay_wait(sl);
+	if (zfs_mirror_mdata_enable())
+		flag = sbd_zvol_mdata_mirror_replay_wait(sl);
+	else
+		sbd_zvol_mirror_replay_wait(sl);
+	
 	if (op == SCMD_READ) {
 		lba = READ_SCSI21(&task->task_cdb[1], uint64_t);
 		len = (uint32_t)task->task_cdb[4];
@@ -981,6 +988,22 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
+	}
+
+	if (flag) {
+		dnode_t *mdn;
+		int check_result;
+		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		mdn = DB_DNODE(db);
+
+		objset_t *os = mdn->dn_objset;
+		dmu_mirror_lock(RW_READER);
+		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
+		dmu_mirror_unlock();
+		if (check_result) {
+			cmn_err(CE_WARN, "%s line %d mirror read wait", __func__, __LINE__);
+			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
+		}
 	}
 
 	task->task_cmd_xfer_length = len;
@@ -1808,8 +1831,13 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	uint8_t	sync_wr_flag = 0, do_zcopy = 0, is_meta_data = 0;
+	int flag = 0;
 
-	sbd_zvol_mirror_replay_wait(sl);  
+	if (zfs_mirror_mdata_enable())
+		flag = sbd_zvol_mdata_mirror_replay_wait(sl);
+	else
+		sbd_zvol_mirror_replay_wait(sl);
+	
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_WRITE_PROTECTED);
@@ -1864,6 +1892,22 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
+	}
+
+	if (flag) {
+		dnode_t *mdn;
+		int check_result;
+		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		mdn = DB_DNODE(db);
+
+		objset_t *os = mdn->dn_objset;
+		dmu_mirror_lock(RW_READER);
+		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
+		dmu_mirror_unlock();
+		if (check_result) {
+			cmn_err(CE_WARN, "%s line %d mirror write wait", __func__, __LINE__);
+			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
+		}
 	}
 
 	task->task_cmd_xfer_length = len;
@@ -4127,8 +4171,11 @@ void
 sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 {
 	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 
-	sbd_zvol_mirror_replay_wait((sbd_lu_t *)task->task_lu->lu_provider_private);
+	if (!zfs_mirror_mdata_enable())
+		sbd_zvol_mirror_replay_wait(sl);		
+	
 	if (dbuf->db_flags & DB_LU_DATA_BUF) {
 		/*
 		 * Buffers passed in from the LU always complete

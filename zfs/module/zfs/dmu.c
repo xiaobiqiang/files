@@ -72,6 +72,8 @@ static int dmu_handle_write_optimize(dmu_buf_impl_t *db,
  */
 int zfs_nopwrite_enabled = 1;
 
+krwlock_t mirror_lock;
+
 const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	DMU_BSWAP_UINT8,	TRUE,	"unallocated"		},
 	{	DMU_BSWAP_ZAP,		TRUE,	"object directory"	},
@@ -2714,6 +2716,84 @@ dmu_data_newer(objset_t *os, uint64_t data_object,
 
 #endif
 
+int 
+dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
+{
+	dnode_t *mdn;
+	int result = B_FALSE;
+	zil_data_record_t *data_record;
+	mirror_tree_t *mirror_record;
+	uint64_t spa_id, os_id, hash_key;
+
+	if ((NULL == g_mirror_data) || (NULL == &g_mirror_data->mirror_data_list)) {
+		cmn_err(CE_WARN, "%s line %d, mirror data write g_mirror_data is null...", __func__, __LINE__);
+		return (B_FALSE);
+	}
+
+	mdn = DMU_META_DNODE(os);
+	ASSERT(mdn->dn_object == DMU_META_DNODE_OBJECT);
+
+	mirror_tree_data_t *mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+	bzero(mirror_data, sizeof(mirror_tree_data_t));
+
+	mirror_record = list_head(&g_mirror_data->mirror_data_list);
+	if (NULL == mirror_record || NULL == mirror_record->list_os)
+		return (B_FALSE);
+
+	spa_id = spa_guid(os->os_spa);
+	os_id = os->os_dsl_dataset->ds_object;
+	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+
+	while (NULL != mirror_record) {
+		void *data = NULL;
+		avl_index_t where;
+
+		if ((NULL == mirror_record->list_os) 
+			|| hash_key != mirror_record->hash_key) {
+			mirror_record = list_next(&g_mirror_data->mirror_data_list, mirror_record);
+			continue;
+		}
+
+		mirror_data->start_addr = offset;
+		mirror_data->data_len = data_len;
+		mirror_data->count = 0;
+		mirror_data->type = 0; // check for find
+
+		rw_enter(&mirror_record->list_os->mirror_record_lock, RW_READER);
+		data = avl_find(&mirror_record->record_tree, (const void *)mirror_data, &where);
+		rw_exit(&mirror_record->list_os->mirror_record_lock);
+		if (NULL != data)
+			result = B_TRUE;
+
+		break;
+	}
+	kmem_free(mirror_data, sizeof(mirror_tree_data_t));
+
+	return (result);
+}
+
+void
+dmu_mirror_init(void)
+{
+	rw_init(&mirror_lock, NULL, RW_DEFAULT, NULL);
+}
+
+void
+dmu_mirror_fini(void)
+{
+	rw_destroy(&mirror_lock);
+}
+
+void dmu_mirror_lock(int rw)
+{
+	rw_enter(&mirror_lock, rw);
+}
+
+void dmu_mirror_unlock()
+{
+	rw_exit(&mirror_lock);
+}
+
 void
 dmu_init(void)
 {
@@ -2721,6 +2801,7 @@ dmu_init(void)
 	sa_cache_init();
 	xuio_stat_init();
 	dmu_objset_init();
+	dmu_mirror_init();
 	dnode_init();
 	dbuf_init();
 	zfetch_init();
@@ -2739,6 +2820,7 @@ dmu_fini(void)
 	dbuf_fini();
 	dnode_fini();
 	dmu_objset_fini();
+	dmu_mirror_fini();
 	xuio_stat_fini();
 	sa_cache_fini();
 	zfs_dbgmsg_fini();
@@ -2771,6 +2853,9 @@ EXPORT_SYMBOL(dmu_buf_hold);
 EXPORT_SYMBOL(dmu_get_lock_para);
 EXPORT_SYMBOL(dmu_get_crypt_data);
 EXPORT_SYMBOL(dmu_free_crypt_data);
+EXPORT_SYMBOL(dmu_check_mirror_repeat_data);
+EXPORT_SYMBOL(dmu_mirror_lock);
+EXPORT_SYMBOL(dmu_mirror_unlock);
 
 
 EXPORT_SYMBOL(dmu_ot);

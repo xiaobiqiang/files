@@ -60,6 +60,7 @@ extern int zvol_get_volume_params(minor_t minor, uint64_t *blksize,
 extern uint64_t zvol_get_volume_size(void *minor_hdl);
 extern int zvol_get_volume_wce(void *minor_hdl);
 extern void zvol_mirror_replay_wait(void *minor_hdl);
+extern int zvol_mdata_mirror_replay_wait(void *minor_hdl);
 
 extern int zvol_get_disk_name(const char *name, char *disk_name, int len);
 extern int zvol_flush_write_cache(const char *name, void *arg);

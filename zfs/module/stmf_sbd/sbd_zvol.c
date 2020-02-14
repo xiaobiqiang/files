@@ -704,3 +704,11 @@ void sbd_zvol_mirror_replay_wait(sbd_lu_t *sl)
 	}
 }
 
+int sbd_zvol_mdata_mirror_replay_wait(sbd_lu_t *sl)
+{
+	if ((sl->sl_access_state == SBD_LU_ACTIVE) &&
+		((sl->sl_flags & SL_CALL_ZVOL) != 0)) {
+		return zvol_mdata_mirror_replay_wait(sl->sl_zvol_minor_hdl);
+	}
+	return (B_FALSE);
+}
