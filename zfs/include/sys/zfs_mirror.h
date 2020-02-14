@@ -367,7 +367,7 @@ int zfs_mirror_get_updated_spa(uint32_t hostid, nvlist_t **nv_ptr);
 char *zfs_mirror_candidate_hosts_show(char * buf, uint32_t len);
 #endif
 
-boolean_t zfs_mirror_mdata_enable();
+boolean_t zfs_mirror_mdata_enable(void);
 uint64_t zfs_mirror_spa_os_keygen(uint64_t spa_id, uint64_t os_id);
 
 

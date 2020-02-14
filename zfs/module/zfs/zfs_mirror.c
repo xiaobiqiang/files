@@ -3836,7 +3836,7 @@ static int zfs_mirror_os_io_expired_handle(void)
     return (cnt);
 }
 
-boolean_t zfs_mirror_mdata_enable()
+boolean_t zfs_mirror_mdata_enable(void)
 {
 	return (zfs_mirror_enable() && zfs_mirror_performace_flag);
 }
