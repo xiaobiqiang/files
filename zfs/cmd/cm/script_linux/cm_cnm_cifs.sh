@@ -288,7 +288,6 @@ function cm_cnm_cifs_delete()
     local nametype=$3
     local name=$4
     #local user=`cm_cnm_cifs_user_get $nametype "$name"`
-    local iRet=$CM_ERR_NOT_EXISTS
     
     local cnt=`getfacl -cp "$dir" 2>/dev/null |grep ":$name:"|wc -l`
     if [ $cnt -ne 1 ]; then
@@ -303,7 +302,7 @@ function cm_cnm_cifs_delete()
     
     setfacl -x $nametype:$name $dir
     
-    return $iRet
+    return $?
 }
 
 #==================================================================================
@@ -372,8 +371,8 @@ function cm_cnm_cifs_main()
         #    return $CM_PARAM_ERR
         #fi
         mountpoint="/"$nasdir
-        abe=`zfs get sharesmb $nasdir |sed '1d' |awk '{print $3}'`
-        inherit=`zfs get aclinherit $nasdir |sed '1d' |awk '{print $3}'`
+        #abe=`zfs get sharesmb $nasdir |sed '1d' |awk '{print $3}'`
+        #inherit=`zfs get aclinherit $nasdir |sed '1d' |awk '{print $3}'`
         if [ "X$inherit" == "Xpassthrough" ] || [ "X$inherit" == "Xpassthrough-x" ]; then
             inherit='true'
         else
