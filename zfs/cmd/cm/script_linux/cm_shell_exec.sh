@@ -419,8 +419,10 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'collisions|ierrors|norcvbuf|obytes|obytes64|oerrors|rbytes|rbytes64|link_duplex|ifspeed|noxmtbuf' \
-    |awk '{printf $2" "}'
+    local read=`cat /proc/net/dev|grep $name|awk '{print $2}'`
+    local write=`cat /proc/net/dev|grep $name|awk '{print $10}'`
+    
+    echo "0 0 100000000 2 0 0 $write $write 0 $read $read"
     return $?
 }
 
@@ -434,7 +436,7 @@ function cm_pmm_dup_ifspeed()
 function cm_pmm_nic_check()
 {
     local name=$1
-    nicstat | grep -w $name | wc -l
+    ip link|grep $name|wc -l
 }
 
 function cm_pmm_disk_instance()

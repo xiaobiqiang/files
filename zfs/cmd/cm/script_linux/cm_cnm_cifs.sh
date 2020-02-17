@@ -43,11 +43,11 @@ function cm_cnm_cifs_getbatch()
     
     ((index=$offset))
     #脚本里下标从1开始计算,并跳过第一行
-    ((offset=$offset+2))
+    ((offset=$offset+1))
     #获取结束行号
     ((total=$offset+$total-1))
     
-    local rows=`ls -dV "$dir" 2>/dev/null |sed -n "${offset},${total}p"`
+    local rows=`getfacl -cp "$dir" 2>/dev/null |sed -n "${offset},${total}p"`
     for row in $rows
     do
         #使用:分割
@@ -60,34 +60,33 @@ function cm_cnm_cifs_getbatch()
         local permission=$CM_NAS_PERISSION_RW
         local name="unknow"
         
-        if [ $col_num -eq 4 ]; then
-            #everyone@ rwxpdDaARWc--s fd----- allow
-            nametype=$CM_NAME_GROUP
-            name=${colarr[0]}
-            permission=${colarr[1]}
-        elif [ $col_num -eq 5 ]; then
-            if [ ${colarr[0]}"X" = "groupX" ]; then
-                nametype=$CM_NAME_GROUP
-            fi
-            name=${colarr[1]}
-            permission=${colarr[2]}
+        if [ ${colarr[0]} = 'user' ]; then
+            nametype=$CM_NAME_USER
         else
-            return $CM_FAIL
+            nametype=$CM_NAME_GROUP
         fi
         
+        if [ $col_num -eq 3 ]; then
+            name=${colarr[1]}
+            permission=${colarr[2]}
+        else 
+            name=${colarr[0]}"@"
+            permission=${colarr[1]}
+        fi
+
         #转换权限
         case $permission in
-            "rwxpdDaARWcCos")
+            "rwx")
             permission=$CM_NAS_PERISSION_RW
             ;;
-            "rwxpdDaARWc--s")
-            permission=$CM_NAS_PERISSION_RD
-            ;;
-            *)
+            "r-x")
             permission=$CM_NAS_PERISSION_RO
             ;;
+            *)
+            permission=$CM_NAS_PERISSION_RD
+            ;;
         esac
-        echo "$index $domain $nametype $name $permission"
+        echo "$index $permission $domain $nametype $name"
         ((index=$index+1))
     done
     return $CM_OK
@@ -106,7 +105,7 @@ function cm_cnm_cifs_getbatch()
 function cm_cnm_cifs_count()
 {
     local dir=$1
-    local cnt=`ls -dV "$dir" 2>/dev/null |sed 1d |wc -l`
+    local cnt=`getfacl -cp  "$dir" 2>/dev/null |sed 1d |wc -l`
     
     echo "$cnt"
     return $CM_OK
@@ -197,20 +196,32 @@ function cm_cnm_cifs_add()
     local permission=$5
     local abe=$6
     local inherit=$7
-    local user=`cm_cnm_cifs_user_get $nametype "$name"`
+    #local user=`cm_cnm_cifs_user_get $nametype "$name"`
+    local acl
     #domain 预留
     
     #检查是否存在
-    local cnt=`ls -dV "$dir" 2>/dev/null |grep "${user}:" |wc -l`
+    local cnt=`getfacl -cp "$dir" 2>/dev/null |grep ":$name:"|wc -l`
     if [ $cnt -ne 0 ]; then
         return $CM_ERR_ALREADY_EXISTS
     fi
     
-    permission=`cm_cnm_cifs_permission_get $permission "$abe" "$inherit"`
+    #permission=`cm_cnm_cifs_permission_get $permission "$abe" "$inherit"`
+    if [ $permission -eq 0 ]; then
+        acl="rwx"
+    elif [ $permission -eq 1 ]; then
+        acl="r-x"
+    else
+        acl="--x"
+    fi
     
-    #echo "add $dir $user:$permission"
-    chmod A+${user}":"${permission} "$dir" 2>/dev/null
-    #echo "add $dir $domain $nametype $name $permission"
+    if [ $nametype -eq 0 ]; then
+        nametype="user"
+    else
+        nametype="group"
+    fi
+ 
+    setfacl -m $nametype:$name:$acl $dir
     return $?
 }
 
@@ -238,24 +249,23 @@ function cm_cnm_cifs_update()
     local abe=$6
     local inherit=$7
     local iRet=$CM_ERR_NOT_EXISTS
-    local user=`cm_cnm_cifs_user_get $nametype "$name"`
     
-    permission=`cm_cnm_cifs_permission_get $permission "$abe" "$inherit"`
-    
-    local rows=`ls -dV "$dir" 2>/dev/null |grep "${user}:"`
-    
-    #删除再增加，ACL中可以通过指定index修改，但是查询Index太麻烦
-    for row in $rows
-    do
-        chmod A-${row} "$dir" 2>/dev/null
-        iRet=$?
-    done
-    
-    if [ $iRet -eq $CM_OK ]; then
-        chmod A+${user}":"${permission} "$dir" 2>/dev/null
-        iRet=$?
+    if [ $permission -eq 0 ]; then
+        acl="rwx"
+    elif [ $permission -eq 1 ]; then
+        acl="r-x"
+    else
+        acl="--x"
     fi
-    return $iRet
+    
+    if [ $nametype -eq 0 ]; then
+        nametype="user"
+    else
+        nametype="group"
+    fi
+ 
+    setfacl -m $nametype:$name:$acl $dir
+    return $?
 }
 
 #==================================================================================
@@ -277,15 +287,21 @@ function cm_cnm_cifs_delete()
     local domain=$2
     local nametype=$3
     local name=$4
-    local user=`cm_cnm_cifs_user_get $nametype "$name"`
+    #local user=`cm_cnm_cifs_user_get $nametype "$name"`
     local iRet=$CM_ERR_NOT_EXISTS
     
-    local rows=`ls -dV "$dir" 2>/dev/null |grep "${user}:"`
-    for row in $rows
-    do
-        chmod A-${row} "$dir" 2>/dev/null
-        iRet=$?
-    done
+    local cnt=`getfacl -cp "$dir" 2>/dev/null |grep ":$name:"|wc -l`
+    if [ $cnt -ne 1 ]; then
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ $nametype -eq 0 ]; then
+        nametype="user"
+    else
+        nametype="group"
+    fi
+    
+    setfacl -x $nametype:$name $dir
     
     return $iRet
 }
@@ -350,11 +366,12 @@ function cm_cnm_cifs_main()
     local abe='off'
     local inherit='false'
     if [ "X${nasdir:0:1}" != 'X/' ]; then
-        mountpoint=`zfs list -H -o mountpoint "$nasdir" 2>/dev/null`
-        if [ "X$mountpoint" = "X" ]; then
+        #mountpoint=`zfs list -H -o mountpoint "$nasdir" 2>/dev/null`
+        #if [ "X$mountpoint" = "X" ]; then
             #echo "$nasdir not existed"
-            return $CM_PARAM_ERR
-        fi
+        #    return $CM_PARAM_ERR
+        #fi
+        mountpoint="/"$nasdir
         abe=`zfs get sharesmb $nasdir |sed '1d' |awk '{print $3}'`
         inherit=`zfs get aclinherit $nasdir |sed '1d' |awk '{print $3}'`
         if [ "X$inherit" == "Xpassthrough" ] || [ "X$inherit" == "Xpassthrough-x" ]; then
