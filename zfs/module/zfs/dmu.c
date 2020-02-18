@@ -1275,6 +1275,13 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
             didcpy = dmu_bio_copy(db->db_data + bufoff, tocpy, bio,
                 bio_offset);
 
+			if (didcpy < tocpy) {
+				cmn_err(CE_WARN, "zjn %s %d didcpy=%d tocpy=%d", __func__,
+					__LINE__, didcpy, tocpy);
+				err = EIO;
+				break;
+			}
+
             if (b_sync) {
                 mirror_success = dmu_mirror_write_data(db,
                     (char *) ((char *)db->db_data + bufoff),
@@ -1296,6 +1303,13 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
             tmp_data = dmu_request_arcbuf(db, tocpy);
             didcpy = dmu_bio_copy((char *)tmp_data->b_data, tocpy, bio,
                 bio_offset);
+
+			if (didcpy < tocpy) {
+				cmn_err(CE_WARN, "zjn %s %d didcpy=%d tocpy=%d", __func__,
+					__LINE__, didcpy, tocpy);
+				err = EIO;
+				break;
+			}
 			
             mirror_success = dmu_mirror_write_data(db, tmp_data->b_data,
                 bufoff + db->db_offset, tocpy, tx->tx_txg, type);
@@ -1319,23 +1333,16 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
 
 		if (tocpy == db->db_size)
 			dmu_buf_fill_done(db, tx);
-
-		if (didcpy < tocpy)
-			err = EIO;
-
+		
 		if (mirror_success > 0  && b_sync) {
-/*            dmu_direct_write(db, tx);
-            if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-			err = EIO;
+			dmu_direct_write(db, tx);
+			if (!tx->tx_bdirect)
+				tx->tx_bdirect = B_TRUE;
         }
-		if (err)
-            break;
 
 		size -= tocpy;
 		offset += didcpy;
 		bio_offset += didcpy;
-		err = 0;
 	}
 
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
@@ -1592,10 +1599,9 @@ dmu_write_uio_dnode(dnode_t *dn, uio_t *uio, uint64_t size,
 			break;
 
 		if (mirror_success > 0  && b_sync) {
-/*			dmu_direct_write(db, tx);
+			dmu_direct_write(db, tx);
 			if (!tx->tx_bdirect)
-				tx->tx_bdirect = B_TRUE; */
-			err = 1;
+				tx->tx_bdirect = B_TRUE;
 		}		
 	}
 
@@ -1733,10 +1739,9 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
         mirror_success = dmu_mirror_write_data(&db->db, (char *)db->db.db_data,
             db->db.db_offset,  db->db.db_size, tx->tx_txg, MIRROR_DATA_ALIGNED);
         if (mirror_success > 0 && b_sync) {
-/*            dmu_direct_write(&db->db, tx);
+			dmu_direct_write(&db->db, tx);
             if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-        	ret = 1;
+                tx->tx_bdirect = B_TRUE;
         }
 #endif
 		dbuf_rele(db, FTAG);
@@ -2603,36 +2608,34 @@ dmu_write_mirror(objset_t *os, dmu_buf_t *db,
     uint64_t object, uint64_t offset, uint64_t size,
     const void *data, dmu_tx_t *tx, boolean_t b_sync)
 {
-        int mirror_success;
-        boolean_t b_woptimize;
-        boolean_t b_mirror;
-        zfs_mirror_data_type_t type;
+    int mirror_success;
+    boolean_t b_woptimize;
+    boolean_t b_mirror;
+    zfs_mirror_data_type_t type;
 
-        b_mirror = B_FALSE;
-        mirror_success = 0;
+    b_mirror = B_FALSE;
+    mirror_success = 0;
 
-        b_woptimize = dmu_write_optimize(db);
-		//b_woptimize = B_FALSE;
-        if (b_woptimize) {
-            type = MIRROR_DATA_UNALIGNED;
-        } else {
-            type = MIRROR_DATA_ALIGNED;
-        }
+    b_woptimize = dmu_write_optimize(db);
+    if (b_woptimize) {
+        type = MIRROR_DATA_UNALIGNED;
+    } else {
+        type = MIRROR_DATA_ALIGNED;
+    }
 
-        mirror_success = dmu_mirror_write_data(db, (char *) data,
-            offset,  size, tx->tx_txg, type);
-        if (mirror_success == 0) {
-            b_mirror = B_TRUE;
-        }
+    mirror_success = dmu_mirror_write_data(db, (char *) data,
+        offset,  size, tx->tx_txg, type);
+    if (mirror_success == 0) {
+        b_mirror = B_TRUE;
+    }
 
-        dmu_write(os, object, offset, size, data, tx, b_mirror);
-        if (mirror_success > 0  && b_sync) {
-/*            dmu_direct_write(db, tx);
-            if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-            return(1);
-        }
-		return(0);
+    dmu_write(os, object, offset, size, data, tx, b_mirror);
+    if (mirror_success > 0  && b_sync) {
+		dmu_direct_write(db, tx);
+        if (!tx->tx_bdirect)
+            tx->tx_bdirect = B_TRUE;
+    }
+	return (0);
 }
 
 int
