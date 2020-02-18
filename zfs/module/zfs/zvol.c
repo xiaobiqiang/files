@@ -1323,6 +1323,7 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 
     mutex_enter(&zv->zv_state_lock);
 	zv->zv_open_count--;
+	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);	
 	if (zv->zv_open_count == 0) {
 		zvol_last_close(zv);
 		cv_signal(&zv->zv_rele_cv);
@@ -1744,7 +1745,8 @@ zvol_alloc(dev_t dev, const char *name)
 
 	zv->zv_queue->queuedata = zv;
 	zv->zv_dev = dev;
-	zv->zv_open_count = 0;
+	zv->zv_open_count = 0;	
+	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);	
 	strlcpy(zv->zv_name, name, MAXNAMELEN);
 
 	zfs_rlock_init(&zv->zv_range_lock);
@@ -1886,10 +1888,9 @@ zvol_create_minor_impl(const char *name)
 	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, zv->zv_queue);
 #endif
 
-	if (bmdata) {
-		cv_init(&zv->zv_cp, NULL, CV_DEFAULT, NULL);
+	cv_init(&zv->zv_cp, NULL, CV_DEFAULT, NULL);
+	if (bmdata)
 		zv->zv_cp_state = ZVOL_COPYING;
-	}
 
 #if 0
 	if (spa_writeable(dmu_objset_spa(os))) {
@@ -2097,7 +2098,8 @@ zvol_release_force(zvol_state_t *zv)
 		zv->zv_name, (ulong_t)zv->zv_open_count);
 	if (zv->zv_open_count > 0) {
 		zv->zv_open_count = 0;
-		zvol_last_close(zv);
+		zvol_last_close(zv);		
+		printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count); 
 	}
 	mutex_exit(&zv->zv_state_lock);
 }
@@ -2712,12 +2714,12 @@ zvol_objset_replay_all_cache(void *arg)
 		dmu_prefetch(zv->zv_objset, ZVOL_OBJ, zv->zv_volsize - len, len);
 	}
 
+	mutex_enter(&zv->zv_state_lock);
 	if (zv->zv_open_count == 0) {
 		dmu_objset_disown(zv->zv_objset, zvol_tag);
 		zv->zv_objset = NULL;
 	}
-
-	mutex_enter(&zv->zv_state_lock);
+	
 	zv->zv_state = ZVOL_VALID;
 	cv_broadcast(&zv->zv_cv);
 	mutex_exit(&zv->zv_state_lock);
