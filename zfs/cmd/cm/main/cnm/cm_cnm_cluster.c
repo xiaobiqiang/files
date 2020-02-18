@@ -995,3 +995,271 @@ sint32 cm_cnm_cluster_stat_sync_request(uint64 data_id, void *pdata, uint32 len)
 }
 
 
+typedef struct
+{
+    sint8 ip[CM_IP_LEN];
+    sint8 name[CM_STRING_256];
+}cm_cnm_remote_cluster_info_t;
+
+static cm_db_handle_t gCmRemoteClustersHandle=NULL;
+sint32 cm_cnm_cluster_remote_init(void)
+{
+    sint32 iRet = CM_FAIL;
+    cm_db_handle_t handle = NULL;    
+    const sint8* initdb="CREATE TABLE IF NOT EXISTS record_t ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+            "ip VARCHAR(32),"
+            "name VARCHAR(256))";
+    iRet = cm_db_open_ext(CM_DATA_DIR"cm_remoteclusters.db",&handle);
+    if(CM_OK != iRet)
+    {
+        return iRet;
+    }
+    iRet = cm_db_exec_ext(handle,initdb);
+    gCmRemoteClustersHandle = handle;
+    return iRet;
+}
+
+static sint32 cm_cnm_cluster_remote_decode_ext(const cm_omi_obj_t ObjParam, void* data, cm_omi_field_flag_t *set)
+{
+    sint32 iRet = CM_OK;
+    cm_cnm_remote_cluster_info_t* info = data;
+  
+    cm_cnm_decode_param_t param_str[] = 
+    {
+        {CM_OMI_FIELD_REMOTECLUSTER_IP,sizeof(info->ip),info->ip,NULL},
+        {CM_OMI_FIELD_REMOTECLUSTER_NAME,sizeof(info->name),info->name,NULL},
+    };
+
+    iRet = cm_cnm_decode_str(ObjParam,param_str,
+        sizeof(param_str)/sizeof(cm_cnm_decode_param_t),set);
+    if(iRet != CM_OK)
+    {
+        return iRet;
+    }
+    
+    return CM_OK;
+}
+
+sint32 cm_cnm_cluster_remote_decode(const cm_omi_obj_t ObjParam, void **ppDecodeParam)
+{
+    return cm_cnm_decode_comm(ObjParam, sizeof(cm_cnm_remote_cluster_info_t), 
+        cm_cnm_cluster_remote_decode_ext, ppDecodeParam);
+}
+
+cm_omi_obj_t cm_cnm_cluster_remote_encode(const void *pDecodeParam, void *pAckData, uint32 AckLen)
+{
+    cm_db_handle_t handle=gCmRemoteClustersHandle;
+    sint8 *sql = pAckData;
+    cm_omi_obj_t items = NULL;
+    
+    if(NULL == pAckData)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"pAckData null");
+        return NULL;
+    }    
+    
+    items = cm_omi_obj_new_array();
+    if(NULL == items)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"new items fail");
+        return NULL;
+    }
+
+    (void)cm_db_exec(handle,cm_omi_encode_db_record_each,items,"%s",sql);
+    return items;
+}
+
+sint32 cm_cnm_cluster_remote_getbatch(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    const cm_cnm_decode_info_t* pDecode=(const cm_cnm_decode_info_t*)pDecodeParam;
+    uint32 offset=0;
+    uint32 total=CM_CNM_MAX_RECORD;
+    sint8 *sql = NULL;
+    
+    if(NULL != pDecode)
+    {
+        offset = (uint32)pDecode->offset;
+        total = pDecode->total;
+    }
+
+    sql = CM_MALLOC(CM_STRING_256);
+    if(NULL == sql)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"malloc fail");
+        return CM_FAIL;
+    }
+    
+    CM_VSPRINTF(sql,CM_STRING_256,"SELECT ip as f0, name as f2 FROM record_t"
+        " ORDER BY id LIMIT %u,%u",offset,total);
+    *ppAckData = sql;
+    *pAckLen = CM_STRING_256;
+    return CM_OK;
+}
+
+sint32 cm_cnm_cluster_remote_count(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    uint64 cnt = 0;
+    
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&cnt,
+        "SELECT COUNT(*) FROM record_t");
+    return cm_cnm_ack_uint64(cnt,ppAckData,pAckLen);
+}
+
+sint32 cm_cnm_cluster_remote_insert(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    const cm_cnm_decode_info_t* pDecode=(const cm_cnm_decode_info_t*)pDecodeParam;
+    const cm_cnm_remote_cluster_info_t* info = NULL;
+    uint64 cnt = 0;
+    
+    if(NULL == pDecode)
+    {
+        return CM_PARAM_ERR;
+    }
+
+    info = (const cm_cnm_remote_cluster_info_t*)pDecode->data;
+    if((info->ip[0] == '\0') || (info->name[0] == '\0'))
+    {
+        return CM_PARAM_ERR;
+    }
+
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&cnt,
+        "SELECT COUNT(*) FROM record_t WHERE ip='%s' OR name='%s'",
+        info->ip,info->name);
+    if(cnt > 0)
+    {
+        return CM_ERR_ALREADY_EXISTS;
+    }
+    cnt = 0;
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle, &cnt,
+        "SELECT seq+1 FROM sqlite_sequence WHERE name='record_t'"); 
+    return cm_sync_request(CM_SYNC_OBJ_REMOTE_CLUSTER,cnt,(void*)info,
+        sizeof(cm_cnm_remote_cluster_info_t));
+}
+
+sint32 cm_cnm_cluster_remote_delete(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    const cm_cnm_decode_info_t* pDecode=(const cm_cnm_decode_info_t*)pDecodeParam;
+    const cm_cnm_remote_cluster_info_t* info = NULL;
+    uint64 id=0;
+    if(NULL == pDecode)
+    {
+        return CM_PARAM_ERR;
+    }
+
+    info = (const cm_cnm_remote_cluster_info_t*)pDecode->data;
+    if(info->ip[0] == '\0')
+    {
+        return CM_PARAM_ERR;
+    }
+
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&id,
+        "SELECT COUNT(*) FROM record_t WHERE ip='%s'",
+        info->ip);
+    if(id == 0)
+    {
+        return CM_ERR_NOT_EXISTS;
+    }
+    return cm_sync_delete(CM_SYNC_OBJ_REMOTE_CLUSTER,id);
+}
+
+sint32 cm_cnm_cluster_remote_update(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen)
+{
+    const cm_cnm_decode_info_t* pDecode=(const cm_cnm_decode_info_t*)pDecodeParam;
+    const cm_cnm_remote_cluster_info_t* info = NULL;
+    uint64 cnt = 0;
+    uint64 id=0;
+    if(NULL == pDecode)
+    {
+        return CM_PARAM_ERR;
+    }
+
+    info = (const cm_cnm_remote_cluster_info_t*)pDecode->data;
+    if((info->ip[0] == '\0') || (info->name[0] == '\0'))
+    {
+        return CM_PARAM_ERR;
+    }
+
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&id,
+        "SELECT COUNT(*) FROM record_t WHERE ip='%s'",
+        info->ip);
+    if(id == 0)
+    {
+        return CM_ERR_NOT_EXISTS;
+    }
+    cnt = 0;
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&cnt,
+        "SELECT COUNT(*) FROM record_t WHERE name='%s'",
+        info->ip,info->name);
+    if(cnt > 0)
+    {
+        return CM_ERR_ALREADY_EXISTS;
+    }
+    return cm_sync_request(CM_SYNC_OBJ_REMOTE_CLUSTER,id,(void*)info,
+        sizeof(cm_cnm_remote_cluster_info_t));
+}
+
+sint32 cm_cnm_cluster_remote_sync_request(uint64 data_id, void *pdata, uint32 len)
+{
+    uint64 cnt = 0;
+    cm_cnm_remote_cluster_info_t *info = pdata;
+
+    (void)cm_db_exec_get_count(gCmRemoteClustersHandle,&cnt,"SELECT COUNT(id) FROM record_t"
+        " WHERE id=%llu",data_id);
+    if(0 == cnt)
+    {
+        return cm_db_exec_ext(gCmRemoteClustersHandle,"INSERT INTO record_t"
+            " (ip,name) VALUES ('%s','%s')",
+            info->ip,info->name);
+    }
+    return cm_db_exec_ext(gCmRemoteClustersHandle,"UPDATE record_t SET"
+            " name='%s' WHERE id=%llu",
+            info->name,data_id);
+}
+
+static sint32 cm_cnm_cluster_remote_get_each(
+    void *arg, sint32 col_cnt, sint8 **col_vals, sint8 **col_names)
+{
+    cm_cnm_remote_cluster_info_t *info = arg;
+
+    if(2 != col_cnt)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"col_cnt %u",col_cnt);
+        return CM_FAIL;
+    }
+    CM_VSPRINTF(info->ip,sizeof(info->ip),"%s",col_vals[0]);
+    CM_VSPRINTF(info->name,sizeof(info->name),"%s",col_vals[1]);
+    return CM_OK;
+}
+
+sint32 cm_cnm_cluster_remote_sync_get(uint64 data_id, void **pdata, uint32 *plen)
+{
+    uint32 cnt = 0;
+    cm_cnm_remote_cluster_info_t *info = CM_MALLOC(sizeof(cm_cnm_remote_cluster_info_t));
+
+    if(NULL == info)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"malloc fail");
+        return CM_FAIL;
+    }
+    cnt = cm_db_exec_get(gCmRemoteClustersHandle,cm_cnm_cluster_remote_get_each,
+        info,1,sizeof(cm_cnm_remote_cluster_info_t),
+        "SELECT ip,name FROM record_t WHERE id=%llu LIMIT 1",data_id);
+    if(0 == cnt)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"id=%llu",data_id);
+        CM_FREE(info);
+        return CM_FAIL;
+    }
+    *pdata = info;
+    *plen = sizeof(cm_cnm_remote_cluster_info_t);
+    return CM_OK;
+}
+
+sint32 cm_cnm_cluster_remote_sync_delete(uint64 data_id)
+{
+    return cm_db_exec_ext(gCmRemoteClustersHandle,"DELETE FROM record_t"
+            " WHERE id=%llu",data_id);
+}
+
+

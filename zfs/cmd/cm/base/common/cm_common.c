@@ -297,9 +297,15 @@ sint32 cm_system_in(uint32 tmout, const sint8* cmdforamt,...)
 {
     va_list args;
     sint8 cmdbuf[CM_STRING_1K] = {0};
-    sint32 iret=CM_VSPRINTF(cmdbuf,sizeof(cmdbuf),"timeout %u ",tmout);
-    sint8 *pcmddata=cmdbuf+iret;
     cm_hrtime_t hrt = CM_GET_HRTIME();
+    sint8 *pcmddata=cmdbuf;
+    sint32 iret = 0;
+
+    if(tmout > CM_CMT_REQ_TMOUT_NEVER)
+    {
+        iret=CM_VSPRINTF(cmdbuf,sizeof(cmdbuf),"timeout %u ",tmout);
+        pcmddata=cmdbuf+iret;
+    }
     
     va_start(args, cmdforamt);
     (void)vsnprintf(pcmddata,CM_STRING_1K-iret,cmdforamt,args);
@@ -367,9 +373,15 @@ sint32 cm_exec_tmout(sint8 *buff, sint32 size,sint32 tmout, const sint8* cmdfora
 {    
     sint32 iRet = CM_OK;
     sint8 cmd[CM_STRING_1K] = {0};
-    int len = CM_VSPRINTF(cmd,CM_STRING_1K,"timeout %u ",CM_CMT_REQ_TMOUT);
-    sint8 *pcmdstr = cmd+len;
     cm_hrtime_t hrt = CM_GET_HRTIME();
+    sint8 *pcmdstr = cmd;
+    int len = 0;
+
+    if(tmout > CM_CMT_REQ_TMOUT_NEVER)
+    {
+        len = CM_VSPRINTF(cmd,CM_STRING_1K,"timeout %u ",tmout);
+        pcmdstr += len;
+    }
     
     CM_ARGS_TO_BUF(pcmdstr, sizeof(cmd)-len,cmdforamt);
 

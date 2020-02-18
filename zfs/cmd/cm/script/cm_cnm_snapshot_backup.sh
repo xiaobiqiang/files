@@ -11,6 +11,7 @@ CM_SSH_KEY_DIR="/etc/root/.ssh"
 function cm_cnm_snapshot_backup_init_sshd()
 {
     local tmpfile=${CM_SSHD_CFG_FILE}.tmp
+    cp ${CM_SSHD_CFG_FILE} "${CM_SSHD_CFG_FILE}.backup"
     rm $tmpfile 2>/dev/null
     cat ${CM_SSHD_CFG_FILE} | awk '{if($1=="PermitEmptyPasswords" || $1=="PermitRootLogin"){$2="yes";print;} else{print;};}' > $tmpfile
 	mv $tmpfile ${CM_SSHD_CFG_FILE}
@@ -20,9 +21,15 @@ function cm_cnm_snapshot_backup_init_sshd()
 function cm_cnm_snapshot_backup_term_sshd()
 {
     local tmpfile=${CM_SSHD_CFG_FILE}.tmp
-    rm $tmpfile 2>/dev/null
-    cat ${CM_SSHD_CFG_FILE} | awk '{if($1=="PermitEmptyPasswords" || $1=="PermitRootLogin"){$2="no";print;} else{print;};}' > $tmpfile
-    mv $tmpfile ${CM_SSHD_CFG_FILE}
+    local bkupfile=${CM_SSHD_CFG_FILE}.backup
+
+    if [ -f $bkupfile ]; then
+        mv ${bkupfile} ${CM_SSHD_CFG_FILE}
+    else
+        rm $tmpfile 2>/dev/null
+        cat ${CM_SSHD_CFG_FILE} | awk '{if($1=="PermitEmptyPasswords" || $1=="PermitRootLogin"){$2="no";print;} else{print;};}' > $tmpfile
+        mv $tmpfile ${CM_SSHD_CFG_FILE}
+    fi
     return $CM_OK
 }
 

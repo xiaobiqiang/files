@@ -113,6 +113,7 @@ typedef enum
     CM_OMI_OBJECT_MAILRECV,
     CM_OMI_OBJECT_NASCOPY,
     CM_OMI_OBJECT_UCACHE,
+    CM_OMI_OBJECT_REMOTE_CLUSTER,
     
     CM_OMI_OBJECT_BUTT
 } cm_omi_object_e;
@@ -1070,6 +1071,14 @@ typedef enum
     CM_OMI_FIELD_UCACHE_TYPE,
     CM_OMI_FIELD_UCACHE_DOMAIN,
 }cm_omi_field_cnm_usercache_e;
+
+typedef enum
+{
+    CM_OMI_FIELD_REMOTECLUSTER_IP = 0,
+    CM_OMI_FIELD_REMOTECLUSTER_NID,
+    CM_OMI_FIELD_REMOTECLUSTER_NAME,
+}cm_omi_field_remote_cluster_e;
+
 
 extern const uint32 *g_CmOmiObjCmdNoCheckPtr;
 extern const cm_omi_map_cfg_t CmOmiMapCmds[CM_OMI_CMD_BUTT];

@@ -287,6 +287,7 @@ extern const cm_omi_map_object_t CmCnmMailsendCfg;
 extern const cm_omi_map_object_t CmCnmMailrecvCfg;
 extern const cm_omi_map_object_t CmCnmNascopyCfg;
 extern const cm_omi_map_object_t CmDomainUserCacheCfg;
+extern const cm_omi_map_object_t CmCnmRemoteClusterCfg;
 
 const cm_omi_map_object_t* CmOmiMap[CM_OMI_OBJECT_BUTT] =
 {
@@ -381,6 +382,7 @@ const cm_omi_map_object_t* CmOmiMap[CM_OMI_OBJECT_BUTT] =
 	&CmCnmMailrecvCfg,
 	&CmCnmNascopyCfg,
 	&CmDomainUserCacheCfg,
+	&CmCnmRemoteClusterCfg,
 };
 
 const cm_omi_map_cfg_t CmCnmMapCommErr[] =

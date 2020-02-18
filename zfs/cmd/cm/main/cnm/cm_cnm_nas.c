@@ -378,7 +378,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_BLOCKSIZE))
     {
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set recordsize=%uK %s/%s 2>&1",info->blocksize,info->pool,info->name);
         if(CM_OK != iRet)
         {
@@ -389,7 +389,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
 
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_ACCESS))
     {
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "chmod %u `zfs list -H -o mountpoint %s/%s 2>/dev/null` 2>/dev/null",
             info->access,info->pool,info->name);
         if(CM_OK != iRet)
@@ -406,7 +406,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
             CM_LOG_ERR(CM_MOD_CNM,"policy[%u]",info->write_policy);
             return CM_PARAM_ERR;
         }
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set origin:sync=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -419,7 +419,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_IS_COMP))
     {
         str = (CM_TRUE == info->is_compress)? "on" : "off";
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set compression=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -432,7 +432,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_QOS)
         && (g_cm_sys_ver != CM_SYS_VER_SOLARIS_V7R16))
     {
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set bandwidth=%s %s/%s 2>&1",
             info->qos_val,info->pool,info->name);
         if(CM_OK != iRet)
@@ -444,7 +444,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
 
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_QUOTA))
     {
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set quota=%s %s/%s 2>&1",
             info->quota,info->pool,info->name);
         if(CM_OK != iRet)
@@ -457,7 +457,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_DEDUP))
     {
         str = (CM_TRUE == info->dedup)? "on" : "off";
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set dedup=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -490,7 +490,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
                 str="off";
             }
         }
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             CM_SHELL_EXEC" cm_zfs_set %s/%s sharesmb %s 2>&1",
             info->pool,info->name, str);
         if(CM_OK != iRet)
@@ -508,7 +508,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_QOS_AVS)
         && (g_cm_sys_ver != CM_SYS_VER_SOLARIS_V7R16))
     {
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set nasavsbw=%s %s/%s 2>&1",
             info->qos_avs,info->pool,info->name);
         if(CM_OK != iRet)
@@ -521,7 +521,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     if(CM_OMI_FIELDS_FLAG_ISSET(set,CM_OMI_FIELD_NAS_ACLINHERIT))
     {
         str = cm_cnm_get_enum_str(&CmOmiMapAclInheritType,info->aclinherit);
-        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set aclinherit=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -548,7 +548,7 @@ sint32  cm_cnm_nas_local_create(
         return CM_PARAM_ERR;
     }
     info = (const cm_cnm_nas_info_t *)req->data;
-    iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+    iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
         "zfs create %s/%s 2>&1",info->pool,info->name);
     if(CM_OK != iRet)
     {
@@ -594,7 +594,7 @@ sint32 cm_cnm_nas_local_delete(
     info = (const cm_cnm_nas_info_t *)req->data;
     
     /* zfs destroy -rRf */
-    iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+    iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT_NEVER,
         "zfs destroy -rRf %s/%s 2>&1",info->pool,info->name);
     if(CM_OK != iRet)
     {

@@ -46,12 +46,12 @@ sint32 cm_cnm_lun_init(void)
     {
         case CM_SYS_VER_SOLARIS_V7R16:
             g_cm_cnm_lun_get_cmd = "zfs list -H -t volume -o "
-                "name,used,avail,volsize,volblocksize,"
+                "name,referenced,avail,volsize,volblocksize,"
                 "refreservation,compression,sync,appmeta,dedup";
             break;
         default:
             g_cm_cnm_lun_get_cmd = "zfs list -H -t volume -o "
-                "name,used,avail,volsize,volblocksize,"
+                "name,referenced,avail,volsize,volblocksize,"
                 "refreservation,compression,sync,appmeta,dedup,"
                 "zfs:single_data,thold";
             break;
@@ -844,11 +844,11 @@ static sint32 cm_cnm_lun_local_qos_update(cm_cnm_lun_param_t *req, const sint8* 
     
     if('\0' != info->qos_val[0])
     {
-        iRet = cm_system(pFormat,subcmd,stmfid,info->qos_val);
+        iRet = cm_system_no_tmout(pFormat,subcmd,stmfid,info->qos_val);
     }
     else
     {
-        iRet = cm_system(pFormat,subcmd,stmfid,"0");
+        iRet = cm_system_no_tmout(pFormat,subcmd,stmfid,"0");
     }
 
     if(CM_OK != iRet)
@@ -857,6 +857,55 @@ static sint32 cm_cnm_lun_local_qos_update(cm_cnm_lun_param_t *req, const sint8* 
         return iRet;
     }
     return CM_OK;
+}
+
+static uint64 cm_cnm_lun_volsize_tokb(const sint8* volsize,uint32 blocksize)
+{
+    double dval=atof(volsize);
+    sint32 len=strlen(volsize);
+    sint8 flag=0;
+    uint64 res=0;
+    if(len < 2)
+    {
+        return 0;
+    }
+    len--;
+    if((volsize[len]=='b') || (volsize[len]=='B'))
+    {
+        flag = volsize[len-1];
+    }
+    else
+    {
+        flag = volsize[len];
+    }
+    
+    switch(flag)
+    {
+        case 'p':
+        case 'P':
+            dval *=1024;
+        case 't':
+        case 'T':
+            dval *=1024;
+        case 'g':
+        case 'G':
+            dval *=1024;
+        case 'm':
+        case 'M':
+            dval *=1024;
+        case 'k':
+        case 'K':
+            break;
+        case 'b':
+        case 'B':
+            dval /=1024;
+            break;
+        default:
+            dval=0;
+            break;
+    }
+    res = (uint64)dval;
+    return res-(res%blocksize);
 }
 
 sint32 cm_cnm_lun_local_create(
@@ -869,7 +918,9 @@ sint32 cm_cnm_lun_local_create(
     sint8 id[CM_STRING_64] = {0};
     cm_cnm_lun_param_t *req = param;
     cm_cnm_lun_info_t *info = &req->info;
-
+    uint32 blocksize=128;
+    uint64 volsize = 0;
+    
     CM_LOG_WARNING(CM_MOD_CNM,"create %s/%s",info->pool,info->name);
     CM_SNPRINTF_ADD(buf,sizeof(buf),"zfs create");
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_SINGLE)
@@ -881,6 +932,7 @@ sint32 cm_cnm_lun_local_create(
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_BLOCKSIZE))
     {
         CM_SNPRINTF_ADD(buf,sizeof(buf)," -b %uK",info->blocksize);
+        blocksize = info->blocksize;
     }    
     
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_COMPRESS))
@@ -917,9 +969,18 @@ sint32 cm_cnm_lun_local_create(
         }
         CM_SNPRINTF_ADD(buf,sizeof(buf)," -o origin:sync=%s",policy);
     }
-    
-    CM_SNPRINTF_ADD(buf,sizeof(buf)," -V %s %s/%s 2>&1", info->space_total,info->pool,info->name);
-    iRet = cm_exec_cmd_for_str(buf,buf,sizeof(buf),CM_CMT_REQ_TMOUT);
+
+    /* begin for 8219 */
+    volsize = cm_cnm_lun_volsize_tokb(info->space_total, blocksize);
+    CM_LOG_WARNING(CM_MOD_CNM,"blocksize:%u volsize:%s = %lluK",
+        blocksize,info->space_total,volsize);
+    if(volsize == 0)
+    {
+        return CM_PARAM_ERR;
+    }
+    CM_SNPRINTF_ADD(buf,sizeof(buf)," -V %lluK %s/%s 2>&1", volsize,info->pool,info->name);
+    /* end for 8219 */
+    iRet = cm_exec_cmd_for_str(buf,buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER);
     if(CM_OK != iRet)
     {
         CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,buf);
@@ -929,7 +990,7 @@ sint32 cm_cnm_lun_local_create(
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_DEDUP))
     {
         const sint8* str = (CM_TRUE == info->dedup)? "on" : "off";
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set dedup=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -942,11 +1003,11 @@ sint32 cm_cnm_lun_local_create(
     {
         if(CM_TRUE == info->is_double)
         {
-            cm_system("zfs set zfs:single_data=0 %s/%s 2>/dev/null",info->pool,info->name);
+            cm_system_no_tmout("zfs set zfs:single_data=0 %s/%s 2>/dev/null",info->pool,info->name);
         }
         else
         {
-            cm_system("zfs set zfs:single_data=1 %s/%s 2>/dev/null",info->pool,info->name);
+            cm_system_no_tmout("zfs set zfs:single_data=1 %s/%s 2>/dev/null",info->pool,info->name);
         }
     }
 
@@ -957,7 +1018,7 @@ sint32 cm_cnm_lun_local_create(
     
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_ALARM_THRESHOLD))
     {
-        cm_system("zfs set thold=%u %s/%s 2>/dev/null",info->alarm_threshold,info->pool,info->name);
+        cm_system_no_tmout("zfs set thold=%u %s/%s 2>/dev/null",info->alarm_threshold,info->pool,info->name);
     }
     /* 设置失败也不用返回错误了 */
     iRet = cm_cnm_lun_local_get_stmfid(info->pool,info->name,id,sizeof(id));
@@ -991,7 +1052,7 @@ sint32 cm_cnm_lun_local_update(
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_COMPRESS))
     {
         str = (CM_TRUE == info->is_compress)? "on" : "off";
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set compression=%s %s/%s 2>&1",str,info->pool,info->name);
         if(CM_OK != iRet)
         {
@@ -1003,7 +1064,7 @@ sint32 cm_cnm_lun_local_update(
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_HOT))
     {
         str = (CM_TRUE == info->is_hot)? "on" : "off";
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set appmeta=%s %s/%s 2>&1",str,info->pool,info->name);
         if(CM_OK != iRet)
         {
@@ -1020,7 +1081,7 @@ sint32 cm_cnm_lun_local_update(
             CM_LOG_ERR(CM_MOD_CNM,"policy[%u]",info->write_policy);
             return CM_PARAM_ERR;
         }
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set origin:sync=%s %s/%s 2>&1",str,info->pool,info->name);
         if(CM_OK != iRet)
         {
@@ -1031,16 +1092,32 @@ sint32 cm_cnm_lun_local_update(
     
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_TOTAL))
     {
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
-            "stmfadm modify-lu -c -s %s %s 2>&1",info->space_total,id);
+        /* begin for 8219 */
+        uint32 blocksize=cm_exec_int("zfs get volblocksize %s/%s |sed -n 2p |awk '{print $3}'",
+            info->pool,info->name);
+        uint64 volsize = 0;
+        if(blocksize == 0)
+        {
+            blocksize=512;
+            CM_LOG_ERR(CM_MOD_CNM,"get %s/%s blocksize 0",info->pool,info->name);
+        }
+        volsize = cm_cnm_lun_volsize_tokb(info->space_total,blocksize);
+        if(volsize == 0)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"get %s/%s volsize 0",info->pool,info->name);
+            return CM_PARAM_ERR;
+        }
+        /* end for 8219 */
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
+            "stmfadm modify-lu -c -s %lluK %s 2>&1",volsize,id);
         if(CM_OK != iRet)
         {
             CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,buf);
             return cm_cnm_get_errcode(&CmCnmMapCommErrCfg,buf,iRet);
         }
         
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
-            "zfs set volsize=%s %s/%s 2>&1",info->space_total,info->pool,info->name);
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
+            "zfs set volsize=%lluK %s/%s 2>&1",volsize,info->pool,info->name);
         if(CM_OK != iRet)
         {
             CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,buf);
@@ -1051,7 +1128,7 @@ sint32 cm_cnm_lun_local_update(
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_DEDUP))
     {
         str = (CM_TRUE == info->dedup)? "on" : "off";
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set dedup=%s %s/%s 2>&1",
             str,info->pool,info->name);
         if(CM_OK != iRet)
@@ -1065,12 +1142,12 @@ sint32 cm_cnm_lun_local_update(
     {     
         if(CM_TRUE == info->is_double)
         {
-            iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+            iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
                 "zfs set zfs:single_data=0 %s/%s 2>/dev/null",info->pool,info->name);
         }
         else
         {
-            iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+            iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
                 "zfs set zfs:single_data=1 %s/%s 2>/dev/null",info->pool,info->name);
         }
         if(CM_OK != iRet)
@@ -1087,7 +1164,7 @@ sint32 cm_cnm_lun_local_update(
     
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_ALARM_THRESHOLD))
     {
-        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+        iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
             "zfs set thold=%u %s/%s 2>&1",info->alarm_threshold,info->pool,info->name);
         if(CM_OK != iRet)
         {
@@ -1114,7 +1191,7 @@ sint32 cm_cnm_lun_local_delete(
     info = &req->info;
 
     CM_LOG_WARNING(CM_MOD_CNM,"%s/%s",info->pool,info->name); 
-    iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT,
+    iRet = cm_exec_tmout(buf,sizeof(buf),CM_CMT_REQ_TMOUT_NEVER,
         CM_SHELL_EXEC" cm_lun_delete %s %s 2>&1",info->pool,info->name);
     if(CM_OK != iRet)
     {

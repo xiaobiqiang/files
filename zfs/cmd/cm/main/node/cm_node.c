@@ -231,6 +231,16 @@ uint32 cm_node_get_sbbid(void)
 
 uint32 cm_node_get_master(void)
 {
+    if(CM_NODE_ID_NONE != g_CmMasterId)
+    {
+        return g_CmMasterId;
+    }
+    
+    if(2 == cm_node_count())
+    {
+        return cm_node_get_id();
+    }
+    
     return g_CmMasterId;
 }
 
@@ -243,6 +253,16 @@ uint32 cm_node_get_submaster(uint32 SubDomainId)
        CM_LOG_INFO(CM_MOD_NODE,"SubDomain[%u] not found", SubDomainId); 
        return CM_NODE_ID_NONE;
     }
+    if(CM_NODE_ID_NONE != pinfo->submaster_id)
+    {
+        return pinfo->submaster_id;
+    }
+
+    if(2 == cm_node_subcount(SubDomainId))
+    {
+        return cm_node_get_id();
+    }
+    
     return pinfo->submaster_id;
 }
 
@@ -1288,6 +1308,17 @@ sint32 cm_node_add(const sint8* ipaddr, uint32 sbbid)
         CM_LOG_ERR(CM_MOD_NODE,"ip %s self",ipaddr);
         return CM_PARAM_ERR;
     }
+    CM_MEM_ZERO(&NodeInfo,sizeof(NodeInfo));
+    NodeInfo.id = cm_ipaddr_to_nid(ipaddr);
+    CM_VSPRINTF(NodeInfo.ip_addr,sizeof(NodeInfo.ip_addr),"%s",ipaddr);
+    
+    iRet = cm_exec_int("sqlite3 "CM_NODE_DB_FILE
+        " \'SELECT COUNT(id) FROM record_t WHERE id=%u\'", NodeInfo.id);
+    if(0 != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_NODE,"ipaddr[%s] already in current[%d]",ipaddr,iRet);
+        return CM_OK;
+    }
     
     /* 检查节点连通性 */
     if(CM_OK != cm_cnm_exec_ping(ipaddr))
@@ -1295,9 +1326,6 @@ sint32 cm_node_add(const sint8* ipaddr, uint32 sbbid)
         CM_LOG_ERR(CM_MOD_NODE,"ping %s fail",ipaddr);
         return CM_ERR_CONN_FAIL;
     }
-    CM_MEM_ZERO(&NodeInfo,sizeof(NodeInfo));
-    NodeInfo.id = cm_ipaddr_to_nid(ipaddr);
-    CM_VSPRINTF(NodeInfo.ip_addr,sizeof(NodeInfo.ip_addr),"%s",ipaddr);
     
     /* 获取主机名 和 ID */
     iRet = cm_exec_tmout(buff,sizeof(buff),5,
@@ -1453,4 +1481,18 @@ const sint8* cm_node_getversion(void)
 {
     return g_CmNodeInfoLocal.version;
 }
+
+uint32 cm_node_count(void)
+{
+    return (uint32)cm_exec_int("sqlite3 "CM_NODE_DB_FILE
+        " 'SELECT COUNT(id) FROM record_t'");
+}
+
+uint32 cm_node_subcount(uint32 SubDomainId)
+{
+    return (uint32)cm_exec_int("sqlite3 "CM_NODE_DB_FILE
+        " 'SELECT COUNT(id) FROM record_t WHERE subdomain=%u'",SubDomainId);
+}
+
+
 

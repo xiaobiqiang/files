@@ -102,3 +102,75 @@ const cm_omi_map_object_t CmCnmClusterCfg =
     CmOmiMapClusterCmds
 };
 
+
+const cm_omi_map_object_field_t CmOmiMapRemoteClusterFields[] =
+{
+    {{"ip", CM_OMI_FIELD_REMOTECLUSTER_IP}, "-ip",{CM_OMI_DATA_STRING, CM_IP_LEN, {IP_FORMAT}}},
+    {{"nid", CM_OMI_FIELD_REMOTECLUSTER_NID}, "-nid",{CM_OMI_DATA_INT, 4, {NULL}}},
+    {{"name", CM_OMI_FIELD_REMOTECLUSTER_NAME}, "-name",{CM_OMI_DATA_STRING, 256, {NULL}}},
+};
+
+
+const cm_omi_map_object_field_t* CmOmiMapRemoteClusterCmdParamsGetBatch[]=
+{
+    &CmOmiMapCommFields[1], /*offset*/
+    &CmOmiMapCommFields[2], /*total*/
+};
+
+const cm_omi_map_object_field_t* CmOmiMapRemoteClusterCmdParamsAdd[]=
+{
+    &CmOmiMapRemoteClusterFields[CM_OMI_FIELD_REMOTECLUSTER_IP], /*IP*/
+    &CmOmiMapRemoteClusterFields[CM_OMI_FIELD_REMOTECLUSTER_NAME], /*IP*/
+};
+
+
+const cm_omi_map_object_cmd_t CmOmiMapRemoteClusterCmds[] =
+{
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
+        0,
+        NULL,
+        2,
+        CmOmiMapRemoteClusterCmdParamsGetBatch,
+    },
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_COUNT],
+        0,
+        NULL,
+        0,
+        NULL,
+    },  
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_ADD],
+        2,
+        CmOmiMapRemoteClusterCmdParamsAdd,
+        0,
+        NULL,
+    },
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_DELETE],
+        1,
+        CmOmiMapRemoteClusterCmdParamsAdd,
+        0,
+        NULL,
+    },  
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_MODIFY],
+        2,
+        CmOmiMapRemoteClusterCmdParamsAdd,
+        0,
+        NULL,
+    },  
+};
+
+
+const cm_omi_map_object_t CmCnmRemoteClusterCfg =
+{
+    {"remote_cluster", CM_OMI_OBJECT_REMOTE_CLUSTER},
+    sizeof(CmOmiMapRemoteClusterFields)/sizeof(cm_omi_map_object_field_t),
+    CmOmiMapRemoteClusterFields,
+    sizeof(CmOmiMapRemoteClusterCmds)/sizeof(cm_omi_map_object_cmd_t),
+    CmOmiMapRemoteClusterCmds
+};
+
+

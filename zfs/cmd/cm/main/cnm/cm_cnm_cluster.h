@@ -44,4 +44,28 @@ cm_omi_obj_t cm_cnm_cluster_stat_encode(const void *pDecodeParam, void *pAckData
 extern sint32 cm_cnm_cluster_stat_sync_request(uint64 data_id, void *pdata, uint32 
 len);
 
+
+extern sint32 cm_cnm_cluster_remote_init(void);
+
+extern sint32 cm_cnm_cluster_remote_decode(const cm_omi_obj_t ObjParam, void **ppDecodeParam);
+extern cm_omi_obj_t cm_cnm_cluster_remote_encode(const void *pDecodeParam, void *pAckData, uint32 AckLen);
+
+extern sint32 cm_cnm_cluster_remote_getbatch(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_cluster_remote_count(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_cluster_remote_insert(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_cluster_remote_delete(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_cluster_remote_update(const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
+
+extern sint32 cm_cnm_cluster_remote_sync_request(uint64 data_id, void *pdata, uint32 
+len);
+
+extern sint32 cm_cnm_cluster_remote_sync_get(uint64 data_id, void **pdata, uint32 
+*plen);
+
+extern sint32 cm_cnm_cluster_remote_sync_delete(uint64 data_id);
+
 #endif /* MAIN_CNM_CM_CNM_CLUSTER_H_ */

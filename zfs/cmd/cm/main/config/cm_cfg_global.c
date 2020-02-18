@@ -42,6 +42,7 @@
 #include "cm_cnm_dirquota.h"
 #include "cm_cnm_topo_power.h"
 #include "cm_cnm_expansion_cabinet.h"
+#include "cm_cnm_cluster.h"
 
 
 extern sint32 cm_cnm_cluster_stat_sync_request(uint64 data_id, void *pdata, uint32 
@@ -223,6 +224,14 @@ const cm_sync_config_t g_cm_sync_config[CM_SYNC_OBJ_BUTT] =
         cm_cnm_mailrecv_sync_request,
         cm_cnm_mailrecv_sync_get,
         cm_cnm_mailrecv_sync_delete,
+    },
+
+    {
+        CM_SYNC_OBJ_REMOTE_CLUSTER,
+        CM_SYNC_FLAG_ALWAYLS,
+        cm_cnm_cluster_remote_sync_request,
+        cm_cnm_cluster_remote_sync_get,
+        cm_cnm_cluster_remote_sync_delete,
     },
 };
 

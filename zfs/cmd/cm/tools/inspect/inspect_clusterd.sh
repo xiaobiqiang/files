@@ -28,7 +28,7 @@ function clusterd_node()
 {
     local result=$INSPECT_OK
     local localhost=`hostname`
-    local arrays=($(zfs clustersan list-host -sfp|egrep 'hostname|link'|awk 'NR>1{print}'|awk -F':' '{print $2}'))
+    local arrays=($(zfs clustersan list-host -sfp|egrep 'hostname|    state'|awk 'NR>1{print}'|awk -F':' '{print $2}'))
     local cols=${#arrays[@]}
     #开始
     INSPECT_START ${FUNCNAME}

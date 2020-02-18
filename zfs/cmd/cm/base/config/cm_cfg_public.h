@@ -64,7 +64,7 @@
 
 #define CM_RPC_CLIENT_LIST_MAX 64
 
-#define CM_RPC_MAX_MSG_LEN 8192
+#define CM_RPC_MAX_MSG_LEN 32678
 
 #define CM_RPC_SERVER_PORT 5588
 
@@ -107,6 +107,8 @@
 #define CM_HOURS_OF_DAY 24
 
 #define CM_CMT_REQ_TMOUT 20
+#define CM_CMT_REQ_TMOUT_NEVER 0
+
 
  typedef enum
 {

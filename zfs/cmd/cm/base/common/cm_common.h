@@ -54,6 +54,8 @@ extern double cm_exec_double(const sint8* cmdforamt,...);
 extern sint32 cm_exec_int(const sint8* cmdforamt,...);
 
 #define cm_system(...)  cm_system_in(CM_CMT_REQ_TMOUT,__VA_ARGS__)
+#define cm_system_no_tmout(...)  cm_system_in(CM_CMT_REQ_TMOUT_NEVER,__VA_ARGS__)
+
 
 extern bool_t cm_file_exist(const sint8* filename);
 

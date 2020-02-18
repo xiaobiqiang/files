@@ -46,6 +46,8 @@ typedef enum
     CM_SYNC_OBJ_LOWDATA_VOLUME,
     CM_SYNC_OBJ_MAILSEND,
     CM_SYNC_OBJ_MAILRECV,
+
+    CM_SYNC_OBJ_REMOTE_CLUSTER,
     
     CM_SYNC_OBJ_BUTT
 } cm_sync_obj_e;

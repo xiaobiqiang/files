@@ -2144,6 +2144,40 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmUcache[] =
     },
 };
 
+const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmRemoteCluster[] =
+{
+    /* getbatch */
+    {
+        CM_OMI_CMD_GET_BATCH, CM_OMI_PERMISSION_ALL,
+        cm_cnm_cluster_remote_decode, cm_cnm_cluster_remote_getbatch, cm_cnm_cluster_remote_encode
+    },
+   
+    /* count */
+    {
+        CM_OMI_CMD_COUNT, CM_OMI_PERMISSION_ALL,
+        cm_cnm_cluster_remote_decode, cm_cnm_cluster_remote_count, cm_omi_encode_count,
+        NULL
+    },
+
+    {
+        CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
+        cm_cnm_cluster_remote_decode, cm_cnm_cluster_remote_insert, NULL,
+        NULL
+    },
+
+    {
+        CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
+        cm_cnm_cluster_remote_decode, cm_cnm_cluster_remote_delete, NULL,
+        NULL
+    },
+    {
+        CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
+        cm_cnm_cluster_remote_decode, cm_cnm_cluster_remote_update, NULL,
+        NULL
+    },
+};
+
+
 
 #define CM_OMI_OBJ_CFG(id,cfg,init) \
     {(id),sizeof(cfg)/sizeof(cm_omi_object_cmd_cfg_t),(cfg),(init)}
@@ -2282,7 +2316,8 @@ const cm_omi_object_cfg_t g_CmOmiObjectCfg[CM_OMI_OBJECT_BUTT] =
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_NASCOPY,g_CmOmiObjectCfgCnmNascopy,cm_cnm_nas_copy_init),
 	
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_UCACHE,g_CmOmiObjectCfgCnmUcache,NULL),
-	
+
+	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_REMOTE_CLUSTER, g_CmOmiObjectCfgCnmRemoteCluster, cm_cnm_cluster_remote_init),
   /*mem*/
 
 };
