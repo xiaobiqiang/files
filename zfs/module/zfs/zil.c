@@ -42,6 +42,7 @@
 #include <sys/metaslab.h>
 #include <sys/trace_zil.h>
 #include <sys/zfs_mirror.h>
+#include <sys/dsl_dir.h>
 
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
