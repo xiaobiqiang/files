@@ -840,7 +840,8 @@ zvol_write(struct bio *bio)
 		repeat = dmu_check_mirror_repeat_data(zv->zv_objset, offset, size);
 		dmu_mirror_unlock();
 		if (repeat) {
-			cmn_err(CE_WARN, "%s line %d, mirror data write wait...", __func__, __LINE__);
+			cmn_err(CE_WARN, "%s line %d, %s mirror data write wait...", 
+				__func__, __LINE__, zv->zv_name);
 			zvol_mirror_replay_wait((void *)zv);
 		}
 	}
@@ -946,7 +947,8 @@ zvol_read(struct bio *bio)
 		repeat = dmu_check_mirror_repeat_data(zv->zv_objset, offset, len);
 		dmu_mirror_unlock();
 		if (repeat) {
-			cmn_err(CE_WARN, "%s line %d, mirror data write wait...", __func__, __LINE__);
+			cmn_err(CE_WARN, "%s line %d, %s mirror data write wait...", 
+				__func__, __LINE__, zv->zv_name);
 			zvol_mirror_replay_wait((void *)zv);
 		}
 	}
@@ -2647,6 +2649,7 @@ zvol_free_mirror(objset_t *os)
 {
 	mirror_tree_t *cur;
 	uint64_t spa_id, os_id, hash_key;
+	char *name;
 
 	if (NULL == g_mirror_data)
 		return;
@@ -2654,6 +2657,7 @@ zvol_free_mirror(objset_t *os)
 	spa_id = spa_guid(os->os_spa);
 	os_id = os->os_dsl_dataset->ds_object;
 	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+	name = os->os_dsl_dataset->ds_dir->dd_myname;
 
 	for (cur = list_head(&g_mirror_data->mirror_data_list); NULL != cur;
 		cur = list_next(&g_mirror_data->mirror_data_list, cur)) {
@@ -2667,7 +2671,8 @@ zvol_free_mirror(objset_t *os)
 	}
 
 	if (g_mirror_data->list_num <= 0) {
-		cmn_err(CE_WARN, "%s line %d mirror g_mirror_data free.", __func__, __LINE__);
+		cmn_err(CE_WARN, "%s line %d %s mirror g_mirror_data free.", 
+			__func__, __LINE__, name);
 		list_destroy(&g_mirror_data->mirror_data_list);
 		kmem_free(g_mirror_data, sizeof(mirror_lun_list_t));
 		g_mirror_data = NULL;

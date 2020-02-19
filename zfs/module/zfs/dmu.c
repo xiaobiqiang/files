@@ -2722,8 +2722,8 @@ dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
 {
 	dnode_t *mdn;
 	int result = B_FALSE;
-	zil_data_record_t *data_record;
 	mirror_tree_t *mirror_record;
+	mirror_tree_data_t *mirror_data;
 	uint64_t spa_id, os_id, hash_key;
 
 	if ((NULL == g_mirror_data) || (NULL == &g_mirror_data->mirror_data_list)) {
@@ -2734,7 +2734,7 @@ dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
 	mdn = DMU_META_DNODE(os);
 	ASSERT(mdn->dn_object == DMU_META_DNODE_OBJECT);
 
-	mirror_tree_data_t *mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+	mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
 	bzero(mirror_data, sizeof(mirror_tree_data_t));
 
 	mirror_record = list_head(&g_mirror_data->mirror_data_list);

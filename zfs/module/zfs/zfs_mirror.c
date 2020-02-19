@@ -34,7 +34,7 @@
 #include <sys/cluster_san.h>
 #include <sys/zil_impl.h>
 
-static int zfs_mirror_performace_flag = B_FALSE;
+static int zfs_mirror_performace_flag = 1;
 
 /* DEBUG */
 int debug_msg = 0;

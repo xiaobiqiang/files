@@ -2468,7 +2468,10 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
     zil_data_record_t *data_record;
 	uint64_t data_addr, data_len;
 	int err;
-	
+	char *name;
+
+	name = os->os_dsl_dataset->ds_dir->dd_myname;
+	cmn_err(CE_NOTE, "%s line %d %s start replay all data!", __func__, __LINE__, name);
     while (data_record = list_head(&os->os_zil_list)) {
         list_remove(&os->os_zil_list, data_record);
         if (data_record->data_type == R_DISK_DATA) {
@@ -2487,8 +2490,8 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
 			data_len = header->len;
             err = zfs_replay_cache_data(os, (zfs_mirror_cache_data_t *)data_record->data);
 			if (err)
-				cmn_err(CE_WARN, "%s %d zfs replay cache data failed, err: %d",
-					__func__, __LINE__, err);
+				cmn_err(CE_WARN, "%s line %d %s zfs replay cache data failed, err: %d",
+					__func__, __LINE__, name, err);
         }
 
 		if (bmdata) {
@@ -2499,7 +2502,7 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
 
         kmem_free(data_record, sizeof(zil_data_record_t));
     }
-	cmn_err(CE_WARN, "%s, %d, finished replay all data!", __func__, __LINE__);
+	cmn_err(CE_WARN, "%s line %d %s finished replay all data!", __func__, __LINE__, name);
 }
 
 #endif

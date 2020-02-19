@@ -993,15 +993,16 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	if (flag) {
 		dnode_t *mdn;
 		int check_result;
+		objset_t *os;
 		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		
 		mdn = DB_DNODE(db);
-
-		objset_t *os = mdn->dn_objset;
+		os = mdn->dn_objset;
 		dmu_mirror_lock(RW_READER);
 		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
 		dmu_mirror_unlock();
 		if (check_result) {
-			cmn_err(CE_WARN, "%s line %d mirror read wait", __func__, __LINE__);
+			cmn_err(CE_WARN, "%s line %d %s mirror read wait", __func__, __LINE__, sl->sl_name);
 			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
 		}
 	}
@@ -1897,15 +1898,16 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 	if (flag) {
 		dnode_t *mdn;
 		int check_result;
+		objset_t *os;
 		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		
 		mdn = DB_DNODE(db);
-
-		objset_t *os = mdn->dn_objset;
+		os = mdn->dn_objset;
 		dmu_mirror_lock(RW_READER);
 		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
 		dmu_mirror_unlock();
 		if (check_result) {
-			cmn_err(CE_WARN, "%s line %d mirror write wait", __func__, __LINE__);
+			cmn_err(CE_WARN, "%s line %d %s mirror write wait", __func__, __LINE__, sl->sl_name);
 			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
 		}
 	}

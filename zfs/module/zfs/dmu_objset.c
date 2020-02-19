@@ -2687,16 +2687,16 @@ void dmu_mirror_data(objset_t *os, kcondvar_t *zv_cp, uint8_t *zv_cp_state, int 
 
 	strcat(lun, os->os_spa->spa_name);
 	strcat(lun, os->os_dsl_dataset->ds_dir->dd_myname);
+	cmn_err(CE_WARN, "%s line %d mirror copy start, name=%s", __func__, __LINE__, lun);
 
 	if (NULL != list_head(&os->os_zil_list)) {
-		cmn_err(CE_WARN, "%s line %d mirror copy start, name=%s", __func__, __LINE__, lun);
 		dmu_mirror_lock(RW_WRITER);
 		if (NULL == g_mirror_data) {
 			g_mirror_data = kmem_alloc(sizeof(mirror_lun_list_t), KM_SLEEP);
 	
 			list_create(&g_mirror_data->mirror_data_list, sizeof(mirror_tree_t), offsetof(mirror_tree_t, data_node));
 			g_mirror_data->list_num = 0;
-			cmn_err(CE_WARN, "%s line %d mirror alloc success", __func__, __LINE__);
+			cmn_err(CE_WARN, "%s line %d mirror alloc success, name=%s", __func__, __LINE__, lun);
 		}
 
 		record = kmem_alloc(sizeof(mirror_tree_t), KM_SLEEP);
@@ -2723,7 +2723,7 @@ void dmu_mirror_data(objset_t *os, kcondvar_t *zv_cp, uint8_t *zv_cp_state, int 
 	}
 
 	if (NULL != zv_cp) {
-		cmn_err(CE_WARN, "%s line %d replay mirror copye end", __func__, __LINE__);
+		cmn_err(CE_WARN, "%s line %d replay mirror copy end, name=%s", __func__, __LINE__, lun);
 		*zv_cp_state = ZVOL_COPYED;
 		cv_broadcast(zv_cp); 
 	}
