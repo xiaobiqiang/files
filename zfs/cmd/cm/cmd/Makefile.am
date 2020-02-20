@@ -20,9 +20,9 @@ AM_CPPFLAGS = \
 	-I$(top)/cmd \
 	-I$(top)/cmd/config
 ceres_cmd_SOURCES = \
-	./cm_cmd_client.c \
-	./cm_main_cmd.c 
+	./cm_main_cmd.c \
+	./cm_cmd_client.c 
 ceres_cmd_LDADD = \
 	$(top)/base/libcmbase.la
-ceres_cmd_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
 

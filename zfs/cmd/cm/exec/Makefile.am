@@ -23,5 +23,5 @@ ceres_exec_SOURCES = \
 	./cm_main_exec.c 
 ceres_exec_LDADD = \
 	$(top)/base/libcmbase.la
-ceres_exec_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
 

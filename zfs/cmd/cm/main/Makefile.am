@@ -30,51 +30,51 @@ AM_CPPFLAGS = \
 	-I$(top)/main/sync \
 	-I$(top)/main/task
 ceres_cm_SOURCES = \
-	./alarm/cm_alarm.c \
 	./cmd/cm_cmd_server.c \
+	./node/cm_node.c \
 	./cm_main.c \
-	./cnm/cm_cnm_admin.c \
-	./cnm/cm_cnm_aggr.c \
-	./cnm/cm_cnm_alarm.c \
-	./cnm/cm_cnm_cluster.c \
-	./cnm/cm_cnm_clusternas.c \
-	./cnm/cm_cnm_common.c \
-	./cnm/cm_cnm_demo.c \
-	./cnm/cm_cnm_dirquota.c \
-	./cnm/cm_cnm_disk.c \
-	./cnm/cm_cnm_dnsm.c \
-	./cnm/cm_cnm_duallive.c \
-	./cnm/cm_cnm_expansion_cabinet.c \
-	./cnm/cm_cnm_migrate.c \
-	./cnm/cm_cnm_nas.c \
-	./cnm/cm_cnm_node.c \
-	./cnm/cm_cnm_phys.c \
-	./cnm/cm_cnm_pmm.c \
-	./cnm/cm_cnm_pmm_lun.c \
-	./cnm/cm_cnm_pool.c \
-	./cnm/cm_cnm_quota.c \
-	./cnm/cm_cnm_san.c \
-	./cnm/cm_cnm_snapshot.c \
-	./cnm/cm_cnm_snapshot_backup.c \
-	./cnm/cm_cnm_snapshot_clone.c \
-	./cnm/cm_cnm_systime.c \
-	./cnm/cm_cnm_task_manager.c \
-	./cnm/cm_cnm_topo_power.c \
-	./cnm/cm_cnm_user.c \
+	./task/cm_task.c \
+	./htbt/cm_htbt.c \
+	./alarm/cm_alarm.c \
 	./config/cm_cfg_global.c \
 	./config/cm_cfg_omi.c \
-	./htbt/cm_htbt.c \
-	./node/cm_node.c \
-	./pmm/cm_pmm.c \
+	./pmm/cm_pmm_node.c \
 	./pmm/cm_pmm_cluster.c \
 	./pmm/cm_pmm_common.c \
-	./pmm/cm_pmm_node.c \
 	./pmm/cm_pmm_pool.c \
+	./pmm/cm_pmm.c \
 	./sche/cm_sche.c \
-	./sync/cm_sync.c \
-	./task/cm_task.c 
+	./cnm/cm_cnm_pmm.c \
+	./cnm/cm_cnm_phys.c \
+	./cnm/cm_cnm_snapshot_clone.c \
+	./cnm/cm_cnm_nas.c \
+	./cnm/cm_cnm_node.c \
+	./cnm/cm_cnm_migrate.c \
+	./cnm/cm_cnm_aggr.c \
+	./cnm/cm_cnm_common.c \
+	./cnm/cm_cnm_dnsm.c \
+	./cnm/cm_cnm_quota.c \
+	./cnm/cm_cnm_topo_power.c \
+	./cnm/cm_cnm_systime.c \
+	./cnm/cm_cnm_snapshot.c \
+	./cnm/cm_cnm_pool.c \
+	./cnm/cm_cnm_clusternas.c \
+	./cnm/cm_cnm_duallive.c \
+	./cnm/cm_cnm_pmm_lun.c \
+	./cnm/cm_cnm_expansion_cabinet.c \
+	./cnm/cm_cnm_alarm.c \
+	./cnm/cm_cnm_cluster.c \
+	./cnm/cm_cnm_admin.c \
+	./cnm/cm_cnm_demo.c \
+	./cnm/cm_cnm_san.c \
+	./cnm/cm_cnm_snapshot_backup.c \
+	./cnm/cm_cnm_task_manager.c \
+	./cnm/cm_cnm_user.c \
+	./cnm/cm_cnm_dirquota.c \
+	./cnm/cm_cnm_disk.c \
+	./sync/cm_sync.c 
 ceres_cm_LDADD = \
 	$(top)/config/libcfg.la \
 	$(top)/base/libcmbase.la
-ceres_cm_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_cm_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
 

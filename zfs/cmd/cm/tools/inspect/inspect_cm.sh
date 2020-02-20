@@ -12,13 +12,27 @@ function cm_rootdir()
     INSPECT_START ${FUNCNAME}
     
     #执行相关检查，并设置巡检结果
-    df -h |awk '(($6=="/")||($6=="/root")||($6=="/etc")||($6=="/gui")||($6=="/var")){print $6" "$5}' |sed 's/%//g' |while read line
+    #df -h |awk '(($6=="/")||($6=="/root")||($6=="/etc")||($6=="/gui")||($6=="/var")){print $6" "$5}' |sed 's/%//g' |while read line
+    #do
+    #    local info=($line)
+    #    local rate=${line[1]}
+    #    printf "%-10s %10s%%\n" ${line[0]} ${line[1]}
+    #    ((rate=$rate+0))
+    #    if [ $rate -ge ${DEFAULT_DIRRATE} ]; then
+    #        result=$INSPECT_FAIL
+    #    fi
+    #done
+
+    local arrays=($(df -h |awk '(($6=="/")||($6=="/root")||($6=="/etc")||($6=="/gui")||($6=="/var")){print $6" "$5}'|sed 's/%//g'))
+    local cols=${#arrays[@]}
+
+    for (( i=0; i<$cols; i=i+2 ))
     do
-        local info=($line)
-        local rate=${line[1]}
-        printf "%-10s %10s%%\n" ${line[0]} ${line[1]}
-        ((rate=$rate+0))
-        if [ $rate -ge ${DEFAULT_DIRRATE} ]; then
+        local j=i
+        local name=${arrays[j]}
+        local rate=${arrays[((j=$j+1))]}
+        printf "%-10s %10s%%\n" $name $rate
+        if [ $rate -ge $DEFAULT_DIRRATE ]; then
             result=$INSPECT_FAIL
         fi
     done

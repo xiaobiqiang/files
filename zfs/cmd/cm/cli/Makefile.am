@@ -26,5 +26,5 @@ ceres_cli_SOURCES = \
 ceres_cli_LDADD = \
 	$(top)/config/libcfg.la \
 	$(top)/base/libcmbase.la
-ceres_cli_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_cli_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
 

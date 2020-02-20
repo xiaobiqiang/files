@@ -62,6 +62,13 @@ EOF
 		;;
 		jni)
 		echo "	-I\$(top)/config \\">>$amdir
+		find /usr/lib/jvm -name "*jni*" | while read line
+		do
+			jnidir=`echo $line|sed "s/jni.h//g"|sed "s/jni_md.h//g"`
+			if [ -d $jnidir ]; then
+				echo "	-I$jnidir \\">>$am
+			fi
+		done
 		;;
 		*)
 		;;
@@ -99,10 +106,11 @@ function make_am_open()
 			echo "	${arrays[i]} \\" >>$am
 		fi
 	done
-	echo "\$(shell cp .libs/libcmopensrc.so /usr/local/lib)" >> $am
-	echo "\$(shell cp .libs/libcmopensrc.so.0 /usr/local/lib)" >> $am
-	echo "\$(shell cp .libs/libcmopensrc.so.0.0.0 /usr/local/lib)" >> $am
 	cd $BUILD_DIR
+    
+cat >> $am <<EOF
+libcmopensrc_la_CFLAGS = -std=gnu99 -lpthread -ldl
+EOF
 }
 
 function make_am_base()
@@ -155,7 +163,7 @@ cat >> $am <<EOF
 ceres_cli_LDADD = \\
 	\$(top)/config/libcfg.la \\
 	\$(top)/base/libcmbase.la
-ceres_cli_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cli_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 }
@@ -186,7 +194,7 @@ function make_am_cmd()
 cat >> $am <<EOF
 ceres_cmd_LDADD = \\
 	\$(top)/base/libcmbase.la
-ceres_cmd_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
@@ -241,7 +249,7 @@ function make_am_exec()
 cat >> $am <<EOF
 ceres_exec_LDADD = \\
 	\$(top)/base/libcmbase.la
-ceres_exec_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
@@ -274,7 +282,7 @@ cat >> $am <<EOF
 ceres_cm_LDADD = \\
 	\$(top)/config/libcfg.la \\
 	\$(top)/base/libcmbase.la
-ceres_cm_CFLAGS = -std=c99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cm_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
@@ -294,15 +302,14 @@ function make_am_jni()
 	((col=$cols-1))
 	for (( i=0; i<$cols; i=i+1 ))
 	do
-		if [ $i -eq $col ]; then
-			echo "	${arrays[i]} " >>$am
-		else
-			echo "	${arrays[i]} \\" >>$am
-		fi
+		echo "	${arrays[i]} \\" >>$am
 	done
 	cd $BUILD_DIR
 	
+	carrays=($(du -a ../config|grep '\.c'|awk '{print $2}'))
+	barrays=($(du -a ../base|grep '\.c'|awk '{print $2}'))
 	arrays=($(du -a ../opensrc/json/|grep '\.c'|awk '{print $2}'))
+	arrays=(${barrays[*]} ${carrays[*]} ${arrays[*]})
 	cols=${#arrays[@]}
 	((col=$cols-1))
 	for (( i=0; i<$cols; i=i+1 ))
@@ -318,7 +325,7 @@ cat >> $am <<EOF
 libcmjni_LDADD = \\
 	\$(top)/config/libcfg.la \\
 	\$(top)/base/libcmbase.la
-
+libcmjni_la_CFLAGS = -std=gnu99 -lpthread -ldl
 EOF
 
 }
