@@ -1906,12 +1906,17 @@ zvol_create_minor_impl(const char *name)
 	replay_arg->zv = zv;
 	replay_arg->bmdata = bmdata;
 
+	cmn_err(CE_NOTE, "%s %d %s start zvol_objset_replay_all_cache thread",
+		__func__, __LINE__, name);
 	replay_th = thread_create(NULL, 0,
 		zvol_objset_replay_all_cache, (void*)replay_arg,
 		0, &p0, TS_RUN, minclsyspri);
 	
-	if (replay_th == NULL)
+	if (replay_th == NULL) {
+		cmn_err(CE_NOTE, "%s %d %s start failed, invoke directly",
+			__func__, __LINE__, name);
 		zvol_objset_replay_all_cache((void*)replay_arg);
+	}
 
 	if (bmdata) {
 		spa_t *spa = dmu_objset_spa(zv->zv_objset);

@@ -2601,45 +2601,42 @@ dmu_fsname(const char *snapname, char *buf)
 int
 mirror_compare(const void *x1, const void *x2)
 {
-	mirror_tree_data_t *comp_mirror_data = (mirror_tree_data_t *)x1;
-	mirror_tree_data_t *base_mirror_data = (mirror_tree_data_t *)x2;
+	mirror_tree_data_t *data1 = (mirror_tree_data_t *)x1;
+	mirror_tree_data_t *data2 = (mirror_tree_data_t *)x2;
+	uint64_t data1_s = data1->start_addr;
+	uint64_t data1_e = data1->start_addr + data1->data_len;
+	uint64_t data2_s = data2->start_addr;
+	uint64_t data2_e = data2->start_addr + data2->data_len;
+	uint8_t type = data1->type;
 
-	uint64_t base_start = base_mirror_data->start_addr;
-	uint64_t base_end = base_start + base_mirror_data->data_len;
-	uint64_t comp_start = comp_mirror_data->start_addr;
-	uint64_t comp_end = comp_start + comp_mirror_data->data_len;
-	uint8_t type = comp_mirror_data->type;
+	VERIFY(data1_s < data1_e);
+	VERIFY(data2_s < data2_e);
 
 	// check
 	if (0 == type) {
-		if (base_end < comp_start)
-			return 1;
-		if (base_start > comp_end)
-			return -1;
-
-		if ((comp_start >= base_start && comp_start < base_end)
-			|| (comp_end > base_start && comp_end <= base_end)
-			|| (comp_start <= base_start && comp_end >= base_end))
-			return 0;
+		if (data1_e <= data2_s)
+			return (-1);
+		else if (data1_s >= data2_e)
+			return (1);
+		else
+			return (0);
+	} else {
+		// find for remove
+		VERIFY(type == 1);
+		
+		if (data1_s < data2_s)
+			return (-1);
+		else if (data1_s > data2_s)
+			return (1);
+		else {
+			if (data1_e < data2_e)
+				return (-1);
+			else if (data1_e > data2_e)
+				return (1);
+			else
+				return (0);
+		}
 	}
-
-	//find for remove
-	if (1 == type) {
-		if (base_end < comp_start)
-			return 1;
-		else if (base_start > comp_end)
-			return -1;
-		else if (base_start < comp_start && base_end > comp_start)
-			return 1;
-		else if (base_start > comp_start && base_start < comp_end)
-			return -1;
-		else if (base_start == comp_start && base_end == comp_end)
-			return 0;
-
-		return -2;
-	}
-
-	return -2;
 }
 
 void dmu_mirror_add_tree(mirror_tree_t *record)
