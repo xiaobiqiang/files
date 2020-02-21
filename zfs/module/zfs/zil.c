@@ -42,6 +42,7 @@
 #include <sys/metaslab.h>
 #include <sys/trace_zil.h>
 #include <sys/zfs_mirror.h>
+#include <sys/dsl_dir.h>
 
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
@@ -2421,6 +2422,7 @@ zil_remove_mirror_data(objset_t *os, uint64_t data_addr, uint64_t data_len)
 	mirror_tree_t *cur;
 	avl_index_t where;
 	dnode_t *mdn;
+	mirror_tree_data_t *mirror_data;
 	void *data;
 	uint64_t spa_id, os_id, hash_key;
 
@@ -2432,7 +2434,7 @@ zil_remove_mirror_data(objset_t *os, uint64_t data_addr, uint64_t data_len)
 	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
 
 	mdn = DMU_META_DNODE(os);
-	mirror_tree_data_t *mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+	mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
 	if (NULL == mirror_data) {
 		cmn_err(CE_WARN, "%s line %d mirror mirror_data alloc error", __func__, __LINE__);
 		return;
@@ -2472,7 +2474,7 @@ zil_replay_all_data(objset_t *os, boolean_t bmdata)
 
 	name = os->os_dsl_dataset->ds_dir->dd_myname;
 	cmn_err(CE_NOTE, "%s line %d %s start replay all data!", __func__, __LINE__, name);
-    while (data_record = list_head(&os->os_zil_list)) {
+    while ((data_record = list_head(&os->os_zil_list)) != NULL) {
         list_remove(&os->os_zil_list, data_record);
         if (data_record->data_type == R_DISK_DATA) {
 			zil_log_record_t *log_record = (zil_log_record_t *)data_record->data;

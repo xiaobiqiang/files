@@ -564,7 +564,7 @@ dmu_objset_clean_seg_data(void  *arg)
     os = worker->worker_os;
        mutex_enter(&worker->worker_mtx);
     worker->worker_executor = curthread;
-    while (head_data = list_head(&worker->worker_list)) {
+    while ((head_data = list_head(&worker->worker_list)) != NULL) {
         list_remove(&worker->worker_list, head_data);
         atomic_add_64(&worker->worker_data, -head_data->data_len);
         gcache_size_add(0 - head_data->data_len);
@@ -2646,6 +2646,9 @@ void dmu_mirror_add_tree(mirror_tree_t *record)
 {
 	avl_index_t where;
 	zil_data_record_t *data_record;
+	mirror_tree_data_t *mirror_data;
+	zfs_mirror_cache_data_t *cache_data;
+	zfs_mirror_msg_mirrordata_header_t *header;
 	void *data;
 	dnode_t *mdn;
 	objset_t *os = record->list_os;
@@ -2656,12 +2659,11 @@ void dmu_mirror_add_tree(mirror_tree_t *record)
 		data_record = list_next(&os->os_zil_list, data_record)) {
 		if (data_record->data_type != R_CACHE_DATA)
 			continue;
-
-		mirror_tree_data_t *mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+		mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
 		bzero(mirror_data, sizeof(mirror_tree_data_t));
 
-		zfs_mirror_cache_data_t *cache_data = (zfs_mirror_cache_data_t *)data_record->data;
-		zfs_mirror_msg_mirrordata_header_t *header = cache_data->cs_data->ex_head;
+		cache_data = (zfs_mirror_cache_data_t *)data_record->data;
+		header = cache_data->cs_data->ex_head;
 
 		mirror_data->start_addr = mdn->dn_datablkszsec * header->blk_offset;
 		mirror_data->data_len = header->len;
@@ -2806,7 +2808,7 @@ dmu_objset_clear_mirror_io(objset_t *os, uint64_t txg)
     }
 
     blkptr_array->blkptr_num  = os->os_mirror_io_num[txg_id];
-    while (mirror_io = list_head(&os->os_mirror_io_list[txg_id])) {
+    while ((mirror_io = list_head(&os->os_mirror_io_list[txg_id])) != NULL) {
         list_remove(&os->os_mirror_io_list[txg_id], mirror_io);
         debug_mirror_io_addr(mirror_io->hash_key);
         blkptr_array->blkptr_array[index].spa_id = mirror_io->spa_id;

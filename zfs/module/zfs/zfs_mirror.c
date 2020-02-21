@@ -574,7 +574,7 @@ zfs_mirror_unaligned_hash_valdtor(mod_hash_val_t val)
 
     while ((blk_hash = list_head(blk_hash_list)) != NULL) {
         list_remove(blk_hash_list, blk_hash);
-        while (cache_data = list_remove_head(&blk_hash->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&blk_hash->hash_nonali_blk_list)) != NULL) {
             csh_rx_data_free(cache_data->cs_data, B_TRUE);
             kmem_free(cache_data, sizeof(zfs_mirror_cache_data_t));
         }
@@ -844,7 +844,7 @@ zfs_mirror_clean_cache_txg_list(mirror_cache_txg_list_t *txg_list)
     zfs_mirror_cache_data_t *cache_data = NULL;
 
     mutex_enter(&txg_list->cache_txg_list_mtx);
-    while (cache_data = list_remove_head(&txg_list->cache_txg_list)) {
+    while ((cache_data = list_remove_head(&txg_list->cache_txg_list)) != NULL) {
         atomic_inc_64(&zfs_mirror_mac_port->rx_ali_data_dec_frames);
         atomic_add_64(&zfs_mirror_mac_port->rs_ali_cache_size,
             0 - cache_data->cs_data->data_len);
@@ -1384,7 +1384,7 @@ zfs_mirror_log_clean(objset_t *os,
         if (data_type == MIRROR_DATA_UNALIGNED) {
             mutex_enter(&os->os_mirror_io_mutex[txg_id]);
             if (os->os_mirror_io_num[txg_id] != 0) {
-                while (mirror_io = list_head(&os->os_mirror_io_list[txg_id])) {
+                while ((mirror_io = list_head(&os->os_mirror_io_list[txg_id])) != NULL) {
                     list_remove(&os->os_mirror_io_list[txg_id], mirror_io);
                     zfs_mirror_destroy(mirror_io);
                 }
@@ -2650,7 +2650,7 @@ static void zfs_mirror_get_all_unalign_buf(objset_t *os)
                 __func__, hash_blk->hash_key);
         }
 
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             zil_data_record_t *data_record;
             zfs_mirror_msg_mirrordata_header_t *header =
                 cache_data->cs_data->ex_head;
@@ -3341,7 +3341,7 @@ static int zfs_mirror_unaligned_expired_handle(void)
     vfree(unaligned_located);
 
     while ((hash_blk = list_remove_head(&clean_list)) != NULL) {
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             atomic_inc_64(&zfs_mirror_mac_port->rx_nonali_data_dec_frames);
             atomic_add_64(&zfs_mirror_mac_port->rs_nonali_cache_size,
                 0 - cache_data->cs_data->data_len);
@@ -3667,7 +3667,7 @@ static void zfs_mirror_handle_unaligned_actived(void *arg)
     csh_rx_data_free(cs_data, B_TRUE);
 
     while ((hash_blk = list_remove_head(&clean_list)) != NULL) {
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             atomic_inc_64(&zfs_mirror_mac_port->rx_nonali_data_dec_frames);
             atomic_add_64(&zfs_mirror_mac_port->rs_nonali_cache_size,
                 0 - cache_data->cs_data->data_len);

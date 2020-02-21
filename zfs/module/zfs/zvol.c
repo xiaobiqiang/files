@@ -1135,9 +1135,7 @@ zvol_first_open(zvol_state_t *zv)
 	uint64_t volsize;
 	int error;
 	uint64_t ro;
-	int ret = 0;
-	uint64_t position = 0;
-
+	
 	ASSERT(MUTEX_HELD(&zv->zv_state_lock));
 	if (zv->zv_state == ZVOL_VALID) {
 		/* lie and say we're read-only */
