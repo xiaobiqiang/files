@@ -49,6 +49,7 @@
 #include <sys/dmu_tx.h>
 #include <sys/dkio.h>
 #include <sys/zio.h>
+#include <sys/zfs_mirror.h>
 #include <sys/zfs_rlock.h>
 #include <sys/zfs_znode.h>
 #include <sys/spa_impl.h>
@@ -59,6 +60,9 @@
 #define	ZVOL_UNINITIALIZED	0x0
 #define	ZVOL_VALID			0x1
 #define	ZVOL_INVALID		0x2
+
+#define ZVOL_COPYING		0X0
+#define ZVOL_COPYED			0X1
 
 #define ZVOL_REMOVE_WAIT_GAP	200	/* ms */
 #define ZVOL_REMOVE_WAIT_COUNT	8
@@ -105,6 +109,8 @@ typedef struct zvol_state {
 	kcondvar_t		zv_cv;		/* wait create minor done */
 	uint8_t			zv_state;
 	kcondvar_t		zv_rele_cv;
+	kcondvar_t		zv_cp;		/* wait copy mirror data */
+	uint8_t			zv_cp_state;
 } zvol_state_t;
 
 typedef enum {
@@ -123,6 +129,12 @@ typedef struct {
 	zprop_source_t source;
 	uint64_t snapdev;
 } zvol_task_t;
+
+typedef struct zvol_replay_arg
+{
+	zvol_state_t *zv;
+	boolean_t	bmdata;
+} zvol_replay_arg_t;
 
 #define	ZVOL_RDONLY	0x1
 #define	ZVOL_WCE	0x8
@@ -804,6 +816,7 @@ zvol_write(struct bio *bio)
 	rl_t *rl;
     boolean_t sync;
     uint64_t write_flag = 0;
+	int flag = 0;
 
 	ASSERT(zv && zv->zv_open_count > 0);
 
@@ -816,7 +829,22 @@ zvol_write(struct bio *bio)
 	if (size == 0)
 		goto out;
 
-    zvol_mirror_replay_wait((void *)zv);
+	if (zfs_mirror_mdata_enable())
+		flag = zvol_mdata_mirror_replay_wait((void *)zv);
+	else
+		zvol_mirror_replay_wait((void *)zv);
+
+	if (flag) {
+		int repeat;
+		dmu_mirror_lock(RW_READER);
+		repeat = dmu_check_mirror_repeat_data(zv->zv_objset, offset, size);
+		dmu_mirror_unlock();
+		if (repeat) {
+			cmn_err(CE_WARN, "%s line %d, %s mirror data write wait...", 
+				__func__, __LINE__, zv->zv_name);
+			zvol_mirror_replay_wait((void *)zv);
+		}
+	}
 
     sync = dmu_objset_sync_check(zv->zv_objset);
    	if (sync) {
@@ -900,15 +928,31 @@ zvol_read(struct bio *bio)
 	uint64_t offset = BIO_BI_SECTOR(bio) << 9;
 	uint64_t len = BIO_BI_SIZE(bio);
 	int error;
+	int flag = 0;
 	rl_t *rl;
 
 	ASSERT(zv && zv->zv_open_count > 0);
 
-    zvol_mirror_replay_wait((void *)zv);
-
 	if (len == 0)
 		return (0);
 
+	if (zfs_mirror_mdata_enable())
+		flag = zvol_mdata_mirror_replay_wait((void *)zv);
+	else
+		zvol_mirror_replay_wait((void *)zv);
+
+	if (flag) {
+		int repeat;
+		dmu_mirror_lock(RW_READER);
+		repeat = dmu_check_mirror_repeat_data(zv->zv_objset, offset, len);
+		dmu_mirror_unlock();
+		if (repeat) {
+			cmn_err(CE_WARN, "%s line %d, %s mirror data write wait...", 
+				__func__, __LINE__, zv->zv_name);
+			zvol_mirror_replay_wait((void *)zv);
+		}
+	}
+	
 	rl = zfs_range_lock(&zv->zv_range_lock, offset, len, RL_READER);
 
 	error = dmu_read_bio(zv->zv_objset, ZVOL_OBJ, bio);
@@ -1091,9 +1135,7 @@ zvol_first_open(zvol_state_t *zv)
 	uint64_t volsize;
 	int error;
 	uint64_t ro;
-	int ret = 0;
-	uint64_t position = 0;
-
+	
 	ASSERT(MUTEX_HELD(&zv->zv_state_lock));
 	if (zv->zv_state == ZVOL_VALID) {
 		/* lie and say we're read-only */
@@ -1281,6 +1323,7 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 
     mutex_enter(&zv->zv_state_lock);
 	zv->zv_open_count--;
+	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);	
 	if (zv->zv_open_count == 0) {
 		zvol_last_close(zv);
 		cv_signal(&zv->zv_rele_cv);
@@ -1702,7 +1745,8 @@ zvol_alloc(dev_t dev, const char *name)
 
 	zv->zv_queue->queuedata = zv;
 	zv->zv_dev = dev;
-	zv->zv_open_count = 0;
+	zv->zv_open_count = 0;	
+	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);	
 	strlcpy(zv->zv_name, name, MAXNAMELEN);
 
 	zfs_rlock_init(&zv->zv_range_lock);
@@ -1756,6 +1800,7 @@ zvol_free(zvol_state_t *zv)
 	mutex_destroy(&zv->zv_state_lock);
 	cv_destroy(&zv->zv_cv);
 	cv_destroy(&zv->zv_rele_cv);
+	cv_destroy(&zv->zv_cp);
 	kmem_free(zv, sizeof (zvol_state_t));
 }
 
@@ -1774,6 +1819,8 @@ zvol_create_minor_impl(const char *name)
 	unsigned minor = 0;
 	int error = 0;
 	kthread_t *replay_th;
+	zvol_replay_arg_t *replay_arg;
+	boolean_t bmdata = zfs_mirror_mdata_enable();
 
 	mutex_enter(&zvol_state_lock);
 
@@ -1841,6 +1888,10 @@ zvol_create_minor_impl(const char *name)
 	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, zv->zv_queue);
 #endif
 
+	cv_init(&zv->zv_cp, NULL, CV_DEFAULT, NULL);
+	if (bmdata)
+		zv->zv_cp_state = ZVOL_COPYING;
+
 #if 0
 	if (spa_writeable(dmu_objset_spa(os))) {
 		if (zil_replay_disable)
@@ -1851,15 +1902,30 @@ zvol_create_minor_impl(const char *name)
 #endif
 
 	/* replay */
-	mutex_enter(&zv->zv_state_lock);
-#if	0
+	replay_arg = kmem_zalloc(sizeof(zvol_replay_arg_t), KM_SLEEP);
+	replay_arg->zv = zv;
+	replay_arg->bmdata = bmdata;
+
+	cmn_err(CE_NOTE, "%s %d %s start zvol_objset_replay_all_cache thread",
+		__func__, __LINE__, name);
 	replay_th = thread_create(NULL, 0,
-		zvol_objset_replay_all_cache, (void*)zv,
+		zvol_objset_replay_all_cache, (void*)replay_arg,
 		0, &p0, TS_RUN, minclsyspri);
 	
-	if (replay_th == NULL)
-#endif
-		zvol_objset_replay_all_cache((void*)zv);
+	if (replay_th == NULL) {
+		cmn_err(CE_NOTE, "%s %d %s start failed, invoke directly",
+			__func__, __LINE__, name);
+		zvol_objset_replay_all_cache((void*)replay_arg);
+	}
+
+	if (bmdata) {
+		spa_t *spa = dmu_objset_spa(zv->zv_objset);
+
+		mutex_enter(&spa->spa_do_zvol_lock);
+		atomic_dec_32(&spa->spa_zvol_minor_creating_cnt);
+		cv_signal(&spa->spa_do_zvol_cv);
+		mutex_exit(&spa->spa_do_zvol_lock);
+	}
 
 out_doi:
 	kmem_free(doi, sizeof (dmu_object_info_t));
@@ -2037,7 +2103,8 @@ zvol_release_force(zvol_state_t *zv)
 		zv->zv_name, (ulong_t)zv->zv_open_count);
 	if (zv->zv_open_count > 0) {
 		zv->zv_open_count = 0;
-		zvol_last_close(zv);
+		zvol_last_close(zv);		
+		printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count); 
 	}
 	mutex_exit(&zv->zv_state_lock);
 }
@@ -2057,7 +2124,6 @@ zvol_remove_minors_impl(const char *name)
 
 	
 	printk(KERN_WARNING "%s %s begin", __func__, name);
-
 	mutex_enter(&zvol_state_lock);
 
 	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
@@ -2544,6 +2610,79 @@ zvol_mirror_replay_wait(void *minor_hdl)
 }
 EXPORT_SYMBOL(zvol_mirror_replay_wait);
 
+static int 
+zvol_mdata_wait_copy_done(zvol_state_t *zv)
+{
+	ASSERT(MUTEX_HELD(&zv->zv_state_lock));
+
+	if (zv->zv_state == ZVOL_UNINITIALIZED) {
+		if (zv->zv_cp_state == ZVOL_COPYING){
+			cv_wait(&zv->zv_cp, &zv->zv_state_lock);
+		}
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+int 
+zvol_mdata_mirror_replay_wait(void *minor_hdl)
+{
+	zvol_state_t *zv = (zvol_state_t *)minor_hdl;
+	int flag = 0;
+
+	if (zv == NULL) {
+		cmn_err(CE_WARN, "%s: zv mustn't NULL", __func__);
+		return (B_FALSE);
+	}
+
+	mutex_enter(&zv->zv_state_lock);
+	if (zv->zv_state == ZVOL_VALID) {
+		mutex_exit(&zv->zv_state_lock);	
+		return (B_FALSE);
+	}
+	
+	flag = zvol_mdata_wait_copy_done(zv);
+	mutex_exit(&zv->zv_state_lock);
+	return (flag);
+}
+EXPORT_SYMBOL(zvol_mdata_mirror_replay_wait);
+
+static void 
+zvol_free_mirror(objset_t *os)
+{
+	mirror_tree_t *cur;
+	uint64_t spa_id, os_id, hash_key;
+	char *name;
+
+	if (NULL == g_mirror_data)
+		return;
+
+	spa_id = spa_guid(os->os_spa);
+	os_id = os->os_dsl_dataset->ds_object;
+	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+	name = os->os_dsl_dataset->ds_dir->dd_myname;
+
+	for (cur = list_head(&g_mirror_data->mirror_data_list); NULL != cur;
+		cur = list_next(&g_mirror_data->mirror_data_list, cur)) {
+		if (hash_key == cur->hash_key) {
+			g_mirror_data->list_num--;
+			avl_destroy(&cur->record_tree);
+			list_remove(&g_mirror_data->mirror_data_list, cur);
+			kmem_free(cur, sizeof(mirror_tree_t));
+			break;
+		}
+	}
+
+	if (g_mirror_data->list_num <= 0) {
+		cmn_err(CE_WARN, "%s line %d %s mirror g_mirror_data free.", 
+			__func__, __LINE__, name);
+		list_destroy(&g_mirror_data->mirror_data_list);
+		kmem_free(g_mirror_data, sizeof(mirror_lun_list_t));
+		g_mirror_data = NULL;
+	}
+}
+
+
 static void
 zvol_objset_replay_all_cache(void *arg)
 {
@@ -2551,12 +2690,25 @@ zvol_objset_replay_all_cache(void *arg)
 	spa_t *spa;
 	uint64_t len;
 	uint64_t elapsed_time;
+	zvol_replay_arg_t *replay_arg;
+	boolean_t bmdata;
 
-	zv = (zvol_state_t *)arg;
-	ASSERT(MUTEX_HELD(&zv->zv_state_lock));
+	replay_arg = (zvol_replay_arg_t *)arg;
+	zv = replay_arg->zv;
+	bmdata = replay_arg->bmdata;
+	
 	elapsed_time = gethrtime();
 	spa = dmu_objset_spa(zv->zv_objset);
-	dmu_objset_replay_all_cache(zv->zv_objset);
+
+	if (bmdata)
+		dmu_objset_replay_all_cache(zv->zv_objset, &zv->zv_cp, &zv->zv_cp_state, B_TRUE);
+	else
+		dmu_objset_replay_all_cache(zv->zv_objset, NULL, NULL, B_FALSE);
+
+	dmu_mirror_lock(RW_WRITER);
+	if (bmdata)
+		zvol_free_mirror(zv->zv_objset);
+	dmu_mirror_unlock();
 
 	/*
 	 * When udev detects the addition of the device it will immediately
@@ -2570,21 +2722,26 @@ zvol_objset_replay_all_cache(void *arg)
 		dmu_prefetch(zv->zv_objset, ZVOL_OBJ, zv->zv_volsize - len, len);
 	}
 
+	mutex_enter(&zv->zv_state_lock);
 	if (zv->zv_open_count == 0) {
 		dmu_objset_disown(zv->zv_objset, zvol_tag);
 		zv->zv_objset = NULL;
 	}
-
+	
 	zv->zv_state = ZVOL_VALID;
 	cv_broadcast(&zv->zv_cv);
 	mutex_exit(&zv->zv_state_lock);
 	cmn_err(CE_NOTE, "%s: zvol create minor done, elapsed time:%"PRId64"ms",
 		zv->zv_name, (gethrtime() - elapsed_time)/1000000);
 
-	mutex_enter(&spa->spa_do_zvol_lock);
-	atomic_dec_32(&spa->spa_zvol_minor_creating_cnt);
-	cv_signal(&spa->spa_do_zvol_cv);
-	mutex_exit(&spa->spa_do_zvol_lock);
+	if (!bmdata) {
+		mutex_enter(&spa->spa_do_zvol_lock);
+		atomic_dec_32(&spa->spa_zvol_minor_creating_cnt);
+		cv_signal(&spa->spa_do_zvol_cv);
+		mutex_exit(&spa->spa_do_zvol_lock);
+	}
+	
+	kmem_free(replay_arg, sizeof(zvol_replay_arg_t));
 }
 
 int

@@ -42,6 +42,7 @@
 #include <sys/metaslab.h>
 #include <sys/trace_zil.h>
 #include <sys/zfs_mirror.h>
+#include <sys/dsl_dir.h>
 
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
@@ -2414,20 +2415,96 @@ zil_replay_disk_data(objset_t *os,
     kmem_free(log_record, sizeof(zil_log_record_t));
 }
 
+
+void 
+zil_remove_mirror_data(objset_t *os, uint64_t data_addr, uint64_t data_len)
+{
+	mirror_tree_t *cur;
+	avl_index_t where;
+	dnode_t *mdn;
+	mirror_tree_data_t *mirror_data;
+	void *data;
+	uint64_t spa_id, os_id, hash_key;
+
+	if ((NULL == g_mirror_data) || (NULL == &g_mirror_data->mirror_data_list)) 
+		return;
+
+	spa_id = spa_guid(os->os_spa);
+	os_id = os->os_dsl_dataset->ds_object;
+	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+
+	mdn = DMU_META_DNODE(os);
+	mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+	if (NULL == mirror_data) {
+		cmn_err(CE_WARN, "%s line %d mirror mirror_data alloc error", __func__, __LINE__);
+		return;
+	}
+
+	for (cur = list_head(&g_mirror_data->mirror_data_list); NULL != cur;
+		cur = list_next(&g_mirror_data->mirror_data_list, cur)) {
+		if (hash_key != cur->hash_key)
+			continue;
+
+		mirror_data->start_addr = data_addr;
+		mirror_data->data_len = data_len;
+		mirror_data->count = 0;
+		mirror_data->type = 1; // check for remove
+
+		data = avl_find(&cur->record_tree, (void *)mirror_data, &where);
+		if (data != NULL) {
+			mirror_tree_data_t *data_result = (mirror_tree_data_t *)data;
+			if (data_result->count == 0) {
+				avl_remove(&cur->record_tree, data);
+				kmem_free(data, sizeof(mirror_tree_data_t));
+			} else
+				data_result->count--;
+		}
+		break;
+	}
+	kmem_free(mirror_data, sizeof(mirror_tree_data_t));
+}
+
 void
-zil_replay_all_data(objset_t *os)
+zil_replay_all_data(objset_t *os, boolean_t bmdata)
 {
     zil_data_record_t *data_record;
-    while (data_record = list_head(&os->os_zil_list)) {
+	uint64_t data_addr, data_len;
+	int err;
+	char *name;
+
+	name = os->os_dsl_dataset->ds_dir->dd_myname;
+	cmn_err(CE_NOTE, "%s line %d %s start replay all data!", __func__, __LINE__, name);
+    while ((data_record = list_head(&os->os_zil_list)) != NULL) {
         list_remove(&os->os_zil_list, data_record);
         if (data_record->data_type == R_DISK_DATA) {
+			zil_log_record_t *log_record = (zil_log_record_t *)data_record->data;
+			data_addr = log_record->offset;
+			data_len = log_record->len;
             zil_replay_disk_data(os, data_record->data);
-        } else if (data_record->data_type == R_CACHE_DATA) {
-            zfs_replay_cache_data(os, (zfs_mirror_cache_data_t *)data_record->data);
+        } else {
+        	zfs_mirror_cache_data_t *cache_data = 
+				(zfs_mirror_cache_data_t *)data_record->data;
+			zfs_mirror_msg_mirrordata_header_t *header = 
+				(zfs_mirror_msg_mirrordata_header_t *)cache_data->cs_data->ex_head;
+
+			VERIFY(data_record->data_type == R_CACHE_DATA);
+			data_addr = header->blk_offset;
+			data_len = header->len;
+            err = zfs_replay_cache_data(os, (zfs_mirror_cache_data_t *)data_record->data);
+			if (err)
+				cmn_err(CE_WARN, "%s line %d %s zfs replay cache data failed, err: %d",
+					__func__, __LINE__, name, err);
         }
+
+		if (bmdata) {
+			rw_enter(&os->mirror_record_lock, RW_WRITER);
+			zil_remove_mirror_data(os, data_addr, data_len);
+			rw_exit(&os->mirror_record_lock);
+		}
 
         kmem_free(data_record, sizeof(zil_data_record_t));
     }
+	cmn_err(CE_WARN, "%s line %d %s finished replay all data!", __func__, __LINE__, name);
 }
 
 #endif

@@ -72,6 +72,8 @@ static int dmu_handle_write_optimize(dmu_buf_impl_t *db,
  */
 int zfs_nopwrite_enabled = 1;
 
+krwlock_t mirror_lock;
+
 const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	DMU_BSWAP_UINT8,	TRUE,	"unallocated"		},
 	{	DMU_BSWAP_ZAP,		TRUE,	"object directory"	},
@@ -1273,6 +1275,13 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
             didcpy = dmu_bio_copy(db->db_data + bufoff, tocpy, bio,
                 bio_offset);
 
+			if (didcpy < tocpy) {
+				cmn_err(CE_WARN, "zjn %s %d didcpy=%d tocpy=%d", __func__,
+					__LINE__, didcpy, tocpy);
+				err = EIO;
+				break;
+			}
+
             if (b_sync) {
                 mirror_success = dmu_mirror_write_data(db,
                     (char *) ((char *)db->db_data + bufoff),
@@ -1294,6 +1303,13 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
             tmp_data = dmu_request_arcbuf(db, tocpy);
             didcpy = dmu_bio_copy((char *)tmp_data->b_data, tocpy, bio,
                 bio_offset);
+
+			if (didcpy < tocpy) {
+				cmn_err(CE_WARN, "zjn %s %d didcpy=%d tocpy=%d", __func__,
+					__LINE__, didcpy, tocpy);
+				err = EIO;
+				break;
+			}
 			
             mirror_success = dmu_mirror_write_data(db, tmp_data->b_data,
                 bufoff + db->db_offset, tocpy, tx->tx_txg, type);
@@ -1317,23 +1333,16 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
 
 		if (tocpy == db->db_size)
 			dmu_buf_fill_done(db, tx);
-
-		if (didcpy < tocpy)
-			err = EIO;
-
+		
 		if (mirror_success > 0  && b_sync) {
-/*            dmu_direct_write(db, tx);
-            if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-			err = EIO;
+			dmu_direct_write(db, tx);
+			if (!tx->tx_bdirect)
+				tx->tx_bdirect = B_TRUE;
         }
-		if (err)
-            break;
 
 		size -= tocpy;
 		offset += didcpy;
 		bio_offset += didcpy;
-		err = 0;
 	}
 
 	dmu_buf_rele_array(dbp, numbufs, FTAG);
@@ -1590,10 +1599,9 @@ dmu_write_uio_dnode(dnode_t *dn, uio_t *uio, uint64_t size,
 			break;
 
 		if (mirror_success > 0  && b_sync) {
-/*			dmu_direct_write(db, tx);
+			dmu_direct_write(db, tx);
 			if (!tx->tx_bdirect)
-				tx->tx_bdirect = B_TRUE; */
-			err = 1;
+				tx->tx_bdirect = B_TRUE;
 		}		
 	}
 
@@ -1731,10 +1739,9 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
         mirror_success = dmu_mirror_write_data(&db->db, (char *)db->db.db_data,
             db->db.db_offset,  db->db.db_size, tx->tx_txg, MIRROR_DATA_ALIGNED);
         if (mirror_success > 0 && b_sync) {
-/*            dmu_direct_write(&db->db, tx);
+			dmu_direct_write(&db->db, tx);
             if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-        	ret = 1;
+                tx->tx_bdirect = B_TRUE;
         }
 #endif
 		dbuf_rele(db, FTAG);
@@ -2601,36 +2608,34 @@ dmu_write_mirror(objset_t *os, dmu_buf_t *db,
     uint64_t object, uint64_t offset, uint64_t size,
     const void *data, dmu_tx_t *tx, boolean_t b_sync)
 {
-        int mirror_success;
-        boolean_t b_woptimize;
-        boolean_t b_mirror;
-        zfs_mirror_data_type_t type;
+    int mirror_success;
+    boolean_t b_woptimize;
+    boolean_t b_mirror;
+    zfs_mirror_data_type_t type;
 
-        b_mirror = B_FALSE;
-        mirror_success = 0;
+    b_mirror = B_FALSE;
+    mirror_success = 0;
 
-        b_woptimize = dmu_write_optimize(db);
-		//b_woptimize = B_FALSE;
-        if (b_woptimize) {
-            type = MIRROR_DATA_UNALIGNED;
-        } else {
-            type = MIRROR_DATA_ALIGNED;
-        }
+    b_woptimize = dmu_write_optimize(db);
+    if (b_woptimize) {
+        type = MIRROR_DATA_UNALIGNED;
+    } else {
+        type = MIRROR_DATA_ALIGNED;
+    }
 
-        mirror_success = dmu_mirror_write_data(db, (char *) data,
-            offset,  size, tx->tx_txg, type);
-        if (mirror_success == 0) {
-            b_mirror = B_TRUE;
-        }
+    mirror_success = dmu_mirror_write_data(db, (char *) data,
+        offset,  size, tx->tx_txg, type);
+    if (mirror_success == 0) {
+        b_mirror = B_TRUE;
+    }
 
-        dmu_write(os, object, offset, size, data, tx, b_mirror);
-        if (mirror_success > 0  && b_sync) {
-/*            dmu_direct_write(db, tx);
-            if (!tx->tx_bdirect)
-                tx->tx_bdirect = B_TRUE; */
-            return(1);
-        }
-		return(0);
+    dmu_write(os, object, offset, size, data, tx, b_mirror);
+    if (mirror_success > 0  && b_sync) {
+		dmu_direct_write(db, tx);
+        if (!tx->tx_bdirect)
+            tx->tx_bdirect = B_TRUE;
+    }
+	return (0);
 }
 
 int
@@ -2712,7 +2717,84 @@ dmu_data_newer(objset_t *os, uint64_t data_object,
     return (b_newer);
 }
 
+int 
+dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len)
+{
+	dnode_t *mdn;
+	int result = B_FALSE;
+	mirror_tree_t *mirror_record;
+	mirror_tree_data_t *mirror_data;
+	uint64_t spa_id, os_id, hash_key;
+
+	if ((NULL == g_mirror_data) || (NULL == &g_mirror_data->mirror_data_list)) {
+		cmn_err(CE_WARN, "%s line %d, mirror data write g_mirror_data is null...", __func__, __LINE__);
+		return (B_FALSE);
+	}
+
+	mdn = DMU_META_DNODE(os);
+	ASSERT(mdn->dn_object == DMU_META_DNODE_OBJECT);
+
+	mirror_data = kmem_alloc(sizeof(mirror_tree_data_t), KM_SLEEP);
+	bzero(mirror_data, sizeof(mirror_tree_data_t));
+
+	mirror_record = list_head(&g_mirror_data->mirror_data_list);
+	if (NULL == mirror_record || NULL == mirror_record->list_os)
+		return (B_FALSE);
+
+	spa_id = spa_guid(os->os_spa);
+	os_id = os->os_dsl_dataset->ds_object;
+	hash_key = zfs_mirror_spa_os_keygen(spa_id, os_id);
+
+	while (NULL != mirror_record) {
+		void *data = NULL;
+		avl_index_t where;
+
+		if ((NULL == mirror_record->list_os) 
+			|| hash_key != mirror_record->hash_key) {
+			mirror_record = list_next(&g_mirror_data->mirror_data_list, mirror_record);
+			continue;
+		}
+
+		mirror_data->start_addr = offset;
+		mirror_data->data_len = data_len;
+		mirror_data->count = 0;
+		mirror_data->type = 0; // check for find
+
+		rw_enter(&mirror_record->list_os->mirror_record_lock, RW_READER);
+		data = avl_find(&mirror_record->record_tree, (const void *)mirror_data, &where);
+		rw_exit(&mirror_record->list_os->mirror_record_lock);
+		if (NULL != data)
+			result = B_TRUE;
+
+		break;
+	}
+	kmem_free(mirror_data, sizeof(mirror_tree_data_t));
+
+	return (result);
+}
 #endif
+
+void
+dmu_mirror_init(void)
+{
+	rw_init(&mirror_lock, NULL, RW_DEFAULT, NULL);
+}
+
+void
+dmu_mirror_fini(void)
+{
+	rw_destroy(&mirror_lock);
+}
+
+void dmu_mirror_lock(int rw)
+{
+	rw_enter(&mirror_lock, rw);
+}
+
+void dmu_mirror_unlock(void)
+{
+	rw_exit(&mirror_lock);
+}
 
 void
 dmu_init(void)
@@ -2721,6 +2803,7 @@ dmu_init(void)
 	sa_cache_init();
 	xuio_stat_init();
 	dmu_objset_init();
+	dmu_mirror_init();
 	dnode_init();
 	dbuf_init();
 	zfetch_init();
@@ -2739,6 +2822,7 @@ dmu_fini(void)
 	dbuf_fini();
 	dnode_fini();
 	dmu_objset_fini();
+	dmu_mirror_fini();
 	xuio_stat_fini();
 	sa_cache_fini();
 	zfs_dbgmsg_fini();
@@ -2771,6 +2855,9 @@ EXPORT_SYMBOL(dmu_buf_hold);
 EXPORT_SYMBOL(dmu_get_lock_para);
 EXPORT_SYMBOL(dmu_get_crypt_data);
 EXPORT_SYMBOL(dmu_free_crypt_data);
+EXPORT_SYMBOL(dmu_check_mirror_repeat_data);
+EXPORT_SYMBOL(dmu_mirror_lock);
+EXPORT_SYMBOL(dmu_mirror_unlock);
 
 
 EXPORT_SYMBOL(dmu_ot);

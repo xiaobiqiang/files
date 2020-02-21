@@ -967,6 +967,10 @@ int dmu_write_mirror_fs(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t size, const void *data, dmu_tx_t *tx, boolean_t b_sync);
 #endif
 
+int dmu_check_mirror_repeat_data(objset_t *os, uint64_t offset, uint64_t data_len);
+void dmu_mirror_lock(int rw);
+void dmu_mirror_unlock(void);
+
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */
 extern uint64_t zfs_crc64_table[256];
