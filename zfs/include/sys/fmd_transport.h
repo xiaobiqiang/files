@@ -40,6 +40,9 @@ extern void fmd_client_send_msg(const fmd_msg_t *fmsg);
 
 extern int fmd_kernel_send_msg(const fmd_msg_t *fmsg);
 
+extern int zfs_ev_notify_chain_register(struct atomic_notifier_head *nh, struct notifier_block *n);
+extern int zfs_ev_notify_chain_unregister(struct atomic_notifier_head *nh, struct notifier_block *n);
+
 #define NETLINK_FMD	25
 #define FMD_NET_GROUP (CN_NETLINK_USERS + 5)
 #define FMD_NET_PID	 100
