@@ -2662,7 +2662,7 @@ void dmu_mirror_add_tree(mirror_tree_t *record)
 		cache_data = (zfs_mirror_cache_data_t *)data_record->data;
 		header = cache_data->cs_data->ex_head;
 
-		mirror_data->start_addr = mdn->dn_datablkszsec * header->blk_offset;
+		mirror_data->start_addr = header->blk_offset;
 		mirror_data->data_len = header->len;
 		mirror_data->count = 0;
 		mirror_data->type = 1; 

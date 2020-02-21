@@ -2445,7 +2445,7 @@ zil_remove_mirror_data(objset_t *os, uint64_t data_addr, uint64_t data_len)
 		if (hash_key != cur->hash_key)
 			continue;
 
-		mirror_data->start_addr = mdn->dn_datablkszsec * data_addr;
+		mirror_data->start_addr = data_addr;
 		mirror_data->data_len = data_len;
 		mirror_data->count = 0;
 		mirror_data->type = 1; // check for remove
