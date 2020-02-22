@@ -214,7 +214,7 @@ subCommandProps_t subcommands[] = {
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
 	{"modify-lu", modifyLuFunc, "psf", NULL, NULL, OPERAND_MANDATORY_SINGLE,
 		OPERANDSTRING_LU, MODIFY_HELP},
-	{"delete-lu", deleteLuFunc, "k", NULL, NULL,
+	{"delete-lu", deleteLuFunc, "kc", NULL, NULL,
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_LU, NULL},
 	{"delete-tg", deleteTargetGroupFunc, "c", NULL, NULL,
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
@@ -1642,6 +1642,7 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	boolean_t viewEntriesRemoved = B_FALSE;
 	boolean_t noLunFound = B_FALSE;
 	boolean_t views = B_FALSE;
+	boolean_t isCluster = B_FALSE;
 	char sGuid[GUID_INPUT + 1];
 	stmfViewEntryList *viewEntryList = NULL;
 
@@ -1651,6 +1652,9 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			case 'k':
 				keepViews = B_TRUE;
 				break;
+			case 'c':
+				isCluster = B_TRUE;
+				break;				
 			default:
 				(void) fprintf(stderr, "%s: %c: %s\n",
 				    cmdName, options->optval,
@@ -1691,6 +1695,8 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		stmfRet = stmfDeleteLu(&delGuid);
 		switch (stmfRet) {
 			case STMF_STATUS_SUCCESS:
+				if (B_TRUE == isCluster)
+					stmfadm_send_cmd(cmdfullName);				
 				break;
 			case STMF_ERROR_NOT_FOUND:
 				noLunFound = B_TRUE;
@@ -1711,6 +1717,9 @@ deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				ret++;
 				break;
 		}
+
+		if (ret)
+			return (ret);
 
 		if (!keepViews) {
 			stmfRet = stmfGetViewEntryList(&delGuid,

@@ -4777,6 +4777,9 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		}
 		
 		ilu->ilu_ntasks_cur = 0;
+
+		/* use stmfadm delete-lu -c xxxxx to deregister proxy lu */
+		#if 0
 		/* de-register with proxy if available */
 		if (ilu->ilu_access == STMF_LU_ACTIVE &&
 		    stmf_state.stmf_alua_state == 1) {
@@ -4801,6 +4804,7 @@ stmf_deregister_lu(stmf_lu_t *lu)
 				}
 			}
 		}
+		#endif
 
 		if (ilu->ilu_next)
 			ilu->ilu_next->ilu_prev = ilu->ilu_prev;
