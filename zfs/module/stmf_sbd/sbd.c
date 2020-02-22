@@ -3081,15 +3081,13 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		if (sbd_is_zvol(sl->sl_data_filename)) {
 			sl->sl_flags |= SL_ZFS_META;
 			sl->sl_meta_offset = 0;
-			sl->sl_name = sl->sl_data_filename;
-			sl->sl_alias = strrchr(sl->sl_data_filename, '/') + 1;
 		} else {
 			sl->sl_flags |= SL_SHARED_META;
 			sl->sl_data_offset = SHARED_META_DATA_SIZE;
 			sl->sl_total_meta_size = SHARED_META_DATA_SIZE;
 			sl->sl_meta_size_used = 0;
-			sl->sl_alias = sl->sl_name = sl->sl_data_filename;
 		}
+		sl->sl_alias = sl->sl_name = sl->sl_data_filename;
 	}
 	if (slu->slu_alias_valid) {
 		sl->sl_alias_alloc_size = strlen(namebuf + slu->slu_alias_off) + 1;
@@ -3773,9 +3771,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 			sl->sl_name = sl->sl_alias = sl->sl_meta_filename;
 			/* from sl_name for full path name */
 			sl->sl_lu->lu_alias = sl->sl_name;
-			if (sbd_is_zvol(sl->sl_meta_filename)) {
-				sl->sl_alias = strrchr(sl->sl_meta_filename, '/') + 1;
-			}
+			sl->sl_alias = sl->sl_name;
 		} else {
 			*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
 			bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);

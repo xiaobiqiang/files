@@ -2740,7 +2740,6 @@ void* zfs_import_lu(void *arg)
 	ret = stmfImportLu(STMF_DISK, dev_buf, &createdGuid);
 	if (ret == 0) {
 		stmfOnlineLogicalUnit(&createdGuid);
-		stmfNotifyLuActive(dev_buf);
 		syslog(LOG_INFO, " import lu success, %s", lu_name);
  	} else {
  		syslog(LOG_ERR, " import lu failed, %s, ret:0x%x", lu_name, ret);
