@@ -442,21 +442,32 @@ function cm_pmm_nic_check()
 function cm_pmm_disk_instance()
 {
     local name=$1
-    prtconf -a /dev/rdsk/$name|grep -w disk|awk -F'#' '{print $2}' 
+    #prtconf -a /dev/rdsk/$name|grep -w disk|awk -F'#' '{print $2}'
+    name=`cat /tmp/disk.xml |grep "$name"|awk -F'>' '{print $2}'|awk -F'<' '{print $1}'`
+    local diskname=`ls -l $name|awk -F'->' '{print $2}'|awk -F'/' '{print $3}'`
+    cat /proc/diskstats| grep -n -w "$diskname" |awk -F':' '{print $1}'
 }
 
 function cm_pmm_disk()
 {
     local num=$1
-    kstat -m sd -c disk -i $num \
-    |egrep 'snaptime|reads|writes|nread|nwritten|wlentime|rlentime|wtime|rtime' |awk '{printf $2" "}'  
+    #kstat -m sd -c disk -i $num \
+    #|egrep 'snaptime|reads|writes|nread|nwritten|wlentime|rlentime|wtime|rtime' |awk '{printf $2" "}' 
+    
+    local array=($(cat /proc/diskstats|sed -n "$num p"|awk '{print $4" "$6" "$8" "$10}'))
+    local riops=${array[0]}
+    local read=${array[1]}
+    local wiops=${array[2]}
+    local write=${array[3]}
+    
+    echo "0 $read $write $riops 0 0 0 0 $wiops 0"
     return $?
 }
 
 function cm_pmm_disk_check()
 {
     local name=$1
-    iostat -x -n | grep -w $name | wc -l
+    cat /tmp/disk.xml |grep "$name"|wc -l
 }
 
 function cm_pmm_nas()
@@ -477,11 +488,12 @@ function cm_pmm_nas()
 function cm_pmm_pool()
 {
     local name=$1
-    kstat -m zfs -n $name|egrep 'nread|nwritten|reads|writes'|awk '{printf $2" "}'
+    #kstat -m zfs -n $name|egrep 'nread|nwritten|reads|writes'|awk '{printf $2" "}'
+    cat /proc/spl/kstat/zfs/$name/io |awk 'NR==3{print $1" "$2" "$3" "$4}'
 }
 function cm_pmm_cache()
 {
-    kstat -m zfs -n arcstats \
+    cat /proc/spl/kstat/zfs/arcstats \
     | awk '$1=="hits"{printf $2" "}
     $1=="misses"{printf $2" "}
     $1=="l2_hits"{printf $2" "}

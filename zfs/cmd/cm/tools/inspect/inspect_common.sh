@@ -78,7 +78,9 @@ function inspect_init()
     #检查cm_multi服务
     local server='cm_multi_server.py'
     local exec='cm_multi_exec'
-    local curdir=`$(dirname `readlink -f $0`)/`
+    local curdir=`readlink -f $0` 
+    curdir=`dirname $curdir`
+    curdir=$curdir"/"
     if [ ! -f ${CM_SCRIPT_DIR}${server} ]; then
         cp ${curdir}${server} ${CM_SCRIPT_DIR}
     fi
@@ -88,6 +90,9 @@ function inspect_init()
     local isrun=`ps -ef|grep cm_multi_server |grep -v grep`
     if [ "X$isrun" == "X" ]; then
         #手动拉起
+        if [ ! -d "/var/cm/log/" ]; then
+            mkdir -p "/var/cm/log/"
+        fi
         ${CM_SCRIPT_DIR}${server}
         sleep 1
         isrun=`ps -ef|grep cm_multi_server |grep -v grep`

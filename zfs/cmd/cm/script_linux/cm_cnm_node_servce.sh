@@ -48,17 +48,15 @@ function static_cm_cnm_servce_check()
     
     local servce_lines=${#sub_sers[@]}
     #CM_LOG "[${FUNCNAME}:${LINENO}] $servce : ${sub_sers[@]}"
-    local servce_online_lines=`cat $tmp_file |grep -w ${servce}|grep -w online|wc -l`
+    local servce_online_lines=`cat $tmp_file |grep -w ${servce}|grep -w active|wc -l`
     #CM_LOG "$servce_lines $servce_online_lines"
-    if [ $servce_lines -eq 0 ];then
-        echo $UNDEFINE
-    elif [ $servce_lines -eq $servce_online_lines ];then
+    #if [ $servce_lines -eq 0 ];then
+    #    echo $UNDEFINE
+    if [ 1 -eq $servce_online_lines ];then
         echo $ONLINE
-    elif [ $servce_online_lines -gt 0 ];then
-        echo $PARTONLNE
     else
-        local ret=(`cat $tmp_file |grep -w ${servce}|awk '{print $1}'`)
-        if [ "${ret[0]}"x == "offline"x ];then
+        local ret=(`cat $tmp_file |grep -w ${servce}|awk '{print $3}'`)
+        if [ "${ret[0]}"x == "failed"x ];then
             echo $OFFLINE
         elif [ "${ret[0]}"x == "maintenance"x ];then
             echo $MAINTENANCE
@@ -79,7 +77,7 @@ function cm_cnm_servce_getbatch()
 
     local servce_status[0]=$UNDEFINE
     local index=0
-    svcs > $tmp_file
+    systemctl > $tmp_file
     for servce in ${servces[@]}
     do
         servce_status[$index]=`static_cm_cnm_servce_check $index`

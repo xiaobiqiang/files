@@ -650,7 +650,7 @@ static void cm_cnm_node_service_encode_each(cm_omi_obj_t item,void* eachdata,voi
         {CM_OMI_FIELD_NODE_SERVCE_FMD,info->fmd},
         {CM_OMI_FIELD_NODE_SERVCE_ISCSI,info->iscsi},  
     };
-    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_str_t));
+    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_num_t));
     return;
 }
 
