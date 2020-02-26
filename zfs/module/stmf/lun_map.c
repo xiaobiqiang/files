@@ -1307,6 +1307,8 @@ stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail)
 {
 	stmf_id_data_t *nonload_luid_ve = NULL;
 	uint32_t size = sizeof(stmf_view_op_entry_t);
+
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 	
 	if ((nonload_luid_ve = stmf_alloc_id(16, 
 			STMF_ID_TYPE_VE_OP, voe->ve_guid, 
@@ -1314,10 +1316,7 @@ stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail)
 		return -ENOMEM;
 
 	bcopy(voe, nonload_luid_ve->id_impl_specific, size);
-	
-	mutex_enter(&stmf_state.stmf_lock);
 	stmf_append_id(&stmf_state.stmf_nonload_lu_ve_list, nonload_luid_ve);
-	mutex_exit(&stmf_state.stmf_lock);
 	
 	return 0;
 }
