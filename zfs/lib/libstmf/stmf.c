@@ -5832,7 +5832,7 @@ loadStore(int fd)
 			goto out;
 		}
 		for (j = 0; j < viewEntryList->cnt; j++) {
-			ret = addViewEntryIoctl(fd, &guidList->guid[i],
+			ret = addNonLoadViewEntryIoctl(fd, &guidList->guid[i],
 			    &viewEntryList->ve[j]);
 			if (ret != STMF_STATUS_SUCCESS) {
 				goto out;
