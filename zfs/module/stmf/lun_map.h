@@ -148,6 +148,19 @@ typedef enum {
 	MERGE_FLAG_NONE			= 0
 } stmf_merge_flags_t;
 
+extern void
+stmf_append_id(stmf_id_list_t *idlist, stmf_id_data_t *id);
+extern void
+stmf_remove_id(stmf_id_list_t *idlist, stmf_id_data_t *id);
+extern stmf_id_data_t *
+stmf_alloc_id(uint16_t id_size, uint16_t type, uint8_t *id_data,
+			uint32_t additional_size);
+extern void
+stmf_free_id(stmf_id_data_t *id);
+
+extern int
+stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail);
+
 int stmf_add_group_member(uint8_t *grpname, uint16_t grpname_size,
 		uint8_t	*entry_ident, uint16_t entry_size,
 		stmf_id_type_t entry_type, uint32_t *err_detail);

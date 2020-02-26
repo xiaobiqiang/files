@@ -1302,7 +1302,7 @@ stmf_add_ve(uint8_t *hgname, uint16_t hgname_size,
 	return (0);
 }
 
-static int
+int
 stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail)
 {
 	stmf_id_data_t *nonload_luid_ve = NULL;

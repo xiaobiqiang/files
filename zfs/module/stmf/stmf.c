@@ -4736,7 +4736,7 @@ stmf_register_lu(stmf_lu_t *lu, boolean_t proxy_reg)
 			ve_op->ve_target_group.name,
 			ve_op->ve_target_group.name_size,
 			ve_op->ve_guid, &ve_op->ve_ndx,
-			&ve_op->ve_lu_nbr, &error_detail);
+			ve_op->ve_lu_nbr, &error_detail);
 
 		stmf_free_id(nonload_lu_ve);
 	}
