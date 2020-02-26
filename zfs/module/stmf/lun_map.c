@@ -1302,6 +1302,26 @@ stmf_add_ve(uint8_t *hgname, uint16_t hgname_size,
 	return (0);
 }
 
+static int
+stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail)
+{
+	stmf_id_data_t *nonload_luid_ve = NULL;
+	uint32_t size = sizeof(stmf_view_op_entry_t);
+	
+	if ((nonload_luid_ve = stmf_alloc_id(16, 
+			STMF_ID_TYPE_VE_OP, voe->ve_guid, 
+			size)) == NULL)
+		return -ENOMEM;
+
+	bcopy(voe, nonload_luid_ve->id_impl_specific, size);
+	
+	mutex_enter(&stmf_state.stmf_lock);
+	stmf_append_id(&stmf_state.stmf_nonload_lu_ve_list, nonload_luid_ve);
+	mutex_exit(&stmf_state.stmf_lock);
+	
+	return 0;
+}
+
 int
 stmf_remove_ve_by_id(uint8_t *guid, uint32_t veid, uint32_t *err_detail)
 {

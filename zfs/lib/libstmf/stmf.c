@@ -288,7 +288,9 @@ initializeConfig(void)
 		return (STMF_STATUS_SUCCESS);
 	}
 
-	ret = stmfLoadConfig();
+	return STMF_STATUS_ERROR;
+
+/*	ret = stmfLoadConfig();
 	if (ret != STMF_STATUS_SUCCESS) {
 		syslog(LOG_DEBUG,
 		    "initializeConfig:stmfLoadConfig:error(%d)", ret);
@@ -308,7 +310,7 @@ initializeConfig(void)
 		ret = STMF_STATUS_ERROR;
 	}
 
-	return (ret);
+	return (ret); */
 }
 
 
@@ -853,6 +855,108 @@ addViewEntryIoctl(int fd, stmfGuid *lu, stmfViewEntry *viewEntry)
 		    sizeof (ioctlViewEntry.ve_lu_nbr));
 	}
 	viewEntry->luNbrValid = B_TRUE;
+
+done:
+	return (ret);
+}
+
+static int
+addNonLoadViewEntryIoctl(int fd, stmfGuid *lu, stmfViewEntry *viewEntry)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int ioctlRet;
+	stmf_iocdata_t stmfIoctl;
+	stmf_view_op_entry_t ioctlViewEntry;
+
+	bzero(&ioctlViewEntry, sizeof (ioctlViewEntry));
+	/*
+	 * don't set ve_ndx or ve_ndx_valid as ve_ndx_valid should be
+	 * false on input
+	 */
+	ioctlViewEntry.ve_lu_number_valid = viewEntry->luNbrValid;
+	ioctlViewEntry.ve_all_hosts = viewEntry->allHosts;
+	ioctlViewEntry.ve_all_targets = viewEntry->allTargets;
+	ioctlViewEntry.ve_ndx_valid = viewEntry->veIndexValid;
+	ioctlViewEntry.ve_ndx = viewEntry->veIndex;
+
+	ASSERT(ioctlViewEntry.ve_ndx_valid == B_TRUE);
+
+	if (viewEntry->allHosts == B_FALSE) {
+		bcopy(viewEntry->hostGroup, &ioctlViewEntry.ve_host_group.name,
+		    sizeof (stmfGroupName));
+		ioctlViewEntry.ve_host_group.name_size =
+		    strlen((char *)viewEntry->hostGroup);
+	}
+	if (viewEntry->allTargets == B_FALSE) {
+		bcopy(viewEntry->targetGroup,
+		    &ioctlViewEntry.ve_target_group.name,
+		    sizeof (stmfGroupName));
+		ioctlViewEntry.ve_target_group.name_size =
+		    strlen((char *)viewEntry->targetGroup);
+	}
+	if (viewEntry->luNbrValid) {
+		bcopy(viewEntry->luNbr, &ioctlViewEntry.ve_lu_nbr,
+		    sizeof (ioctlViewEntry.ve_lu_nbr));
+	}
+	bcopy(lu, &ioctlViewEntry.ve_guid, sizeof (stmfGuid));
+
+	bzero(&stmfIoctl, sizeof (stmfIoctl));
+	/*
+	 * Issue ioctl to add to the view entry
+	 */
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_ibuf_size = sizeof (ioctlViewEntry);
+	stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)&ioctlViewEntry;
+	stmfIoctl.stmf_obuf_size = sizeof (ioctlViewEntry);
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)&ioctlViewEntry;
+	ioctlRet = ioctl(fd, STMF_IOCTL_ADD_NONLOAD_VIEW_ENTRY, &stmfIoctl);
+	if (ioctlRet != 0) {
+		switch (ioctlRet) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+				ret = STMF_ERROR_PERM;
+				break;
+			case EACCES:
+				switch (stmfIoctl.stmf_error) {
+					case STMF_IOCERR_UPDATE_NEED_CFG_INIT:
+						ret = STMF_ERROR_CONFIG_NONE;
+						break;
+					default:
+						ret = STMF_ERROR_PERM;
+						break;
+				}
+				break;
+			default:
+				switch (stmfIoctl.stmf_error) {
+					case STMF_IOCERR_LU_NUMBER_IN_USE:
+						ret = STMF_ERROR_LUN_IN_USE;
+						break;
+					case STMF_IOCERR_VIEW_ENTRY_CONFLICT:
+						ret = STMF_ERROR_VE_CONFLICT;
+						break;
+					case STMF_IOCERR_UPDATE_NEED_CFG_INIT:
+						ret = STMF_ERROR_CONFIG_NONE;
+						break;
+					case STMF_IOCERR_INVALID_HG:
+						ret = STMF_ERROR_INVALID_HG;
+						break;
+					case STMF_IOCERR_INVALID_TG:
+						ret = STMF_ERROR_INVALID_TG;
+						break;
+					default:
+						syslog(LOG_DEBUG,
+						    "addViewEntryIoctl"
+						    ":error(%d)",
+						    stmfIoctl.stmf_error);
+						ret = STMF_STATUS_ERROR;
+						break;
+				}
+				break;
+		}
+		goto done;
+	}
 
 done:
 	return (ret);

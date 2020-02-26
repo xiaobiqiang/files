@@ -92,7 +92,8 @@ typedef enum {
 	STMF_ID_TYPE_TARGET,
 	STMF_ID_TYPE_LU_GUID,
 	STMF_ID_TYPE_HOST_GROUP,
-	STMF_ID_TYPE_TARGET_GROUP
+	STMF_ID_TYPE_TARGET_GROUP,
+	STMF_ID_TYPE_VE_OP
 } stmf_id_type_t;
 
 typedef struct stmf_id_list {
