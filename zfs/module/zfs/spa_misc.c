@@ -605,6 +605,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	spa->spa_deadman_synctime = MSEC2NSEC(zfs_deadman_synctime_ms);
 
 	refcount_create(&spa->spa_refcount);
+	refcount_dbg_create(&spa->spa_dbg_refcount);
 	spa_config_lock_init(spa);
 	spa_stats_init(spa);
 
@@ -721,6 +722,7 @@ spa_remove(spa_t *spa)
 	spa_config_set(spa, NULL);
 
 	refcount_destroy(&spa->spa_refcount);
+	refcount_dbg_destroy(&spa->spa_dbg_refcount);
 
 	spa_stats_destroy(spa);
 	spa_config_lock_destroy(spa);
@@ -812,6 +814,7 @@ spa_open_ref(spa_t *spa, void *tag)
 	ASSERT(refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
 	(void) refcount_add(&spa->spa_refcount, tag);
+	(void) refcount_dbg_add(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -824,6 +827,7 @@ spa_close(spa_t *spa, void *tag)
 	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
 	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) refcount_dbg_remove(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -838,6 +842,7 @@ void
 spa_async_close(spa_t *spa, void *tag)
 {
 	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) refcount_dbg_remove(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -2443,9 +2448,23 @@ spa_get_group_flags(spa_t *spa)
 size_t
 sprintf_spa_refcount(spa_t *spa, char *buf, size_t len)
 {
-	size_t n;
+	refcount_dbg_t	*spa_dbg_refcount = &spa->spa_dbg_refcount;
+	reference_dbg_t *ref;
+	size_t off = 0, n;
 
-	n = snprintf(buf, len, "spa %s:", spa_name(spa));
+	n = snprintf(buf, len, "spa name %s:", spa_name(spa));
+	off += n;
+	n = snprintf(buf + off, len - off, "ref_count = %d, ref_removed = %d", 
+		spa_dbg_refcount->rc_count, spa_dbg_refcount->rc_removed_count);
+	off += n;
+
+	for (ref = list_head(&spa_dbg_refcount.rc_list); ref; 
+		ref = list_next(&spa_dbg_refcount->rc_list, ref)) {
+		n = snprintf(buf + off, len - off, "ref_holder: %s", (char *)ref->ref_holder);
+		off += n;
+	}
+
+	return off;
 }
 
 void
