@@ -302,7 +302,7 @@ static void cm_cnm_alarm_record_sql(const cm_cnm_alarm_query_t *query,
 
     len = strlen(sql);
     
-    len += CM_VSPRINTF(sql+len,buf_size-len," ORDER BY record_t.report_time DESC"
+    len += CM_VSPRINTF(sql+len,buf_size-len," ORDER BY record_t.id DESC"
         " LIMIT %llu,%llu",query->offset,cnt);
 
     CM_LOG_INFO(CM_MOD_CNM,"%s",sql);
@@ -714,7 +714,6 @@ sint32  cm_cnm_threshold_update(const void *pDecodeParam,void **ppAckData,uint32
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     cm_alarm_threshold_t info = {0,0,0};
     const cm_alarm_threshold_t *req= NULL;
-    uint32 count = 0;
     sint32 iRet = CM_FAIL;
     if(decode == NULL)
     {
@@ -1105,7 +1104,6 @@ static void cm_cnm_storage_alarm_add(const sint8* name,uint32 type,sint32 used)
 static void cm_cnm_storage_alarm_process(const sint8* name,uint32 type,const sint8* percent)
 {
     cm_cnm_storage_alarm_node_t *pnode = NULL;
-    sint32 iRet = CM_OK;
     sint32 used = atoi(percent);
     sint8 param[128] = {0};
 
@@ -1582,8 +1580,6 @@ static sint32 cm_cnm_mailsend_local_get_each(
 
 sint32 cm_cnm_mailsend_update(const void *pDecodeParam,void **ppAckData,uint32 * pAckLen)
 {
-    uint32 cnt = 0;
-    sint32 iRet = 0;
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     cm_cnm_mailsend_info_t data;
     const cm_cnm_mailsend_info_t *info = NULL;
@@ -1858,7 +1854,10 @@ sint32  cm_cnm_mailrecv_insert(void *pDecodeParam,void **ppAckData,uint32 * pAck
     
     (void)cm_db_exec_get_count(mail_db_handle, &cnt,
         "SELECT seq+1 FROM sqlite_sequence WHERE name='receiver_t'"); 
-        
+    if(cnt == 0)
+    {
+        cnt = 1;
+    }
     CM_LOG_WARNING(CM_MOD_CNM,"%llu,%s,%u",cnt,info->receiver,info->level); 
     return cm_sync_request(CM_SYNC_OBJ_MAILRECV,cnt,info,sizeof(cm_cnm_mailrecv_info_t));     
 }
@@ -1866,7 +1865,6 @@ sint32  cm_cnm_mailrecv_insert(void *pDecodeParam,void **ppAckData,uint32 * pAck
 sint32  cm_cnm_mailrecv_update(const void *pDecodeParam,void **ppAckData,uint32 * pAckLen)
 {
     uint32 cnt = 0;
-    sint32 iRet = 0;
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     const cm_cnm_mailrecv_info_t *info = NULL;
     cm_cnm_mailrecv_info_t data;
@@ -1946,7 +1944,6 @@ sint32 cm_cnm_mailrecv_getbatch(const void * pDecodeParam,void **ppAckData,uint3
     const cm_cnm_decode_info_t *dec = pDecodeParam;
     cm_cnm_mailrecv_info_t *info = NULL;
     uint32 offset = 0;
-    sint32 iRet = CM_OK;
     uint32 total = CM_CNM_MAX_RECORD;
 
     if(dec != NULL)

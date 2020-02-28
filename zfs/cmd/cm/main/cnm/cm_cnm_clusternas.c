@@ -326,14 +326,9 @@ sint32  cm_cnm_cluster_nas_local_create(
     {
         return CM_ERR_ALREADY_EXISTS; 
     }
-    (void)cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
-        "zfs multiclus create %s %s 2>&1",info->group_name,info->nas);
-    if(NULL != strstr(buff,"Fail"))
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"%s",buff);
-        return CM_FAIL;
-    }
-    return CM_OK;
+    
+    return cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,
+            "zfs multiclus create %s %s 2>&1",info->group_name,info->nas);
 }    
 
 sint32  cm_cnm_cluster_nas_local_add(
@@ -347,6 +342,8 @@ sint32  cm_cnm_cluster_nas_local_add(
     uint32 cnt = 0;
     uint32 nascheck = 0;
     sint8 buff[CM_STRING_1K] = {0};
+    sint32 iRet = CM_OK;
+    
     if(NULL == req)
     {
         return CM_PARAM_ERR;
@@ -355,18 +352,13 @@ sint32  cm_cnm_cluster_nas_local_add(
     nascheck = cm_exec_int("zfs list -H -t filesystem -o name %s 2>/dev/null |wc -l",info->nas);
     if(0==nascheck)
     {
-       return CM_ERR_NOT_EXISTS; 
+        return CM_ERR_NOT_EXISTS; 
     }
     cnt = cm_exec_int("zfs multiclus -v | grep -w '%s' | wc -l",info->nas);
     if(0==cnt)
     {
-        (void)cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
-        "zfs multiclus add %s %s 2>&1",info->group_name,info->nas);
-        if(NULL != strstr(buff,"Fail"))
-    {
-            CM_LOG_ERR(CM_MOD_CNM,"%s",buff);
-            return CM_FAIL;
-        }
+        iRet = cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,
+            "zfs multiclus add %s %s 2>&1",info->group_name,info->nas);
     }
     if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_CLUSTER_NAS_ZFS_ROLE))
     {
@@ -376,7 +368,6 @@ sint32  cm_cnm_cluster_nas_local_add(
         if(NULL != strstr(buff,"Fail"))
         {
             CM_LOG_ERR(CM_MOD_CNM,"%s",buff);
-            return CM_FAIL;
         } 
     }
     if((cnt != 0)
@@ -384,7 +375,7 @@ sint32  cm_cnm_cluster_nas_local_add(
     { 
         return CM_ERR_ALREADY_EXISTS; 
     }
-    return CM_OK;
+    return iRet;
 }  
 
 sint32  cm_cnm_cluster_nas_local_delete(
@@ -398,6 +389,7 @@ sint32  cm_cnm_cluster_nas_local_delete(
     uint32 cnt = 0;
     uint32 nascheck = 0;
     sint8 buff[CM_STRING_1K] = {0};
+    sint32 iRet = CM_OK;
     if(NULL == req)
     {
         return CM_PARAM_ERR;
@@ -412,20 +404,15 @@ sint32  cm_cnm_cluster_nas_local_delete(
     cnt = cm_exec_int("zfs multiclus -v | grep -w '%s' | wc -l",info->nas);
     if(cnt > 0)
     {
-        (void)cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
-        "%s delete %s %s 2>&1",g_cm_cnm_cluster_nas_script,info->group_name,info->nas);
-        if(NULL != strstr(buff,"Fail"))
-        {
-            CM_LOG_ERR(CM_MOD_CNM,"%s",buff);
-            return CM_FAIL;
-        } 
+        iRet = cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT,
+            "%s delete %s %s 2>&1",g_cm_cnm_cluster_nas_script,info->group_name,info->nas);
     }
     if(cnt == 0)
     { 
         CM_LOG_ERR(CM_MOD_CNM,"nas %s is no member in cluster %s",info->nas,info->group_name);
         return CM_ERR_NOT_EXISTS; 
     }
-    return CM_OK;
+    return iRet;
 }  
 
 sint32 cm_cnm_cluster_nas_create(

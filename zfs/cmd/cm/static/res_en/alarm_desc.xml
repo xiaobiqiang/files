@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <alarms>
     <alarm id="1" name="disk lost" title="(#0)disk (#1) lost" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="check the disk removed or damaged!"/>
-    <alarm id="2" name="disk recover" title="(#0)disk (#1) recover" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="nothing to do!"/>
+    <alarm id="2" name="disk insert" title="(#0)disk (#1) insert" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="nothing to do!"/>
 
 
     <alarm id="21" name="slow disk" title="(#0)slow disk (#1)" desc="hostname (#0), disk name (#1), slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
@@ -48,6 +48,9 @@
     <alarm id="53" name="zfs/io deadlock" title="zfs/io deadlock" desc="zfs/io deadlock in node (#0)." suggest="save data and reboot"/>
     <alarm id="54" name="pool resilvered" title="pool resilvered" desc="in node(#0) pool(#1) resilvered." suggest="none"/>
     <alarm id="55" name="dirquota" title="DIR(#1)dirquota" desc="in node (#0)， DIR (#1),usred (#3),quota size(#2)." suggest="clean space"/>
+	
+    <alarm id="56" name="rpc flowcontrol open" title="rpc flowcontrol open" desc="node (#0),rpc flowcontrol open,the app is(#1)." suggest="none"/>
+    <alarm id="57" name="rpc flowcontrol close" title="rpc flowcontrol close" desc="node (#0),rpc flowcontrol close,the app is(#1)." suggest="none"/>
 	
     <alarm id="10000000" name="node offline" title="Node (#0) offline" desc="Node (#0) offline" suggest="check node status"/>
     <alarm id="10000010" name="nas overload alarm" title="(#0)nas overload alarm" desc="hostname (#0)， nas name (#1)." suggest="check nas using situation"/>

@@ -176,7 +176,7 @@ sint32 cm_omi_remote_connect(const sint8* ipaddr)
     cm_rpc_handle_t *pHandle=NULL;
     cm_rpc_handle_t *ptmp=CmOmiRemoteHandles;
     sint32 iloop=0;
-    sint32 *pIndex=0;
+    sint32 freeindex=0;
     sint32 iRet = CM_OK;
     const sint8* ipconn=NULL;
     
@@ -184,11 +184,11 @@ sint32 cm_omi_remote_connect(const sint8* ipaddr)
     {
         if(*ptmp == NULL)
         {
-            if(pHandle != NULL)
+            if(pHandle == NULL)
             {
                 /* get free handle */
                 pHandle = ptmp;
-                *pIndex = iloop;
+                freeindex = iloop;
             }
             continue;
         }
@@ -205,6 +205,7 @@ sint32 cm_omi_remote_connect(const sint8* ipaddr)
 
     if(pHandle == NULL)
     {
+        CM_LOG_ERR(CM_MOD_OMI,"conn to %s no free",ipaddr);
         return -1;
     }
     
@@ -214,7 +215,7 @@ sint32 cm_omi_remote_connect(const sint8* ipaddr)
         CM_LOG_ERR(CM_MOD_OMI,"conn to %s fail[%d]",ipaddr,iRet);
         return -2;
     }
-    return *pIndex;
+    return freeindex;
 }
 
 sint32 cm_omi_remote_request(sint32 handle,const sint8 *pReq, 

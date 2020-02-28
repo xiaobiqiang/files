@@ -841,6 +841,46 @@ void cm_cnm_encode_num(cm_omi_obj_t item, const cm_omi_field_flag_t *field,
     return;
 }
 
+void cm_cnm_mkparam_str(sint8* buff,sint32 len, 
+    const cm_omi_field_flag_t *field,
+    const cm_cnm_map_value_str_t *map, uint32 count)
+{
+    while(count > 0)
+    {
+        count--;
+        if(CM_OMI_FIELDS_FLAG_ISSET(field,map->id))
+        {
+            CM_SNPRINTF_ADD(buff,len,"|%s",map->value);
+        }
+        else
+        {
+            CM_SNPRINTF_ADD(buff,len,"|-");
+        }
+        map++;
+    }
+    return;
+}
+
+void cm_cnm_mkparam_num(sint8* buff,sint32 len,
+    const cm_omi_field_flag_t *field,
+    const cm_cnm_map_value_num_t *map, uint32 count)
+{
+    while(count > 0)
+    {
+        count--;
+        if(CM_OMI_FIELDS_FLAG_ISSET(field,map->id))
+        {
+            CM_SNPRINTF_ADD(buff,len,"|%u",map->value);
+        }
+        else
+        {
+            CM_SNPRINTF_ADD(buff,len,"|-");
+        }
+        map++;
+    }
+    return;
+}
+
 void cm_cnm_encode_double(cm_omi_obj_t item, const cm_omi_field_flag_t *field,
     const cm_cnm_map_value_double_t *map, uint32 count)
 {
@@ -915,7 +955,7 @@ sint32 cm_cnm_exec_local(void *pMsg, uint32 Len, void** ppAck, uint32 *pAckLen)
     CM_MEM_ZERO(pbuff,CM_STRING_2K);
     
     iRet = cm_exec_tmout(pbuff,CM_STRING_2K,CM_CMT_REQ_TMOUT,cmd);
-    if((CM_OK != iRet) || (0 == strlen(pbuff)))
+    if(0 == strlen(pbuff))
     {
         CM_FREE(pbuff);
         return iRet;
@@ -923,7 +963,7 @@ sint32 cm_cnm_exec_local(void *pMsg, uint32 Len, void** ppAck, uint32 *pAckLen)
 
     *ppAck = pbuff;
     *pAckLen = strlen(pbuff)+1;
-    return CM_OK;
+    return iRet;
 }
 
 typedef struct

@@ -238,10 +238,15 @@ int main(int argc, const char *argv[])
     return 0;
 }
 
-
+extern void cm_cnm_localtask_thread(void);
 static void cm_period_20s(uint32 sec)
 {
     sec++;
+
+    if(0 == (sec % 5))
+    {
+        cm_cnm_localtask_thread();
+    }
     if(0 != (sec % 20))
     {
         return;

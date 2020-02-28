@@ -232,6 +232,7 @@ sint32 cm_cnm_nas_delete(
     return cm_cnm_nas_requst(CM_OMI_CMD_DELETE,pDecodeParam,ppAckData,pAckLen);
 }    
 
+#if 0
 static sint32 cm_cnm_nas_local_get_each(void *arg, sint8 **cols, uint32 col_num)
 {
     cm_cnm_nas_info_t *info = arg;
@@ -348,7 +349,97 @@ sint32 cm_cnm_nas_local_get(
     *pAckLen = sizeof(cm_cnm_nas_info_t);
     return CM_OK;
 }    
+#else
+static sint32 cm_cnm_nas_local_get_each(void *arg, sint8 **cols, uint32 col_num)
+{
+    cm_cnm_nas_info_t *info = arg;
+    const uint32 def_num=13;
+    
+    if(def_num != col_num)
+    {
+        CM_LOG_WARNING(CM_MOD_CNM,"col_num[%u] def_num[%u]",col_num,def_num);
+        return CM_FAIL;
+    }
+    /* name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit,
+bandwidth,nasavsbw */
+    CM_MEM_ZERO(info,sizeof(cm_cnm_nas_info_t));
+    sscanf(cols[0],"%[a-zA-Z0-9_.-]/%[a-zA-Z0-9_.-]",info->pool,info->name);
+    info->nid = cm_node_get_id();
+    CM_VSPRINTF(info->space_used,sizeof(info->space_used),"%s",cols[1]);
+    CM_VSPRINTF(info->space_avail,sizeof(info->space_avail),"%s",cols[2]);
+    CM_VSPRINTF(info->quota,sizeof(info->quota),"%s",cols[3]);
+    info->blocksize = (uint16)atoi(cols[4]);
 
+    info->is_compress = (0 == strcmp(cols[5],"on")) ? CM_TRUE : CM_FALSE;    
+    info->write_policy = (uint8)cm_cnm_get_enum(&CmOmiMapLunSyncTypeCfg,cols[6],0);
+    info->dedup = (0 == strcmp(cols[7],"on")) ? CM_TRUE : CM_FALSE;   
+
+    if(0 == strcmp(cols[8],"off"))
+    {
+        info->smb = CM_FALSE;
+        info->abe = CM_FALSE;
+    }
+    else
+    {
+        info->smb = CM_TRUE;
+        if(0 == strcmp(cols[8],"abe=true"))
+        {
+            info->abe = CM_TRUE;
+        }
+    }
+
+    info->aclinherit = (uint8)cm_cnm_get_enum(&CmOmiMapAclInheritType,cols[9],0);
+
+    CM_VSPRINTF(info->qos_avs,sizeof(info->qos_avs),"%s",cols[10]);
+    CM_VSPRINTF(info->qos_val,sizeof(info->qos_val),"%s",cols[11]);
+    info->access = (uint16)atoi(cols[12]);
+    return CM_OK;
+}
+
+sint32 cm_cnm_nas_local_getbatch(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    sint32 iRet = CM_OK;
+    
+    CM_LOG_INFO(CM_MOD_CNM,"offset[%llu] total[%u]",offset,total);
+    iRet = cm_exec_get_list(cm_cnm_nas_local_get_each,
+        (uint32)offset,sizeof(cm_cnm_nas_info_t),ppAck,&total,
+        CM_SCRIPT_DIR"cm_cnm.sh nas_getbatch");
+    if(CM_OK != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]",iRet);
+        return iRet;
+    }
+    *pAckLen = total * sizeof(cm_cnm_nas_info_t);
+    return CM_OK;
+}
+
+sint32 cm_cnm_nas_local_get(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    sint32 iRet = CM_OK;
+    const cm_cnm_decode_info_t *req = param;
+    const cm_cnm_nas_info_t *info = (const cm_cnm_nas_info_t *)req->data;
+    
+    total = 1;
+    CM_LOG_INFO(CM_MOD_CNM,"offset[%llu] total[%u]",offset,total);
+    iRet = cm_exec_get_list(cm_cnm_nas_local_get_each,
+        (uint32)0,sizeof(cm_cnm_nas_info_t),ppAck,&total,
+        CM_SCRIPT_DIR"cm_cnm.sh nas_getbatch %s/%s",info->pool,info->name);
+    if(CM_OK != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]",iRet);
+        return iRet;
+    }
+    *pAckLen = total * sizeof(cm_cnm_nas_info_t);
+    return CM_OK;
+}
+
+#endif
 sint32 cm_cnm_nas_local_count(
     void *param, uint32 len,
     uint64 offset, uint32 total, 
@@ -362,6 +453,7 @@ sint32 cm_cnm_nas_local_count(
     return cm_cnm_ack_uint64(cnt,ppAck,pAckLen);
 }    
 
+#if 0
 static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     const cm_cnm_nas_info_t *info)
 {
@@ -534,6 +626,7 @@ static sint32 cm_cnm_nas_local_set(const cm_omi_field_flag_t *set,
     return (0 == failnum)? CM_OK: CM_FAIL;
 }
 
+
 sint32  cm_cnm_nas_local_create(
     void *param, uint32 len,
     uint64 offset, uint32 total, 
@@ -603,7 +696,82 @@ sint32 cm_cnm_nas_local_delete(
     }
     return CM_OK;
 }    
+#else
+static sint32 cm_cnm_nas_local_exec(const sint8* act,
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    uint32 taskid=0;
+    sint8 buf[CM_STRING_1K] = {0};
+    sint32 buflen=sizeof(buf);
+    sint32 iRet = CM_OK;
+    const cm_cnm_decode_info_t *req = (const cm_cnm_decode_info_t *)param;
+    const cm_cnm_nas_info_t *info = (const cm_cnm_nas_info_t *)req->data;
+    cm_cnm_map_value_num_t optnum[] = 
+        {
+            {CM_OMI_FIELD_NAS_BLOCKSIZE, info->blocksize},
+            {CM_OMI_FIELD_NAS_ACCESS, info->access},
+            {CM_OMI_FIELD_NAS_WRITE_POLICY, info->write_policy},
+            {CM_OMI_FIELD_NAS_IS_COMP, info->is_compress},
+            {CM_OMI_FIELD_NAS_DEDUP, info->dedup},
+            {CM_OMI_FIELD_NAS_SMB, info->smb},
+            {CM_OMI_FIELD_NAS_ABE, info->abe},
+            {CM_OMI_FIELD_NAS_ACLINHERIT, info->aclinherit},
+        };
+    cm_cnm_map_value_str_t optstr[] = 
+        {
+            {CM_OMI_FIELD_NAS_QUOTA,info->quota},
+            {CM_OMI_FIELD_NAS_QOS,info->qos_val},
+            {CM_OMI_FIELD_NAS_QOS_AVS,info->qos_avs},
+        };
+    
+    CM_SNPRINTF_ADD(buf,buflen,"%s/%s",info->pool,info->name);
+    cm_cnm_mkparam_num(buf,buflen,&req->set,optnum,sizeof(optnum)/sizeof(cm_cnm_map_value_num_t));
+    cm_cnm_mkparam_str(buf,buflen,&req->set,optstr,sizeof(optstr)/sizeof(cm_cnm_map_value_num_t));
+    
+    iRet = cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,
+        CM_SCRIPT_DIR"cm_cnm.sh nas_%s '%s' 2>&1",act,buf);
+    if((CM_OK != iRet) || (*ppAck == NULL) || (*pAckLen == 0))
+    {
+        return iRet;
+    }
+    taskid = atoi((sint8*)*ppAck);
+    CM_FREE(*ppAck);
+    *ppAck = NULL;
+    *pAckLen = 0;
+    if(taskid > 0)
+    {
+        return cm_cnm_ack_uint64(taskid,ppAck,pAckLen);
+    }
+    return CM_OK;
+}
 
+sint32 cm_cnm_nas_local_create(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_nas_local_exec("create",param,len,offset,total,ppAck,pAckLen);
+}
+
+sint32 cm_cnm_nas_local_update(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_nas_local_exec("update",param,len,offset,total,ppAck,pAckLen);
+}
+
+sint32 cm_cnm_nas_local_delete(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_nas_local_exec("delete",param,len,offset,total,ppAck,pAckLen);
+}
+
+#endif
 static void cm_cnm_nas_oplog_report(
     const sint8* sessionid, const void *pDecodeParam, uint32 alarmid)
 {

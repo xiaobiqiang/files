@@ -1133,6 +1133,10 @@ sint32 cm_cnm_cluster_remote_insert(const void *pDecodeParam,void **ppAckData, u
     cnt = 0;
     (void)cm_db_exec_get_count(gCmRemoteClustersHandle, &cnt,
         "SELECT seq+1 FROM sqlite_sequence WHERE name='record_t'"); 
+    if(cnt == 0)
+    {
+        cnt = 1;
+    }
     return cm_sync_request(CM_SYNC_OBJ_REMOTE_CLUSTER,cnt,(void*)info,
         sizeof(cm_cnm_remote_cluster_info_t));
 }

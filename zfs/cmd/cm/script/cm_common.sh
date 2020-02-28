@@ -15,6 +15,7 @@ CM_LOG_LEVEL=$CM_LOG_LEVEL_ERR
 
 CM_SYS_VER_DEFAULT=0
 CM_SYS_VER_SOLARIS_V7R16=1
+CM_SYS_VER_SOLARIS_NOMASTER=2
 
 CM_OS_TYPE_SOLARIS=0
 CM_OS_TYPE_ILLUMOS=1
@@ -89,6 +90,9 @@ function cm_systerm_version_get()
         local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
         if [ "X$versions" == "Xv7.r16" ]; then
             echo $CM_SYS_VER_SOLARIS_V7R16
+            return 0
+        elif [[ "$versions" == *"CDCFS"* ]]; then
+            echo $CM_SYS_VER_SOLARIS_NOMASTER
             return 0
         fi
     fi

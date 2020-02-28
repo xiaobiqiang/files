@@ -152,8 +152,6 @@ sint32 cm_cmt_request(uint32 Nid,cm_msg_type_e Msg,const void *pData, uint32 Dat
     if(CM_OK != iRet)
     {
         CM_LOG_INFO(CM_MOD_CMT,"Nid(%u) Msg(%u) fail iRet=%d",Nid, Msg,iRet);
-        cm_rpc_msg_delete(pAckMsg);
-        return iRet;
     }
 
     iRet = pAckMsg->result;

@@ -163,8 +163,8 @@ sint32 cm_omi_obj_key_set_double_ex(cm_omi_obj_t obj, uint32 key, double val)
 }
 
 
-cm_omi_obj_t cm_omi_encode_count(
-    const void *pDecodeParam, void *pAckData, uint32 AckLen)
+cm_omi_obj_t cm_omi_encode_num(
+    uint32 key,const void *pDecodeParam, void *pAckData, uint32 AckLen)
 {
     cm_omi_obj_t items = NULL;
     cm_omi_obj_t item = NULL;
@@ -192,7 +192,7 @@ cm_omi_obj_t cm_omi_encode_count(
         return items;
     }
     /* CM_OMI_FIELD_COUNT 259 */
-    (void)cm_omi_obj_key_set_u64_ex(item, 259, *pData);
+    (void)cm_omi_obj_key_set_u64_ex(item, key, *pData);
 
     if(CM_OK != cm_omi_obj_array_add(items, item))
     {
@@ -202,6 +202,19 @@ cm_omi_obj_t cm_omi_encode_count(
 
     return items;
 }
+
+cm_omi_obj_t cm_omi_encode_count(
+    const void *pDecodeParam, void *pAckData, uint32 AckLen)
+{
+    return cm_omi_encode_num(259,pDecodeParam,pAckData,AckLen);
+}
+
+cm_omi_obj_t cm_omi_encode_taskid(
+    const void *pDecodeParam, void *pAckData, uint32 AckLen)
+{
+    return cm_omi_encode_num(266,pDecodeParam,pAckData,AckLen);
+}
+
 
 uint32 cm_omi_get_fields(const sint8 *fields_str, sint8 **fields, uint32 max)
 {
@@ -430,6 +443,46 @@ sint32 cm_omi_init(bool_t isclient)
     }
 
     return cm_omi_init_server();
+}
+
+cm_omi_obj_t cm_omi_encode_errormsg(
+    const void *pDecodeParam, void *pAckData, uint32 AckLen)
+{
+    cm_omi_obj_t items = NULL;
+    cm_omi_obj_t item = NULL;
+    sint8 *pData = (sint8*)pAckData;
+    uint32 count = AckLen;
+
+    if(0 == count)
+    {
+        return NULL;
+    }
+
+    items = cm_omi_obj_new_array();
+
+    if(NULL == items)
+    {
+        CM_LOG_ERR(CM_MOD_CNM, "new items fail");
+        return NULL;
+    }
+
+    item = cm_omi_obj_new();
+
+    if(NULL == item)
+    {
+        CM_LOG_ERR(CM_MOD_CNM, "new item fail");
+        return items;
+    }
+    /* CM_OMI_FIELD_ERROR_MSG 265 */
+    (void)cm_omi_obj_key_set_str_ex(item, 265, pData);
+
+    if(CM_OK != cm_omi_obj_array_add(items, item))
+    {
+        CM_LOG_ERR(CM_MOD_CNM, "add item fail");
+        cm_omi_obj_delete(item);
+    }
+
+    return items;
 }
 
 

@@ -107,7 +107,13 @@ extern sint32 cm_omi_remote_connect(const sint8* ipaddr);
 extern sint32 cm_omi_remote_request(sint32 handle,const sint8 *pReq, 
     sint8 **ppAckData, uint32 *pAckLen, uint32 timeout);
 
-//extern sint32 cm_omi_remote_connect(sint32 handle);
+extern sint32 cm_omi_remote_close(sint32 handle);
+
+extern cm_omi_obj_t cm_omi_encode_errormsg(
+    const void *pDecodeParam, void *pAckData, uint32 AckLen);
+
+extern cm_omi_obj_t cm_omi_encode_taskid(
+    const void *pDecodeParam, void *pAckData, uint32 AckLen);
 
 
 #endif /* BASE_OMI_CM_OMI_H_ */

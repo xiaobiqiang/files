@@ -280,5 +280,16 @@ extern void cm_cnm_oplog_report(const sint8 *sessionid,uint32 alarmid,
     const cm_cnm_oplog_param_t* params, uint32 cnt, const cm_omi_field_flag_t* 
     set);
 
+extern sint32 cm_cnm_localtask_create(
+    const sint8* name, const sint8* cmd, uint32 *tid);
+
+extern void cm_cnm_mkparam_str(sint8* buff,sint32 len, 
+    const cm_omi_field_flag_t *field,
+    const cm_cnm_map_value_str_t *map, uint32 count);
+
+extern void cm_cnm_mkparam_num(sint8* buff,sint32 len,
+    const cm_omi_field_flag_t *field,
+    const cm_cnm_map_value_num_t *map, uint32 count);
+
 #endif /* MAIN_CNM_CM_CNM_COMMON_H_ */
 

@@ -402,6 +402,58 @@ sint32 cm_exec_tmout(sint8 *buff, sint32 size,sint32 tmout, const sint8* cmdfora
     return iRet;
 }
 
+sint32 cm_exec_out(sint8 **ppAck, uint32 *pAclLen,sint32 tmout, const sint8* cmdforamt,...)
+{    
+    sint32 iRet = CM_OK;
+    sint8 cmd[CM_STRING_1K] = {0};
+    cm_hrtime_t hrt = CM_GET_HRTIME();
+    sint8 *pcmdstr = cmd;
+    sint8 *pbuff = CM_MALLOC(CM_STRING_2K);
+    sint32 buffsize=CM_STRING_2K;
+    int len = 0;
+
+    if(pbuff == NULL)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"malloc fail!");
+        return CM_FAIL;
+    }
+    if(tmout > CM_CMT_REQ_TMOUT_NEVER)
+    {
+        len = CM_VSPRINTF(cmd,CM_STRING_1K,"timeout %u ",tmout);
+        pcmdstr += len;
+    }
+    
+    CM_ARGS_TO_BUF(pcmdstr, sizeof(cmd)-len,cmdforamt);
+    CM_MEM_ZERO(pbuff,buffsize);
+    
+    iRet = cm_exec_in(cmd, pbuff, buffsize);
+    buffsize = strlen(pbuff);
+    if(buffsize > 0)
+    {
+        *pAclLen = buffsize+1;
+        *ppAck = pbuff;
+    }
+    else
+    {
+        CM_FREE(pbuff);
+    }
+    hrt = cm_hrtime_delta(hrt,CM_GET_HRTIME());
+    if(hrt >= CM_EXEC_LOG_TIME)
+    {
+        CM_LOG_WARNING(CM_MOD_NONE,"[%s] cost %llus",pcmdstr,CM_HRTIME_TO_S(hrt));
+    }
+    if(iRet != CM_OK)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"[%s] fail[%d]",pcmdstr,iRet);
+        if(iRet > CM_ERR_TIMEOUT_IRET)
+        {
+            iRet = CM_FAIL;
+        }        
+    }
+    return iRet;
+}
+
+
 sint32 cm_exec_get_subpid(const sint8 *cmd, uint32 *subPID)
 {
     sint32 pid = 0;

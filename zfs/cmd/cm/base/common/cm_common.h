@@ -92,4 +92,6 @@ extern sint32 cm_exec_get_list(cm_exec_cbk_col_t cbk,
 
 extern uint64 cm_hrtime_delta(cm_hrtime_t old, cm_hrtime_t new);
 
+extern sint32 cm_exec_out(sint8 **ppAck, uint32 *pAclLen,sint32 tmout, const sint8* cmdforamt,...);
+
 #endif /* BASE_COMMON_CM_COMMON_H_ */

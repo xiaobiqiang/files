@@ -801,13 +801,7 @@ sint32 cm_cnm_pool_local_create(
     CM_LOG_WARNING(CM_MOD_CNM,"%s",cmd);
     CM_SNPRINTF_ADD(cmd,buf_len," 2>&1");
     
-    iRet = cm_exec_cmd_for_str(cmd,cmd,buf_len,CM_CMT_REQ_TMOUT);
-    if(CM_OK != iRet)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,cmd);
-        iRet = cm_cnm_get_errcode(&CmCnmPoolMapErrCfg,cmd,iRet);
-    }
-    return iRet;
+    return cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,cmd);
 }
 
 sint32 cm_cnm_pool_local_update(
@@ -866,7 +860,7 @@ sint32 cm_cnm_pool_local_delete(
     
     CM_LOG_WARNING(CM_MOD_CNM,"zpool destroy %s",req->name);
 
-    iRet = cm_exec_tmout(cmd,buf_len,CM_CMT_REQ_TMOUT,
+    iRet = cm_exec_tmout(cmd,buf_len,CM_CMT_REQ_TMOUT_NEVER,
         "zfs list -H -o name,mountpoint|grep -v _bit0 |egrep \"^%s/\" "
         "|awk 'BEGIN{lun=0;nas=0}$2==\"-\"{lun+=1}{nas+=1}END{nas=nas-lun;print lun\" \"nas}'",
         req->name);
@@ -890,15 +884,8 @@ sint32 cm_cnm_pool_local_delete(
         return CM_ERR_POOL_NAS_EXISTS;
     }
     
-    CM_VSPRINTF(cmd,buf_len,"zpool destroy -f %s 2>&1",req->name);
-    
-    iRet = cm_exec_cmd_for_str(cmd,cmd,buf_len,CM_CMT_REQ_TMOUT);
-    if(CM_OK != iRet)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,cmd);
-        iRet = cm_cnm_get_errcode(&CmCnmPoolMapErrCfg,cmd,iRet);
-    }
-    return iRet;
+    return cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,
+        "zpool destroy -f %s 2>&1",req->name);
 }
 
 sint32 cm_cnm_zpool_eximport_task_report
@@ -1652,16 +1639,11 @@ sint32 cm_cnm_pooldisk_local_add(
     else
     {
         cm_cnm_pool_local_make_raidx(cmd,buf_len,disk_ids,req->group,raid);   
+        CM_SNPRINTF_ADD(cmd,buf_len," 2>&1");
     }
     CM_LOG_WARNING(CM_MOD_CNM,"%s",cmd);   
     
-    iRet = cm_exec_cmd_for_str(cmd,cmd,buf_len,CM_CMT_REQ_TMOUT);
-    if(CM_OK != iRet)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,cmd);
-        iRet = cm_cnm_get_errcode(&CmCnmPoolMapErrCfg,cmd,iRet);
-    }
-    return iRet;
+    return cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,cmd);
 }
 
 sint32 cm_cnm_pooldisk_local_delete(
@@ -1690,13 +1672,7 @@ sint32 cm_cnm_pooldisk_local_delete(
     CM_SNPRINTF_ADD(cmd,buf_len," %s 2>&1",disk_ids);
     CM_LOG_WARNING(CM_MOD_CNM,"%s",cmd);   
     
-    iRet = cm_exec_cmd_for_str(cmd,cmd,buf_len,CM_CMT_REQ_TMOUT);
-    if(CM_OK != iRet)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,cmd);
-        iRet = cm_cnm_get_errcode(&CmCnmPoolMapErrCfg,cmd,iRet);
-    }
-    return iRet;
+    return cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,cmd);
 }
 
 void cm_cnm_pooldisk_oplog_add(const sint8* sessionid, const void *pDecodeParam, sint32 Result)

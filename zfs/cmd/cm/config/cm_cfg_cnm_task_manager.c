@@ -123,3 +123,90 @@ const cm_omi_map_object_t CmCnmTaskManagerCfg =
     sizeof(CmOmiMapTaskManagerCmds) / sizeof(cm_omi_map_object_cmd_t),
     CmOmiMapTaskManagerCmds
 };
+
+
+const cm_omi_map_cfg_t CmTaskLocalMapTypeName[] =
+{
+    {"ready", 0},
+    {"runing", 1},
+    {"finish_ok",2},
+    {"finish_fail",3},
+    {"finish_exception",4},
+};
+
+const cm_omi_map_enum_t CmTaskLocalMapEnumTypeName =
+{
+    sizeof(CmTaskLocalMapTypeName) / sizeof(cm_omi_map_cfg_t),
+    CmTaskLocalMapTypeName
+};
+
+const cm_omi_map_object_field_t CmOmiMapFieldsTaskLocal[] =
+{
+    {{"tid", CM_OMI_FIELD_LOCALTASK_TID}, "-tid", {CM_OMI_DATA_INT, 4, {NULL}}},
+    {{"nid", CM_OMI_FIELD_LOCALTASK_NID}, "-nid", {CM_OMI_DATA_INT, 4, {NULL}}},
+    {{"progress", CM_OMI_FIELD_LOCALTASK_PROG}, "-prog", {CM_OMI_DATA_INT, 4, {NULL}}},
+    {{"status", CM_OMI_FIELD_LOCALTASK_STATUS}, "-status", {CM_OMI_DATA_ENUM, 4, {&CmTaskLocalMapEnumTypeName}}},
+    {{"start", CM_OMI_FIELD_LOCALTASK_START}, "-start", {CM_OMI_DATA_TIME, 8, {NULL}}},
+    {{"finish", CM_OMI_FIELD_LOCALTASK_END}, "-finish", {CM_OMI_DATA_TIME, 8, {NULL}}},
+    {{"desc", CM_OMI_FIELD_LOCALTASK_DESC}, "-desc", {CM_OMI_DATA_STRING, CM_TASK_DESC_LEN, {NULL}}},
+};
+
+const cm_omi_map_object_field_t* CmOmiMapLocalTaskCmdParamsGetBatch[]=
+{
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_NID],
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_PROG],
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_STATUS],
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_START],
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_END],
+    &CmOmiMapCommFields[1], /*offset*/
+    &CmOmiMapCommFields[2], /*total*/
+};
+
+const cm_omi_map_object_field_t* CmOmiMapLocalTaskCmdParamsGet[]=
+{
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_NID],
+    &CmOmiMapFieldsTaskLocal[CM_OMI_FIELD_LOCALTASK_TID],
+};
+
+const cm_omi_map_object_cmd_t CmOmiMapLocalTaskCmds[] =
+{
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
+        0,
+        NULL,
+        7,
+        CmOmiMapLocalTaskCmdParamsGetBatch,
+    },
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_COUNT],
+        0,
+        NULL,
+        5,
+        CmOmiMapLocalTaskCmdParamsGetBatch,
+    },  
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_GET],
+        2,
+        CmOmiMapLocalTaskCmdParamsGet,
+        0,
+        NULL,
+    },
+    {
+        &CmOmiMapCmds[CM_OMI_CMD_DELETE],
+        2,
+        CmOmiMapLocalTaskCmdParamsGet,
+        0,
+        NULL,
+    },
+};
+
+
+const cm_omi_map_object_t CmCnmTaskLocalCfg =
+{
+    {"local_task", CM_OMI_OBJECT_LOCAL_TASK},
+    sizeof(CmOmiMapFieldsTaskLocal) / sizeof(cm_omi_map_object_field_t),
+    CmOmiMapFieldsTaskLocal,
+    sizeof(CmOmiMapLocalTaskCmds) / sizeof(cm_omi_map_object_cmd_t),
+    CmOmiMapLocalTaskCmds
+};
+

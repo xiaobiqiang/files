@@ -31,8 +31,7 @@ static sint32 cm_cmd_exec(const sint8 **ppParam, uint32 ParamNum, void **ppAckDa
 static sint32 cm_cmd_count(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen);
 static sint32 cm_cmd_setuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen);
 static sint32 cm_cmd_getuptime(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen);
-
-
+static sint32 cm_cmd_starttask(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen);
 
 const cm_cmd_cbk_cfg_t g_cm_cmd_cfg[] = 
 {
@@ -46,6 +45,7 @@ const cm_cmd_cbk_cfg_t g_cm_cmd_cfg[] =
     {"count",cm_cmd_count},
     {"setuptime",cm_cmd_setuptime},
     {"getuptime",cm_cmd_getuptime},
+    {"starttask",cm_cmd_starttask},
 };
 
 sint32 cm_cmd_init(void)
@@ -449,14 +449,14 @@ static sint32 cm_cmd_exec(const sint8 **ppParam, uint32 ParamNum, void **ppAckDa
     }
     
     iRet = cm_cnm_exec_remote(nid,CM_FALSE,pbuff,CM_STRING_4K,cmd);
-    if((CM_OK != iRet) || (0 == strlen(pbuff)))
+    if(0 == strlen(pbuff))
     {
         CM_FREE(pbuff);
         return iRet;
     }
     *ppAckData = pbuff;
     *pAckLen = strlen(pbuff)+1;
-    return CM_OK;
+    return iRet;
 }
 
 static sint32 cm_cmd_count(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
@@ -624,5 +624,31 @@ static sint32 cm_cmd_getuptime(const sint8 **ppParam, uint32 ParamNum, void **pp
     return CM_OK;
 }
 #endif
+static sint32 cm_cmd_starttask(const sint8 **ppParam, uint32 ParamNum, void **ppAckData, uint32 *pAckLen)
+{
+    uint32 tid = 0;
+    sint32 iRet = CM_OK;
+    sint8 *pbuff = NULL;
+    if(ParamNum < 2)
+    {
+        return CM_PARAM_ERR;
+    }
+    pbuff = CM_MALLOC(CM_STRING_128);
+    if(NULL == pbuff)
+    {
+        return CM_FAIL;
+    }
+    
+    iRet = cm_cnm_localtask_create(ppParam[0],ppParam[1],&tid);
+    if(CM_OK != iRet)
+    {
+        CM_FREE(pbuff);
+        return iRet;
+    }
+    CM_VSPRINTF(pbuff,CM_STRING_128,"taskid: %u\n",tid);
+    *ppAckData = pbuff;
+    *pAckLen = strlen(pbuff)+1;
+    return CM_OK;
+}
 
 

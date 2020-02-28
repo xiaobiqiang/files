@@ -85,7 +85,7 @@ JNIEXPORT jstring JNICALL Java_cm_jni_request(JNIEnv *Env, jobject Obj,jstring R
 	
 	(*Env)->ReleaseStringUTFChars(Env,Req,pReqData);
 	
-    if((CM_OK == iRet) && (NULL != pAckData))
+    if(NULL != pAckData)
     {
         Ack = (*Env)->NewStringUTF(Env,pAckData);
         cm_omi_free(pAckData);
@@ -178,7 +178,7 @@ JNIEXPORT jstring JNICALL Java_cm_jni_remote_1request
 	
 	(*Env)->ReleaseStringUTFChars(Env,Req,pReqData);
 	
-    if((CM_OK == iRet) && (NULL != pAckData))
+    if(NULL != pAckData)
     {
         Ack = (*Env)->NewStringUTF(Env,pAckData);
         cm_omi_free(pAckData);

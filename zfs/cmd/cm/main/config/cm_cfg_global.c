@@ -584,6 +584,13 @@ const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_ucache[] =
     {CM_OMI_CMD_TEST, cm_cnm_ucache_local_test},
 };
 
+const cm_cnm_cfg_cmd_t g_cm_cnm_local_cmd_localtask[] =
+{
+    {CM_OMI_CMD_GET, cm_cnm_localtask_local_get},
+    {CM_OMI_CMD_DELETE, cm_cnm_localtask_local_delete},
+};
+
+
 const cm_cnm_cfg_obj_t g_cm_cnm_cfg_array[] =
 {
     {
@@ -858,6 +865,13 @@ const cm_cnm_cfg_obj_t g_cm_cnm_cfg_array[] =
         sizeof(cm_cnm_ucache_info_t),sizeof(cm_cnm_decode_info_t)+sizeof(cm_cnm_ucache_info_t),
         sizeof(g_cm_cnm_local_cmd_ucache)/sizeof(cm_cnm_cfg_cmd_t),
         g_cm_cnm_local_cmd_ucache
+    },
+
+    {
+        CM_OMI_OBJECT_LOCAL_TASK,
+        sizeof(cm_cnm_localtask_info_t),sizeof(cm_cnm_decode_info_t)+sizeof(cm_cnm_localtask_info_t),
+        sizeof(g_cm_cnm_local_cmd_localtask)/sizeof(cm_cnm_cfg_cmd_t),
+        g_cm_cnm_local_cmd_localtask
     },
     /* 下面是最后一个，一直保留，新配置放前面 */
     {CM_OMI_OBJECT_DEMO, 0, 0, 0, NULL}

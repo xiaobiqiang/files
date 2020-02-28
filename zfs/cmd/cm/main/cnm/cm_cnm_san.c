@@ -908,6 +908,7 @@ static uint64 cm_cnm_lun_volsize_tokb(const sint8* volsize,uint32 blocksize)
     return res-(res%blocksize);
 }
 
+#if 0
 sint32 cm_cnm_lun_local_create(
     void *param, uint32 len,
     uint64 offset, uint32 total, 
@@ -1028,7 +1029,7 @@ sint32 cm_cnm_lun_local_create(
     }
     
     return CM_OK;
-}    
+}   
 
 sint32 cm_cnm_lun_local_update(
     void *param, uint32 len,
@@ -1201,6 +1202,208 @@ sint32 cm_cnm_lun_local_delete(
     return CM_OK;
 }    
 
+
+#else
+static void cm_cnm_lun_local_params(void* params, sint8 *buf, sint32 len)
+{
+    uint32 blocksize=0;
+    uint64 volsize = 0;
+    cm_cnm_lun_param_t *req = params;
+    cm_cnm_lun_info_t *info = &req->info;
+
+    CM_SNPRINTF_ADD(buf,len,"%s/%s",info->pool,info->name);
+    
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_TOTAL))
+    {
+        if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_BLOCKSIZE))
+        {
+            blocksize = info->blocksize;
+        }
+        else
+        {
+            blocksize = cm_exec_int("zfs get volblocksize %s/%s |sed -n 2p |awk '{print $3}'",
+                info->pool,info->name);
+        }
+        
+        if(0 == blocksize)
+        {
+            blocksize = 512;
+        }
+        volsize = cm_cnm_lun_volsize_tokb(info->space_total, blocksize);
+        CM_LOG_WARNING(CM_MOD_CNM,"blocksize:%u volsize:%s = %lluK",
+            blocksize,info->space_total,volsize);
+        if(volsize == 0)
+        {
+            return CM_PARAM_ERR;
+        }
+        CM_SNPRINTF_ADD(buf,len,"|%lluK",volsize);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+    
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_SINGLE))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->is_single);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_BLOCKSIZE))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->blocksize);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+    
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_COMPRESS))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->is_compress);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_HOT))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->is_hot);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+    
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_WRITE_POLICY))
+    {
+        const sint8* policy = cm_cnm_get_enum_str(&CmOmiMapLunSyncTypeCfg,info->write_policy);
+        if(NULL == policy)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"policy[%u]",info->write_policy);
+            return CM_PARAM_ERR;
+        }
+        CM_SNPRINTF_ADD(buf,len,"|%s",policy);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_DEDUP))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->dedup);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+    
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_IS_DOUBLE))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->is_double);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_ALARM_THRESHOLD))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->alarm_threshold);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_QOS))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%u",info->qos);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&req->set,CM_OMI_FIELD_LUN_QOS_VAL))
+    {
+        CM_SNPRINTF_ADD(buf,len,"|%s",info->qos_val);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(buf,len,"|-");
+    }
+    return;
+}
+
+sint32 cm_cnm_lun_local_exec(const sint8* act,
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    sint32 iRet = CM_FAIL;
+    sint8 buf[CM_STRING_128] = {0};
+    sint32 opts[CM_STRING_1K] = {0};
+    cm_cnm_lun_param_t *req = param;
+    cm_cnm_lun_info_t *info = &req->info;
+    uint32 cnt=0;
+    
+    /*lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val*/
+    CM_LOG_WARNING(CM_MOD_CNM,"%s %s/%s",act,info->pool,info->name);
+    cm_cnm_lun_local_params(param,opts,sizeof(opts));
+
+    iRet = cm_exec_out(ppAck,pAckLen,CM_CMT_REQ_TMOUT_NEVER,
+        CM_SCRIPT_DIR"cm_cnm.sh lun_%s '%s' 2>&1",act,opts);
+    if(CM_OK != iRet)
+    {
+        return iRet;
+    }
+    if((*ppAck == NULL) || (*pAckLen == 0))
+    {
+        return iRet;
+    }
+    cnt = atoi((sint8*)*ppAck);
+    CM_FREE(*ppAck);
+    *ppAck = NULL;
+    *pAckLen = 0;
+    if(cnt > 0)
+    {
+        return cm_cnm_ack_uint64(cnt,ppAck,pAckLen);
+    }
+    return CM_OK;
+}
+
+sint32 cm_cnm_lun_local_create(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_lun_local_exec("create",param,len,offset,total,ppAck,pAckLen);
+}
+
+sint32 cm_cnm_lun_local_update(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_lun_local_exec("update",param,len,offset,total,ppAck,pAckLen);
+}
+
+sint32 cm_cnm_lun_local_delete(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen)
+{
+    return cm_cnm_lun_local_exec("delete",param,len,offset,total,ppAck,pAckLen);
+}
+
+
+#endif
 static void cm_cnm_lun_oplog_report(
     const sint8* sessionid, const void *pDecodeParam, uint32 alarmid)
 {

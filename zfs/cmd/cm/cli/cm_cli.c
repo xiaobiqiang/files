@@ -542,13 +542,51 @@ sint32 cm_cli_check_object_cmd(
     return CM_OK;
 }
 
-void cm_cli_print_ack_count(cm_omi_obj_t AckObj)
+void cm_cli_print_ack_count(cm_omi_obj_t AckObj, const sint8* name)
 {
     cm_omi_obj_t item = NULL;
     cm_omi_obj_t items = cm_omi_obj_key_find(AckObj, CM_OMI_KEY_ITEMS);
     uint32 size = 0;
     uint64 count = 0;
+    uint32 key=CM_OMI_FIELD_COUNT;
+    if(NULL == items)
+    {
+        return;
+    }
 
+    size = cm_omi_obj_array_size(items);
+
+    if(0 == size)
+    {
+        return;
+    }
+
+    item = cm_omi_obj_array_idx(items, 0);
+
+    if(NULL == item)
+    {
+        return;
+    }
+    if(0 != strcmp(name, "count"))
+    {
+        key = CM_OMI_FIELD_TASK_ID;
+    }
+
+    if(CM_OK != cm_omi_obj_key_get_u64_ex(item, key, &count))
+    {
+        return;
+    }
+
+    printf("%s : %llu\n", name,count);
+    return;
+}
+
+void cm_cli_print_ack_errormsg(cm_omi_obj_t AckObj)
+{
+    cm_omi_obj_t item = NULL;
+    cm_omi_obj_t items = cm_omi_obj_key_find(AckObj, CM_OMI_KEY_ITEMS);
+    sint32 size;
+    sint8 errmsg[CM_STRING_1K] = {0};
     if(NULL == items)
     {
         return;
@@ -568,14 +606,13 @@ void cm_cli_print_ack_count(cm_omi_obj_t AckObj)
         return;
     }
 
-    if(CM_OK != cm_omi_obj_key_get_u64_ex(item, CM_OMI_FIELD_COUNT, &count))
+    if(CM_OK == cm_omi_obj_key_get_str_ex(item,CM_OMI_FIELD_ERROR_MSG,errmsg,sizeof(errmsg)))
     {
-        return;
+        printf("Error: %s\n", errmsg);
     }
-
-    printf("count : %llu\n", count);
     return;
 }
+
 
 void cm_cli_print_ack_field(cm_omi_obj_t field, const cm_omi_map_object_field_t *pFieldCfg)
 {
@@ -987,14 +1024,10 @@ sint32 cm_cli_print_ack(const cm_omi_map_object_t* pObj, const cm_omi_map_object
     sint32 iRet = cm_omi_obj_key_get_s32(AckObj, CM_OMI_KEY_RESULT, &iRetx);
     cm_cli_print_ack_item_cbk_t cbk = cm_cli_print_ack_item_default;
 
-    if(CM_OK != iRet)
+    if((CM_OK != iRet) ||(CM_OK != iRetx))
     {
+        cm_cli_print_ack_errormsg(AckObj);
         return iRet;
-    }
-
-    if(CM_OK != iRetx)
-    {
-        return iRetx;
     }
 
     switch(pCmd->pcmd->code)
@@ -1003,9 +1036,13 @@ sint32 cm_cli_print_ack(const cm_omi_map_object_t* pObj, const cm_omi_map_object
         case CM_OMI_CMD_GET:
         case CM_OMI_CMD_SCAN:
             break;
-
+        case CM_OMI_CMD_ADD:
+        case CM_OMI_CMD_MODIFY:
+        case CM_OMI_CMD_DELETE:
+            cm_cli_print_ack_count(AckObj,"taskid");
+            return CM_OK;
         case CM_OMI_CMD_COUNT:
-            cm_cli_print_ack_count(AckObj);
+            cm_cli_print_ack_count(AckObj,"count");
             return CM_OK;
 
         default:

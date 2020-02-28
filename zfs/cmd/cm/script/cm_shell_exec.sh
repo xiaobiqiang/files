@@ -401,11 +401,10 @@ function cm_zfs_set()
 function cm_pmm_get_lu()
 {
     local lunname=$1
-    kstat -m stmf -c misc -n stmf_lu_* -s lun-alias \
-    |awk '$2!=""{print $2}' \
-    |awk 'BEGIN{i=0}i==1{printf $1" "}i==2{print $1}{i++}i==3{i=0}' \
-    |awk '$2=="/dev/zvol/rdsk/$lunname"{print $1}'|awk -F'_' '{printf $3}'
-    return $?    
+    kstat -m stmf -c misc -n 'stmf_lu_*' -s lun-alias \
+        |xargs -n10 |grep -w "$lunname" \
+        |awk '{print $6}' |awk -F'_' '{printf $3}'
+    return $?
 }
 
 function cm_pmm_lun()

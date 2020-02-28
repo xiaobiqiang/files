@@ -131,12 +131,16 @@ static sint32 cm_omi_process(const cm_omi_object_cmd_cfg_t* pCmdCfg,
         if(CM_OK != iRet)
         {
             CM_LOG_INFO(CM_MOD_OMI,"cmd[%u] Process Fail[%d]!", pCmdCfg->cmd,iRet);
+            if(NULL != pAckData)
+            {
+                *pObjAck = cm_omi_encode_errormsg(pDecodeData,pAckData,AckLen);
+            }
             break;
         }
 
         if(NULL != pCmdCfg->encode_func)
         {
-            *pObjAck = pCmdCfg->encode_func(pDecodeData,pAckData,AckLen);;
+            *pObjAck = pCmdCfg->encode_func(pDecodeData,pAckData,AckLen);
         }
     }while(0);
 

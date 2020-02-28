@@ -191,18 +191,13 @@ static void* cm_rpc_server_thread(void *pArg)
         }
         pData = &pServerMsg->msg;
         iRet = pServer->cbk(pData, &pAckMsg);
-        if((CM_OK != iRet) || (NULL == pAckMsg))
+        if(NULL == pAckMsg)
         {
             pData->head_len = sizeof(cm_rpc_msg_info_t);
             pData->data_len = 0;
             pData->result = iRet;
             SendLen = sizeof(cm_rpc_msg_info_t);
             AckLen = send(pServerMsg->conn_fd,(void*)pData, SendLen,0);
-            if(NULL != pAckMsg)
-            {
-                CM_FREE(pAckMsg);
-                pAckMsg = NULL;
-            }
         }
         else
         {

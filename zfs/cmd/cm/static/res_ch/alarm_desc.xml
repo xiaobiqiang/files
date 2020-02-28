@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <alarms>
     <alarm id="1" name="硬盘丢失" title="(#0)硬盘(#1)丢失" desc="节点名 (#0)， 硬盘名 (#1),槽位号 (#2), 框号 (#3)." suggest="检查硬盘被移出或是损坏!"/>
-    <alarm id="2" name="硬盘恢复" title="(#0)硬盘(#1)恢复" desc="节点名 (#0)， 硬盘名 (#1),槽位号 (#2), 框号 (#3)." suggest="无须操作!"/>
+    <alarm id="2" name="硬盘插入" title="(#0)硬盘(#1)插入" desc="节点名 (#0)， 硬盘名 (#1),槽位号 (#2), 框号 (#3)." suggest="无须操作!"/>
 
 
     <alarm id="21" name="慢盘" title="(#0)硬盘(#1)为慢盘" desc="节点名 (#0)， 硬盘名 (#1),槽位号 (#2), 框号 (#3)." suggest="更换此盘!"/>
@@ -47,6 +47,9 @@
     <alarm id="54" name="存储池重构完成" title="节点(#0) 存储池(#1)重构完成" desc="节点(#0) 存储池(#1)重构完成." suggest="无"/>
 	
     <alarm id="55" name="目录配额" title="目录(#1)配额告警" desc="节点名 (#0)， 目录 (#1),已使用 (#3),配额大小 (#2)." suggest="请清理多余的空间"/>
+	
+    <alarm id="56" name="rpc流控开启" title="rpc流控开启" desc="节点名 (#0)， (#1) rpc pool 流控开启." suggest="无"/>
+    <alarm id="57" name="rpc流控关闭" title="rpc流控关闭" desc="节点名 (#0)， (#1) rpc pool 流控结束." suggest="无"/>
 	
     <alarm id="10000000" name="节点离线" title="节点(#0)离线" desc="节点名 (#0)离线." suggest="检查节点状态"/>
     <alarm id="10000010" name="CPU占用过高" title="节点(#0)CPU占用过高" desc="节点名 (#0)， CPU利用率 (#1)." suggest="检查CPU使用情况"/>

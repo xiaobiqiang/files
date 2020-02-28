@@ -418,7 +418,7 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgDisk[] =
     /* modify */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_disk_decode, cm_cnm_disk_clear, NULL,
+        cm_cnm_disk_decode, cm_cnm_disk_clear, cm_omi_encode_taskid,
         cm_cnm_disk_oplog_clear
     },
 };
@@ -440,13 +440,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgPoolList[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_pool_decode, cm_cnm_pool_create, NULL,
+        cm_cnm_pool_decode, cm_cnm_pool_create, cm_omi_encode_taskid,
         cm_cnm_pool_oplog_create
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_pool_decode, cm_cnm_pool_delete, NULL,
+        cm_cnm_pool_decode, cm_cnm_pool_delete, cm_omi_encode_taskid,
         cm_cnm_pool_oplog_delete
     },
     /* switch */
@@ -480,13 +480,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgPoolDisk[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_pooldisk_decode, cm_cnm_pooldisk_add, NULL,
+        cm_cnm_pooldisk_decode, cm_cnm_pooldisk_add, cm_omi_encode_taskid,
         cm_cnm_pooldisk_oplog_add
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_pooldisk_decode, cm_cnm_pooldisk_delete, NULL,
+        cm_cnm_pooldisk_decode, cm_cnm_pooldisk_delete, cm_omi_encode_taskid,
         cm_cnm_pooldisk_oplog_delete
     },
 };
@@ -514,19 +514,19 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgLun[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lun_decode, cm_cnm_lun_create, NULL,
+        cm_cnm_lun_decode, cm_cnm_lun_create, cm_omi_encode_taskid,
         cm_cnm_lun_oplog_create
     },
     /* update */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lun_decode, cm_cnm_lun_update, NULL,
+        cm_cnm_lun_decode, cm_cnm_lun_update, cm_omi_encode_taskid,
         cm_cnm_lun_oplog_update
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lun_decode, cm_cnm_lun_delete, NULL,
+        cm_cnm_lun_decode, cm_cnm_lun_delete, cm_omi_encode_taskid,
         cm_cnm_lun_oplog_delete
     },
 };
@@ -776,19 +776,19 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgNas[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_nas_decode, cm_cnm_nas_create, NULL,
+        cm_cnm_nas_decode, cm_cnm_nas_create, cm_omi_encode_taskid,
         cm_cnm_nas_oplog_create
     },
     /* update */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_nas_decode, cm_cnm_nas_update, NULL,
+        cm_cnm_nas_decode, cm_cnm_nas_update, cm_omi_encode_taskid,
         cm_cnm_nas_oplog_update
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_nas_decode, cm_cnm_nas_delete, NULL,
+        cm_cnm_nas_decode, cm_cnm_nas_delete, cm_omi_encode_taskid,
         cm_cnm_nas_oplog_delete
     },
 };
@@ -816,19 +816,19 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCifs[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cifs_decode, cm_cnm_cifs_create, NULL,
+        cm_cnm_cifs_decode, cm_cnm_cifs_create, cm_omi_encode_taskid,
         cm_cnm_cifs_oplog_create
     },
     /* update */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cifs_decode, cm_cnm_cifs_update, NULL,
+        cm_cnm_cifs_decode, cm_cnm_cifs_update, cm_omi_encode_taskid,
         cm_cnm_cifs_oplog_update
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cifs_decode, cm_cnm_cifs_delete, NULL,
+        cm_cnm_cifs_decode, cm_cnm_cifs_delete, cm_omi_encode_taskid,
         cm_cnm_cifs_oplog_delete
     },
 };
@@ -856,13 +856,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgGroup[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_group_decode, cm_cnm_group_create, NULL,
+        cm_cnm_group_decode, cm_cnm_group_create, cm_omi_encode_taskid,
         NULL
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_group_decode, cm_cnm_group_delete, NULL,
+        cm_cnm_group_decode, cm_cnm_group_delete, cm_omi_encode_taskid,
         NULL
     },
 };
@@ -884,13 +884,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgNfs[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_nfs_decode, cm_cnm_nfs_add, NULL,
+        cm_cnm_nfs_decode, cm_cnm_nfs_add, cm_omi_encode_taskid,
         cm_cnm_nfs_oplog_add
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_nfs_decode, cm_cnm_nfs_delete, NULL,
+        cm_cnm_nfs_decode, cm_cnm_nfs_delete, cm_omi_encode_taskid,
         cm_cnm_nfs_oplog_delete
     },
 };
@@ -1082,13 +1082,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgClusterNas[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_create, NULL,
+        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_create, cm_omi_encode_taskid,
         cm_cnm_cluster_nas_oplog_create
     },
     /* update */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_add, NULL,
+        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_add, cm_omi_encode_taskid,
         cm_cnm_cluster_nas_oplog_update
     },
     /* count */
@@ -1099,7 +1099,7 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgClusterNas[] =
     },
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_delete, NULL,
+        cm_cnm_cluster_nas_decode, cm_cnm_cluster_nas_delete, cm_omi_encode_taskid,
         NULL
     },
 };
@@ -1149,14 +1149,14 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgDualliveNas[] =
     /* create */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_duallive_nas_decode, cm_cnm_duallive_nas_create, NULL,
+        cm_cnm_duallive_nas_decode, cm_cnm_duallive_nas_create, cm_omi_encode_taskid,
         cm_cnm_duallive_nas_oplog_create
     },
 
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_duallive_nas_decode, cm_cnm_duallive_nas_delete, NULL,
+        cm_cnm_duallive_nas_decode, cm_cnm_duallive_nas_delete, cm_omi_encode_taskid,
         cm_cnm_duallive_nas_oplog_delete
     },
 };
@@ -1178,14 +1178,14 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgBackUpNas[] =
     /* create */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_backup_nas_decode, cm_cnm_backup_nas_create, NULL,
+        cm_cnm_backup_nas_decode, cm_cnm_backup_nas_create, cm_omi_encode_taskid,
         cm_cnm_backup_nas_oplog_create
     },
 
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_backup_nas_decode, cm_cnm_backup_nas_delete, NULL,
+        cm_cnm_backup_nas_decode, cm_cnm_backup_nas_delete, cm_omi_encode_taskid,
         cm_cnm_backup_nas_oplog_delete
     },
 };
@@ -1207,14 +1207,14 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgLunMirror[] =
     /* create */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lunmirror_decode, cm_cnm_lunmirror_create, NULL,
+        cm_cnm_lunmirror_decode, cm_cnm_lunmirror_create, cm_omi_encode_taskid,
         cm_cnm_lunmirror_oplog_create
     },
 
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lunmirror_decode, cm_cnm_lunmirror_delete, NULL,
+        cm_cnm_lunmirror_decode, cm_cnm_lunmirror_delete, cm_omi_encode_taskid,
         cm_cnm_lunmirror_oplog_delete
     },
 };
@@ -1236,19 +1236,19 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgLunBackup[] =
     /* create */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_create, NULL,
+        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_create, cm_omi_encode_taskid,
         cm_cnm_lunbackup_oplog_create
     },
     /* modify */
     {
         CM_OMI_CMD_MODIFY, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_modify, NULL,
+        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_modify, cm_omi_encode_taskid,
         cm_cnm_lunbackup_oplog_modify
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_delete, NULL,
+        cm_cnm_lunbackup_decode, cm_cnm_lunbackup_delete, cm_omi_encode_taskid,
         cm_cnm_lunbackup_oplog_delete
     },
 };
@@ -2031,7 +2031,7 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmLowdataVolume[] =
     /* add */
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
-        cm_cnm_lowdata_volume_decode, cm_cnm_lowdata_volume_create, NULL,
+        cm_cnm_lowdata_volume_decode, cm_cnm_lowdata_volume_create, cm_omi_encode_taskid,
         NULL
     },
     /* get */
@@ -2177,6 +2177,33 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmRemoteCluster[] =
     },
 };
 
+const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmLocalTask[] =
+{
+    /* getbatch */
+    {
+        CM_OMI_CMD_GET_BATCH, CM_OMI_PERMISSION_ALL,
+        cm_cnm_localtask_decode, cm_cnm_localtask_getbatch, cm_cnm_localtask_encode
+    },
+   
+    /* count */
+    {
+        CM_OMI_CMD_COUNT, CM_OMI_PERMISSION_ALL,
+        cm_cnm_localtask_decode, cm_cnm_localtask_count, cm_omi_encode_count,
+        NULL
+    },
+
+    {
+        CM_OMI_CMD_GET, CM_OMI_PERMISSION_ALL,
+        cm_cnm_localtask_decode, cm_cnm_localtask_get, cm_cnm_localtask_encode,
+        NULL
+    },
+
+    {
+        CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
+        cm_cnm_localtask_decode, cm_cnm_localtask_delete, NULL,
+        NULL
+    },
+};
 
 
 #define CM_OMI_OBJ_CFG(id,cfg,init) \
@@ -2318,6 +2345,7 @@ const cm_omi_object_cfg_t g_CmOmiObjectCfg[CM_OMI_OBJECT_BUTT] =
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_UCACHE,g_CmOmiObjectCfgCnmUcache,NULL),
 
 	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_REMOTE_CLUSTER, g_CmOmiObjectCfgCnmRemoteCluster, cm_cnm_cluster_remote_init),
+	CM_OMI_OBJ_CFG(CM_OMI_OBJECT_LOCAL_TASK, g_CmOmiObjectCfgCnmLocalTask, cm_cnm_localtask_init),
   /*mem*/
 
 };

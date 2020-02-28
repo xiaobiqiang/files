@@ -76,11 +76,6 @@ static sint32 cm_cmt_rpc_callback(cm_rpc_msg_info_t *pmsg, cm_rpc_msg_info_t
     {
         CM_LOG_ERR(CM_MOD_CMT,"Node[%u] msg[%u] iRet[%d]",
             pCmtMsg->from_id,pCmtMsg->msg, iRet);
-        if(NULL != pAckData)
-        {
-            CM_FREE(pAckData);
-        }
-        return iRet;
     }
 
     if((NULL == pAckData) || (0 == AckLen))
@@ -102,7 +97,7 @@ static sint32 cm_cmt_rpc_callback(cm_rpc_msg_info_t *pmsg, cm_rpc_msg_info_t
     CM_FREE(pAckData);
     *ppAckmsg = cm_cmt_get_rpc_msg(pCmtAck);
 
-    return CM_OK;
+    return iRet;
 }
 
 sint32 cm_cmt_request_master(cm_msg_type_e Msg,const void *pData, uint32 DataLen,
