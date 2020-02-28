@@ -11,7 +11,24 @@ BUILD_DIR='../build/'
 CFG_DIR='../config/'
 CM_DIR='../main/'
 JNI_DIR='../jni/'
-projects="open base cli cfg cmd exec cm jni"
+SCRIPT_DIR='../script_linux/'
+PYTHON_DIR='../script_py2/'
+projects="open base cli cfg cmd exec cm jni script python"
+
+function make_am_head()
+{
+
+	local amdir=$1
+
+cat << EOF >$amdir
+include \$(top_srcdir)/config/Rules.am
+
+DEFAULT_INCLUDES += \\
+	-I\$(top_srcdir)/include \\
+	-I\$(top_srcdir)/lib/libspl/include
+
+EOF
+}
 
 function make_am_include()
 {
@@ -19,7 +36,7 @@ function make_am_include()
 	local amdir=$2
 	
 cat << EOF >>$amdir
-AM_CPPFLAGS = \\
+AM_CPPFLAGS += \\
 	-I\$(top)/base/config \\
 	-I\$(top)/base/rpc \\
 	-I\$(top)/base/common \\
@@ -91,7 +108,8 @@ EOF
 function make_am_open()
 {
 	local am=$OPEN_DIR"Makefile.am"
-	echo "lib_LTLIBRARIES = libcmopensrc.la">$am
+	make_am_head $am
+	echo "lib_LTLIBRARIES = libcmopensrc.la">>$am
 	
 	echo "libcmopensrc_la_SOURCES = \\">>$am
 	cd $OPEN_DIR
@@ -106,6 +124,19 @@ function make_am_open()
 			echo "	${arrays[i]} \\" >>$am
 		fi
 	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
+		fi
+	done
 	cd $BUILD_DIR
     
 cat >> $am <<EOF
@@ -116,7 +147,8 @@ EOF
 function make_am_base()
 {
 	local am=$BASE_DIR"Makefile.am"
-	echo "noinst_LTLIBRARIES = libcmbase.la">$am
+	make_am_head $am
+	echo "noinst_LTLIBRARIES = libcmbase.la">>$am
 	
 	make_am_include "base" $am
 
@@ -133,13 +165,27 @@ function make_am_base()
 			echo "	${arrays[i]} \\" >>$am
 		fi
 	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
+		fi
+	done
 	cd $BUILD_DIR
 }
 
 function make_am_cli()
 {
 	local am=$CLI_DIR"Makefile.am"
-	echo "bin_PROGRAMS = ceres_cli">$am
+	make_am_head $am
+	echo "bin_PROGRAMS = ceres_cli">>$am
 	
 	make_am_include "cli" $am
 
@@ -154,6 +200,19 @@ function make_am_cli()
 			echo "	${arrays[i]} " >>$am
 		else
 			echo "	${arrays[i]} \\" >>$am
+		fi
+	done
+
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
 		fi
 	done
 	cd $BUILD_DIR
@@ -171,7 +230,8 @@ EOF
 function make_am_cmd()
 {
 	local am=$CMD_DIR"Makefile.am"
-	echo "bin_PROGRAMS = ceres_cmd">$am
+	make_am_head $am
+	echo "bin_PROGRAMS = ceres_cmd">>$am
 	
 	make_am_include "cmd" $am
 
@@ -186,6 +246,19 @@ function make_am_cmd()
 			echo "	${arrays[i]} " >>$am
 		else
 			echo "	${arrays[i]} \\" >>$am
+		fi
+	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
 		fi
 	done
 	cd $BUILD_DIR
@@ -203,7 +276,8 @@ EOF
 function make_am_cfg()
 {
 	local am=$CFG_DIR"Makefile.am"
-	echo "noinst_LTLIBRARIES = libcfg.la">$am
+	make_am_head $am
+	echo "noinst_LTLIBRARIES = libcfg.la">>$am
 	
 	make_am_include "config" $am
 	
@@ -220,13 +294,27 @@ function make_am_cfg()
 			echo "	${arrays[i]} \\" >>$am
 		fi
 	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
+		fi
+	done
 	cd $BUILD_DIR
 }
 
 function make_am_exec()
 {
 	local am=$EXEC_DIR"Makefile.am"
-	echo "bin_PROGRAMS = ceres_exec">$am
+	make_am_head $am
+	echo "bin_PROGRAMS = ceres_exec">>$am
 	
 	make_am_include "exec" $am
 
@@ -241,6 +329,19 @@ function make_am_exec()
 			echo "	${arrays[i]} " >>$am
 		else
 			echo "	${arrays[i]} \\" >>$am
+		fi
+	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
 		fi
 	done
 	cd $BUILD_DIR
@@ -258,7 +359,8 @@ EOF
 function make_am_cm()
 {
 	local am=$CM_DIR"Makefile.am"
-	echo "bin_PROGRAMS = ceres_cm">$am
+	make_am_head $am
+	echo "bin_PROGRAMS = ceres_cm">>$am
 	
 	make_am_include "main" $am
 
@@ -273,6 +375,19 @@ function make_am_cm()
 			echo "	${arrays[i]} " >>$am
 		else
 			echo "	${arrays[i]} \\" >>$am
+		fi
+	done
+    
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
 		fi
 	done
 	cd $BUILD_DIR
@@ -291,7 +406,8 @@ EOF
 function make_am_jni()
 {
 	local am=$JNI_DIR"Makefile.am"
-	echo "lib_LTLIBRARIES = libcmjni.la">$am
+	make_am_head $am
+	echo "lib_LTLIBRARIES = libcmjni.la">>$am
 	
 	make_am_include "jni" $am
 	
@@ -320,14 +436,68 @@ function make_am_jni()
 			echo "	${arrays[i]} \\" >>$am
 		fi
 	done
-	
+
+	cd $JNI_DIR
+	echo "EXTRA_DIST = \\" >> $am
+	local harrays=($(du -a|grep '\.h'|awk '{print $2}'))
+	local cols=${#harrays[@]}
+	((col=$cols-1))
+	for (( i=0; i<$cols; i=i+1 ))
+	do
+		if [ $i -eq $col ]; then
+			echo "	${harrays[i]} " >>$am
+		else
+			echo "	${harrays[i]} \\" >>$am
+		fi
+	done
+	cd $BUILD_DIR
 cat >> $am <<EOF
-libcmjni_LDADD = \\
-	\$(top)/config/libcfg.la \\
-	\$(top)/base/libcmbase.la
 libcmjni_la_CFLAGS = -std=gnu99 -lpthread -ldl
 EOF
 
+}
+
+function make_am_script()
+{
+    local am=$SCRIPT_DIR"Makefile.am"
+    
+    cd $SCRIPT_DIR
+    echo "cmscriptdir = \${prefix}/cm/script" > $am
+    echo "dist_cmscript_SCRIPTS = \\" >> $am
+
+    local harrays=($(du -a|grep '\.sh'|awk '{print $2}'))
+    local cols=${#harrays[@]}
+    ((col=$cols-1))
+    for (( i=0; i<$cols; i=i+1 ))
+    do
+        if [ $i -eq $col ]; then
+            echo "	${harrays[i]} " >>$am
+        else
+            echo "	${harrays[i]} \\" >>$am
+        fi
+    done
+    cd $BUILD_DIR
+}
+
+function make_am_python()
+{
+    local am=$PYTHON_DIR"Makefile.am"
+
+    cd $PYTHON_DIR
+    echo "cmpythondir = \${prefix}/cm/script" > $am
+    echo "dist_cmpython_SCRIPTS = \\" >> $am
+    local harrays=($(du -a|grep '\.py'|awk '{print $2}'))
+    local cols=${#harrays[@]}
+    ((col=$cols-1))
+    for (( i=0; i<$cols; i=i+1 ))
+    do
+        if [ $i -eq $col ]; then
+            echo "	${harrays[i]} " >>$am
+        else
+            echo "	${harrays[i]} \\" >>$am
+        fi
+    done
+    cd $BUILD_DIR
 }
 
 for project in $projects

@@ -206,6 +206,14 @@ AC_CONFIG_FILES([
 	cmd/cm/jni/Makefile
 	cmd/cm/main/Makefile
 	cmd/cm/opensrc/Makefile
+	cmd/cm/script_linux/Makefile
+	cmd/cm/script_py2/Makefile
+	cmd/cm/static/Makefile
+	cmd/cm/static/comm/Makefile
+	cmd/cm/static/res_ch/Makefile
+	cmd/cm/static/res_en/Makefile
+	cmd/cm/static/task/Makefile
+	cmd/cm/build/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

@@ -1,5 +1,11 @@
+include $(top_srcdir)/config/Rules.am
+
+DEFAULT_INCLUDES += \
+	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/lib/libspl/include
+
 bin_PROGRAMS = ceres_cmd
-AM_CPPFLAGS = \
+AM_CPPFLAGS += \
 	-I$(top)/base/config \
 	-I$(top)/base/rpc \
 	-I$(top)/base/common \
@@ -20,8 +26,11 @@ AM_CPPFLAGS = \
 	-I$(top)/cmd \
 	-I$(top)/cmd/config
 ceres_cmd_SOURCES = \
-	./cm_main_cmd.c \
-	./cm_cmd_client.c 
+	./cm_cmd_client.c \
+	./cm_main_cmd.c 
+EXTRA_DIST = \
+	./cm_cmd_client.h \
+	./config/cm_cfg_global.h 
 ceres_cmd_LDADD = \
 	$(top)/base/libcmbase.la
 ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
