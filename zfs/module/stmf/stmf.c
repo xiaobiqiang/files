@@ -6429,7 +6429,6 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	uint32_t mutex_ishold = mutex_owned(&ilu->ilu_task_lock);
 
 	ASSERT(rw_lock_held(iss->iss_lockp));
-	itask->itask_worker = NULL;
 	itask->itask_flags = ITASK_IN_FREE_LIST;
 	itask->itask_proxy_msg_id = 0;
 
@@ -7316,16 +7315,10 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		return;
 	}
 
-	if (w==NULL){
-		cmn_err(CE_WARN, "WNULL Unexpected xfer completion task %p dbuf %p",
-		    (void *)task, (void *)dbuf);
-		return;
-	}
-
 	mutex_enter(&w->worker_lock);
 	do {
 		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
+		if (old & (ITASK_BEING_ABORTED | ITASK_IN_FREE_LIST)) {
 			mutex_exit(&w->worker_lock);
 			return;
 		}
