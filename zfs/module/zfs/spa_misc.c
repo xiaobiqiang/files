@@ -2445,26 +2445,56 @@ spa_get_group_flags(spa_t *spa)
 	return (spa->spa_disable_group);
 }
 
+static size_t
+sprintf_refcount(refcount_dbg_t *rc, char *buf, size_t len)
+{
+        int n;
+        size_t off = 0;
+        reference_dbg_t *ref;
+		char buffer[64];
+
+        n = snprintf(buf, len, "refcount_t at %p has %llu current holds, "
+            "%llu recently released holds\n",
+            rc, (longlong_t)rc->rc_count, (longlong_t)rc->rc_removed_count);
+        off += n;
+
+        if (rc->rc_count > 0) {
+                n = snprintf(buf + off, len - off, "current holds:\n");
+                off += n;
+                for (ref = list_head(&rc->rc_list); ref != NULL;
+                        ref = list_next(&rc->rc_list, ref)) {
+                        n = snprintf(buf + off, len - off,
+                                "reference %p holder %p number %llu removed %p\n",
+                                ref, ref->ref_holder, (u_longlong_t)ref->ref_number,
+                                ref->ref_removed);
+                        off += n;
+                }
+        }
+
+        if (rc->rc_removed_count > 0) {
+                n = snprintf(buf + off, len - off, "released holds:\n");
+                off += n;
+                for (ref = list_head(&rc->rc_removed); ref != NULL;
+                        ref = list_next(&rc->rc_removed, ref)) {
+                        n = snprintf(buf + off, len - off,
+                                "reference %p holder %p number %llu removed %p\n",
+                                ref, ref->ref_holder, (u_longlong_t)ref->ref_number,
+                                ref->ref_removed);
+                        off += n;
+                }
+        }
+
+        return (off);
+}
+
 size_t
 sprintf_spa_refcount(spa_t *spa, char *buf, size_t len)
 {
-	refcount_dbg_t	*spa_dbg_refcount = &spa->spa_dbg_refcount;
-	reference_dbg_t *ref;
-	size_t off = 0, n;
+	size_t n;
 
-	n = snprintf(buf, len, "spa name %s:", spa_name(spa));
-	off += n;
-	n = snprintf(buf + off, len - off, "ref_count = %d, ref_removed = %d", 
-		spa_dbg_refcount->rc_count, spa_dbg_refcount->rc_removed_count);
-	off += n;
+	n = snprintf(buf, len, "spa name %s:\n", spa_name(spa));
 
-	for (ref = list_head(&spa_dbg_refcount.rc_list); ref; 
-		ref = list_next(&spa_dbg_refcount->rc_list, ref)) {
-		n = snprintf(buf + off, len - off, "ref_holder: %s", (char *)ref->ref_holder);
-		off += n;
-	}
-
-	return off;
+	return (sprintf_refcount(&spa->spa_dbg_refcount, buf + n, len - n) + n);
 }
 
 void
