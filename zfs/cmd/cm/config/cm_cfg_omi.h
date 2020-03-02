@@ -1082,6 +1082,16 @@ typedef enum
     CM_OMI_FIELD_REMOTECLUSTER_NAME,
 }cm_omi_field_remote_cluster_e;
 
+typedef enum
+{
+    CM_OMI_FIELD_LOCALTASK_TID = 0,
+    CM_OMI_FIELD_LOCALTASK_NID,
+    CM_OMI_FIELD_LOCALTASK_PROG,
+    CM_OMI_FIELD_LOCALTASK_STATUS,
+    CM_OMI_FIELD_LOCALTASK_START,
+    CM_OMI_FIELD_LOCALTASK_END,
+    CM_OMI_FIELD_LOCALTASK_DESC,
+}cm_omi_field_localtask_e;
 
 extern const uint32 *g_CmOmiObjCmdNoCheckPtr;
 extern const cm_omi_map_cfg_t CmOmiMapCmds[CM_OMI_CMD_BUTT];
