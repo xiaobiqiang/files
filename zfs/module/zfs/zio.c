@@ -1716,6 +1716,8 @@ zio_suspend(spa_t *spa, zio_t *zio)
 		    ZIO_FLAG_GODFATHER);
 
 	spa->spa_suspended = B_TRUE;
+	cmn_err(CE_WARN, "%s pool(%s) suspend, io_err=%d io_flags=0x%x", __func__, 
+		spa->spa_name, zio->io_error, zio->io_flags);
 
 	if (zio != NULL) {
 		ASSERT(!(zio->io_flags & ZIO_FLAG_GODFATHER));

@@ -74,7 +74,8 @@ struct
 	{ SBD_DO_WRITE_XFER, "sbd_do_write_xfer" },
 	{ SBD_DO_STANDBY_WRITE_XFER, "sbd_do_standby_write_xfer" },
 	{ SBD_HANDLE_ACTIVE_WRITE_XFER_COMPLETION, "sbd_handle_active_write_xfer_completion" },
-	{ SBD_HANDLE_STANDBY_WRITE_XFER_COMPLETION, "sbd_handle_standby_write_xfer_completion" },
+	{ SBD_HANDLE_STANDBY_WRITE_XFER_COMPLETION, "sbd_handle_standby_short_write_xfer_completion" },
+	{ SBD_HANDLE_STANDBY_SHORT_WRITE_XFER_COMPLETION, "sbd_handle_standby_write_xfer_completion" },
 	{ SBD_HANDLE_ACTIVE_WRITE, "sbd_handle_active_write" },
 	{ SBD_HANDLE_STANDBY_WRITE, "sbd_handle_standby_write" },
 	{ SBD_HANDLE_SHORT_READ_XFER_COMPLETION, "sbd_handle_short_read_xfer_completion" },
@@ -4777,6 +4778,9 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		}
 		
 		ilu->ilu_ntasks_cur = 0;
+
+		/* use stmfadm delete-lu -c xxxxx to deregister proxy lu */
+		#if 0
 		/* de-register with proxy if available */
 		if (ilu->ilu_access == STMF_LU_ACTIVE &&
 		    stmf_state.stmf_alua_state == 1) {
@@ -4801,6 +4805,7 @@ stmf_deregister_lu(stmf_lu_t *lu)
 				}
 			}
 		}
+		#endif
 
 		if (ilu->ilu_next)
 			ilu->ilu_next->ilu_prev = ilu->ilu_prev;

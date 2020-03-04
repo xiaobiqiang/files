@@ -1836,12 +1836,7 @@ deleteDiskLu(stmfGuid *luGuid)
 	 */
 	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
 		return (ret);
-
-	ret = removeGuidFromDiskStore(luGuid);
-	if (ret != STMF_STATUS_SUCCESS) {
-		goto done;
-	}
-
+	
 	bcopy(luGuid, deleteLu.dlu_guid, sizeof (deleteLu.dlu_guid));
 	deleteLu.dlu_by_guid = 1;
 
@@ -1869,6 +1864,9 @@ deleteDiskLu(stmfGuid *luGuid)
 				ret = STMF_STATUS_ERROR;
 				break;
 		}
+	} else {
+		/* in order to del completely, first do ioctl, second remove from disk store */
+		ret = removeGuidFromDiskStore(luGuid);
 	}
 
 done:

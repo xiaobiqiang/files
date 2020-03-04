@@ -102,6 +102,8 @@ void sbd_handle_short_write_xfer_completion(scsi_task_t *task,
     stmf_data_buf_t *dbuf);
 void sbd_handle_short_write_transfers(scsi_task_t *task,
     stmf_data_buf_t *dbuf, uint32_t cdb_xfer_size);
+void sbd_handle_standby_short_write_xfer_completion(struct scsi_task *task, 
+	struct stmf_data_buf *dbuf);
 void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
@@ -1775,6 +1777,41 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	return;
 }
 
+void
+sbd_handle_standby_short_write_xfer_completion(struct scsi_task *task,
+    struct stmf_data_buf *dbuf)
+{
+	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
+
+	if (scmd->nbufs > 0) {
+		/*
+		 * Decrement the count to indicate the port xfer
+		 * into the dbuf has completed even though the buf is
+		 * still in use here in the LU provider.
+		 */
+		scmd->nbufs--;
+	}
+
+	if (dbuf->db_xfer_status != STMF_SUCCESS) {
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    dbuf->db_xfer_status, NULL, SBD_HANDLE_STANDBY_SHORT_WRITE_XFER_COMPLETION);
+		return;
+	}
+
+	task->task_nbytes_transferred += dbuf->db_data_size;
+	
+	/* We've got all the data we need, let's proxy the command. */
+	scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+
+	stmf_proxy_scsi_data_res(task, dbuf);
+	
+	stmf_free_dbuf(task, dbuf);
+	task->task_dbuf = NULL;
+	return;
+}
+
+
+
 /*
  * Return true if copy avoidance is beneficial.
  */
@@ -2293,6 +2330,7 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 	sbd_cmd_t *scmd;
 	stmf_status_t st_ret;
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 
 	/*
 	 * For now lets assume we will get only one sglist element
@@ -2328,8 +2366,12 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 		}
 		break;
 	case SCMD_UNMAP:
-		sbd_handle_unmap_xfer(task,
-		    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		if (itask->itask_flags & ITASK_PROXY_TASK) {
+			sbd_handle_standby_short_write_xfer_completion(task, dbuf);
+		} else {
+			sbd_handle_unmap_xfer(task,
+				dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		}
 		break;
 	case SCMD_PERSISTENT_RESERVE_OUT:
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
@@ -3864,7 +3906,11 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			case SCMD_WRITE_G5:
 				break;
 			default:
-				st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK);
+				if (cdb0 == SCMD_UNMAP)
+					st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_PROXY_TASK);
+				else
+					st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK);
+
 				if (st_ret != STMF_SUCCESS) {
 					//stmf_scsilib_send_status(task, STATUS_CHECK,STMF_SAA_LU_NO_ACCESS_UNAVAIL);
 					cdb0 = task->task_cdb[0] & 0x1F;
@@ -4128,6 +4174,18 @@ sbd_dbuf_xfer(struct scsi_task *task, uint32_t relative_offset, uint32_t len)
 	uint8_t op = task->task_cdb[0] & 0x1F;
 	sbd_cmd_t *scmd;
 	//stmf_data_buf_t	*task_dbuf;
+
+	if (task->task_cdb[0] == SCMD_UNMAP) {
+		/*This (cdb[0] == SCMD_UNMAP && dbuf == NULL) happens when we mkfs the lun
+		* by standby multipath. The standby-lu ending will receive SCMD_UNMAP,
+		* and then xfer to active-lu ending by pppt. Then the active-lu ending
+		* xfer a STMF_ICM_SCSI_DATA_REQ msg to standby-lu ending. So we at here.
+		*Handle SCMD_UNMAP that active-lu ending xfer to standby-lu ending
+		* by pppt
+		*/
+		sbd_handle_unmap(task, NULL);
+		return;
+	}
 
 	if (task->task_lu_private) {
 		scmd = (sbd_cmd_t *)task->task_lu_private;
