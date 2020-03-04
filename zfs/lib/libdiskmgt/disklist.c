@@ -1360,8 +1360,8 @@ void slot_map_find_value_guid(slot_map_t *sm, disk_info_t *di)
 	slot_record_t *search = NULL;
 
 	for (search = sm->sm_head; search != NULL; search = search->sr_next) {
-		if (strcasestr(di->dk_serial, search->sr_guid) != NULL ||
-			strcasestr(search->sr_guid, di->dk_serial) != NULL) {
+		if (strcasestr(search->sr_addr, di->dk_scsid) != NULL ||
+				strcasestr(di->dk_scsid, search->sr_addr) != NULL) {
 			di->dk_enclosure = search->sr_enclosure;
 			di->dk_slot = search->sr_slot;
 			break;
