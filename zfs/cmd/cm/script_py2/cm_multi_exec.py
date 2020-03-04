@@ -14,13 +14,16 @@ def recv_data(clientfd):
     recvlen = 0
     splitcut = 0
     system_name = platform.system()
-    
+    # recv : ret|len$data
     data = clientfd.recv(2048)
     for c in data:
         if c == '$':
             break 
         splitcut+=1
 
+    ret,datalen = data[0:splitcut].split('|')
+    ret,datalen = int(ret),int(datalen)
+        
     result += data[splitcut+1:]
     if len(result) != 0:
         if system_name.startswith('Windows'):
@@ -30,25 +33,20 @@ def recv_data(clientfd):
 
     recvlen += len(result)
     if system_name.startswith('Windows'):
-        while recvlen < int(data[0:splitcut]):
+        while recvlen < datalen:
             print clientfd.recv(2048).decode('utf-8').encode('gbk'),
             recvlen += 2048
     else:
-        while recvlen < int(data[0:splitcut]):
+        while recvlen < datalen:
             sys.stdout.write(clientfd.recv(2048))
             recvlen += 2048
 
-    return recvlen
+    return [ret,recvlen]
 
 def remote_cmd(hostname,ip,port,cmd):
     global timeout
     recv_len = 0
-    ret = 0
-    system_name = platform.system()
-    if system_name == 'Linux':
-        ret,_ = commands.getstatusoutput("ping "+ip+" -c 1")
-    else:
-        ret,_ = commands.getstatusoutput("ping "+ip+" 1")
+    ret,_ = commands.getstatusoutput("ping "+ip+" -c  1")
     if ret != 0:
         sys.stderr.write(hostname+" ping fail\n")
         return
@@ -62,28 +60,39 @@ def remote_cmd(hostname,ip,port,cmd):
         return
     clientfd.sendall(cmd)
     try:
-        recv_len = recv_data(clientfd)
+        ret,recv_len = recv_data(clientfd)
     except:
         sys.stderr.write(hostname+" exec timeout\n")
         return
     if recv_len != 0:
         print ""
-    clientfd.close()    
+    clientfd.close()
+    return ret
     
     
 def handle_req_broadcast(argv,hostmap,port):
+    ret = 0
+    ret_bak = 0
     result = ""
     cmd = "cmd|"+argv[1]
     for hostname in hostmap:
         ip = hostmap[hostname]
-        remote_cmd(hostname,ip,port,cmd)
+        ret = remote_cmd(hostname,ip,port,cmd)
+        if ret != 0:
+            ret_bak = ret
+    if  ret_bak != 0:       
+        sys.exit(1)
+        
 
 
 def handle_req_single(argv,hostmap,port):
+    ret = 0
     hostname = argv[1]
     cmd = "cmd|"+argv[2]
     ip = hostmap[hostname]
-    remote_cmd(hostname,ip,port,cmd)
+    ret = remote_cmd(hostname,ip,port,cmd)
+    if ret != 0 :
+        sys.exit(1)
     
 def get_hostmap(hostmap):
     system_name = platform.system()
@@ -96,6 +105,8 @@ def get_hostmap(hostmap):
     else:
         fd = open('/etc/clumgt.config')
         for line in fd:
+            if line[:1] == '#' or line[:2] != "df" :
+                continue
             hostname,ip = line.split(' ')
             hostmap[hostname] = ip.strip()
         fd.close()

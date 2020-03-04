@@ -42,7 +42,12 @@ class Server:
     def send_result(self,sock,result):
         sendlen = len(result)
         sock.sendall(str(sendlen)+"$")
-        sock.sendall(result)  
+        sock.sendall(result)
+
+    def send_result_withret(self,sock,ret,result):
+        sendlen = len(result)
+        sock.sendall(str(ret)+"|"+str(sendlen)+"$")
+        sock.sendall(result)
 
     def server_file_load(self,data,client):
         split_cut = 0
@@ -90,7 +95,7 @@ class Server:
                     cmd += cmds[i]
             #print cmd
             ret,result = commands.getstatusoutput(cmd)
-            self.send_result(client,result)
+            self.send_result_withret(client,ret,result)
             self.cm_multi_log('exec',cmd)
             client.shutdown(socket.SHUT_WR)
         elif "load" ==  data[0:4]:

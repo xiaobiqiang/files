@@ -1093,6 +1093,7 @@ typedef enum
     CM_OMI_FIELD_LOCALTASK_DESC,
 }cm_omi_field_localtask_e;
 
+
 extern const uint32 *g_CmOmiObjCmdNoCheckPtr;
 extern const cm_omi_map_cfg_t CmOmiMapCmds[CM_OMI_CMD_BUTT];
 

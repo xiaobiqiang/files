@@ -15,7 +15,7 @@
 
 typedef struct
 {    
-    sint8 dir_path[CM_STRING_256];  //文件的路径
+    sint8 dir_path[CM_STRING_512];  //文件的路径
     uint32 nid; 
     sint8 quota[CM_STRING_32]; //quota size
     sint8 used[CM_STRING_32];
