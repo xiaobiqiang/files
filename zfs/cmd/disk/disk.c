@@ -48,9 +48,9 @@ static libzfs_handle_t *gzfslib_p ;
 
 void print_info(disk_info_t *di, int count)
 {
-	if (di->dk_is_sys == 1) {
+	/*if (di->dk_is_sys == 1) {
 		strcat(di->dk_scsid, " [system]");
-	}
+	}*/
 
 	(void) printf("%3d. %-50s %-8s %-20s %-8s %-3d %-3d %-5s\n", count,
 			di->dk_scsid,di->dk_vendor,di->dk_serial,di->dk_busy,

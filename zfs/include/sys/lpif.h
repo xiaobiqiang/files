@@ -42,6 +42,12 @@ extern "C" {
 typedef struct lu_reg_arg {
 	uint32_t file_name_len;
 	uint32_t lu_serial_no_len;
+	/*
+	 * meta file name, contain '\0'	(char)
+	 * serial no					(char)
+	 * lu block shift 				(uint8_t)
+	 * lu total size				(uint64_t)
+	 */
 	uint8_t   data[1];
 }lu_reg_arg_t;
 

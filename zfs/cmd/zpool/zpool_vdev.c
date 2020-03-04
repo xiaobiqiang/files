@@ -936,7 +936,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 	uint_t c, children;
 	nvlist_t *nv;
 	char *type;
-	replication_level_t lastrep = { 0 }, rep, *ret;
+	replication_level_t lastrep, rep, *ret;
 	boolean_t dontreport;
 
 	ret = safe_malloc(sizeof (replication_level_t));
@@ -959,7 +959,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &is_log);
 		if (is_log)
 			continue;
-
+		
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_META, &is_meta);
 		if (is_meta) {
 			rep.zprl_type = "disk";
@@ -971,7 +971,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 			rep.zprl_type = "disk";
 			continue;
 		}
-
+		
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE,
 		    &type) == 0);
 		if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -1032,7 +1032,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 				 * If this is a replacing or spare vdev, then
 				 * get the real first child of the vdev.
 				 */
-				if (strcmp(childtype,
+				while (strcmp(childtype,
 				    VDEV_TYPE_REPLACING) == 0 ||
 				    strcmp(childtype, VDEV_TYPE_SPARE) == 0 ||
 				    strcmp(childtype, VDEV_TYPE_METASPARE) == 0 ||
@@ -1043,7 +1043,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 					verify(nvlist_lookup_nvlist_array(cnv,
 					    ZPOOL_CONFIG_CHILDREN, &rchild,
 					    &rchildren) == 0);
-					assert(rchildren == 2);
+					assert(rchildren > 1);
 					cnv = rchild[0];
 
 					verify(nvlist_lookup_string(cnv,
@@ -1246,6 +1246,7 @@ check_replication(nvlist_t *config, nvlist_t *newroot)
 	 * the current pool.
 	 */
 	ret = 0;
+	
 	if (current != NULL) {
 		if (strcmp(current->zprl_type, new->zprl_type) != 0) {
 			vdev_error(gettext(

@@ -41,6 +41,7 @@ enum {
     SAS_EVT_DEV_ADD,
     SAS_EVT_DEV_REMOVE,
     SAS_EVT_DEV_NORESP,
+    SAS_EVT_DEV_MERR,
     SAS_EVT_BUTT
 };
 

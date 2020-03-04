@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alarms>
+    <alarm id="1" name="disk lost" title="(#0)disk (#1) lost" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="check the disk removed or damaged!"/>
+    <alarm id="2" name="disk insert" title="(#0)disk (#1) insert" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="nothing to do!"/>
+
+
+    <alarm id="21" name="slow disk" title="(#0)slow disk (#1)" desc="hostname (#0), disk name (#1), slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="22" name="errors exceeded disk" title="(#0)errors exceeded disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="23" name="medium error disk" title="(#0)medium error disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="24" name="no response disk" title="(#0)no response disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="25" name="predicture failure disk" title="(#0)predicture failure disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="26" name="over temp disk" title="(#0)over temp disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+    <alarm id="27" name="selftest failure disk" title="(#0)selftest failure disk (#1)" desc="hostname (#0), disk name (#1),slot id (#2), en-closure id (#3)." suggest="replace the disk!"/>
+
+
+    <alarm id="28" name="psu alarm" title="device(#1)psu alarm" desc="device (#1) psu alarm, type(#0)(0:controllor, 1: enclosure)." suggest="check the psu state!"/>
+    <alarm id="29" name="fan alarm" title="device(#1)fan alarm" desc="device(#1)fan alarm, type(#0)(0:controllor, 1: enclosure), location (#2)." suggest="check the fan state!"/>
+    <alarm id="30" name="link alarm" title="device(#1)link alarm" desc="device(#1)link alarm, type(#0)(0:controllor, 1: enclosure), location (#2)." suggest="check the link connector!"/>
+    <alarm id="31" name="cpu temp alarm" title="(#0)cpu temp alarm" desc="hostname (#0), name (#1)." suggest="check the cpu temperature!"/>
+    <alarm id="32" name="cpu core alarm" title="(#0)cpu core alarm" desc="hostname (#0), name (#1)." suggest="check the cpu core volts!"/>
+    <alarm id="33" name="cpu dimm alarm" title="(#0)cpu dimm alarm" desc="hostname (#0), name (#1)." suggest="check the cpu dimm volts!"/>
+    <alarm id="34" name="system temp alarm" title="(#0)system temp alarm" desc="hostname (#0), name (#1)." suggest="check the environment temperature!"/>
+    <alarm id="35" name="pcie dimm alarm" title="(#0)pcie dimm alarm" desc="hostname (#0), name (#1)." suggest="check the dimm temperature!"/>
+
+
+    <alarm id="36" name="fc link alarm" title="(#0)fc link (#1) alarm" desc="hostname (#0), name (#1), status (#2)." suggest="check fc link!"/>
+    <alarm id="37" name="ethernet link alarm" title="(#0)ethernet link (#1) alarm" desc="hostname (#0), name (#1), status (#2)." suggest="check ethernet link!"/>
+    <alarm id="38" name="heart link alarm" title="(#0)heart link alarm" desc="hostname (#0), status (#2)." suggest="check heart link!"/>
+    <alarm id="39" name="sas link alarm" title="(#0)sas link alarm" desc="hostname (#0), status (#2)." suggest="check sas link!"/>
+   
+
+    <alarm id="40" name="pool alarm" title="(#0)pool (#1) alarm" desc="hostname (#0), pool name (#1),pool status (#2), scan status (#3)." suggest="repair fault!"/>
+
+    <alarm id="41" name="user quota alarm" title="(#0)user (#1) quota alarm" desc="hostname (#0), name (#1),used (#4),soft user quota (#3),user quota (#2)." suggest="remove somethings!"/>
+    <alarm id="42" name="quota alarm" title="(#0)quota (#1) alarm" desc="hostname (#0), name (#1),quota (#2), used (#3)." suggest="remove somethings!"/>
+
+    <alarm id="43" name="pool thin lun alarm" title="(#0)pool thin lun (#1) alarm" desc="hostname (#0), name (#1),total (#2), used (#3)." suggest="remove somethings!"/>
+    <alarm id="44" name="zfs thin lun alarm" title="(#0)zfs thin lun (#1) alarm" desc="hostname (#0), name (#1),total (#2), used (#3),thold (#4)." suggest="remove somethings!"/>
+    <alarm id="45" name="avs state alarm" title="(#0)avs (#1) state alarm" desc="hostname (#0), name (#1),xxx (#2)." suggest="xxxx!"/>
+    <alarm id="47" name="user release pool fail" title="user release pool fail" desc="nic(#1):IP(#2) down fail in node (#0)." suggest="none"/>
+    <alarm id="48" name="user release pool ip up fail" title="IP (#2) up fail" desc="nic(#1):IP(#2) up fail in node (#0)." suggest="none"/>
+    <alarm id="49" name="user release pool fail" title="export pool (#1) fail in src_node" desc="export pool (#1) fail in src_node (#0)." suggest="check pool state is databusy!"/>
+    <alarm id="50" name="user release pool fail" title="import pool (#1) fail in des_node" desc="import pool (#1) fail in des_node (#0)." suggest="check pool state is databusy!"/>
+    
+    <alarm id="51" name="system release pool fail" title="import pool (#1) fail in des_node" desc="import pool (#1) fail in des_node (#0)" suggest="check ndoe state!"/>
+    
+    <alarm id="52" name="cluster link fault" title="cluster link fault" desc="cluster link fault in node (#0)." suggest="check netlink!"/>
+    <alarm id="53" name="zfs/io deadlock" title="zfs/io deadlock" desc="zfs/io deadlock in node (#0)." suggest="save data and reboot"/>
+    <alarm id="54" name="pool resilvered" title="pool resilvered" desc="in node(#0) pool(#1) resilvered." suggest="none"/>
+    <alarm id="55" name="dirquota" title="DIR(#1)dirquota" desc="in node (#0)， DIR (#1),usred (#3),quota size(#2)." suggest="clean space"/>
+	
+    <alarm id="56" name="rpc flowcontrol open" title="rpc flowcontrol open" desc="node (#0),rpc flowcontrol open,the app is(#1)." suggest="none"/>
+    <alarm id="57" name="rpc flowcontrol close" title="rpc flowcontrol close" desc="node (#0),rpc flowcontrol close,the app is(#1)." suggest="none"/>
+	
+    <alarm id="10000000" name="node offline" title="Node (#0) offline" desc="Node (#0) offline" suggest="check node status"/>
+    <alarm id="10000010" name="nas overload alarm" title="(#0)nas overload alarm" desc="hostname (#0)， nas name (#1)." suggest="check nas using situation"/>
+    <alarm id="10000011" name="pool overload alarm" title="(#0)pool overload alarm" desc="hostname (#0)， pool name (#1)." suggest="check pool using situation"/>
+    <alarm id="10000012" name="ntp sync alarm" title="ntp sync alarm" desc="ip(#0) sync fail." suggest="check ntp server"/>
+    <alarm id="10000014" name="storage too much use" title="(#0) (#1) use too much" desc="(#0) (#1) use too much,proportion(#2)%" suggest="delete some data"/>
+    <alarm id="10000015" name="memory unusual" title="(#0) occur memory unusual" desc="(#0) memory unusual" suggest="check"/>
+    <alarm id="10000016" name="SAS unusual" title="(#0) SAS unusual" desc="(#0) occur SAS unusual，SN (#1)" suggest="check"/>
+    <alarm id="40000000" name="node join in" title="Node (#0) join in the cluster " desc="Node (#0) join in the cluster." suggest="none!"/>
+    <alarm id="40000001" name="node lost" title="Node (#0) lost from the cluster " desc="Node (#0) lost from the cluster." suggest="none!"/>
+    <alarm id="40000002" name="user release pool success" title="user release pool success" desc="release pool (#2) form node (#0) to node (#1) success ,used time (#3)s." suggest="none"/>
+    <alarm id="40000003" name="system release pool success" title="system release pool success" desc="release pool (#1) form src to node (#0) success ,used time (#2)s." suggest="none"/>
+    <alarm id="40000004" name="storage too much use" title="(#0) (#1) use too much" desc="(#0) (#1) use too much,proportion(#2)%" suggest="delete some data"/>
+    
+    <!-- 0:user 1:ip 2:node 3:pool 4:nas 5:blocksize 6:access 7:w_policy 8:is_comp 9:qos 10:quota 11:dedup 12:avsbw 13:smb -->
+    <alarm id="80000000" name="create NAS success" title="create NAS (#3)/(#4) success" desc="user(#0)(IP:(#1)) create NAS (#3)/(#4) success on the node(#2),blocksize (#5)(K), access (#6), is_comp (#8)(0:off 1:on), QOS (#9), quota (#10), dedup (#11)(0:off 1:on),NASAVS (#12), SMB (#13)(0:off 1:on), ABE (#14)(0:off 1:on), aclinherit(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)." suggest="none"/>
+    <alarm id="80000001" name="create NAS fail" title="create NAS (#3)/(#4) fail" desc="user (#0)(IP:(#1)) create NAS (#3)/(#4) fail on the node (#2),blocksize (#5)(K), access (#6),  is_comp (#8)(0:off 1:on), QOS (#9), quota (#10), dedup (#11)(0:off 1:on),NASAVS #12, SMB #13(0:off 1:on), ABE (#14)(0:off 1:on), aclinherit(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x).." suggest="none"/>
+    <alarm id="80000002" name="update NAS success" title="update NAS (#3)/(#4) success" desc="user (#0)(IP:(#1)) update NAS (#3)/(#4) success on the node (#2),blocksize (#5)(K), access (#6), is_comp (#8)(0:off 1:on), QOS (#9), quota (#10), dedup (#11)(0:off 1:on),NASAVS (#12), SMB (#13)(0:off 1:on), ABE (#14)(0:off 1:on), aclinherit(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x).." suggest="none"/>
+    <alarm id="80000003" name="update NAS fail" title="update NAS (#3)/(#4) fail" desc="user (#0)(IP:(#1)) update NAS (#3)/(#4) fail on the node (#2),blocksize (#5)(K), access (#6), is_comp (#8)(0:off 1:on), QOS (#9), quota (#10), dedup (#11)(0:off 1:on),NASAVS (#12), SMB (#13)(0:off 1:on), ABE (#14)(0:off 1:on), aclinherit(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x).." suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:pool 4:nas -->
+    <alarm id="80000004" name="delete NAS success" title="delete NAS (#3)/(#4) success" desc="user (#0)(IP:(#1)) delete NAS (#3)/(#4) success on the node (#2)." suggest="none"/>
+    <alarm id="80000005" name="delete NAS fail" title="delete NAS (#3)/(#4) fail" desc="user (#0)(IP:)(#1)) delete NAS (#3)/(#4) fail on the node (#2)." suggest="none"/>
+    
+    <!-- 0:user 1:ip 2:node 3:pool 4:lun 5:space 6:w_policy 7:is_double 8:is_comp 9:is_hot 10:alarm_threshold 11:qos 12:qos_val 13:dedup 14:blocksize 15:is_single -->
+    <alarm id="80000006" name="create LUN success" title="create LUN (#3)/(#4) success" desc="user(#0)(IP:(#1)) create LUN (#3)/(#4) success on the node(#2), space (#5),is_double (#7)(0:no 1:yes), is_comp (#8)(0:off 1:on), is_hot (#9)(0:no 1:yes), alarm_threshold (#10), QOS type(#11)(0:off 1:IOPS 2:Bandwidth), QOS value (#12), dedup (#13)(0:off 1:on),blocksize (#14), is_single (#13)(0:no 1:yes)." suggest="none"/>
+    <alarm id="80000007" name="create LUN fail" title="create LUN (#3)/(#4) fail" desc="user (#0)(IP:(#1)) create LUN (#3)/(#4) fail on the node (#2),space (#5), is_comp (#8)(0:off 1:on), is_hot (#9)(0:no 1:yes), alarm_threshold (#10), QOS type(#11)(0:off 1:IOPS 2:Bandwidth), QOS value (#12), dedup (#13)(0:off 1:on),blocksize (#14), is_single (#13)(0:no 1:yes)." suggest="none"/>
+    <alarm id="80000008" name="update LUN success" title="update LUN (#3)/(#4) success" desc="user (#0)(IP:(#1)) update LUN (#3)/(#4) success on the node (#2),space (#5),is_double (#7)(0:no 1:yes), is_comp (#8)(0:off 1:on), is_hot (#9)(0:no 1:yes), alarm_threshold (#10), QOS type(#11)(0:off 1:IOPS 2:Bandwidth), QOS value (#12), dedup (#13)(0:off 1:on)." suggest="none"/>
+    <alarm id="80000009" name="update LUN fail" title="update LUN (#3)/(#4) fail" desc="user (#0)(IP:(#1)) update LUN (#3)/(#4) fail on the node (#2),space (#5),is_double (#7)(0:no 1:yes), is_comp (#8)(0:off 1:on), is_hot (#9)(0:no 1:yes), alarm_threshold (#10), QOS type(#11)(0:off 1:IOPS 2:Bandwidth), QOS value (#12), dedup (#13)(0:off 1:on)." suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:pool 4:lun -->
+    <alarm id="80000010" name="delete LUN success" title="delete LUN (#3)/(#4) success" desc="user (#0)(IP:(#1)) delete LUN (#3)/(#4) success on the node (#2)." suggest="none"/>
+    <alarm id="80000011" name="delete LUN fail" title="delete LUN (#3)/(#4) fail" desc="user (#0)(IP:)(#1)) delete LUN (#3)/(#4) fail on the node (#2)." suggest="none"/>
+    
+    <alarm id="80000012" name="config cluster success" title="cluster(#2)config success" desc="user (#0)(IP:(#1)) config cluster success: name (#2), cluster IP (#3), gateway (#4), netmask (#5), interface of cluster (#6), enable ipmi (#8)(0:no 1:yes)，failover (#9)(0:roundrobin 1:loadbalance)." suggest="none"/>
+    <alarm id="80000013" name="config cluster fail" title="cluster(#2)config success" desc="user (#0)(IP:(#1)) config cluster fail: name (#2), cluster IP (#3), gateway (#4), netmask (#5), interface of cluster (#6), enable ipmi (#8)(0:no 1:yes),failover (#9)(0:roundrobin 1:loadbalance)." suggest="none"/>
+    <alarm id="80000014" name="cluster power off success" title="cluster power off success" desc="user (#0)(IP:(#1)) power the cluster off successfully." suggest="none"/>
+    <alarm id="80000015" name="cluster power off fail" title="cluster power off fail" desc="user (#0)(IP:(#1)) power the cluster off unsuccessfully." suggest="none"/>
+    <alarm id="80000016" name="cluster reboot success" title="cluster reboot success" desc="user (#0)(IP:(#1)) reboot the cluster successfully." suggest="none"/>
+    <alarm id="80000017" name="cluster reboot fail" title="cluster reboot fail" desc="user (#0)(IP:(#1)) reboot the cluster unsuccessfully." suggest="none"/>
+    
+    <alarm id="80000018" name="add node success" title="add node successfully" desc="user (#0)(IP:(#1)) add node with ip of (#2) successfully." suggest="none"/>
+    <alarm id="80000019" name="add node fail" title="add node fail" desc="user (#0)(IP:(#1))add node with ip of (#2) unsuccessfully." suggest="none"/>
+    <alarm id="80000020" name="delete node success" title="delete node successfully" desc="user (#0)(IP:(#1))delete node of (#2) successfully" suggest="none"/>
+    <alarm id="80000021" name="delete node fail" title="delete node fail" desc="user (#0)(IP:(#1))delete node of (#2) unsuccessfully" suggest="none"/>
+    <alarm id="80000022" name="node power on success" title="node power on success" desc="user (#0)(IP:(#1)) use user of (#3) to power on the node of (#2) successfully." suggest="none"/>
+    <alarm id="80000023" name="node power on fail" title="node power on fail" desc="user (#0)(IP:(#1)) use user of (#3) to power on the node of (#2) unsuccessfully." suggest="check user and password"/>
+    <alarm id="80000024" name="node power off success" title="node power off success" desc="user (#0)(IP:(#1)) power off node of (#2) successfully." suggest="none"/>
+    <alarm id="80000025" name="node power off fail" title="node power off fail" desc="user (#0)(IP:(#1)) power off node of (#2) unsuccessfully." suggest="none"/>
+    <alarm id="80000026" name="node reboot success" title="node reboot success" desc="user (#0)(IP:(#1)) reboot the node of (#2) successfully" suggest="none"/>
+    <alarm id="80000027" name="node reboot fail" title="node reboot fail" desc="user (#0)(IP:(#1)) reboot the node of (#2) unsuccessfully" suggest="none"/>
+    
+    <alarm id="80000028" name="snapshot backup success" title="snapshot backup success" desc="user (#0)(IP:(#1)) create snapshot backup successfully which is from node of (#2) to node with ip of (#3), the first snapshot is (#4), the second is (#5),destination is (#6), see the progress at task manager." suggest="none"/>
+    <alarm id="80000029" name="snapshot backup fail" title="snapshot backup fail" desc="user (#0)(IP:(#1)) create snapshot backup fail which is from node of (#2) to node with ip of (#3), the first snapshot is (#4), the second is (#5),destination is (#6)." suggest="check if the snapshot exists, non-incremental snapshot backup need non-existence of distination. ensure that when incremental snapshot backcup, the distination has already the first source snapshot and the second one must be later than the first source snapshot and the lastest snapshot of distination is the very first source snapshot"/>
+    
+    <alarm id="80000030" name="delete task success" title="delete task success" desc="user (#0)(IP:(#1)) delete the task with id of (#2) successfully" suggest="none"/>
+    <alarm id="80000031" name="delete task fail" title="delete task fail" desc="user (#0)(IP:(#1)) delete the task with id of (#2) unsuccessfully" suggest="check if the task exists"/>
+    
+    <alarm id="80000032" name="snapshot clone success" title="snapshot clone success" desc="user (#0)(IP:(#1)) create snapshot clone at node of (#2) successfully, the source snapshot is (#3), the distination is (#4)." suggest="none"/>
+    <alarm id="80000033" name="snapshot clone fail" title="snapshot clone fail" desc="user (#0)(IP:(#1)) create snapshot clone at node of (#2) fail, the source snapshot is (#3), the distination is (#4)." suggest="check if the source snapshot and the distination are in the same pool"/>
+    
+    <alarm id="80000034" name="create lun duallive success" title="create lun(#5) duallive success" desc="user (#0)(IP:(#1)) create lun duallive successfully which is from node of (#3) to that of (#4), the application mode is (#2)(0:sync 1:async), the master node is (#3) and the slave is (#4), the lun is (#5), the two sides's network interface is (#6), ip of (#7) and netmask of (#9) are binded to the master interface, the slave interface is binded with ip of (#8) and netmask of (#10), if syncing once when established or not (#11)?(0:no 1:yes)." suggest="none"/>
+    <alarm id="80000035" name="create lun duallive fail" title="create lun(#5) duallive fail" desc="user (#0)(IP:(#1)) create lun duallive unsuccessfully which is from node of (#3) to that of (#4), the application mode is (#2)(0:sync 1:async), the master node is (#3) and the slave is (#4), the lun is (#5), the two sides's network interface is (#6), ip of (#7) and netmask of (#9) are binded to the master interface, the slave interface is binded with ip of (#8) and netmask of (#10), if syncing once when established or not (#11)?(0:no 1:yes)." suggest="ensure that the size and LU of the two luns are the same, if not, check if those luns were created in a cluster. suggest strongly that the network interface provided for duallive use the different network segment from igb0 interface"/>
+    <alarm id="80000036" name="delete lun duallive success" title="delete lun(#3) duallive success" desc="user (#0)(IP:(#1)) delete lun of (#3) duallive on node of (#2) successfully." suggest="none"/>
+    <alarm id="80000037" name="delete lun duallive fail" title="delete lun(#3) duallive success" desc="user (#0)(IP:(#1)) delete lun of (#3) duallive on node of (#2) unsuccessfully" suggest="check if duallive of the lun exists on the assigned node, ensure that the assigned node is the master one of this duallive."/>
+    
+    <alarm id="80000038" name="create lun backup success" title="create lun(#5) backup success" desc="user (#0)(IP:(#1))create lun backup successfully which is from node of (#3) to that of (#4), the application mode is (#2)(0:sync 1:async), the master node is (#3) and the slave is (#4), the master lun is (#5) and the slave one is (#6), the two sides's network interface is (#7), ip of (#8) and netmask of (#10) are binded to the master interface, the slave interface is binded with ip of (#9) and netmask of (#11), if syncing once when established or not (#12)?(0:no 1:yes)." suggest="none"/>
+    <alarm id="80000039" name="create lun backup fail" title="create lun(#5) backup fail" desc="user (#0)(IP:(#1)) create lun backup unsuccessfully which is from node of (#3) to that of (#4), the application mode is (#2)(0:sync 1:async), the master node is (#3) and the slave is (#4), the master lun is (#5) and the slave one is (#6), the two sides's network interface is (#7), ip of (#8) and netmask of (#10) are binded to the master interface, the slave interface is binded with ip of (#9) and netmask of (#11), if syncing once when established or not (#12)?(0:no 1:yes)." suggest="ensure that the size of two luns is the same, suggest strongly using IP with the different network segment from igb0"/>
+    <alarm id="80000040" name="update lun backup success" title="update lun(#5) backup success" desc="user (#0)(IP:(#1)) update lun backup from node of (#3) to node of (#4) successfully, the master lun is (#5), the slave one is (#6)，operation is (#2)(0:set interval of async mode  1:forward full sync 2:reverse full sync 3:forward update sync 4:reverse update sync) the async interval is set to (#7), except setting interval, others can see progress in task manager." suggest="none"/>
+    <alarm id="80000041" name="update lun backup fail" title="update lun(#5) backup fail" desc="user (#0)(IP:(#1)) update lun backup from node of (#3) to node of (#4) unsuccessfully, the master lun is (#5), the slave one is (#6)，operation is (#2)(0:set interval of async mode  1:forward full sync 2:reverse full sync 3:forward update sync 4:reverse update sync) the async interval is set to (#7)." suggest="none"/>
+    <alarm id="80000042" name="delete lun backup success" title="delete lun(#4) backup success" desc="user (#0)(IP:(#1)) delete the lun backup from lun (#4) at node of (#2) to that of (#5) at node of (#4) successfully." suggest="none"/>
+    <alarm id="80000043" name="delete lun backup fail" title="delete lun(#4) backup success" desc="user (#0)(IP:(#1)) delete the lun backup from lun (#4) at node of (#2) to that of (#5) at node of (#4) fail." suggest="1.know that if /etc/hosts exists the map of two rdc_ip 2.check network health"/>
+    
+    <alarm id="80000044" name="update alarm config success" title="update alarm config success" desc="user (#0)(IP:(#1)) set alarm config with id of (#2) successfully to that level is (#3)(0:critical 1:major 2:minor 3:trival), is_disable (#4)(0:no 1:yes)." suggest="none"/>
+    <alarm id="80000045" name="update alarm config fail" title="update alarm config fail" desc="user (#0)(IP:(#1))set alarm config with id of (#2) unsuccessfully to that level is (#3)(0:critical 1:major 2:minor 3:trival), is_disable (#4)(0:no 1:yes)." suggest="none"/>
+    
+    <alarm id="80000046" name="set system time success" title="set system time success" desc="user (#0)(IP:(#1)) successfully sets TimeZone to (#2) and time to (#3)." suggest="none"/>
+    <alarm id="80000047" name="set system time fail" title="set system time fail" desc="user (#0)(IP:(#1)) unsuccessfully sets TimeZone to (#2) and time to (#3)." suggest="none"/>
+    
+    <alarm id="80000048" name="update pmm_config success" title="update pmm_config success" desc="user (#0)(IP:(#1)) successfully set save_days to (#2)." suggest="none"/>
+    <alarm id="80000049" name="update pmm_config fail" title="update pmm_config fail" desc="user (#0)(IP:(#1)) unsuccessfully set save_days to (#2)." suggest="none"/>
+    
+    <alarm id="80000050" name="add GUI user success" title="add GUI user(#2) success" desc="user (#0)(IP:(#1)) adds user (#2) and successfully sets level to (#3)(0:superadmin 1-32: 32 normal permissions)." suggest="none"/>
+    <alarm id="80000051" name="add GUI user fail" title="add GUI user(#2) fail" desc="user (#0)(IP:(#1)) adds user (#2) and unsuccessfully sets level to (#3)(0:superadmin 1-32: 32 normal permissions)." suggest="none"/>    
+    <alarm id="80000052" name="modify GUI user success" title="modify GUI user success" desc="user (#0)(IP:(#1)) successfully sets (#2)'s permission level to (#3) and password to (#4)." suggest="none"/>
+    <alarm id="80000053" name="modify GUI user fail" title="modify GUI user fail" desc="user (#0)(IP:(#1)) unsuccessfully sets (#2)'s permission level to (#3) and password to (#4)." suggest="none"/>
+    <alarm id="80000054" name="delete GUI user success" title="delete GUI user success" desc="user (#0)(IP:(#1)) successfully delete user with id of (#2)." suggest="none"/>
+    <alarm id="80000055" name="delete GUI user fail" title="delete GUI user fail" desc="user (#0)(IP:(#1)) unsuccessfully delete user with id of (#2)." suggest="none"/>
+    
+    <alarm id="80000056" name="initialize disk success" title="initialize disk success" desc="user (#0)(IP:(#1)) successfully initializes the disk of (#3) on node of (#2)." suggest="none"/>
+    <alarm id="80000057" name="initialize disk fail" title="initialize disk fail" desc="user (#0)(IP:(#1)) unsuccessfully initializes the disk of (#3) on node of (#2)." suggest="ensure that the disk is not in the pool at the assigned node"/>
+    
+    <!-- 0:user 1:ip 2:id 3:gid 4:name 5:path -->
+    <alarm id="80000100" name="create USER success" title="create USER(#2) sucess" desc="user(#0)(IP:(#1)) create user(#4),path(#5) success" suggest="none"/>
+    <alarm id="80000101" name="create USER fail" title="create USER(#2) fail" desc="user(#0)(IP:(#1)) create user(#4),path(#5) fail" suggest="none"/>
+    <alarm id="80000102" name="update USER success" title="update USER(#2) success" desc="user(#0)(IP:(#1)) update user(#4),path(#5) success" suggest="none"/>
+    <alarm id="80000103" name="update USER fail" title="update USER(#2) fail" desc="user(#0)(IP:(#1)) update user(#4),path(#5) fail" suggest="none"/>
+    <!-- 0:user 1:ip 2:name -->
+    <alarm id="80000104" name="delete USER success" title="delete USER(#0) success" desc="delete USER(#4) success" suggest="none"/>
+    <alarm id="80000105" name="delete USER fail" title="delete USER(#0) fail" desc="delete USER(#4) fail" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:usertype 3:node 4:name 5:filename 6:hardspace 7:softspace -->
+    <alarm id="80000106" name="update QUOTA success" title="update QUOTA success" desc="user(#0)(IP:(#1)) update QUOTA(#4) success,type(#2),node(#3),file(#4),hardspace(#6),softspace(#7)" suggest="none"/>
+    <alarm id="80000107" name="update QUOTA fail" title="update QUOTA fail" desc="user(#0)(IP:(#1)) update QUOTA(#4) fail,type(#2),node(#3),file(#4),hardspace(#6),softspace(#7)" suggest="none"/>
+    <!-- 0:user 1:ip 2:usertype 3:node 4:name 5:filename -->
+    <alarm id="80000108" name="delete QUOTA success" title="delete QUOTA success" desc="user(#0)(IP:(#1)) delete name(#4) file(#5) on node(#3) success" suggest="none"/>
+    <alarm id="80000109" name="delete QUOTA fail" title="delete QUOTA fail" desc="user(#0)(IP:(#1)) delete name(#4) file(#5) on node(#3) fail" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:filename 3:node 4:adapter 5:ip 6:netmask -->
+    <alarm id="80000110" name="create IPSHIFT success" title="create IPSHIFT(#5) success" desc="user(#0)(IP:(#1)) create IPSHIFT success，file(#2),node(#3),adapter(#4),IP(#5),netmask(#6)" suggest="none"/>
+    <alarm id="80000111" name="create IPSHIFT fail" title="create IPSHIFT(#5) fail" desc="user(#0)(IP:(#1)) create IPSHIFT fail，file(#2),node(#3),adapter(#4),IP(#5),netmask(#6)" suggest="none"/>
+    <!-- 0:user 1:ip 2:filename 3:node 4:ip -->
+    <alarm id="80000112" name="delete IPSHIFT success" title="delete IPSHIFT(#4)success" desc="user(#0)(IP:(#1)) delete IP(#4) file(#2) on node(#3) success" suggest="none"/>
+    <alarm id="80000113" name="delete IPSHIFT fail" title="delete IPSHIFT(#4)success" desc="user(#0)(IP:(#1)) delete IP(#4) file(#2) on node(#3) fail" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:destination 3:node 4:netmask 5:geteway -->
+    <alarm id="80000114" name="create ROUTE success" title="create ROUTE success" desc="cerate ROUTE success,destination(#2),node(#3),netmask(#4),geteway(#5)" suggest="none"/>
+    <alarm id="80000115" name="create ROUTE fail" title="create ROUTE fail" desc="cerate ROUTE fail,destination(#2),node(#3),netmask(#4),geteway(#5)" suggest="none"/>
+    <alarm id="80000116" name="delete ROUTE success" title="delete ROUTE success" desc="delete ROUTE success,destination(#2),node(#3),netmask(#4),geteway(#5)" suggest="none"/>
+    <alarm id="80000117" name="delete ROUTE fail" title="delete ROUTE fail" desc="delete ROUTE fail,destination(#2),node(#3),netmask(#4),geteway(#5)" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:adapter 3:node 4:ip 5:netmask -->
+    <alarm id="80000118" name="create phys_ip success" title="create phys_ip(#4)success" desc="create phys_ip success,adapter(#2),node(#3),ip(#4),netmask(#5)" suggest="none"/>
+    <alarm id="80000119" name="create phys_ip fail" title="create phys_ip(#4)fail" desc="create phys_ip fail,adapter(#2),node(#3),ip(#4),netmask(#5)" suggest="none"/>
+    <alarm id="80000120" name="delete phys_ip success" title="delete phys_ip(#4)success" desc="delete phys_ip success,adapter(#2),node(#3),ip(#4),netmask(#5)" suggest="none"/>
+    <alarm id="80000121" name="delete phys_ip fail" title="delete phys_ip(#4)fail" desc="delete phys_ip fail,adapter(#2),node(#3),ip(#4),netmask(#5)" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:type 3:node 4:opreation 5:path 6:pool 7:lunid 8:progress -->
+    <alarm id="80000122" name="create lun_migrate success" title="create lun_migrate success" desc="create lun_migrate success,type(#2)(0:disk 1:lun),node(#3),path(#5),pool(#6),lunid(#7)" suggest="none"/>
+    <alarm id="80000123" name="create lun_migrate fail" title="create lun_migrate fail" desc="create lun_migrate fail,type(#2)(0:disk 1:lun),node(#3),path(#5),pool(#6),lunid(#7)" suggest="none"/>
+    <alarm id="80000124" name="update lun_migrate success" title="update lun_migrate success" desc="update lun_migrate success,type(#2)(0:disk 1:lun),node(#3),path(#5),opreation(#8)" suggest="none"/>
+    <alarm id="80000125" name="update lun_migrate fail" title="update lun_migrate fail" desc="update lun_migrate fail,type(#2)(0:disk 1:lun),node(#3),path(#5),opreation(#8)" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:name 3:node 4:state 5:ip 6:netmask 7:adapter 8:policy 9:lacpactivity 10:lacptimer -->
+    <alarm id="80000126" name="create aggr success" title="create aggr (#5) success" desc="create aggr success,ip(#5),node(#3),netmask(#6),adapter(#7),policy(#8),lacpactivity(#9),lacptimer(#10)" suggest="none"/>
+    <alarm id="80000127" name="create aggr fail" title="create aggr (#5) fail" desc="create aggr fail,ip(#5),node(#3),netmask(#6),adapter(#7),policy(#8),lacpactivity(#9),lacptimer(#10)" suggest="none"/>
+    <alarm id="80000128" name="update aggr success" title="update aggr (#5)success" desc="update aggr success,ip(#5),node(#3),netmask(#6),adapter(#7),policy(#8),lacpactivity(#9),lacptimer(#10)" suggest="none"/>
+    <alarm id="80000129" name="update aggr fail" title="update aggr (#5)fail" desc="update aggr fail,ip(#5),node(#3),netmask(#6),adapter(#7),policy(#8),lacpactivity(#9),lacptimer(#10)" suggest="none"/>
+    <!-- 0:user 1:ip 2:name 3:node 4:state 5:ip 6:netmask  -->
+    <alarm id="80000130" name="delete aggr success" title="delete aggr(#2)success" desc="delete aggr success,node(#3),name(#2)" suggest="none"/>
+    <alarm id="80000131" name="delete aggr fail" title="delete aggr(#2)fail" desc="delete aggr faile,node(#3),name(#2)" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:node 3:dst 4:src 5:mount 6：state -->
+    <alarm id="80000132" name="create nas_shadow success" title="create nas_shadow success" desc="create nas_shadow success,node(#2),dst(#3),src(#4),mount(#5)" suggest="none"/>
+    <alarm id="80000133" name="create nas_shadow fail" title="create nas_shadow fail" desc="create nas_shadow fail,node(#2),dst(#3),src(#4),mount(#5)" suggest="none"/>
+    <alarm id="80000134" name="update nas_shadow success" title="update nas_shadow success" desc="update nas_shadow success,node(#2)" suggest="none"/>
+    <alarm id="80000135" name="update nas_shadow fail" title="update nas_shadow fail" desc="其update nas_shadow fail,node(#2)" suggest="none"/>
+    <!-- 0:user 1:ip 2:name -->
+    <alarm id="80000136" name="delete nas_shadow success" title="delete nas_shadow success" desc="delete nas_shadow(#2)success" suggest="none"/>
+    <alarm id="80000137" name="delete nas_shadow fail" title="delete nas_shadow fail" desc="delete nas_shadow(#2)fail" suggest="none"/>
+	
+    <!-- lowdata -->
+    <alarm id="80000138" name="update nas lowdata success" title="update nas lowdata success" desc="user(#0)(IP:(#1))update lowdata node(#3),NAS (#2),status(#4)(0:off 1:migrate 2:delete 3:default),time_unit(#5)(0:second 1:minute 2:hour 3:day),cri(#6)(0:atime 1:ctime),timeout(#7),delete timeout(#8),whether or not start lowdata(#9)(0:start 1:stop 2:all) success" suggest="无"/>
+    <alarm id="80000139" name="update nas lowdata fail" title="update nas lowdata fail" desc="user(#0)(IP:(#1))update lowdata node(#3),NAS (#2),status(#4)(0:off 1:migrate 2:delete 3:default),time_unit(#5)(0:second 1:minute 2:hour 3:day),cri(#6)(0:atime 1:ctime),timeout(#7),delete timeout(#8),whether or not start lowdata(#9)(0:start 1:stop 2:all) fail" suggest="无"/>
+    <!-- dirlowdata -->
+    <alarm id="80000140" name="update nas dirlowdata success" title="update nas dirlowdata success" desc="user(#0)(IP:(#1))update dirlowdata node(#3),NAS(#2),dir(#4),status(#5)(0:off 1:migrate 2:delete 3:default),time_unit(#6)(0:second 1:minute 2:hour 3:day),cri(#7)(0:atime 1:ctime),timeout(#8),timeout(#9),,whether or not start dirlowdata(#10)(0:start 1:stop 2:all) success" suggest="无"/>
+    <alarm id="80000141" name="update nas dirlowdata fail" title="update nas dirlowdata fail" desc="user(#0)(IP:(#1))update dirlowdata node(#3),NAS(#2),dir(#4),status(#5)(0:off 1:migrate 2:delete 3:default),time_unit(#6)(0:second 1:minute 2:hour 3:day),cri(#7)(0:atime 1:ctime),timeout(#8),timeout(#9),,whether or not start dirlowdata(#10)(0:start 1:stop 2:all) fail" suggest="无"/>
+    
+    <!-- 0:groupname 1:nid 2:nas -->
+    <alarm id="80000200" name="create NAS_CLUSTER success" title="create NAS_CLUSTER (#2) success" desc="user(#0)(IP:(#1)) create NAS_CLUSTER success on node(#2) the master is(#4)." suggest="none"/>
+    <alarm id="80000201" name="create NAS_CLUSTER fail" title="create NAS_CLUSTER (#2) fail" desc="user(#0)(IP:(#1)) create NAS_CLUSTER fail on node(#3)." suggest="none"/>
+    <!-- 0:groupname 1:nid 2:nas 3：role -->
+    <alarm id="80000202" name="update NAS_CLUSTER success" title="update NAS_CLUSTER (#2) success" desc="user(#0)(IP:(#1)) update NAS_CLUSTER success on node(#3),(#4) was updated successfully,if the role of (#4) is set,the role of (#4) is (#5)(0:slave 1:master 2:master2 3:master3 4:master4)" suggest="none"/>
+    <alarm id="80000203" name="update NAS_CLUSTER fail" title="update NAS_CLUSTER (#2) fail" desc="user(#0)(IP:(#1)) update NAS_CLUSTER fail on node(#3),(#4) was updated fail." suggest="none"/>
+    <!-- 0:ip 1:domain 2:nid -->
+    <alarm id="80000204" name="create DNSM success" title="create DNSM ((#2)(#3)) success" desc="user(#0)(IP:(#1)) create DNSM success on node (#4)." suggest="none"/>
+    <alarm id="80000205" name="create DNSM fail" title="create DNSM ((#2)(#3)) fail" desc="user(#0)(IP:(#1)) create DNSM fail on node (#4)." suggest="none"/>
+    <!-- 0:domain 1:ip 2:nid -->
+    <alarm id="80000206" name="update DNSM success" title="update DNSM ((#2)(#3)) success" desc="user(#0)(IP:(#1)) update DNSM success on node (#4)." suggest="none"/>
+    <alarm id="80000207" name="update DNSM success" title="update DNSM ((#2)(#3)) success" desc="user(#0)(IP:(#1)) update DNSM success on node (#4)." suggest="none"/>
+    <!-- 0:domain 1:nid -->
+    <alarm id="80000208" name="delete DNSM success" title="delete DNSM (#2) success" desc="user(#0)(IP:(#1)) delete DNSM success on node (#3)." suggest="none"/>
+    <alarm id="80000209" name="delete DNSM success" title="delete DNSM (#2) success" desc="user(#0)(IP:(#1)) delete DNSM success on node (#3)." suggest="none"/>
+    <!-- 0:operate 1:nic 2:ip 3:port 4:nid -->
+    <alarm id="80000210" name="create ipfilter configuration success" title="create ipfilter source ip (#4) success" desc="user(#0)(IP:(#1)) create ipfilter configuration success on node (#6)，the operation is (#2)(0:deny 1:allow),the nic is (#3),the ip is (#4),the port is (#5)." suggest="none"/>
+    <alarm id="80000211" name="create ipfilter configuration fail" title="create ipfilter source ip (#4) fail" desc="user(#0)(IP:(#1)) create ipfilter configuration fail on node (#6)，the operation is (#2)(0:deny 1:allow),the nic is (#3),the ip is (#4),the port is (#5)." suggest="none"/>
+    <!-- 0:status 1:nid -->
+    <alarm id="80000212" name="update ipfilter status success" title="update ipfilter's status to (#2) success" desc="user(#0)(IP:(#1)) update ipfilter status success on node (#3),the status is (#2)(0:disable 1:enable) now." suggest="none"/>
+    <alarm id="80000213" name="update ipfilter status fail" title="update ipfilter's status to (#2) fail" desc="user(#0)(IP:(#1)) update ipfilter status fail on node (#3)." suggest="none"/>
+    <!-- 0:operate 1:nic 2:ip 3:port 4:nid -->
+    <alarm id="80000214" name="delete ipfilter configuration success" title="delete source ip (#4) success" desc="user(#0)(IP:(#1)) delete ipfilter configuration success on node (#6)，the operation is (#2)(0:deny 1:allow),the nic is (#3),the ip is (#4),the port is (#5)." suggest="none"/>
+    <alarm id="80000215" name="delete ipfilter configuration fail" title="delete source ip (#4) fail" desc="user(#0)(IP:(#1)) delete ipfilter configuration fail on node (#6)，the operation is (#2)(0:deny 1:allow),the nic is (#3),the ip is (#4),the port is (#5)." suggest="none"/>
+    <!-- 0:protocol -->
+    <alarm id="80000216" name="create TERGET success" title="create TERGET success" desc="user(#0)(IP:(#1)) create TERGET success, the protocol is (#0)(0:unkown 1:iscsi 2:fc 3:ib)." suggest="none"/>
+    <alarm id="80000217" name="create TERGET fail" title="create TERGET fail" desc="user(#0)(IP:(#1)) create TERGET fail, the protocol is (#0)(0:unkown 1:iscsi 2:fc 3:ib)." suggest="none"/>
+    <!-- 0:lun 1:hostgroup 2:targetgroup-->
+    <alarm id="80000218" name="create LUNMAP success" title="create LUNMAP for (#2) success" desc="user(#0)(IP:(#1)) create LUNMAP for (#2) success,the hostgroup is (#3),the targetgroup is (#4)." suggest="none"/>
+    <alarm id="80000219" name="create LUNMAP fail" title="create LUNMAP for (#2) fail" desc="user(#0)(IP:(#1)) create LUNMAP for (#2) fail,the hostgroup is (#3),the targetgroup is (#4)." suggest="none"/>
+    <!-- -->
+    <alarm id="80000220" name="update LUNMAP success" title="update LUNMAP success" desc="user(#0)(IP:(#1)) update LUNMAP success." suggest="none"/>
+    <alarm id="80000221" name="update LUNMAP fail" title="update LUNMAP fail" desc="user(#0)(IP:(#1)) update LUNMAP fail." suggest="none"/>
+    <!-- 0:lun 1:hostgroup -->
+    <alarm id="80000222" name="delete LUNMAP success" title="delete LUNMAP for (#2) success" desc="user(#0)(IP:(#1)) delete LUNMAP for (#2) success,the hostgroup is (#3)." suggest="none"/>
+    <alarm id="80000223" name="delete LUNMAP fail" title="delete LUNMAP for (#2) fail" desc="user(#0)(IP:(#1)) delete LUNMAP for (#2) fail,the hostgroup is (#3)." suggest="none"/>
+    <!-- 0:nid 1:nas 2:nametype 3:name 4:permission -->
+    <alarm id="80000226" name="create CIFS success" title="create CIFS share for user (#5) success" desc="user(#0)(IP:(#1)) create CIFS share for user (#5) success on node (#2),the name type is (#4)(0:user 1:ugroup),the permission is (#6)(0:RW 1:RO 2:RD),the directory is (#3)." suggest="none"/>
+    <alarm id="80000227" name="create CIFS fail" title="create CIFS share for user (#5) fail" desc="user(#0)(IP:(#1)) create CIFS share for user (#5) failed on node (#2),the name type is (#4)(0:user 1:ugroup),the permission is (#6)(0:RW 1:RO 2:RD),the directory is (#3)." suggest="none"/>
+    <!-- 0:nid 1:nas 2:nametype 3:name 4:permission -->
+    <alarm id="80000228" name="update CIFS success" title="update CIFS share for user (#5) success" desc="user(#0)(IP:(#1)) update CIFS share for user (#5) success on node (#2),the name type is (#4)(0:user 1:ugroup),the permission is (#6)(0:RW 1:RO 2:RD),the directory is (#3)." suggest="none"/>
+    <alarm id="80000229" name="update CIFS fail" title="update CIFS share for user (#5) fail" desc="user(#0)(IP:(#1)) update CIFS share for user (#5) failed on node (#2),the name type is (#4)(0:user 1:ugroup),the permission is (#6)(0:RW 1:RO 2:RD),the directory is (#3)." suggest="none"/>
+    <!-- 0:nid 1:nas 2:nametype 3:name -->
+    <alarm id="80000230" name="delete CIFS success" title="delete CIFS share for user (#5) success" desc="user(#0)(IP:(#1)) delete CIFS share for user (#5) success on node (#2),the name type is (#4)(0:user 1:ugroup),the directory is (#3)." suggest="none"/>
+    <alarm id="80000231" name="delete CIFS fail" title="delete CIFS share for user (#5) fail" desc="user(#0)(IP:(#1)) delete CIFS share for user (#5) failed on node (#2),the name type is (#4)(0:user 1:ugroup),the directory is (#3)." suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:nas 4:ipaddress 5:permission -->
+    <alarm id="80000300" name="NAS insert IP success" title="NAS:(#3) insert IP:(#4) success" desc="user (#0)(IP:(#1)) NAS insert IP:(#4)success on the node(#2)，permission(#5)(0:rw 1:ro)。" suggest="none"/>
+    <alarm id="80000301" name="NAS insert IP fail" title="NAS:(#3) insert IP:(#4) fail" desc="user (#0)(IP:(#1)) NAS insert IP:(#4)fail on the node(#2)，permission(#5)(0:rw 1:ro)。" suggest="node"/>
+    <!-- 0:user 1:ip 2:node 3:nas 4:ipaddress -->
+    <alarm id="80000302" name="NAS delete IP success" title="NAS:(#3) delete IP:(#4) success" desc="user (#0)(IP:(#1)) NAS delete IP:(#4)success on the node(#2)，permission(#5)(0:rw 1:ro)。" suggest="node"/>
+    <alarm id="80000303" name="NAS delete IP fail" title="NAS:(#3) delete IP:(#4) fail" desc="user (#0)(IP:(#1)) NAS delete IP:(#4)success on the node(#2)，permission(#5)(0:rw 1:ro)。" suggest="node"/>
+
+    <!-- 0:user 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype 7:workload_if 8:workload_ip 9:netmask -->
+    <alarm id="80000304" name="create nas duallive success" title="create nas duallive ((#2):(#3) link (#4):(#5)) success" desc="user (#0)(IP:(#1))create nas duallive ((#2):(#3) link (#4):(#5)) success on the node(#2),sync type(#6)(0:off 1:async 2:sync) workload card:(#7) workload IP(#8) netmask(#9)。" suggest="无"/>
+    <alarm id="80000305" name="create nas duallive fail" title="create nas duallive ((#2):(#3) link (#4):(#5)) fail" desc="user (#0)(IP:(#1))create nas duallive ((#2):(#3) link (#4):(#5)) fail on the node(#2),sync type(#6)(0:off 1:async 2:sync)  workload card:(#7) workload IP(#8) netmask(#9)。" suggest="无"/>
+    <!-- 0:user 1:ip 2:master_node 3:master_nas -->
+    <alarm id="80000306" name="delete nas duallive success" title="delete nas duallive success , master is ((#2):(#3))" desc="user(#0)(IP:(#1))delete nas duallive success , master is ((#2):(#3)) on the node(#2)。" suggest="none"/>
+    <alarm id="80000307" name="delete nas duallive fail" title="delete nas duallive fail , master is ((#2):(#3))" desc="user(#0)(IP:(#1))delete nas duallive fail , master is ((#2):(#3)) on the node(#2)。" suggest="none"/>
+    
+    <!-- 0:user 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype -->
+    <alarm id="80000308" name="create nas backup success" title="create nas backup ((#2):(#3) link (#4):(#5)) success" desc="user(#0)(IP:(#1))create nas backup ((#2):(#3) link (#4):(#5)) success on the node(#2),sync type(#6)(0:off 1:async 2:sync)。" suggest="none"/>
+    <alarm id="80000309" name="create nas backup fail" title="create nas backup ((#2):(#3) link (#4):(#5)) fail" desc="user(#0)(IP:(#1))create nas backup ((#2):(#3) link (#4):(#5)) fail on the node(#2),sync type(#6)(0:off 1:async 2:sync)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:master_node 3:master_nas -->
+    <alarm id="80000310" name="delete nas backup success" title="delete nas backup success , master is ((#2):(#3))" desc="user(#0)(IP:(#1))delete nas backup success , master is ((#2):(#3)) on the node(#2)。" suggest="none"/>
+    <alarm id="80000311" name="delete nas backup fail" title="delete nas backup fail , master is ((#2):(#3))" desc="user(#0)(IP:(#1))delete nas backup fail , master is ((#2):(#3)) on the node(#2)。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:node 3:nfs 4:stmf 5:ssh 6:ftp 7:smb 8:guiview 9:fmd 10:iscsi -->
+    <alarm id="80000312" name="change node service status success" title="change node service status success" desc="user(#0)(IP:(#1))change node service status success on the node(#2),nfs to (#3),stmf to (#4),ssh to (#5),ftp to (#6),smb to (#7),guiview to (#8),fmd to (#10),iscsi to (#11)。" suggest="none"/>
+    <alarm id="80000313" name="change node service status fail" title="change node service status fail" desc="user(#0)(IP:(#1))change node service status fail on the node(#2),nfs to (#3),stmf to (#4),ssh to (#5),ftp to (#6),smb to (#7),guiview to (#8),fmd to (#10),iscsi to (#11)。。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:node 3:nas 4:quota -->
+    <alarm id="80000314" name="directory quota success" title="directory ((#3)) quota success" desc="user(#0)(IP:(#1))directory ((#3)) quota success on the node(#2), quota:(#4)。" suggest="none"/>
+    <alarm id="80000315" name="directory quota fail" title="directory ((#3)) quota fail" desc="user(#0)(IP:(#1))directory ((#3)) quota fail on the node(#2), quota:(#4)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:nas -->
+    <alarm id="80000316" name="cancel directory quota success" title="cancel (#3) quota success" desc="user(#0)(IP:(#1))cancel (#3) quota success on the node(#2)。" suggest="none"/>
+    <alarm id="80000317" name="cancel directory quota fail" title="cancel (#3) quota fail" desc="user(#0)(IP:(#1))cancel (#3) quota fail on the node(#2)。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:node 3:raid 4:name 5:param 6:group -->
+    <alarm id="80000318" name="create pool success" title="create pool (#4) success" desc="user(#0)(IP:(#1))create pool (#4) success on the node(#2),raid:(#3)(0:raid0 1:raid1 5:raid5 6:raid6 10:raid10 50:raid50)，disk ID(#5)。" suggest="none"/>
+    <alarm id="80000319" name="create pool fail" title="create pool (#4) fail" desc="user(#0)(IP:(#1))create pool (#4) fail on the node(#2),raid:(#3)(0:raid0 1:raid1 5:raid5 6:raid6 10:raid10 50:raid50)，disk ID(#5)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:name 4:operation 5:var -->
+    <alarm id="80000320" name="modify pool success" title="modify pool (#3) success" desc="user(#0)(IP:(#1))modify pool (#3) success on the node(#2),operation is (#4)(2:scrub 3:clear 4:release 5:destory)。" suggest="none"/>
+    <alarm id="80000321" name="modify pool fail" title="modify pool (#3) fail" desc="user(#0)(IP:(#1))modify pool (#3) fail on the node(#2),operation is (#4)(2:scrub 3:clear 4:release 5:destory)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:pool-->
+    <alarm id="80000322" name="delete pool success" title="delete pool (#3) success" desc="user(#0)(IP:(#1))delete pool (#3) success on the node(#2)。" suggest="none"/>
+    <alarm id="80000323" name="delete pool fail" title="delete pool (#3) fail" desc="user(#0)(IP:(#1))delete pool (#3) success on the node(#2)。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:node 3:pool 4:param 5:type 6:raid 7:group -->
+    <alarm id="80000324" name="insert disks to the pool success" title="insert disks to the pool (#3) success" desc="user(#0)(IP:(#1))insert disks to the pool (#3) success on the node(#2),type (#5),raid:raid(#6)。" suggest="none"/>
+    <alarm id="80000325" name="insert disks to the pool fail" title="insert disks to the pool (#3) fail" desc="user(#0)(IP:(#1))insert disks to the pool (#3) fail on the node(#2),type (#5),raid:raid(#6)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:node 3:pool 4:param -->
+    <alarm id="80000326" name="delete disks form the pool success" title="delete disks (#4) form the pool (#3) success" desc="user(#0)(IP:(#1))delete disks (#4) form the pool (#3) success on the node(#2)。" suggest="none"/>
+    <alarm id="80000327" name="delete disks form the pool fail" title="delete disks (#4) form the pool (#3) fail" desc="user(#0)(IP:(#1))delete disks (#4) form the pool (#3) fail on the node(#2)。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:node 3:dir 4:name -->
+    <alarm id="80000328" name="create snapshot success" title="create snapshot (#3) success" desc="user(#0)(IP:(#1))create snapshot (#3) success,snapshot name is(#4)。" suggest="none"/>
+    <alarm id="80000329" name="create snapshot fail" title="create snapshot (#3) fail" desc="user(#0)(IP:(#1))create snapshot (#3) fail,snapshot name is(#4)。" suggest="none"/>
+    <alarm id="80000330" name="modify snapshot success" title="modify snapshot (#3) success" desc="user(#0)(IP:(#1))modify snapshot (#3) success,snapshot name is(#4)。" suggest="none"/>
+    <alarm id="80000331" name="modify snapshot fail" title="modify snapshot (#3) fail" desc="user(#0)(IP:(#1))modify snapshot (#3) fail,snapshot name is(#4)。" suggest="none"/>
+    <alarm id="80000332" name="delete snapshot success" title="delete snapshot (#3) success" desc="user(#0)(IP:(#1))delete snapshot (#3) success,snapshot name is(#4)。" suggest="none"/>
+    <alarm id="80000333" name="delete snapshot fail" title="delete snapshot (#3) fail" desc="user(#0)(IP:(#1))delete snapshot (#3) fail,snapshot name is(#4)。" suggest="none"/>
+
+    <!-- 0:user 1:ip 2:dir 3:name 4:expired 5:type 6:daytype 7:minute 8:hours 9:days -->
+    <alarm id="80000334" name="create snapshot success " title="create snapshot (#3) success" desc="user(#0)(IP:(#1))create snapshot (#3) success,snapshot name is(#4),expired:(#4),type:(#5)(0:generate once snapshot in expired times 1:take a snapshot every regular intervals),daytype:(#6)(0:everyday 1:monthday 2:weekday),minute(#7),hours(#8),days(#9)。" suggest="none"/>
+    <alarm id="80000335" name="create snapshot fail" title="create snapshot (#3) fail" desc="user(#0)(IP:(#1))create snapshot (#3) fail,snapshot name is(#4)) ,expired(#4),type:(#5)(0:generate once snapshot in expired times 1:take a snapshot every regular intervals),daytype:(#6)(0:everyday 1:monthday 2:weekday),minute(#7),hours(#8),days(#9)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:id 3:type 4:daytype 5:minute 6:hours 7:days 8:expired-->
+    <alarm id="80000336" name="modify snapshot success" title="modify snapshot (#2) success" desc="user(#0)(IP:(#1))modify snapshot (#2) success ,type:(#3)(0:generate once snapshot in expired times 1:take a snapshot every regular intervals),daytype:(#4)(0:everyday 1:monthday 2:weekday),minute(#5),hours(#6),days(#7),expired(#8)。" suggest="none"/>
+    <alarm id="80000337" name="modify snapshot fail" title="modify snapshot (#2) fail" desc="user(#0)(IP:(#1))modify snapshot (#2) success ,type:(#3)(0:generate once snapshot in expired times 1:take a snapshot every regular intervals),daytype:(#4)(0:everyday 1:monthday 2:weekday),minute(#5),hours(#6),days(#7),expired(#8)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:id -->
+    <alarm id="80000338" name="delete snapshot success" title="delete snapshot (#2) success" desc="user(#0)(IP:(#1))delete snapshot (#2) success ." suggest="none"/>
+    <alarm id="80000339" name="delete snapshot fail" title="delete snapshot (#2) fail" desc="user(#0)(IP:(#1))delete snapshot (#2) fail ." suggest="none"/>
+
+    <!-- 0:user 1:ip 2:type 3:name -->
+    <alarm id="80000340" name="create hostgroup success" title="create hostgroup (#2) (#3) success" desc="user(#0)(IP:(#1))create (#2) group (#3) success 。" suggest="none"/>
+    <alarm id="80000341" name="create hostgroup fail" title="create hostgroup (#2) (#3) fail" desc="user(#0)(IP:(#1))create (#2) (#3) fail 。" suggest="none"/>
+    <!-- 0:user 1:ip 2:type 3:name 4:action 5:members -->
+    <alarm id="80000342" name="modify hostgroup success" title="modify hostgroup (#2) (#3) success" desc="user(#0)(IP:(#1))modify (#2) (#3) success ,modify operation is (#4)(0:add 1:remove),members(#5)。" suggest="none"/>
+    <alarm id="80000343" name="modify hostgroup fail" title="modify hostgroup (#2)(#3) fail" desc="user(#0)(IP:(#1))modify (#2) (#3) fail ,modify operation is (#4)(0:add 1:remove),members(#5)。" suggest="none"/>
+    <!-- 0:user 1:ip 2:type 3:name -->
+    <alarm id="80000344" name="delete hostgroup success" title="delete hostgroup(#2) (#3) success" desc="user(#0)(IP:(#1))在节点(#2)delete (#2) (#3) success 。" suggest="none"/>
+    <alarm id="80000345" name="delete hostgroup fail" title="delete hostgroup (#2) (#3) fail" desc="user(#0)(IP:(#1))在节点(#2)delete (#2) (#3) fail 。" suggest="none"/>
+	
+    <!-- 0:user 1:ip 2:domian_user 3:local_user -->
+    <alarm id="80000346" name="create domain user success" title="create domain user success" desc="user(#0)(IP:(#1))create success,domain user(#2),map user(#3)." suggest="none"/>
+    <alarm id="80000347" name="create domain user fail" title="create domain user fail" desc="user(#0)(IP:(#1))create fail,domain user(#2),map user(#3)." suggest="none"/>
+    <alarm id="80000348" name="delete domain user success" title="delete domain user success" desc="user(#0)(IP:(#1))delete success,domain user(#2),map user(#3)." suggest="none"/>
+    <alarm id="80000349" name="delete domain user fail" title="delete domain user fail" desc="user(#0)(IP:(#1))delete fail,domain user(#2),map user(#3)." suggest="none"/>
+    
+    <!-- 0:user 1:ip 2:domian_user 3:local_user -->
+    <alarm id="80000350" name="set dns ip successfull" title="set dns ip successfull" desc="user(#0)(IP:(#1))set dns master_ip:(#2),slave_ip:(#3) successful." suggest="none"/>
+    <alarm id="80000351" name="set dns ip failed" title="set dns ip failed" desc="user(#0)(IP:(#1))set dns master_ip:(#2),slave_ip:(#3) failed." suggest="none"/>
+    <alarm id="80000352" name="delete dns ip successfull" title="delete dns ip successfull" desc="user(#0)(IP:(#1))delete dns master_ip:(#2),slave_ip:(#3) successful." suggest="none"/>
+    <alarm id="80000353" name="delete dns ip failed" title="delete dns ip failed" desc="user(#0)(IP:(#1))delete dns master_ip:(#2),slave_ip:(#3) failed." suggest="none"/>
+</alarms>

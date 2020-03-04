@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<errors>
+    <error id="0" desc="执行成功" suggest="无"/>
+    <error id="1" desc="执行失败" suggest="无"/>
+    <error id="2" desc="参数错误" suggest="无"/>
+    <error id="3" desc="执行超时" suggest="无"/>
+    <error id="4" desc="不支持该操作" suggest="无"/>
+    <error id="5" desc="系统繁忙" suggest="无"/>
+    <error id="6" desc="数据太长" suggest="无"/>
+    <error id="7" desc="主节点不存在" suggest="无"/>
+    <error id="8" desc="当前节点非主节点" suggest="无"/>
+    <error id="9" desc="链接失败" suggest="无"/>
+    <error id="10" desc="需要登录" suggest="无"/>
+    <error id="11" desc="用户名或者密码错误" suggest="无"/>
+    
+    <error id="12" desc="记录不存在" suggest="无"/>
+    <error id="13" desc="记录已经存在" suggest="无"/>
+    <error id="14" desc="连接不通" suggest="无"/>
+    <error id="15" desc="无权限" suggest="无"/>
+    
+    <error id="17" desc="锁定中，请稍后再试" suggest="无"/>
+    <error id="18" desc="有文件存在,并且没有设置策略" suggest="无"/>
+    
+    <error id="19" desc="卷存在映射" suggest="无"/>
+    <error id="50" desc="stmfadm 部分节点执行失败" suggest="排查每个节点，使其一致"/>
+    <error id="51" desc="存在不在线的节点，请确保所有节点在线时执行操作" suggest="检查节点状态"/>
+    <error id="100" desc="存储池已经存在" suggest="无"/>
+    <error id="101" desc="存储池不存在" suggest="无"/>
+    <error id="102" desc="硬盘不存在" suggest="无"/>
+    <error id="103" desc="硬盘不支持" suggest="无"/>
+    <error id="104" desc="至少需要两块盘" suggest="无"/>
+    <error id="105" desc="硬盘使用中" suggest="无"/>
+    <error id="106" desc="获取XML文件失败" suggest="无"/>
+    <error id="107" desc="硬盘数不对" suggest="无"/>
+    <error id="108" desc="热备盘容量太小" suggest="无"/>
+    <error id="109" desc="存储池下存在卷" suggest="无"/>
+    <error id="110" desc="存储池下存在文件系统" suggest="无"/>
+    <error id="111" desc="卷状态不适合创建" suggest="无"/>
+    <error id="112" desc="卷状态正处于其他目的端" suggest="无"/>
+    <error id="124" desc="执行命令超时" suggest="无"/>
+    
+    <error id="150" desc="链接FMD模块失败" suggest="无"/>
+    <error id="151" desc="卷大小无效" suggest="无"/>
+    <error id="152" desc="当前状态不允许修改" suggest="无"/>
+    <error id="153" desc="存在更新的快照" suggest="删除更新的快照"/>
+    <error id="154" desc="快照克隆依赖该快照" suggest="无"/>
+    <error id="155" desc="该主机组存在映射卷" suggest="无"/>  
+    <error id="220" desc="克隆的快照不在同一个池" suggest="无"/>
+    <error id="221" desc="为卷创建LU失败" suggest="无"/>
+    
+    <error id="231" desc="主节点网卡查不到IP" suggest="无"/>
+    <error id="232" desc="从节点网卡查不到IP" suggest="无"/>
+    <error id="233" desc="主备份节点网卡查不到IP" suggest="无"/>
+    <error id="234" desc="从备份节点网卡查不到IP" suggest="无"/>
+	
+	<error id="240" desc="集群中没有这条记录" suggest="无"/>
+	<error id="241" desc="双活的两个卷位于同一sbbid上" suggest="使用两个位于不同sbbid上的同名卷"/>
+	<error id="242" desc="两个卷的LU NAME不同" suggest="打开集群，删除卷，重启机器，重新创建卷"/>
+	<error id="243" desc="创建位图卷失败" suggest="无"/>
+	<error id="244" desc="为卷添加视图失败" suggest="无"/>
+	<error id="245" desc="为池绑定IP失败" suggest="无"/>
+	<error id="246" desc="向/etc/hosts追加rdc:ip_owner失败" suggest="无"/>
+	<error id="247" desc="开启或配置AVS服务失败" suggest="无"/>
+	<error id="248" desc="未打开集群" suggest="无"/>
+	<error id="249" desc="两个卷的大小不同" suggest="无"/>
+    <error id="250" desc="SAN备份的两个卷位于同一节点" suggest="导出一个池到对端"/>
+	
+    <error id="251" desc="IP漂移新增IP已经存在" suggest="无"/>
+</errors>
