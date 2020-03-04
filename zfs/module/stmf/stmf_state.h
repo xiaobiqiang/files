@@ -70,6 +70,7 @@ typedef struct stmf_state {
 	stmf_id_list_t		stmf_hg_list;
 	stmf_id_list_t		stmf_tg_list;
 	stmf_id_list_t		stmf_luid_list;
+	stmf_id_list_t		stmf_nonload_lu_ve_list;
 
 	stmf_ver_tg_t		*stmf_ver_tg_head;
 
