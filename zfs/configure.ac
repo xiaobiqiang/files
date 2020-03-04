@@ -197,6 +197,23 @@ AC_CONFIG_FILES([
 	cmd/ipmi_monitor/Makefile
 	cmd/drbdmon/Makefile
 	cmd/drbdctl/Makefile
+	cmd/cm/Makefile
+	cmd/cm/base/Makefile
+	cmd/cm/cli/Makefile
+	cmd/cm/cmd/Makefile
+	cmd/cm/config/Makefile
+	cmd/cm/exec/Makefile
+	cmd/cm/jni/Makefile
+	cmd/cm/main/Makefile
+	cmd/cm/opensrc/Makefile
+	cmd/cm/script_linux/Makefile
+	cmd/cm/script_py2/Makefile
+	cmd/cm/static/Makefile
+	cmd/cm/static/comm/Makefile
+	cmd/cm/static/res_ch/Makefile
+	cmd/cm/static/res_en/Makefile
+	cmd/cm/static/task/Makefile
+	cmd/cm/build/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

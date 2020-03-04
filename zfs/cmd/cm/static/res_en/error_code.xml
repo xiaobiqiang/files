@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<errors>
+    <error id="0" desc="OK" suggest="none"/>
+    <error id="1" desc="FAIL" suggest="none"/>
+    <error id="2" desc="Parameter error" suggest="none"/>
+    <error id="3" desc="Time out" suggest="none"/>
+    <error id="4" desc="Not Support" suggest="none"/>
+    <error id="5" desc="Busy" suggest="none"/>
+    <error id="6" desc="Data too long" suggest="none"/>
+    <error id="7" desc="Master node not found" suggest="none"/>
+    <error id="8" desc="The node is not master" suggest="none"/>
+    <error id="9" desc="Connect fail" suggest="none"/>
+    <error id="10" desc="Need Login" suggest="none"/>
+    <error id="11" desc="User Name or Password Error" suggest="none"/> 
+    
+    <error id="12" desc="Record not exists" suggest="none"/>
+    <error id="13" desc="Record already exists" suggest="none"/>
+    <error id="14" desc="Connect fail" suggest="none"/>
+    <error id="15" desc="No Permission" suggest="none"/>
+    
+    <error id="17" desc="Locked, Try again later" suggest="none"/>
+    <error id="18" desc="File exists, And no set up strategy" suggest="none"/>
+    <error id="19" desc="Lunmap exists" suggest="none"/>
+    <error id="50" desc="Some Node execute fail" suggest="none"/>
+    <error id="51" desc="Some Node offline" suggest="check node"/>
+    <error id="100" desc="Pool already exists" suggest="none"/>
+    <error id="101" desc="Pool not exists" suggest="none"/>
+    <error id="102" desc="Disk not exists" suggest="none"/>
+    <error id="103" desc="Disk not support" suggest="none"/>
+    <error id="104" desc="Requires at least 2 devices" suggest="none"/>
+    <error id="105" desc="Disk busy" suggest="none"/>
+    <error id="106" desc="Parse XML file fail" suggest="none"/>
+    <error id="107" desc="Disk Number Error" suggest="none"/>
+    <error id="108" desc="Spare is too small" suggest="none"/>
+    <error id="109" desc="LUN exists in the pool" suggest="none"/>
+    <error id="110" desc="NAS exists in the pool" suggest="none"/>
+    <error id="111" desc="LUN status is err" suggest="none"/>
+    <error id="112" desc="LUN is others desc" suggest="none"/>
+    <error id="124" desc="time out" suggest="none"/>
+    
+    <error id="150" desc="fmadm: failed to connect to fmd" suggest="none"/>
+    <error id="151" desc="size error" suggest="none"/>
+    <error id="152" desc="stmfadm: cannot modify" suggest="none"/>
+    <error id="153" desc="more recent snapshots exist!" suggest="delete the recent snapshots"/>
+    <error id="154" desc="snapshot has dependent clones!" suggest="delete the recent snapshots"/>
+    <error id="155" desc="this hostgroup has lunmaps!" suggest="none"/>
+    <error id="220" desc="can't clone snapshot at different pools" suggest="none"/>
+    <error id="221" desc="create-lu failed for volume" suggest="none"/>
+    
+    <error id="231" desc="duallive master netif not ip" suggest="none"/>
+    <error id="232" desc="duallive slave netif not ip" suggest="none"/>
+    <error id="233" desc="duallive master backup netif not ip" suggest="none"/>
+    <error id="234" desc="duallive slave backup netif not ip" suggest="none"/>
+	
+	<error id="240" desc="this record is not in cluster" suggest="none"/>
+	<error id="241" desc="those volume is in the same sbbid" suggest="use two volumes in different sbbid"/>
+	<error id="242" desc="different LU NAMES of those volumes" suggest="establish cluster,destroy those volumes,then reboot,create volumes again"/>
+	<error id="243" desc="create bitmap volume fail" suggest="none"/>
+	<error id="244" desc="add view fail for volumes" suggest="none"/>
+	<error id="245" desc="the pool bind rdc:ip_owner fail" suggest="none"/>
+	<error id="246" desc="append pool's rdc:ip_owner to /etc/hosts fail" suggest="none"/>
+	<error id="247" desc="open or config avs service fail" suggest="none"/>
+	<error id="248" desc="not open cluster yet" suggest="none"/>
+	<error id="249" desc="those volumes are not with the same size" suggest="none"/>
+    <error id="250" desc="both of volumes are at the same node" suggest="export one of pool to another mirror"/>
+	
+    <error id="251" desc="ip_shift ip is exists" suggest="none"/>
+</errors>
