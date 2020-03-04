@@ -620,13 +620,13 @@ dsl_pool_sync_done(dsl_pool_t *dp, uint64_t txg)
     objset_t *os;
     uint64_t ds_object;
 	dsl_dataset_t *ds_synced;
-/*	
+	
 	while ((zilog = txg_list_remove(&dp->dp_dirty_zilogs, txg))) {
 		dsl_dataset_t *ds = dmu_objset_ds(zilog->zl_os);
 		zil_clean(zilog, txg);
 		ASSERT(!dmu_objset_is_dirty(zilog->zl_os, txg));
 		dmu_buf_rele(ds->ds_dbuf, zilog);
-	} */
+	}
 	while (ds_synced = list_remove_head(&dp->dp_synced_datasets)) {
 #ifdef _KERNEL
 	 	os = ds_synced->ds_objset;
