@@ -7269,6 +7269,8 @@ _init(void)
 	zfs_ioctl_init();
 	lun_migrate_init();
 
+	zfs_udb_init();
+
 	if ((error = zfs_attach()) != 0)
 		goto out;
 
@@ -7291,6 +7293,7 @@ _init(void)
 	return (0);
 
 out:
+	zfs_udb_fini();
 	zfs_fini();
 	spa_fini();
 	lun_migrate_fini();
@@ -7306,6 +7309,7 @@ static void __exit
 _fini(void)
 {
 	zfs_detach();
+	zfs_udb_fini();
 	zfs_fini();
 	spa_fini();
 	lun_migrate_fini();

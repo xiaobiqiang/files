@@ -2148,7 +2148,8 @@ zvol_remove_minors_impl(const char *name)
 			if (zv->zv_open_count > 0)
 				continue;
 #endif
-			printk(KERN_WARNING "%s %s", __func__, zv->zv_name);
+			printk(KERN_WARNING "%s %s zv_open_count %lu", __func__,
+				zv->zv_name, (ulong_t)zv->zv_open_count);
 			while (zv->zv_open_count && count > 0) {
 				cv_timedwait(&zv->zv_rele_cv, &zvol_state_lock, 
 					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 10));
@@ -2169,9 +2170,14 @@ zvol_remove_minors_impl(const char *name)
 		    (strncmp(zv->zv_name, name, namelen) == 0 &&
 		    (zv->zv_name[namelen] == '/' ||
 		    zv->zv_name[namelen] == '@'))) {
-		    zvol_release_force(zv);
-			zvol_remove(zv);
-			zvol_free(zv);
+		    if (zv->zv_open_count == 0) {
+				zvol_remove(zv);
+				zvol_free(zv);
+			} else {
+				printk(KERN_WARNING "%s zv_open_count %lu",
+					zv->zv_name, (ulong_t)zv->zv_open_count);
+				zv->zv_flags &= ~ZVOL_WANT_REMOVE;
+			}
 	    }
 	}
 
