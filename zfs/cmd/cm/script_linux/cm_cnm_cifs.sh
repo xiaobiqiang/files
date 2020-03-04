@@ -221,7 +221,7 @@ function cm_cnm_cifs_add()
         nametype="group"
     fi
  
-    setfacl -m $nametype:$name:$acl $dir
+    setfacl -Rm $nametype:$name:$acl $dir
     return $?
 }
 
