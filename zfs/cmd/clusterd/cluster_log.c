@@ -23,7 +23,10 @@ static char *log_name = NULL;
 static pid_t log_pid;
 
 #define	LOG_DATE_SIZE	32
+
+#ifndef	PATH_MAX
 #define	PATH_MAX	255
+#endif
 
 #define	CLUSTER_LOG_FILE	0x1
 #define	CLUSTER_LOG_TERMINAL	0x2
@@ -31,8 +34,8 @@ static pid_t log_pid;
 
 #define	CLUSTER_DEFAULT_LOG	"cluster.log"
 
-static int cluster_log_level_min = LOG_WARNING;
-static uint_t cluster_log_flags = CLUSTER_LOG_FILE;
+static int cluster_log_level_min = LOG_INFO;
+static uint_t cluster_log_flags = CLUSTER_LOG_FILE|CLUSTER_LOG_SYSLOG;
 
 static char cluster_log_prefix[] = "/var/cluster/log/";
 
@@ -58,6 +61,10 @@ vlog_prefix(int severity, const char *prefix, const char *format, va_list args)
 	    log_name, log_pid, prefix);
 	cp = strchr(buf, '\0');
 	(void) vsnprintf(cp, sizeof (buf) - (cp - buf), format, args);
+
+	if (cluster_log_flags & CLUSTER_LOG_SYSLOG || !logfile)
+		syslog(severity, "%s", cp);
+
 	(void) strcat(buf, "\n");
 
 	if (cluster_log_flags & CLUSTER_LOG_FILE && logfile) {
@@ -66,8 +73,6 @@ vlog_prefix(int severity, const char *prefix, const char *format, va_list args)
 	}
 	if (cluster_log_flags & CLUSTER_LOG_TERMINAL)
 		(void) fputs(buf, stdout);
-	if (cluster_log_flags & CLUSTER_LOG_SYSLOG || !logfile)
-		vsyslog(severity, format, args);
 }
 
 void
@@ -112,10 +117,16 @@ log_dir_writeable(const char *path)
 }
 
 void
-cluster_log_init(const char *execname)
+cluster_log_init(const char *execname, const char *logpath,
+	int log_level, int log_flags)
 {
 	int dirfd, logfd;
-	char *dir;
+	const char *dir;
+
+	if (log_level > 0)
+		cluster_log_level_min = log_level;
+	if (log_flags > 0)
+		cluster_log_flags = log_flags;
 
 	if (logfile) {
 		(void) fclose(logfile);
@@ -132,7 +143,7 @@ cluster_log_init(const char *execname)
 			return;
 	}
 
-	dir = cluster_log_prefix;
+	dir = logpath != NULL ? logpath : cluster_log_prefix;
 
 	if ((logfd = openat(dirfd, CLUSTER_DEFAULT_LOG, O_CREAT | O_RDWR,
 	    0644)) == -1) {

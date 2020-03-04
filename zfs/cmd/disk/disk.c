@@ -428,6 +428,7 @@ typedef struct led_operation {
 led_operation_t disk_led_operation[] = {
 			{"active", MPI2_SEP_REQ_SLOTSTATUS_NO_ERROR},
 			{"fault", MPI2_SEP_REQ_SLOTSTATUS_DEV_FAULTY},
+			{"force_active", MPI2_SEP_REQ_SLOTSTATUS_DEV_FAULTY},
 				{NULL, 0}
 };
 void usage(void)
@@ -441,7 +442,7 @@ void usage(void)
 	       "disk create <-d dev path | -i dev index> <-p slices index> <-s size | -g gap index>\n"
 	       "disk delete <-d dev path | -i dev index> <-p slices index> \n"
 	       "disk gaps <-d dev path | -i dev index>\n"
-	       "disk led <-d dev path >  < -o operation (fault,active)>\n"
+	       "disk led <-d dev path >  < -o operation (fault,active,force_active)>\n"
 	       "disk initialize <-d dev path >\n"
 	       "disk restore <-d dev path >\n");
 }

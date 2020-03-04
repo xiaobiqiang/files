@@ -2125,12 +2125,6 @@ sbd_transition_to_active_lu(char *data_fname)
 
 		hostid = zone_get_hostid(NULL);
 		sl->sl_active_hostid = hostid;
-
-		if (sl->sl_alias) {
-			lu->lu_alias = sl->sl_alias;
-		} else {
-			lu->lu_alias = sl->sl_name;
-		}
 		
 		sl->sl_trans_op = SL_OP_NONE;
 		new = NULL;
@@ -2358,12 +2352,9 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret, boolean_t proxy_re
 	}
 	
 	lu->lu_id = (scsi_devid_desc_t *)sl->sl_device_id;
-	/* MATIS-2758 */
-	if (sl->sl_name) {
-		lu->lu_alias = sl->sl_name;
-	} else {
-		lu->lu_alias = sl->sl_alias;
-	}
+
+	/* from sl_name for full path name */
+	lu->lu_alias = sl->sl_name;
 
 	/* set proxy_reg_cb_arg to meta filename */
 	if (sl->sl_meta_filename) {
@@ -3034,6 +3025,8 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 			kmem_alloc(sl->sl_data_fname_alloc_size, KM_SLEEP);
 			(void) strcpy(sl->sl_data_filename, namebuf + slu->slu_data_fname_off);
 
+			/* from sl_name for full path name */
+			sl->sl_lu->lu_alias = sl->sl_name;
 			cmn_err(CE_NOTE, "%s: already created data_filename = %s, access_state: %d",
 				__func__, sl->sl_name, sl->sl_access_state);
 		} else {
@@ -3778,6 +3771,8 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 				sl->sl_mgmt_url_alloc_size = 0;
 			}
 			sl->sl_name = sl->sl_alias = sl->sl_meta_filename;
+			/* from sl_name for full path name */
+			sl->sl_lu->lu_alias = sl->sl_name;
 			if (sbd_is_zvol(sl->sl_meta_filename)) {
 				sl->sl_alias = strrchr(sl->sl_meta_filename, '/') + 1;
 			}
@@ -4136,11 +4131,8 @@ sim_sli_loaded:
 #endif
 
 	if (standby) {
-		if (sl->sl_alias) {
-			lu->lu_alias = sl->sl_alias;
-		} else {
-			lu->lu_alias = sl->sl_name;
-		}
+		/* from sl_name for full path name */
+		lu->lu_alias = sl->sl_name;
 	}
 
 	/* config avs */
@@ -4312,7 +4304,8 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 		(void) strcpy(sl->sl_alias, (char *)mlu->mlu_buf +
 		    mlu->mlu_alias_off);
 		lu = sl->sl_lu;
-		lu->lu_alias = sl->sl_alias;
+		/* from sl_name for full path name */
+		lu->lu_alias = sl->sl_name;
 		mutex_exit(&sl->sl_lock);
 	}
 

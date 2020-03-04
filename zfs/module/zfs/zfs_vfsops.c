@@ -1402,7 +1402,8 @@ zfs_sb_setup(zfs_sb_t *zsb, boolean_t mounting)
 
             /* check mirror status in dmu_objset_replay_all_cache */
             zsb->z_replay = B_TRUE;
-            dmu_objset_replay_all_cache(zsb->z_os);
+			/* don't optimze cache replay in zfs filesystem currently */
+            dmu_objset_replay_all_cache(zsb->z_os, NULL, NULL, B_FALSE);
             zsb->z_replay = B_FALSE;
 		}
 

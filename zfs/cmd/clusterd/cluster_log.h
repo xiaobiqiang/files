@@ -4,7 +4,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-extern void cluster_log_init(const char *execname);
+extern void cluster_log_init(const char *execname, const char * logpath,
+	int log_level, int log_flags);
 extern void cluster_log_framework(int severity, const char *format, ...);
 
 #define	c_log	cluster_log_framework

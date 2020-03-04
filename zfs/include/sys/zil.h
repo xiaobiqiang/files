@@ -540,7 +540,7 @@ extern void	zil_set_logbias(zilog_t *zilog, uint64_t slogval);
 
 extern void zil_write_ctrl_data(objset_t *os, uint64_t dn_object,
     dmu_tx_t *tx, uint64_t txtype, struct dmu_ctrl_data *ctrl_datap);
-void zil_replay_all_data(objset_t *os);
+void zil_replay_all_data(objset_t *os, boolean_t bmdata);
 int zil_replay_write_ctrl(objset_t *os, lr_write_ctrl_t *lr, boolean_t byteswap);
 void zil_insert_data_record_list_by_sort(
     objset_t *os, zil_data_record_t *data_record);
