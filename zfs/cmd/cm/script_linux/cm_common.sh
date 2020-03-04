@@ -156,7 +156,15 @@ function cm_get_localmanageport()
 {
     local cfgfile='/var/cm/data/node_config.ini'
     if [ ! -f ${cfgfile} ]; then
-        echo "eth0"
+        portlist=`ls /etc/sysconfig/network-scripts| grep ifcfg |grep -v lo|sort`
+        for portfile in $portlist
+        do
+            ipaddr=`cat /etc/sysconfig/network-scripts/$portfile| grep IPADDR|awk -F'=' '{print $2}'`
+            if [ "X$ipaddr" != "X" ]; then
+                cat /etc/sysconfig/network-scripts/$portfile| grep DEVICE|awk -F'=' '{print $2}'
+                break
+            fi
+        done
         return 0
     fi
     local mport=`grep '^mport' $cfgfile |sed 's/ //g' |awk -F'=' '{print $2}'`
