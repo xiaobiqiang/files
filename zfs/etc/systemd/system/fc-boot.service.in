@@ -9,9 +9,7 @@ After=zfs-clusterd.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=/usr/sbin/rmmod qla2xxx
-ExecStartPre=sleep 3
-ExecStart=/sbin/modprobe qlf_hengwei
+ExecStart=@sbindir@/fcboot
 
 [Install]
 WantedBy=multi-user.target
