@@ -2010,6 +2010,7 @@ _ctl_get_sas_devinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
         kdev_info->wwid = sas_device->volume_wwid;
         kdev_info->sas_address = sas_device->sas_address;
         kdev_info->enclosure_id = sas_device->enclosure_logical_id;
+        kdev_info->enclosure_hdl = sas_device->enclosure_handle;
         kdev_info->slot = sas_device->slot;
         kdev_info++;
         sas_dev_copied++;

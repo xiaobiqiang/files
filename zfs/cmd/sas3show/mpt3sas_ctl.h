@@ -292,6 +292,10 @@ struct mpt3sas_dev_info {
     uint64_t  wwid;
     uint64_t enclosure_id;
 	uint64_t  slot;
+    uint16_t enclosure_hdl;
+    uint16_t pad1;
+    uint16_t pad2;
+    uint16_t pad3;    
 };
 
 struct mpt3_sas_devinfo_buffer {
