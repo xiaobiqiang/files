@@ -1506,12 +1506,9 @@ int disk_get_info(disk_table_t *dt)
 		disk_table_insert(dt, di_cur);
 	}
 
-	(void) disk_get_system(sysdisk);	
-
 	for (di_cur = dt->next; di_cur != NULL; di_cur = di_cur->next) {
-		if (strncmp(di_cur->dk_name, sysdisk, 8) == 0) {
+		if (disk_get_system(di_cur->dk_name)) {
 			di_cur->dk_is_sys = 1;
-			break;
 		}
 	}
 
@@ -1520,7 +1517,7 @@ int disk_get_info(disk_table_t *dt)
 	return (0);
 }
 
-void disk_get_system(char *disk_name)
+int disk_get_system(char *disk_name)
 {
 	int ret = -1;
 	FILE *fp = -1;
@@ -1528,29 +1525,25 @@ void disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	fp = fopen("/etc/mtab", "r");
+	fp = popen("blkid | grep ceressystemlabel", "r");
 	if (fp == NULL) {
 		return; 
 	}
-	
 	while (fgets(tmp, sizeof(tmp), fp)) {
 		if (tmp[0] == '\n' || tmp[0] == '\r') 
 			continue;
 		
 		sscanf(tmp, "%s", dev);
-		if (strncmp(dev, "/dev/sd", 7) == 0) {
-			sscanf(tmp, "%*s %s", args);
-			if (strcasecmp(args, "/") == 0 || strcasecmp(args, "/boot") == 0
-				|| strcasecmp(args, "/home") == 0) {
-				memcpy(disk_name, dev, 8);
-				break;
-			}
+		if (strncmp(dev, disk_name, 8) == 0) {
+			pclose(fp);
+			return 1;
 		} else {
 			continue;
 		}
 	}
 
-	(void) fclose(fp);
+	(void) pclose(fp);
+	return 0;
 }
 
 int disk_get_gsize(disk_info_t *di)
