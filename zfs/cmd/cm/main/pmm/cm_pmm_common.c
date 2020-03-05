@@ -79,7 +79,7 @@ const cm_pmm_config_t  g_cm_pmm_config[CM_PMM_TYPE_BUTT] =
         sizeof(cm_cnm_pmm_lun_info_t),
         cm_pmm_lun_get_data,
         cm_pmm_lun_cal_data,
-        cm_pmm_lun_check_data
+        NULL
     },
     {
         CM_PMM_TYPE_NIC,
@@ -93,7 +93,7 @@ const cm_pmm_config_t  g_cm_pmm_config[CM_PMM_TYPE_BUTT] =
         sizeof(cm_cnm_pmm_disk_info_t),
         cm_pmm_disk_get_data,
         cm_pmm_disk_cal_data,
-        cm_pmm_disk_check_data
+        NULL
     },
     {
         CM_PMM_TYPE_CIFS,

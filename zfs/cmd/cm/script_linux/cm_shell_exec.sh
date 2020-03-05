@@ -2,6 +2,8 @@
 
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
+ZVOL_DIR='/dev/zvol'
+PROC_DISKSTATS='/proc/diskstats'
 #==============================================================================
 #调用说明
 #./cm_shell_exec.sh <functionname> <arg1> <arg2> <...>
@@ -405,8 +407,35 @@ function cm_pmm_get_lu()
 
 function cm_pmm_lun()
 {
-    local stmf_id=$1
-    kstat -m stmf -n $stmf_id|egrep 'reads|writes|nread|nwritten'| awk '{printf $2" "}'
+    local full_name=$1
+    local pool_name=`echo $full_name|awk -F'/' '{print $1}'`
+    local lu_name=`echo $full_name|awk -F'/' '{print $2}'`
+    local pool_num=`ls $ZVOL_DIR|grep -w $pool_name|wc -l`
+    local nwritten=0
+    local nread=0
+    if [ $pool_num -eq 1 ];then
+        local sd=`ls -l $ZVOL_DIR/$pool_name|grep -w $lu_name|awk -F'/' '{print $3}'`
+        if [ "X$sd" == "X" ];then
+            return $CM_ERR_NOT_EXISTS;
+        fi
+    else
+        return $CM_ERR_NOT_EXISTS;
+    fi
+    local data=(`cat $PROC_DISKSTATS|awk '$3=="'$sd'"{print $1" "$5}'`)
+    local writes=${data[1]}
+    local reads=${data[0]}
+    local blocksize=`zfs get -H -o value volblocksize $full_name`
+    local val=`echo $blocksize| awk '{print int($1)}'`
+    local unit=`echo $blocksize|sed 's/$val//g'`
+    if [ "X$unit" == "XK" ];then
+        unit=1000
+    else
+        unit=1
+    fi
+    ((blocksize=$val*$unit))
+    ((nwritten=$writes*$blocksize))
+    ((nread=$reads*$blocksize))
+    echo "$nread $nwritten $reads $writes"
     return $?
 }
 
