@@ -1000,6 +1000,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.device")) {
 			fault_device = B_FALSE;
+		} else if (fmd_nvl_class_match(hdl, fault,
+		    "fault.fs.zfs.dev.merr")) {
+			fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault, "fault.io.*")) {
 			is_disk = B_TRUE;
 			degrade_device = B_TRUE;
@@ -1067,27 +1070,38 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 			if (nvlist_lookup_nvlist(fault, FM_FAULT_RESOURCE,
 			    &resource) != 0 ||
 			    nvlist_lookup_string(resource, FM_FMRI_SCHEME,
-			    &scheme) != 0)
-				continue;
+			    &scheme) != 0) {
 
-			if (strcmp(scheme, FM_FMRI_SCHEME_ZFS) != 0)
+                syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
 				continue;
+             }
+
+			if (strcmp(scheme, FM_FMRI_SCHEME_ZFS) != 0) {
+                syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
+                continue;
+             }
 
 			if (nvlist_lookup_uint64(resource, FM_FMRI_ZFS_POOL,
-			    &pool_guid) != 0)
-				continue;
+			    &pool_guid) != 0) {
+                syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
+                continue;
+            }
 
 			if (nvlist_lookup_uint64(resource, FM_FMRI_ZFS_VDEV,
 			    &vdev_guid) != 0) {
 				if (is_repair || is_segment_error)
 					vdev_guid = 0;
-				else
+				else {
+                    syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
 					continue;
+                }
 			}
 
 			if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
-			    &vdev)) == NULL)
-				continue;
+			    &vdev)) == NULL) {
+                syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
+                continue;
+            }
 
 			if (is_segment_error && !is_repair) {
 				memset(buf, 0, 256);
@@ -1112,6 +1126,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 //				(void) zpool_clr_zfs_recover(zhp);
 			}
 			zpool_close(zhp);
+            syslog(LOG_ERR, "not handle zfs event [line:%d}\n", __LINE__);
 			continue;
 		}
 
