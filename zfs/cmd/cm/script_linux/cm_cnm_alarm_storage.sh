@@ -11,6 +11,9 @@ function unit_conversion()
         elif [[ $param =~ "G" ]]; then
             sizes=`echo $param|sed 's/G//g'`
             sizes=`echo "scale=0;$sizes*1024"|bc -l`
+        elif [[ $param =~ "P" ]]; then
+            sizes=`echo $param|sed 's/P//g'`
+            sizes=`echo "scale=0;$sizes*1024*1024*1024"|bc -l`
         else 
             sizes=`echo $param|sed 's/T//g'`
             sizes=`echo "scale=0;$sizes*1024*1024"|bc -l`
@@ -71,37 +74,37 @@ function alarm_status()
     return $iRet
 }
 
-
-iRet=$CM_OK
-list=($(zfs list -H -o name,used,avail,quota,volsize,mountpoint))
-len=${#list[@]}
-((cols=$len/6))
-
-for (( i=0; i<$cols; i=i+1 ))
-do
-    ((j=i*6))
-    name=${list[j]}
-    used=${list[((j=$j+1))]}
-    avail=${list[((j=$j+1))]}
-    quota=${list[((j=$j+1))]}
-    volsize=${list[((j=$j+1))]}
-    mountpoint=${list[((j=$j+1))]}
-    
-    if [ `grep \"$name\" /tmp/lu.xml|wc -l` -ne 0 ]; then 
-        if [ `grep $name /tmp/lu.xml| grep "refreservation=\"none\""|wc -l` -eq 0 ]; then
-            continue
+function alarm_check()
+{
+    local iRet=$CM_OK
+    zfs list -H -o name,used,avail,quota,volsize,mountpoint,type,referenced |while read line
+    do
+        local infos=($line)
+        local name=${infos[0]}
+        local used=${infos[1]}
+        local avail=${infos[2]}
+        local quota=${infos[3]}
+        local volsize=${infos[4]}
+        local mountpoint=${infos[5]}
+        
+        if [ "X${infos[6]}" == "Xvolume" ]; then
+            used=${infos[7]}
         fi
-    fi
- 
-    echo "$name,\c"
-    storage_type $name $mountpoint
-    iRet=$?
-    if [ $iRet != $CM_OK ]; then
-        exit $iRet
-    fi
-    alarm_status $used $avail $quota $volsize
-    iRet=$?
-    if [ $iRet != $CM_OK ]; then
-        exit $iRet
-    fi
-done
+        
+        echo "$name,\c"
+        storage_type $name $mountpoint
+        iRet=$?
+        if [ $iRet != $CM_OK ]; then
+            exit $iRet
+        fi
+        alarm_status $used $avail $quota $volsize
+        iRet=$?
+        if [ $iRet != $CM_OK ]; then
+            exit $iRet
+        fi
+    done
+    return 0
+}
+
+alarm_check
+exit $?

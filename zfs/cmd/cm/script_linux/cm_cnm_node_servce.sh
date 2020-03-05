@@ -48,15 +48,17 @@ function static_cm_cnm_servce_check()
     
     local servce_lines=${#sub_sers[@]}
     #CM_LOG "[${FUNCNAME}:${LINENO}] $servce : ${sub_sers[@]}"
-    local servce_online_lines=`cat $tmp_file |grep -w ${servce}|grep -w active|wc -l`
+    local servce_online_lines=`cat $tmp_file |grep -w ${servce}|grep -w online|wc -l`
     #CM_LOG "$servce_lines $servce_online_lines"
-    #if [ $servce_lines -eq 0 ];then
-    #    echo $UNDEFINE
-    if [ 1 -eq $servce_online_lines ];then
+    if [ $servce_lines -eq 0 ];then
+        echo $UNDEFINE
+    elif [ $servce_lines -eq $servce_online_lines ];then
         echo $ONLINE
+    elif [ $servce_online_lines -gt 0 ];then
+        echo $PARTONLNE
     else
-        local ret=(`cat $tmp_file |grep -w ${servce}|awk '{print $3}'`)
-        if [ "${ret[0]}"x == "failed"x ];then
+        local ret=(`cat $tmp_file |grep -w ${servce}|awk '{print $1}'`)
+        if [ "${ret[0]}"x == "offline"x ];then
             echo $OFFLINE
         elif [ "${ret[0]}"x == "maintenance"x ];then
             echo $MAINTENANCE
@@ -77,7 +79,7 @@ function cm_cnm_servce_getbatch()
 
     local servce_status[0]=$UNDEFINE
     local index=0
-    systemctl > $tmp_file
+    svcs > $tmp_file
     for servce in ${servces[@]}
     do
         servce_status[$index]=`static_cm_cnm_servce_check $index`
@@ -172,6 +174,19 @@ function cm_cnm_servce_updata()
     return $CM_OK
 }
 
+function cm_cnm_server_iscsi_check()
+{
+    local sname='/network/iscsi/target'
+    local status=`svcs $sname |sed 1d |awk '{print $1}'`
+    if [ "X$status" == "Xonline" ]; then
+        return $CM_OK
+    fi
+    
+    CM_EXEC_CMD "svcadm disable $sname"
+    CM_EXEC_CMD "svcadm enable $sname"
+    return $?
+}
+
 function cm_cnm_servce_main()
 {
     local fun=$1
@@ -185,6 +200,12 @@ function cm_cnm_servce_main()
         update)
             cm_cnm_servce_updata $cmd
             iRet=$?
+        ;;
+        iscsi_check)
+            cm_cnm_server_iscsi_check
+            iRet=$?
+        ;;
+        *)
         ;;
     esac
     return $iRet
