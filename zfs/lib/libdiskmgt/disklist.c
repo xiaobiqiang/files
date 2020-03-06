@@ -1364,10 +1364,11 @@ void slot_map_find_value_guid(slot_map_t *sm, disk_info_t *di)
 				strcasestr(di->dk_scsid, search->sr_addr) != NULL) {
 			di->dk_enclosure = search->sr_enclosure;
 			di->dk_slot = search->sr_slot;
-			break;
+			return;
 		}
 	}
-
+	di->dk_enclosure = 0;
+	di->dk_slot = 0;
 	return;
 }
 
