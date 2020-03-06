@@ -201,6 +201,8 @@ function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
+    
+    /var/cm/script/cm_cnm_node_servce.sh iscsi_check
     return 0
 }
 
