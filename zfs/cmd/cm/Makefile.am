@@ -1,7 +1,6 @@
 top=$(shell pwd)
 export top
 install-exec-hook:
-	top=`pwd`
 	chmod 777 ./cpcmfile.sh
 	./cpcmfile.sh
 
