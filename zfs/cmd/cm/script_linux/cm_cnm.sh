@@ -1056,7 +1056,7 @@ function cm_cnm_lun_create_exec()
     #lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val
     local params="$1"
     local paramnull="-"
-    params=`echo "$params" |sed 's/\|/ /g'`
+    params=`echo "$params" |sed 's/|/ /g'`
     params=($params)
     local lunname=${params[0]}
     local lunsize=${params[1]}
@@ -1543,7 +1543,7 @@ function cm_cnm_nas_getbatch_nomaster()
 
 function cm_cnm_nas_getbatch_def()
 {
-    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit"
+    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit,bandwidth,nasavsbw"
     local nasname=$1
     zfs list -H -t filesystem -o $opt $nasname |grep '/' \
         |while read line
