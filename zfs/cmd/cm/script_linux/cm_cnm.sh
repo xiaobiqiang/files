@@ -1316,7 +1316,8 @@ function cm_cnm_nas_set()
     local params=$1
     local failnum=0
     local paramnull="-"
-    params=`echo "$params" |sed 's/\|/ /g'`
+    params=`echo "$params" |sed 's/|/ /g'`
+    #The charactor '|' is no need to escape on Linux command 'sed'    
     params=($params)
     local nasname=${params[0]}
     local blocksize=${params[1]}
@@ -1347,7 +1348,7 @@ function cm_cnm_nas_set()
         if [ $iRet -ne $CM_OK ]; then
             ((failnum=$failnum+1))
         fi
-    fi
+    fi  
     
     if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
         local wp=("unkown" "disk" "poweroff" "mirror" "standard" "always")
