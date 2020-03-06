@@ -1543,7 +1543,7 @@ function cm_cnm_nas_getbatch_nomaster()
 
 function cm_cnm_nas_getbatch_def()
 {
-    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit,bandwidth,nasavsbw"
+    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit"
     local nasname=$1
     zfs list -H -t filesystem -o $opt $nasname |grep '/' \
         |while read line
