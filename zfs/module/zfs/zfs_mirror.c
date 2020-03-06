@@ -34,6 +34,8 @@
 #include <sys/cluster_san.h>
 #include <sys/zil_impl.h>
 
+static int zfs_mirror_performace_flag = 1;
+
 /* DEBUG */
 int debug_msg = 0;
 int zfs_mirror_new_debug_yc = 0;
@@ -572,7 +574,7 @@ zfs_mirror_unaligned_hash_valdtor(mod_hash_val_t val)
 
     while ((blk_hash = list_head(blk_hash_list)) != NULL) {
         list_remove(blk_hash_list, blk_hash);
-        while (cache_data = list_remove_head(&blk_hash->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&blk_hash->hash_nonali_blk_list)) != NULL) {
             csh_rx_data_free(cache_data->cs_data, B_TRUE);
             kmem_free(cache_data, sizeof(zfs_mirror_cache_data_t));
         }
@@ -842,7 +844,7 @@ zfs_mirror_clean_cache_txg_list(mirror_cache_txg_list_t *txg_list)
     zfs_mirror_cache_data_t *cache_data = NULL;
 
     mutex_enter(&txg_list->cache_txg_list_mtx);
-    while (cache_data = list_remove_head(&txg_list->cache_txg_list)) {
+    while ((cache_data = list_remove_head(&txg_list->cache_txg_list)) != NULL) {
         atomic_inc_64(&zfs_mirror_mac_port->rx_ali_data_dec_frames);
         atomic_add_64(&zfs_mirror_mac_port->rs_ali_cache_size,
             0 - cache_data->cs_data->data_len);
@@ -1382,7 +1384,7 @@ zfs_mirror_log_clean(objset_t *os,
         if (data_type == MIRROR_DATA_UNALIGNED) {
             mutex_enter(&os->os_mirror_io_mutex[txg_id]);
             if (os->os_mirror_io_num[txg_id] != 0) {
-                while (mirror_io = list_head(&os->os_mirror_io_list[txg_id])) {
+                while ((mirror_io = list_head(&os->os_mirror_io_list[txg_id])) != NULL) {
                     list_remove(&os->os_mirror_io_list[txg_id], mirror_io);
                     zfs_mirror_destroy(mirror_io);
                 }
@@ -1415,7 +1417,7 @@ zfs_mirror_log_clean(objset_t *os,
         }
 
         if (taskq_dispatch(zfs_mirror_mac_port->mirror_log_clean,
-            (task_func_t *)clear_func, para, TQ_NOSLEEP) == NULL) {
+            (task_func_t *)clear_func, para, TQ_NOSLEEP) == 0) {
             cmn_err(CE_NOTE, "mirror log clean dispath failed, %d", data_type);
             clear_func(para);
         }
@@ -1835,8 +1837,8 @@ zfs_mirror_walk_host_cb(cluster_san_hostinfo_t *cshi, void *arg)
 static int
 mirror_candidate_host_compare(const void *a, const void *b)
 {
-	zfs_mirror_candidate_node_t *n1 = a;
-	zfs_mirror_candidate_node_t *n2 = b;
+	const zfs_mirror_candidate_node_t *n1 = a;
+	const zfs_mirror_candidate_node_t *n2 = b;
 
 	if (n1->hostid < n2->hostid)
 		return (-1);
@@ -2519,12 +2521,12 @@ zfs_replay_worker(data_replay_para_t *para)
     kmem_free(para, sizeof(data_replay_para_t));
 }
 
-void zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
+int zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
 {
     objset_t	*os = NULL;
     lr_t	*lrp = NULL;
     uint64_t	txtype = 0;
-    int			err;
+    int			err = 0;
     int			retry = 0;
     int			retry_max = 3;
 
@@ -2545,9 +2547,11 @@ void zfs_replay_meta_worker(meta_data_replay_para_t *meta_para)
     kmem_free(meta_para->data, meta_para->len);
     #endif
     kmem_free(meta_para, sizeof(data_replay_para_t));
+
+	return (err);
 }
 
-void zfs_replay_cache_data(objset_t *os,
+int zfs_replay_cache_data(objset_t *os,
     zfs_mirror_cache_data_t *cache_data)
 {
     uint64_t offset;
@@ -2560,6 +2564,7 @@ void zfs_replay_cache_data(objset_t *os,
     boolean_t b_meta_type = B_FALSE;
     zfs_mirror_msg_mirrordata_header_t *header =
         cache_data->cs_data->ex_head;
+	int err = 0;
 
     object_id = header->object_id;
     blk_txg = header->txg;
@@ -2590,7 +2595,7 @@ void zfs_replay_cache_data(objset_t *os,
 
     if (b_newer) {
         if (b_meta_type == B_TRUE) {
-            zfs_replay_meta_worker(meta_para);
+            err = zfs_replay_meta_worker(meta_para);
         } else {
             zfs_replay_worker(para);
         }
@@ -2606,6 +2611,7 @@ void zfs_replay_cache_data(objset_t *os,
     }
     csh_rx_data_free(cache_data->cs_data, B_TRUE);
     kmem_free(cache_data, sizeof(zfs_mirror_cache_data_t));
+	return (err);
 }
 
 static void zfs_mirror_get_all_unalign_buf(objset_t *os)
@@ -2644,7 +2650,7 @@ static void zfs_mirror_get_all_unalign_buf(objset_t *os)
                 __func__, hash_blk->hash_key);
         }
 
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             zil_data_record_t *data_record;
             zfs_mirror_msg_mirrordata_header_t *header =
                 cache_data->cs_data->ex_head;
@@ -3335,7 +3341,7 @@ static int zfs_mirror_unaligned_expired_handle(void)
     vfree(unaligned_located);
 
     while ((hash_blk = list_remove_head(&clean_list)) != NULL) {
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             atomic_inc_64(&zfs_mirror_mac_port->rx_nonali_data_dec_frames);
             atomic_add_64(&zfs_mirror_mac_port->rs_nonali_cache_size,
                 0 - cache_data->cs_data->data_len);
@@ -3661,7 +3667,7 @@ static void zfs_mirror_handle_unaligned_actived(void *arg)
     csh_rx_data_free(cs_data, B_TRUE);
 
     while ((hash_blk = list_remove_head(&clean_list)) != NULL) {
-        while (cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) {
+        while ((cache_data = list_remove_head(&hash_blk->hash_nonali_blk_list)) != NULL) {
             atomic_inc_64(&zfs_mirror_mac_port->rx_nonali_data_dec_frames);
             atomic_add_64(&zfs_mirror_mac_port->rs_nonali_cache_size,
                 0 - cache_data->cs_data->data_len);
@@ -3831,3 +3837,13 @@ static int zfs_mirror_os_io_expired_handle(void)
     list_destroy(&clean_list);
     return (cnt);
 }
+
+boolean_t zfs_mirror_mdata_enable(void)
+{
+	return (zfs_mirror_enable() && zfs_mirror_performace_flag);
+}
+EXPORT_SYMBOL(zfs_mirror_mdata_enable);
+
+module_param(zfs_mirror_performace_flag, int, 0644);
+MODULE_PARM_DESC(zfs_mirror_performace_flag, "Mirror performance flag");
+

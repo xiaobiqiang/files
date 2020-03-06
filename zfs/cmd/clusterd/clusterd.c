@@ -37,16 +37,11 @@
 #include "cn_cluster.h"
 #include "systemd_util.h"
 #include "if_util/if_util.h"
+#include "cluster_log.h"
 #include "clusterd.h"
 
 #define	CLUSTERD_CONF	"/etc/default/clusterd"
 #define	PID_FILE	RUNSTATEDIR "/clusterd.pid"
-
-int clusterd_log_lvl = 0;
-
-#define	c_log(lvl, fmt, ...)	if (lvl <= clusterd_log_lvl) {	\
-	syslog(lvl, fmt, __VA_ARGS__);		\
-}
 
 #ifndef	strlcpy
 #define	strlcpy	strncpy
@@ -348,6 +343,8 @@ static int cluster_poweroff_remote_event_handler(const void *buffer,
 	int bufsize);
 static int cluster_poweron_remote_event_handler(const void *buffer,
 	int bufsize);
+static boolean_t cluster_pool_in_local(const char *poolname,
+	uint64_t pool_guid);
 
 static int cluster_get_eth_ip(char *eth_name, char *ip_buf)
 {
@@ -357,11 +354,11 @@ static int cluster_get_eth_ip(char *eth_name, char *ip_buf)
 	size_t len = 0;
 
 	if ((eth_name == NULL) || (ip_buf == NULL)) {
-		syslog(LOG_WARNING, "%s: arg err", __func__);
+		c_log(LOG_WARNING, "%s: arg err", __func__);
 		return (-1);
 	}
 	if (eth_name[0] == '\0') {
-		syslog(LOG_WARNING, "%s: eth_name is err", __func__);
+		c_log(LOG_WARNING, "%s: eth_name is err", __func__);
 		return (-1);
 	}
 	snprintf(buf, 256, CLUSTER_GET_ETH_IP, eth_name);
@@ -370,14 +367,14 @@ static int cluster_get_eth_ip(char *eth_name, char *ip_buf)
 		ip = fgets(ip_buf, 16, f_ip);
 		fclose(f_ip);
 		if (ip == NULL) {
-			syslog(LOG_WARNING, "%s: get %s ip failed", __func__, eth_name);
+			c_log(LOG_WARNING, "%s: get %s ip failed", __func__, eth_name);
 			return (-1);
 		}
 		len = strlen(ip);
 		if (ip[len - 1] == '\n') {
 			ip[len - 1] = '\0';
 		}
-		syslog(LOG_NOTICE, "%s: get %s ip=%s", __func__, eth_name, ip);
+		c_log(LOG_NOTICE, "%s: get %s ip=%s", __func__, eth_name, ip);
 
 		return (0);
 	}
@@ -416,14 +413,14 @@ static void ipmi_send_local_ip(uint32_t remote_hostid)
 	int ret;
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "%s: host(%d), get zfs handle failed",
+		c_log(LOG_ERR, "%s: host(%d), get zfs handle failed",
 			__func__, remote_hostid);
 		return;
 	}
 
 	ret = ipmi_get_local_ip(ipmi_local_ip);
 	if (ret == 0) {
-		syslog(LOG_NOTICE, "get local ipmi ip:%s", ipmi_local_ip);
+		c_log(LOG_NOTICE, "get local ipmi ip:%s", ipmi_local_ip);
 		cluster_get_eth_ip("igb0", igb0_local_ip);
 		igb0_local_ip[15] = '\0';
 
@@ -433,11 +430,11 @@ static void ipmi_send_local_ip(uint32_t remote_hostid)
 		zc.zc_perm_action = remote_hostid;
 		ret = zfs_ioctl(zfs_handle, ZFS_IOC_HBX, &zc);
 		if (ret != 0) {
-			syslog(LOG_WARNING, "%s: to host(%d) failed",
+			c_log(LOG_WARNING, "%s: to host(%d) failed",
 				__func__, remote_hostid);
 		}
 	} else {
-		syslog(LOG_WARNING, "%s: get local ipmi ip failed",
+		c_log(LOG_WARNING, "%s: get local ipmi ip failed",
 			__func__);
 	}
 
@@ -458,20 +455,20 @@ static void ipmi_route_add(char *ipmi_addr)
 	char ip_buf[16];
 	int ret;
 
-	syslog(LOG_NOTICE, "add route to ipmi addr:%s", ipmi_addr);
+	c_log(LOG_NOTICE, "add route to ipmi addr:%s", ipmi_addr);
 	ret = cluster_get_eth_ip("igb0", ip_buf);
 	if (ret == 0) {
 		len = strlen(ip_buf);
 		if (ip_buf[len - 1] == '\n') {
 			ip_buf[len - 1] = '\0';
 		}
-		syslog(LOG_NOTICE, "get igbo ip=%s", ip_buf);
+		c_log(LOG_NOTICE, "get igbo ip=%s", ip_buf);
 		snprintf(buf, 256, CLUSTER_ROUTE_ADD, ipmi_addr, ip_buf);
-		syslog(LOG_NOTICE, "exec cmd:%s", buf);
+		c_log(LOG_NOTICE, "exec cmd:%s", buf);
 		f_route = popen(buf, "r");
 		if (f_route != NULL) {
 			while (fgets(buf, 256, f_route) != NULL) {
-				syslog(LOG_NOTICE, "%s", buf);
+				c_log(LOG_NOTICE, "%s", buf);
 			}
 			fclose(f_route);
 		}
@@ -486,7 +483,7 @@ static ipmi_power_status_t ipmi_remote_power_status(char *ipmi_ipaddr)
 	int ret;
 
 	if ((ipmi_ipaddr == NULL) || (ipmi_ipaddr[0] == '\0')) {
-		syslog(LOG_WARNING, "get remote power status failed because "
+		c_log(LOG_WARNING, "get remote power status failed because "
 			"hasn't been get the remote ip");
 		return (IPMI_POWER_NONE);
 	}
@@ -495,7 +492,7 @@ static ipmi_power_status_t ipmi_remote_power_status(char *ipmi_ipaddr)
 	snprintf(buf, 256, "/usr/bin/echo %s > %s", ipmi_passwd, IPMI_PASSWORD_FILE);
 	ret = excute_cmd(buf);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "get remote power status failed because "
+		c_log(LOG_WARNING, "get remote power status failed because "
 			"create ipmi password file failed");
 		return (IPMI_POWER_NONE);
 	}
@@ -508,9 +505,9 @@ static ipmi_power_status_t ipmi_remote_power_status(char *ipmi_ipaddr)
 
 	if (f_ip != NULL) {
 		if (fgets(buf, sizeof(buf), f_ip) == NULL) {
-			syslog(LOG_WARNING, "read remote power status failed");
+			c_log(LOG_WARNING, "read remote power status failed");
 		} else {
-			syslog(LOG_NOTICE, "get remote power status:%s", buf);
+			c_log(LOG_NOTICE, "get remote power status:%s", buf);
 			if (strncmp(buf, "on", 2) == 0) {
 				power_status = IPMI_POWER_ON;
 			} else {
@@ -520,7 +517,7 @@ static ipmi_power_status_t ipmi_remote_power_status(char *ipmi_ipaddr)
 		
 		pclose(f_ip);
 	} else {
-		syslog(LOG_WARNING, "get remote power status failed");
+		c_log(LOG_WARNING, "get remote power status failed");
 	}
 
 	/* delete the ipmi password file */
@@ -535,9 +532,9 @@ static int ipmi_remote_power_on(char *ipmi_ipaddr)
 	char buf[256];
 	int ret;
 
-	syslog(LOG_WARNING, "will power on the remote");
+	c_log(LOG_WARNING, "will power on the remote");
 	if ((ipmi_ipaddr == NULL) || (ipmi_ipaddr[0] == '\0')) {
-		syslog(LOG_WARNING, "can't power on the remote: "
+		c_log(LOG_WARNING, "can't power on the remote: "
 			"hasn't been get the remote ip");
 		return (-1);
 	}
@@ -545,7 +542,7 @@ static int ipmi_remote_power_on(char *ipmi_ipaddr)
 	snprintf(buf, 256, "/usr/bin/echo %s > %s", ipmi_passwd, IPMI_PASSWORD_FILE);
 	ret = excute_cmd(buf);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "power on remote: create ipmi password failed");
+		c_log(LOG_WARNING, "power on remote: create ipmi password failed");
 		return (-1);
 	}
 	
@@ -556,7 +553,7 @@ static int ipmi_remote_power_on(char *ipmi_ipaddr)
 	ret = excute_cmd(buf);
 
 	if (ret != 0) {
-		syslog(LOG_WARNING, "power on the remote failed, exited(0x%x)"
+		c_log(LOG_WARNING, "power on the remote failed, exited(0x%x)"
 			" exit status(0x%x)", WIFEXITED(ret), WEXITSTATUS(ret));
 	}
 
@@ -571,9 +568,9 @@ static int ipmi_remote_power_off(char *ipmi_ipaddr)
 	char buf[256];
 	int ret;
 
-	syslog(LOG_WARNING, "will power off the remote");
+	c_log(LOG_WARNING, "will power off the remote");
 	if ((ipmi_ipaddr == NULL) || (ipmi_ipaddr[0] == '\0')) {
-		syslog(LOG_WARNING, "can't power off the remote: "
+		c_log(LOG_WARNING, "can't power off the remote: "
 			"hasn't been get the remote ip");
 		return (-1);
 	}
@@ -581,7 +578,7 @@ static int ipmi_remote_power_off(char *ipmi_ipaddr)
 	snprintf(buf, 256, "/usr/bin/echo %s > %s", ipmi_passwd, IPMI_PASSWORD_FILE);
 	ret = excute_cmd(buf);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "power off remote: create ipmi password failed");
+		c_log(LOG_WARNING, "power off remote: create ipmi password failed");
 		return (-1);
 	}
 
@@ -592,7 +589,7 @@ static int ipmi_remote_power_off(char *ipmi_ipaddr)
 	ret = excute_cmd(buf);
 
 	if (ret != 0) {
-		syslog(LOG_WARNING, "power off the remote failed, exited(0x%x)"
+		c_log(LOG_WARNING, "power off the remote failed, exited(0x%x)"
 			" exit status(0x%x)", WIFEXITED(ret), WEXITSTATUS(ret));
 	}
 
@@ -629,18 +626,25 @@ cluster_do_import(const char *name, uint64_t guid)
 	}
 
 	while ((ret = excute_cmd_common(buf, B_TRUE)) != 0) {
+		if (cluster_pool_in_local(name, guid)) {
+			ret = 0;
+			break;
+		}
 		if (retry >= cluster_do_import_retry_times)
 			break;
 		retry++;
-		sleep(1);
+		sleep(retry * 2);
 	}
 	if (ret) {
 		if (name) {
-			syslog(LOG_WARNING, "import pool %s error %d", name, ret);
+			c_log(LOG_WARNING, "import pool %s error %d", name, ret);
 		} else {
-			syslog(LOG_WARNING, "import pool %llu error %d",
+			c_log(LOG_WARNING, "import pool %llu error %d",
 				(unsigned long long)guid, ret);
 		}
+
+		snprintf(buf, 256, "%s import -ib", ZPOOL_CMD);
+		(void) excute_cmd_common(buf, B_TRUE);
 	}
 
 	return (ret);
@@ -657,10 +661,13 @@ cluster_do_export(const char *name)
 		if (retry >= cluster_do_export_retry_times)
 			break;
 		retry++;
-		sleep(1);
+		sleep(retry * 2);
 	}
 	if (ret) {
-		syslog(LOG_WARNING, "export pool %s error %d", name, ret);
+		c_log(LOG_WARNING, "export pool %s error %d", name, ret);
+
+		snprintf(buf, 256, "%s status %s", ZPOOL_CMD, name);
+		(void) excute_cmd_common(buf, B_TRUE);
 	}
 
 	return (ret);
@@ -712,7 +719,7 @@ static int clusterd_host_is_need_failover(
 	int err;
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "%s: host(%d), get zfs handle failed",
+		c_log(LOG_ERR, "%s: host(%d), get zfs handle failed",
 			__func__, hostid);
 		return (-1);
 	}
@@ -723,7 +730,7 @@ static int clusterd_host_is_need_failover(
 	zc.zc_guid = 0;
 	err = zfs_ioctl(zfs_handle, ZFS_IOC_HBX, &zc);
 	if (err != 0) {
-		syslog(LOG_WARNING, "%s: get the host(%d) is or not need failover failed",
+		c_log(LOG_WARNING, "%s: get the host(%d) is or not need failover failed",
 			__func__, hostid);
 	} else {
 		if (zc.zc_guid == 0) {
@@ -748,7 +755,7 @@ static void clusterd_host_clr_need_failover(uint32_t hostid)
 		return;
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "%s: host(%d), get zfs handle failed",
+		c_log(LOG_ERR, "%s: host(%d), get zfs handle failed",
 			__func__, hostid);
 		return;
 	}
@@ -758,7 +765,7 @@ static void clusterd_host_clr_need_failover(uint32_t hostid)
 	zc.zc_perm_action = hostid;
 	err = zfs_ioctl(zfs_handle, ZFS_IOC_HBX, &zc);
 	if (err != 0) {
-		syslog(LOG_WARNING, "%s: clear host(%d)'s need failover label failed",
+		c_log(LOG_WARNING, "%s: clear host(%d)'s need failover label failed",
 			__func__, hostid);
 	}
 	libzfs_fini(zfs_handle);
@@ -928,7 +935,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, 
 		&pool_guid) == 0);
 
-	syslog(LOG_WARNING, "%s: pool(%s) will import", __func__, poolname);
+	c_log(LOG_WARNING, "%s: pool(%s) will import", __func__, poolname);
 
 	while (((cluster_failover_state->failover_type == HBX_TIMEOUT) || 
 		(cluster_failover_state->failover_type == REMOTE_SPA_NORESPONSE))
@@ -943,7 +950,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 		int try_cnt;
 		
 		if (pool_node->is_updated != B_TRUE) {
-			syslog(LOG_NOTICE, "%s: pool(%s) maybe export or readonly in partner",
+			c_log(LOG_NOTICE, "%s: pool(%s) maybe export or readonly in partner",
 				__func__, poolname);
 #if 0
 			pthread_mutex_lock(&cluster_failover_state->mtx);
@@ -964,7 +971,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 			/* wait a moment, then check index of quantum disk */
 			pthread_mutex_lock(&cluster_failover_state->th_mtx);
 			(void) gettimeofday(&tp, NULL);
-			to.tv_sec = tp.tv_sec + 2;
+			to.tv_sec = tp.tv_sec + 1;
 			to.tv_nsec = tp.tv_usec * 1000;
 			pthread_cond_timedwait(&cluster_failover_state->th_cond,
 				&cluster_failover_state->th_mtx, &to);
@@ -977,10 +984,10 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 
 			if (B_TRUE == zpool_used_index_changed(used_index1, real_nquantum1,
 				used_index2, &real_nquantum2)) {
-				syslog(LOG_WARNING, "pool(%s) in use, wait a moment, check again", poolname);
+				c_log(LOG_WARNING, "pool(%s) in use, wait a moment, check again", poolname);
 				pthread_mutex_lock(&cluster_failover_state->th_mtx);
 				(void) gettimeofday(&tp, NULL);
-				to.tv_sec = tp.tv_sec + 5;
+				to.tv_sec = tp.tv_sec + 1;
 				to.tv_nsec = tp.tv_usec * 1000;
 				pthread_cond_timedwait(&cluster_failover_state->th_cond,
 					&cluster_failover_state->th_mtx, &to);
@@ -997,7 +1004,7 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 			pool_node->uncontrolled = B_TRUE;
 			pthread_cond_signal(&cluster_failover_state->cond);
 			pthread_mutex_unlock(&cluster_failover_state->mtx);
-			syslog(LOG_WARNING, "pool(%s)'s quantum wasn't updated for a long time", poolname);
+			c_log(LOG_WARNING, "pool(%s)'s quantum wasn't updated for a long time", poolname);
 			break;
 		}
 	}
@@ -1018,7 +1025,9 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 		pthread_t tid;
 		failover_pool_import_state_t import_state;
 		compete_pool_param_t	param;
+		int import_trytimes = 10;
 
+_compete:
 		pthread_mutex_init(&import_state.mtx, NULL);
 		pthread_cond_init(&import_state.cond, NULL);
 		import_state.imported = B_FALSE;
@@ -1029,14 +1038,15 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 
 		error = pthread_create(&tid, NULL, cluster_compete_pool, &param);
 		if (error != 0) {
-			syslog(LOG_ERR, "pthread_create error: %d, %s", error, strerror(error));
+			c_log(LOG_ERR, "pthread_create error: %d, %s", error, strerror(error));
 			goto exit_import;
 		}
 		pthread_mutex_lock(&import_state.mtx);
 		pthread_cond_wait(&import_state.cond, &import_state.mtx);
 		if (import_state.imported) {
-			syslog(LOG_WARNING, "compete lost or error");
+			c_log(LOG_WARNING, "compete lost or error");
 			pthread_mutex_unlock(&import_state.mtx);
+			import_trytimes = 0;
 			goto wait_compete_thread;
 		}
 		pthread_mutex_unlock(&import_state.mtx);
@@ -1049,7 +1059,9 @@ static int cluster_import_pool_thread(cluster_pool_thread_t *pool_node)
 				zpool_remove_partner(hdl, poolname, cluster_failover_state->hostid);
 				libzfs_fini(hdl);
 			}
-		}
+			import_trytimes = 0;
+		} else
+			import_trytimes--;
 
 		import_state.imported = B_TRUE;
 
@@ -1059,18 +1071,26 @@ wait_compete_thread:
 exit_import:
 		pthread_mutex_destroy(&import_state.mtx);
 		pthread_cond_destroy(&import_state.cond);
+		if (import_trytimes > 0) {
+			c_log(LOG_WARNING, "failover type %d exit %d times %d",
+				cluster_failover_state->failover_type,
+				cluster_failover_state->thread_exit, import_trytimes);
+			if (cluster_failover_state->failover_type != FAILOVER_NORMAL &&
+				cluster_failover_state->thread_exit == 0)
+				goto _compete;
+		}
 	}
 	(void) gettimeofday(&elapsed_time2, NULL);
 	cluster_failover_time_diff(&elapsed_time1, &elapsed_time2, &diff_time1);
 	cluster_failover_time_diff(&cluster_failover_state->failover_start_time,
 		&elapsed_time2, &diff_time2);
-	syslog(LOG_NOTICE, "%s import pool: %s(spend time:%lds %ldus, "
+	c_log(LOG_NOTICE, "%s import pool: %s(spend time:%lds %ldus, "
 		"from the start failover:%lds %ldus)",
 		FAILOVER_TIME_TAG, poolname,
 		diff_time1.tv_sec, diff_time1.tv_usec,
 		diff_time2.tv_sec, diff_time2.tv_usec);
 EXIT:
-	syslog(LOG_WARNING, "%s: exit, pool(%s)", __func__, poolname);
+	c_log(LOG_WARNING, "%s: exit, pool(%s)", __func__, poolname);
 
 	/* notify cluster_remote_abnormal_handle() thread exit */
 	pthread_mutex_lock(&cluster_failover_state->mtx);
@@ -1145,12 +1165,12 @@ static int cluster_remote_abnormal_handle(void *arg)
 
 	pthread_detach(pthread_self());
 	/* secondly, check partner is online or not */
-	syslog(LOG_ERR, "remote host(%d) abnormal: 0x%x, to do failover",
+	c_log(LOG_ERR, "remote host(%d) abnormal: 0x%x, to do failover",
 		cluster_failover_state->hostid, cluster_failover_state->failover_type);
 
 	hdl = libzfs_init();
 	if (!hdl) {
-		syslog(LOG_ERR, "Failed to get libzfs handle");
+		c_log(LOG_ERR, "Failed to get libzfs handle");
 		pthread_mutex_lock(&cluster_failover_state->mtx);
 		cluster_failover_state->failover_running = 0;
 		pthread_mutex_unlock(&cluster_failover_state->mtx);
@@ -1180,15 +1200,15 @@ static int cluster_remote_abnormal_handle(void *arg)
 		 */
 		system(CLUSTER_SMF_FAILOVER);
 #endif
-		syslog(LOG_ERR, "remote abnormal, partner have no pool, do nothing");
+		c_log(LOG_ERR, "remote abnormal, partner have no pool, do nothing");
 		goto EXIT;
 	}
 	if ((ret = zfs_do_hbx_get_nvlist(hdl, ZFS_HBX_GET_PARTNER_UPDATED_POOL,
 		cluster_failover_state->hostid, &updated_pools)) != 0) {
-		syslog(LOG_ERR, "zfs_do_hbx_get_nvlist error %d", ret);
+		c_log(LOG_ERR, "zfs_do_hbx_get_nvlist error %d", ret);
 	}
 
-	syslog(LOG_NOTICE, "remote abnormal: create the watch pool threads");
+	c_log(LOG_NOTICE, "remote abnormal: create the watch pool threads");
 	/* every pool use a thread */
 	while (elem != NULL) {
 		verify(nvpair_value_nvlist(elem, &config) == 0);
@@ -1215,7 +1235,7 @@ static int cluster_remote_abnormal_handle(void *arg)
 			(void *(*)(void *))cluster_import_pool_thread, (void *)pool_node);
 		if (ret != 0) {
 			atomic_dec_32(&cluster_failover_state->nthreads);
-			syslog(LOG_WARNING, "remote abnormal: create import pool thread failed");
+			c_log(LOG_WARNING, "remote abnormal: create import pool thread failed");
 			error = -1;
 			goto FAILED;
 		}
@@ -1226,7 +1246,7 @@ static int cluster_remote_abnormal_handle(void *arg)
 	while (((cluster_failover_state->failover_type == HBX_TIMEOUT) ||
 		(cluster_failover_state->failover_type == REMOTE_SPA_NORESPONSE))
 		&& (cluster_failover_state->need_failover == 0)) {
-		syslog(LOG_NOTICE, "remote host(%d) abnormal: "
+		c_log(LOG_NOTICE, "remote host(%d) abnormal: "
 			"wait until all pools is dead or stop failover",
 			cluster_failover_state->hostid);
 		pthread_cond_wait(&cluster_failover_state->cond,
@@ -1241,7 +1261,7 @@ static int cluster_remote_abnormal_handle(void *arg)
 	if (cluster_failover_state->need_failover != 0) {
 		(void) gettimeofday(&elapsed_time2, NULL);
 		cluster_failover_time_diff(&elapsed_time1, &elapsed_time2, &diff_time);
-		syslog(LOG_NOTICE, "%s wait all pools dead(spend time:%lds %ldus"
+		c_log(LOG_NOTICE, "%s wait all pools dead(spend time:%lds %ldus"
 			", host:%d)",
  			FAILOVER_TIME_TAG, diff_time.tv_sec, diff_time.tv_usec,
  			cluster_failover_state->hostid);
@@ -1262,9 +1282,9 @@ static int cluster_remote_abnormal_handle(void *arg)
 		}
 
 		if (ipmi_switch == 0) {
-			syslog(LOG_NOTICE, "%s: ipmi is off", __func__);
+			c_log(LOG_NOTICE, "%s: ipmi is off", __func__);
 			if (cluster_failover_state->failover_type == HBX_TIMEOUT) {
-				syslog(LOG_NOTICE, "%s: host(%d) maybe down, so we do failover now",
+				c_log(LOG_NOTICE, "%s: host(%d) maybe down, so we do failover now",
 					__func__, cluster_failover_state->hostid);
 				goto DO_FAILOVER;
 			} else {
@@ -1279,7 +1299,7 @@ static int cluster_remote_abnormal_handle(void *arg)
 		zc.zc_value[0] = '\0';
 		ret = zfs_ioctl(hdl, ZFS_IOC_HBX, &zc);
 		if ((ret != 0) || (zc.zc_value[0] == '\0')) {
-			syslog(LOG_ERR, "%s: get ipmi ip addr failed", __func__);
+			c_log(LOG_ERR, "%s: get ipmi ip addr failed", __func__);
 			if (cluster_failover_state->failover_type == HBX_TIMEOUT) {
 				try_cnt = 3;
 			} else {
@@ -1288,11 +1308,11 @@ static int cluster_remote_abnormal_handle(void *arg)
 			}
 		} else {
 			ipmi_ipaddr = zc.zc_value;
-			syslog(LOG_NOTICE, "%s: get host(%d)'s ipmi ip=%s",
+			c_log(LOG_NOTICE, "%s: get host(%d)'s ipmi ip=%s",
 				__func__, cluster_failover_state->hostid, ipmi_ipaddr);
 		}
 
-		syslog(LOG_WARNING, "remote host(%d) abnormal: ready for failover, "
+		c_log(LOG_WARNING, "remote host(%d) abnormal: ready for failover, "
 			"we will poweroff parter and import the pools",
 			cluster_failover_state->hostid);
 		/* power off the partner avoid manage the same pool both */
@@ -1320,10 +1340,10 @@ static int cluster_remote_abnormal_handle(void *arg)
 			}
 		}
 		if (try_cnt == 3) {
-			syslog(LOG_WARNING, "power off host(%d) failed, please check the net config",
+			c_log(LOG_WARNING, "power off host(%d) failed, please check the net config",
 				cluster_failover_state->hostid);
 			if (cluster_failover_state->failover_type == HBX_TIMEOUT) {
-				syslog(LOG_WARNING, "may be not config the ipmi ip, "
+				c_log(LOG_WARNING, "may be not config the ipmi ip, "
 					"we still do failover when host(%d) timeout",
 					cluster_failover_state->hostid);
 			} else {
@@ -1331,12 +1351,12 @@ static int cluster_remote_abnormal_handle(void *arg)
 				goto FAILED;
 			}
 		} else {
-			syslog(LOG_NOTICE, "remote host(%d) abnormal: power off partner success, do failover",
+			c_log(LOG_NOTICE, "remote host(%d) abnormal: power off partner success, do failover",
 				cluster_failover_state->hostid);
 		}
 		(void) gettimeofday(&elapsed_time3, NULL);
 		cluster_failover_time_diff(&elapsed_time2, &elapsed_time3, &diff_time);
-		syslog(LOG_NOTICE, "%s ipmi power off host(%d) (spend time:%lds %ldus)",
+		c_log(LOG_NOTICE, "%s ipmi power off host(%d) (spend time:%lds %ldus)",
 			FAILOVER_TIME_TAG, cluster_failover_state->hostid,
 			diff_time.tv_sec, diff_time.tv_usec);
 DO_FAILOVER:
@@ -1350,7 +1370,7 @@ DO_FAILOVER:
 
 FAILED:
 	/* wait all thread exit */
-	syslog(LOG_DEBUG, "wait all import spa thread exit");
+	c_log(LOG_DEBUG, "wait all import spa thread exit");
 	pthread_mutex_lock(&cluster_failover_state->th_mtx);
 	if (do_failover == 0) {
 		cluster_failover_state->thread_exit = 1;
@@ -1373,7 +1393,7 @@ FAILED:
 #endif
 		(void) gettimeofday(&elapsed_time2, NULL);
 		cluster_failover_time_diff(&elapsed_time1, &elapsed_time2, &diff_time);
-		syslog(LOG_NOTICE, "%s other failover(task app etc.)(spend time:%lds %ldus)",
+		c_log(LOG_NOTICE, "%s other failover(task app etc.)(spend time:%lds %ldus)",
 			FAILOVER_TIME_TAG, diff_time.tv_sec, diff_time.tv_usec);
 	}
 	
@@ -1392,12 +1412,12 @@ FAILED:
 			try_cnt++;
 		}
 		if (try_cnt == 3) {
-			syslog(LOG_WARNING, "power on host(%d) failed, please manually power on",
+			c_log(LOG_WARNING, "power on host(%d) failed, please manually power on",
 				cluster_failover_state->hostid);
 		}
 		(void) gettimeofday(&elapsed_time2, NULL);
 		cluster_failover_time_diff(&elapsed_time1, &elapsed_time2, &diff_time);
-		syslog(LOG_NOTICE, "%s ipmi power on host(%d) (spend time:%lds %ldus)",
+		c_log(LOG_NOTICE, "%s ipmi power on host(%d) (spend time:%lds %ldus)",
 			FAILOVER_TIME_TAG, cluster_failover_state->hostid,
 			diff_time.tv_sec, diff_time.tv_usec);
 	}
@@ -1419,7 +1439,7 @@ EXIT:
 	(void) gettimeofday(&elapsed_time4, NULL);
 	cluster_failover_time_diff(&cluster_failover_state->failover_start_time,
 		&elapsed_time4, &diff_time);
-	syslog(LOG_NOTICE, "%s host(%d) whole failover(spend time:%lds %ldus)",
+	c_log(LOG_NOTICE, "%s host(%d) whole failover(spend time:%lds %ldus)",
 		FAILOVER_TIME_TAG, cluster_failover_state->hostid,
 		diff_time.tv_sec, diff_time.tv_usec);
 
@@ -1477,7 +1497,7 @@ static void cluster_remote_hbx_timeout(uint32_t hostid)
 	/* determine failover */
 	clusterd_host_is_need_failover(hostid, &need_failover);
 	if (!need_failover) {
-		syslog(LOG_WARNING, "%s: host(%d), don't need failover",
+		c_log(LOG_WARNING, "%s: host(%d), don't need failover",
 			__func__, hostid);
 		return;
 	}
@@ -1495,12 +1515,12 @@ static void cluster_remote_hbx_timeout(uint32_t hostid)
 			(void *)cluster_failover_state);
 		if (ret != 0) {
 			cluster_failover_state->failover_running = 0;
-			syslog(LOG_WARNING, "host(%d) down: create the handle thread failed",
+			c_log(LOG_WARNING, "host(%d) down: create the handle thread failed",
 				hostid);
 			clusterd_host_clr_need_failover(cluster_failover_state->hostid);
 		}
 	} else {		
-		syslog(LOG_WARNING, "host(%d) down: the failover handle(%d) was running",
+		c_log(LOG_WARNING, "host(%d) down: the failover handle(%d) was running",
 			hostid, cluster_failover_state->failover_type);
 	}
 	pthread_mutex_unlock(&cluster_failover_state->mtx);
@@ -1518,7 +1538,7 @@ static void cluster_remote_spa_hung(uint32_t hostid)
 
 	clusterd_host_is_need_failover(hostid, &need_failover);
 	if (!need_failover) {
-		syslog(LOG_WARNING, "%s: host(%d), don't need failover",
+		c_log(LOG_WARNING, "%s: host(%d), don't need failover",
 			__func__, hostid);
 		return;
 	}
@@ -1537,11 +1557,11 @@ static void cluster_remote_spa_hung(uint32_t hostid)
 			(void *)cluster_failover_state);
 		if (ret != 0) {
 			cluster_failover_state->failover_running = 0;
-			syslog(LOG_WARNING, "host(%d)'s spa hung: create the handle thread failed",
+			c_log(LOG_WARNING, "host(%d)'s spa hung: create the handle thread failed",
 				hostid);
 		}
 	} else {		
-		syslog(LOG_WARNING, "host(%d)'s spa hung: the failover handle(%d) was running",
+		c_log(LOG_WARNING, "host(%d)'s spa hung: the failover handle(%d) was running",
 			hostid, cluster_failover_state->failover_type);
 	}
 	pthread_mutex_unlock(&cluster_failover_state->mtx);
@@ -1571,7 +1591,7 @@ cluster_get_host_state(uint32_t hostid)
 	}
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "%s: host(%d), get zfs handle failed",
+		c_log(LOG_ERR, "%s: host(%d), get zfs handle failed",
 			__func__, hostid);
 		return (0);
 	}
@@ -1596,7 +1616,7 @@ hbx_do_cluster_cmd(char *buffer, int size, zfs_hbx_ioc_t iocmd)
 	libzfs_handle_t *zfs_handle = NULL;
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "hbx do cluster cmd get zfs handle failed");
+		c_log(LOG_ERR, "hbx do cluster cmd get zfs handle failed");
 		return (-1);
 	}
 
@@ -1613,7 +1633,7 @@ hbx_do_cluster_cmd_ex(char *buffer, int size, zfs_hbx_ioc_t iocmd, int remote_id
 	libzfs_handle_t *zfs_handle = NULL;
 
 	if ((zfs_handle = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "hbx do cluster cmd get zfs handle failed");
+		c_log(LOG_ERR, "hbx do cluster cmd get zfs handle failed");
 		return (-1);
 	}
 
@@ -1631,7 +1651,7 @@ cluster_update_partner_nic(char *buffer, int size)
 	int fd, actual_size = 0;
 
 	if (size == 0) {
-		syslog(LOG_ERR, "cluster update partner size is 0");
+		c_log(LOG_ERR, "cluster update partner size is 0");
 		return (-1);
 	}
 
@@ -1640,13 +1660,13 @@ cluster_update_partner_nic(char *buffer, int size)
 
 	fd = open(CLS_PAR_NIC_PATH_TMP, O_WRONLY | O_CREAT |O_TRUNC);
 	if (fd < 0) {
-		syslog(LOG_ERR, "cluster update partner open file failed");
+		c_log(LOG_ERR, "cluster update partner open file failed");
 		return (-1);
 	}
 
 	actual_size = write(fd, buffer, size);
 	if (actual_size != size) {
-		syslog(LOG_ERR, "cluster update nic write size not equal,"
+		c_log(LOG_ERR, "cluster update nic write size not equal,"
 			"%d:%d", actual_size, size);
 		close(fd);
 		return (-1);
@@ -1761,18 +1781,18 @@ cluster_update_keyfile_thread(void *arg)
 	size = size - MAX_ID_BYTE;
 	
 	if (size == 0) {
-		syslog(LOG_ERR, "cluster update keyfile size is 0");
+		c_log(LOG_ERR, "cluster update keyfile size is 0");
 		goto exit_thread;
 	}
 
 	fd = open(CLS_PAR_KEYFILE_PATH_TMP, O_WRONLY | O_CREAT |O_TRUNC);
 	if (fd < 0) {
-		syslog(LOG_ERR, "cluster update keyfile open file failed");
+		c_log(LOG_ERR, "cluster update keyfile open file failed");
 		goto exit_thread;
 	}
 	actual_size = write(fd, buffer, size);
 	if (actual_size != size) {
-		syslog(LOG_ERR, "cluster update keyfile write size not equal,"
+		c_log(LOG_ERR, "cluster update keyfile write size not equal,"
 			"%d:%d", actual_size, size);
 		close(fd);
 		goto exit_thread;
@@ -1802,13 +1822,13 @@ cluster_update_keyfile(char *buffer, int size)
 
 	arg = dup_event_data(buffer, size);
 	if (arg == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		c_log(LOG_ERR, "out of memory");
 		return (-1);
 	}
 
 	if (pthread_create(&tid, NULL, cluster_update_keyfile_thread,
 		(void *) arg) != 0) {
-		syslog(LOG_ERR, "pthread_create error.");
+		c_log(LOG_ERR, "pthread_create error.");
 		free(arg->buf);
 		free(arg);
 		return (-1);
@@ -1859,13 +1879,13 @@ cluster_update_remote_cmd(char *cmd_name, int size)
 
 	arg = dup_event_data(cmd_name, size);
 	if (arg == NULL) {
-		syslog(LOG_ERR, "out of memory");
+		c_log(LOG_ERR, "out of memory");
 		return (-1);
 	}
 
 	if (pthread_create(&tid, NULL, cluster_update_remote_cmd_thread,
 		(void *) arg) != 0) {
-		syslog(LOG_ERR, "pthread_create error.");
+		c_log(LOG_ERR, "pthread_create error.");
 		free(arg->buf);
 		free(arg);
 		return (-1);
@@ -1883,20 +1903,20 @@ cluster_change_pool_owner(char *buf, size_t buflen)
 
 	ret = nvlist_unpack(buf, buflen, &ripool, KM_SLEEP);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "%s: nvlist_unpack failed (buflen:%u, ret:%d)",
+		c_log(LOG_WARNING, "%s: nvlist_unpack failed (buflen:%u, ret:%d)",
 			__func__, (unsigned int)buflen, ret);
 		return;
 	}
 	ret = nvlist_lookup_uint32(ripool, "hostid", &hostid);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "%s: get hostid failed, ret:%d",
+		c_log(LOG_WARNING, "%s: get hostid failed, ret:%d",
 			__func__, ret);
 		nvlist_free(ripool);
 		return;
 	}
 	ret = nvlist_lookup_string(ripool, "spa_name", &spa_name);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "%s: get spa_name failed, ret:%d",
+		c_log(LOG_WARNING, "%s: get spa_name failed, ret:%d",
 			__func__, ret);
 		nvlist_free(ripool);
 		return;
@@ -1957,14 +1977,14 @@ cluster_set_hbx_event(hbx_door_para_t *para, char *data, int len)
 	
 	event = malloc(sizeof(cluster_event_t));
 	if (event == NULL) {
-		syslog(LOG_ERR, "set hbx event malloc failed");
+		c_log(LOG_ERR, "set hbx event malloc failed");
 		return;
 	}
 
 	if (data != NULL && len != 0) {
 		buffer = malloc(len);
 		if (buffer == NULL) {
-			syslog(LOG_ERR, "set hbx event, malloc data failed");
+			c_log(LOG_ERR, "set hbx event, malloc data failed");
 			return;
 		}
 		size = len;
@@ -1995,82 +2015,7 @@ excute_cmd_result(const char *cmd, char **result)
 	struct stat sb;
 	ssize_t nread;
 
-	cmdlen = strlen(cmd);
-	pid = getpid();
-	tid = pthread_self();
-	buf = (char *) malloc(cmdlen + 64);
-	if (buf) {
-		snprintf(buf, cmdlen + 64,
-			"%s > /tmp/clusterd.%d.%d.stderr 2>&1",
-			cmd, (int) pid, (int) tid);
-	} else {
-		syslog(LOG_ERR, "out of memory");
-	}
-
-	c_log(LOG_WARNING, "system('%s')", buf);
-	ret = system(buf);
-
-	if (ret == -1) {
-		syslog(LOG_ERR,
-			"system(): create child failed or cannot receive status of child");
-	} else if (!WIFEXITED(ret)) {
-		syslog(LOG_ERR,
-			"system(): shell could not be executed in the child process");
-	} else {
-		ret = WEXITSTATUS(ret);
-	}
-
-	snprintf(buf, cmdlen+64, "/tmp/clusterd.%d.%d.stderr",
-		(int) pid, (int) tid);
-
-	fd = open(buf, O_RDONLY);
-	if (fd == -1) {
-		syslog(LOG_ERR, "open %s error %d", buf, errno);
-		*result = NULL;
-		goto out;
-	}
-
-	if (fstat(fd, &sb) == -1) {
-		syslog(LOG_ERR, "stat %s error %d", buf, errno);
-		*result = NULL;
-		goto out;
-	}
-
-	*result = malloc(sb.st_size + 1);
-	if (*result) {
-		nread = read(fd, *result, sb.st_size);
-		if (nread == -1) {
-			syslog(LOG_ERR, "read %s error %d", buf, errno);
-			free(*result);
-			*result = NULL;
-		} else {
-			if (nread > 0 && (*result)[nread-1] == '\n')
-				(*result)[nread-1] = '\0';
-			else
-				(*result)[nread] = '\0';
-			c_log(LOG_WARNING, "%s", *result);
-		}
-	}
-
-out:
-	if (fd > 0)
-		close(fd);
-	if (unlink(buf) == -1)
-		syslog(LOG_ERR, "unlink %s error %d", buf, errno);
-
-	return (ret);
-}
-
-static int
-excute_cmd_common(const char *cmd, boolean_t dup2log)
-{
-	int ret;
-	char *buf = NULL;
-	size_t cmdlen;
-	pid_t pid;
-	pthread_t tid;
-
-	if (dup2log) {
+	if (result) {
 		cmdlen = strlen(cmd);
 		pid = getpid();
 		tid = pthread_self();
@@ -2080,35 +2025,76 @@ excute_cmd_common(const char *cmd, boolean_t dup2log)
 				"%s > /tmp/clusterd.%d.%d.stderr 2>&1",
 				cmd, (int) pid, (int) tid);
 		} else {
-			syslog(LOG_ERR, "out of memory");
+			c_log(LOG_ERR, "out of memory");
 		}
 	}
 
 	c_log(LOG_WARNING, "system('%s')", cmd);
-	if (buf) {
-		ret = system(buf);
-	} else {
-		ret = system(cmd);
-	}
+	ret = system(buf ? buf : cmd);
+
 	if (ret == -1) {
-		syslog(LOG_ERR,
+		c_log(LOG_ERR,
 			"system(): create child failed or cannot receive status of child");
 	} else if (!WIFEXITED(ret)) {
-		syslog(LOG_ERR,
+		c_log(LOG_ERR,
 			"system(): shell could not be executed in the child process");
 	} else {
 		ret = WEXITSTATUS(ret);
 	}
 
-	if (buf) {
-		snprintf(buf, cmdlen + 64,
-			"cat /tmp/clusterd.%d.%d.stderr | logger -p daemon.notice -t clusterd",
-			(int) pid, (int) tid);
-		(void) system(buf);
-		snprintf(buf, cmdlen + 64,
-			"unlink /tmp/clusterd.%d.%d.stderr",
-			(int) pid, (int) tid);
-		(void) system(buf);
+	if (result == NULL || buf == NULL)
+		return (ret);
+
+	snprintf(buf, cmdlen+64, "/tmp/clusterd.%d.%d.stderr",
+		(int) pid, (int) tid);
+
+	fd = open(buf, O_RDONLY);
+	if (fd == -1) {
+		c_log(LOG_ERR, "open %s error %d", buf, errno);
+		*result = NULL;
+		goto out;
+	}
+
+	if (fstat(fd, &sb) == -1) {
+		c_log(LOG_ERR, "stat %s error %d", buf, errno);
+		*result = NULL;
+		goto out;
+	}
+
+	*result = malloc(sb.st_size + 1);
+	if (*result) {
+		nread = read(fd, *result, sb.st_size);
+		if (nread == -1) {
+			c_log(LOG_ERR, "read %s error %d", buf, errno);
+			free(*result);
+			*result = NULL;
+		} else {
+			if (nread > 0 && (*result)[nread-1] == '\n')
+				(*result)[nread-1] = '\0';
+			else
+				(*result)[nread] = '\0';
+		}
+	}
+
+out:
+	if (fd > 0)
+		close(fd);
+	if (unlink(buf) == -1)
+		c_log(LOG_ERR, "unlink %s error %d", buf, errno);
+
+	return (ret);
+}
+
+static int
+excute_cmd_common(const char *cmd, boolean_t dup2log)
+{
+	int ret;
+	char *buf = NULL;
+
+	ret = excute_cmd_result(cmd, dup2log ? &buf : NULL);
+
+	if (dup2log && buf != NULL) {
+		c_log(LOG_WARNING, "%s", buf);
 		free(buf);
 	}
 
@@ -2178,7 +2164,7 @@ set_remote_mac_state_response_timer(void)
 	sa.sa_handler = response_timeout_handler;
 	sa.sa_flags = SA_RESETHAND;
 	if (sigaction(SIGALRM, &sa, NULL) == -1) {
-		syslog(LOG_ERR, "sigaction() error: signo=SIGALRM, err=%d", errno);
+		c_log(LOG_ERR, "sigaction() error: signo=SIGALRM, err=%d", errno);
 		return (-1);
 	}
 
@@ -2187,7 +2173,7 @@ set_remote_mac_state_response_timer(void)
 	itv.it_value.tv_sec = 10;
 	itv.it_value.tv_usec = 0;
 	if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
-		syslog(LOG_ERR, "setitimer() error: %d", errno);
+		c_log(LOG_ERR, "setitimer() error: %d", errno);
 		return (-1);
 	}
 	return (0);
@@ -2203,7 +2189,7 @@ clear_remote_mac_state_response_timer(void)
 	itv.it_value.tv_sec = 0;
 	itv.it_value.tv_usec = 0;
 	if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
-		syslog(LOG_ERR, "setitimer() error: %d", errno);
+		c_log(LOG_ERR, "setitimer() error: %d", errno);
 		return (-1);
 	}
 	return (0);
@@ -2440,7 +2426,7 @@ cluster_failover_conf_handler(int flag, const void *data)
 		struct link_list **pp, *node;
 
 		if (cf_conf.remote_down) {
-			syslog(LOG_WARNING, "handle mac offline, but remote down");
+			c_log(LOG_WARNING, "handle mac offline, but remote down");
 			clear_cluster_failover_conf();
 			pthread_mutex_unlock(&cf_conf.lock);
 			return (0);
@@ -2483,7 +2469,7 @@ cluster_failover_conf_handler(int flag, const void *data)
 
 			for (i = 0; i < msp->mac_num; i++) {
 				if (msp->linkstate[i] != ils_up) {
-					syslog(LOG_WARNING, "remote link %s state: %d",
+					c_log(LOG_WARNING, "remote link %s state: %d",
 						msp->mac_list[i], msp->linkstate[i]);
 					break;
 				}
@@ -2499,7 +2485,7 @@ cluster_failover_conf_handler(int flag, const void *data)
 					rmsg.pools_list[rmsg.pools_num++] = buf;
 				}
 				if (p != NULL)
-					syslog(LOG_ERR, "%s: out of memory", __func__);
+					c_log(LOG_ERR, "%s: out of memory", __func__);
 				else
 					handle_release_message_common(&rmsg);
 				for (i = 0; i < rmsg.pools_num; i++)
@@ -2524,7 +2510,7 @@ cluster_failover_conf_handler(int flag, const void *data)
 	{
 		struct link_list *p;
 
-		syslog(LOG_WARNING, "wait response timeout");
+		c_log(LOG_WARNING, "wait response timeout");
 		if (cf_conf.todo_release_zpool) {
 			free_link_list(cf_conf.todo_release_zpool, 1);
 			cf_conf.todo_release_zpool = NULL;
@@ -2601,7 +2587,7 @@ zfs_iter_cb(zfs_handle_t *zhp, void *data)
 			continue;
 		err = nvlist_lookup_nvlist(user_props, nvpair_name(elem), &propval);
 		if (err != 0) {
-			syslog(LOG_ERR, "get property error: %d", err);
+			c_log(LOG_ERR, "get property error: %d", err);
 			zfs_close(zhp);
 			return (err);
 		}
@@ -2612,7 +2598,7 @@ zfs_iter_cb(zfs_handle_t *zhp, void *data)
 				zfsname, nvpair_name(elem), strval);
 			
 			if (parse_failover_conf(buf, &conf)) {
-				syslog(LOG_ERR, 
+				c_log(LOG_ERR, 
 					"parse_failover_conf(): failed to parse msg: %s", buf);
 				zfs_close(zhp);
 				return (-1);
@@ -2628,7 +2614,7 @@ zfs_iter_cb(zfs_handle_t *zhp, void *data)
 						ifp = (service_if_t *) p->ptr;
 						if (strcmp(ifp->ip_addr, conf.ip_addr) == 0) {
 							exists = 1;
-							syslog(LOG_WARNING, "zfs_iter_cb: %s:%s exists", 
+							c_log(LOG_WARNING, "zfs_iter_cb: %s:%s exists", 
 								zfsname, conf.ip_addr);
 							break;
 						}
@@ -2663,12 +2649,12 @@ init_zpool_failover_conf(void)
 	int err;
 
 	if ((hdl = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "get zfs handle failed");
+		c_log(LOG_ERR, "get zfs handle failed");
 		return (-1);
 	}
 	err = zfs_iter_root(hdl, zfs_iter_cb, NULL);
 	if (err) {
-		syslog(LOG_ERR, "zfs_iter_root() error: %d", err);
+		c_log(LOG_ERR, "zfs_iter_root() error: %d", err);
 	}
 	libzfs_fini(hdl);
 	return (err);
@@ -2708,18 +2694,18 @@ cluster_do_remote_cmd_impl(void *arg)
 	if (nvlist_lookup_uint32(nvl_cmd, "hostid", &hostid) != 0) {
 		goto out;
 	}
-	syslog(LOG_INFO, "clustersan: do host(%d)'s cmd(%"PRIx64": %s)",
+	c_log(LOG_INFO, "clustersan: do host(%d)'s cmd(%"PRIx64": %s)",
 		hostid, cmd_id, cmd_str);
 	snprintf(pcmd, 512, "%s 2>&1", cmd_str);
 	fptr = popen(pcmd, "r");
 	if (fptr != NULL) {
 		while (fgets(pcmd, 512, fptr) != NULL) {
-			syslog(LOG_INFO, "clustersan: cmd(%"PRIx64") %s", cmd_id,
+			c_log(LOG_INFO, "clustersan: cmd(%"PRIx64") %s", cmd_id,
 				pcmd);
 		}
 		ret = pclose(fptr);
 	} else {
-		syslog(LOG_INFO, "clustersan: use system()");
+		c_log(LOG_INFO, "clustersan: use system()");
 		ret = system(cmd_str);
 	}
 
@@ -2794,10 +2780,10 @@ clusternas_failover_ctl_worker(void* arg)
 				//if (*time == '0') {
 					//sprintf(cmd, "%s %s addif %s", IFCONFIG_CMD, ifp->eth, ifp->ip_addr);
 				//} else {
-				syslog(LOG_ERR, "Cluster nas removeif %s:%s %s's for %s;", ifp->eth, ifp->ip_addr, time, zpool_name);
+				c_log(LOG_ERR, "Cluster nas removeif %s:%s %s's for %s;", ifp->eth, ifp->ip_addr, time, zpool_name);
 					sprintf(cmd, "%s %s removeif %s && sleep %s && %s %s addif %s up", 
 						IFCONFIG_CMD, ifp->eth, ifp->ip_addr, time, IFCONFIG_CMD, ifp->eth, ifp->ip_addr);
-				syslog(LOG_ERR, "Cluster nas addif %s:%s %s's for %s;", ifp->eth, ifp->ip_addr, time, zpool_name);
+				c_log(LOG_ERR, "Cluster nas addif %s:%s %s's for %s;", ifp->eth, ifp->ip_addr, time, zpool_name);
 				//}
 				system(cmd);
 			}
@@ -2823,16 +2809,172 @@ clusternas_failover_ctl(const void *buffer, int bufsize)
 }
 #endif
 
+static void *
+cluster_task_event_handler(void *arg)
+{
+	uint32_t hostid;
+	cluster_event_t *event = arg;
+
+	pthread_detach(pthread_self());
+
+	switch (event->event) {
+	case EVT_CHANGE_POOL_OWNER:
+		cluster_change_pool_owner(event->data, event->size);
+		break;
+	case EVT_UPDATE_PARTNER_NIC_CONFIG:
+		c_log(LOG_ERR, "cluster update nic, size:%d", event->size);
+		/*cluster_update_partner_nic(event->data, event->size);*/
+		break;
+	case EVT_UPDATE_KEYFILE:
+		cluster_update_keyfile(event->data, event->size);
+		break;
+	case EVT_UPDATE_KEYPATH:
+		cluster_update_keyfile_path(event->data, event->size);
+		break;
+	case EVT_UPDATE_RCMD:
+		cluster_update_remote_cmd(event->data, event->size);
+		break;
+	case EVT_REMOTE_HOST_UP:
+		hostid = *((uint32_t *)event->data);
+		c_log(LOG_ERR, "cluster event remote host:%d up", hostid);
+		hbx_do_cluster_cmd(event->data, event->size, ZFS_HBX_SYNC_POOL);
+		cluster_remote_hbx_recover(hostid);
+		pthread_cond_broadcast(&cluster_import_replicas_cv);
+		break;
+	case EVT_REMOTE_HOST_DOWN:
+		hostid = *((uint32_t *)event->data);
+		c_log(LOG_ERR, "cluster event remote host:%d down", hostid);
+		cluster_remote_hbx_timeout(hostid);
+		break;
+
+	case EVT_SYNCKEY_RESULT: {
+		int fifo_fd;
+		char recv_ID[16];		/* recv the synckey pid */
+		char fifo_name[512];
+		char fifo_buffer[16];	/* save fail or success infor */
+
+		bzero(recv_ID, 16);
+		bzero(fifo_buffer, 16);
+
+		strncpy(recv_ID, event->data, MAX_ID_BYTE);
+
+		/* send the synckey result to synckey-process */
+		bzero(fifo_name, 512);
+		sprintf(fifo_name, "/tmp/synckeyrebak%s", recv_ID);
+		fifo_fd = open(fifo_name, O_WRONLY);
+			if (fifo_fd != -1) {
+				strcpy(fifo_buffer, event->data + MAX_ID_BYTE);
+				write(fifo_fd, fifo_buffer, sizeof(fifo_buffer));
+				close(fifo_fd);				
+			} else {
+				c_log(LOG_ERR, "open FIFO fail");
+			}
+		}
+		break;
+	case EVT_MAC_STATE: {
+		mac_state_param_t mac_state, *msp;
+		int i;
+		
+		if (event->size != sizeof(mac_state_param_t)) {
+			c_log(LOG_ERR, "EVT_MAC_STATE: invalid data");
+		} else {
+			msp = (mac_state_param_t *)event->data;
+			if (msp->flag == FLAG_MAC_STATE_REMOTE_STATE)
+				cluster_failover_conf_handler(FLAG_CF_RESPONSE, event->data);
+			else if (msp->flag == FLAG_MAC_STATE_GET_REMOTE) {
+				mac_state.flag = FLAG_MAC_STATE_REMOTE_STATE;
+				mac_state.mac_num = msp->mac_num;
+				for (i = 0; i < msp->mac_num; i++) {
+					if (cluster_link_state(msp->mac_list[i]) != ils_up) {
+						c_log(LOG_WARNING, "link %s dwon", msp->mac_list[i]);
+						mac_state.mac_num = 0;
+						break;
+					}
+					strlcpy(mac_state.mac_list[i], msp->mac_list[i], MAXLINKNAMELEN);
+					mac_state.linkstate[i] = ils_up;
+				}
+				hbx_do_cluster_cmd_ex((char *)&mac_state, 
+					sizeof(mac_state_param_t), ZFS_HBX_MAC_STAT, msp->hostid);
+			} else if (msp->flag == FLAG_MAC_STATE_IP_RELEASED) {
+				/* remote released the IPs, we do ip failover now */
+				/* old ip failover */
+			}
+		}
+		break;
+	}
+	case EVT_MAC_OFFLINE:
+#if	0
+		if (event->size != MAXLINKNAMELEN)
+			c_log(LOG_ERR, "EVT_MAC_OFFLINE: invalid data");
+		else
+			ret = cluster_failover_conf_handler(FLAG_CF_MAC_OFFLINE, event->data);
+#endif
+		break;
+	case EVT_SPA_REMOTE_HUNG:
+		hostid = *((uint32_t *)event->data);
+		cluster_remote_spa_hung(hostid);
+		break;
+	case EVT_SPA_REMOTE_NORESPONSE:
+		cluster_remote_spa_noresponse();
+		break;
+	case EVT_SPA_REMOTE_RESPONSE:
+		cluster_remote_spa_response();
+		break;
+	case EVT_IPMI_EXCHANGE_IP:
+		ipmi_send_local_ip(0);
+		break;
+	case EVT_IPMI_ADD_ROUTE:
+		ipmi_route_add(event->data);
+		break;
+	case EVT_HBX_CLOSED:
+		cluster_hbx_closed();
+		break;
+	case EVT_RELEASE_POOLS:
+		handle_release_pools_event(event->data, event->size);
+		break;
+	case EVT_CLUSTERSAN_SYNC_CMD:
+		cluster_do_remote_cmd(event->data, event->size);
+		break;
+	case EVT_CLUSTER_IMPORT:
+		cluster_import_event_handler(event->data, event->size);
+		break;
+	case EVT_POWEROFF_REMOTEHOST:
+		cluster_poweroff_remote_event_handler(event->data, event->size);
+		break;
+	case EVT_POWERON_REMOTEHOST:
+		cluster_poweron_remote_event_handler(event->data, event->size);
+		break;
+	case EVT_CLUSTERNAS_FAILOVER_CTL:
+		/*clusternas_failover_ctl(event->data, event->size);*/
+		break;
+	case EVT_CLUSTER_CLOSE_RDMA_RPC: {
+#if	0
+			int rpc_upid = *((int *)event->data);
+			c_log(LOG_ERR, "cluster event close rpc process, pid:%d",
+				rpc_upid);
+			if (rpc_upid != 0) {
+				kill(rpc_upid, SIGKILL);
+			}
+			break;
+#endif
+		}
+	default:
+		break;
+	}
+
+	cluster_clear_hbx_event(event);
+	return (NULL);
+}
+
 static void
 cluster_task_wait_event(void)
 {
-	/*int ret;*/
+	int ret;
 	boolean_t wait = B_TRUE;
-	/*cluster_state_t cls_state = CLUSTER_INIT;*/
 	cluster_event_t *event = NULL;
-	uint32_t hostid;
+	pthread_t tid;
 
-	syslog(LOG_ERR, "cluster task wait event");
+	c_log(LOG_WARNING, "cluster task wait event");
 	/*
 	 * do process according to the change of hbx state, should never exit
 	 */
@@ -2843,154 +2985,13 @@ cluster_task_wait_event(void)
 		}
 		pthread_mutex_unlock(&cls_thread.cls_mutex);
 
-		syslog(LOG_INFO, "cluster event is %d", event->event);
-		/*cls_state = cluster_get_sys_state();*/
-		switch (event->event) {
-		case EVT_CHANGE_POOL_OWNER:
-			cluster_change_pool_owner(event->data, event->size);
-			break;
-		case EVT_UPDATE_PARTNER_NIC_CONFIG:
-			syslog(LOG_ERR, "cluster update nic, size:%d", event->size);
-			/*cluster_update_partner_nic(event->data, event->size);*/
-			break;
-		case EVT_UPDATE_KEYFILE:
-			cluster_update_keyfile(event->data, event->size);
-			break;
-		case EVT_UPDATE_KEYPATH:
-			cluster_update_keyfile_path(event->data, event->size);
-			break;
-		case EVT_UPDATE_RCMD:
-			cluster_update_remote_cmd(event->data, event->size);
-			break;
-		case EVT_REMOTE_HOST_UP:
-			hostid = *((uint32_t *)event->data);
-			syslog(LOG_ERR, "cluster event remote host:%d up", hostid);
-			hbx_do_cluster_cmd(event->data, event->size, ZFS_HBX_SYNC_POOL);
-			cluster_remote_hbx_recover(hostid);
-			pthread_cond_broadcast(&cluster_import_replicas_cv);
-			break;
-		case EVT_REMOTE_HOST_DOWN:
-			hostid = *((uint32_t *)event->data);
-			syslog(LOG_ERR, "cluster event remote host:%d down", hostid);
-			cluster_remote_hbx_timeout(hostid);
-			break;
-
-		case EVT_SYNCKEY_RESULT: {
-			int fifo_fd;
-			char recv_ID[16];		/* recv the synckey pid */
-			char fifo_name[512];
-			char fifo_buffer[16];	/* save fail or success infor */
-
-			bzero(recv_ID, 16);
-			bzero(fifo_buffer, 16);
-
-			strncpy(recv_ID, event->data, MAX_ID_BYTE);
-
-			/* send the synckey result to synckey-process */
-			bzero(fifo_name, 512);
-			sprintf(fifo_name, "/tmp/synckeyrebak%s", recv_ID);
-			fifo_fd = open(fifo_name, O_WRONLY);
-				if (fifo_fd != -1) {
-					strcpy(fifo_buffer, event->data + MAX_ID_BYTE);
-					write(fifo_fd, fifo_buffer, sizeof(fifo_buffer));
-					close(fifo_fd);				
-				} else {
-					syslog(LOG_ERR, "open FIFO fail");
-				}
-			}
-			break;
-		case EVT_MAC_STATE: {
-			mac_state_param_t mac_state, *msp;
-			int i;
-			
-			if (event->size != sizeof(mac_state_param_t)) {
-				syslog(LOG_ERR, "EVT_MAC_STATE: invalid data");
-			} else {
-				msp = (mac_state_param_t *)event->data;
-				if (msp->flag == FLAG_MAC_STATE_REMOTE_STATE)
-					cluster_failover_conf_handler(FLAG_CF_RESPONSE, event->data);
-				else if (msp->flag == FLAG_MAC_STATE_GET_REMOTE) {
-					mac_state.flag = FLAG_MAC_STATE_REMOTE_STATE;
-					mac_state.mac_num = msp->mac_num;
-					for (i = 0; i < msp->mac_num; i++) {
-						if (cluster_link_state(msp->mac_list[i]) != ils_up) {
-							syslog(LOG_WARNING, "link %s dwon", msp->mac_list[i]);
-							mac_state.mac_num = 0;
-							break;
-						}
-						strlcpy(mac_state.mac_list[i], msp->mac_list[i], MAXLINKNAMELEN);
-						mac_state.linkstate[i] = ils_up;
-					}
-					hbx_do_cluster_cmd_ex((char *)&mac_state, 
-						sizeof(mac_state_param_t), ZFS_HBX_MAC_STAT, msp->hostid);
-				} else if (msp->flag == FLAG_MAC_STATE_IP_RELEASED) {
-					/* remote released the IPs, we do ip failover now */
-					/* old ip failover */
-				}
-			}
-			break;
+		c_log(LOG_WARNING, "cluster event is %d", event->event);
+		ret = pthread_create(&tid, NULL, cluster_task_event_handler, event);
+		if (ret != 0) {
+			c_log(LOG_ERR,
+				"handle event %d failed: pthread_create error %d %s",
+				event->event, ret, strerror(ret));;
 		}
-		case EVT_MAC_OFFLINE:
-#if	0
-			if (event->size != MAXLINKNAMELEN)
-				syslog(LOG_ERR, "EVT_MAC_OFFLINE: invalid data");
-			else
-				ret = cluster_failover_conf_handler(FLAG_CF_MAC_OFFLINE, event->data);
-#endif
-			break;
-		case EVT_SPA_REMOTE_HUNG:
-			hostid = *((uint32_t *)event->data);
-			cluster_remote_spa_hung(hostid);
-			break;
-		case EVT_SPA_REMOTE_NORESPONSE:
-			cluster_remote_spa_noresponse();
-			break;
-		case EVT_SPA_REMOTE_RESPONSE:
-			cluster_remote_spa_response();
-			break;
-		case EVT_IPMI_EXCHANGE_IP:
-			ipmi_send_local_ip(0);
-			break;
-		case EVT_IPMI_ADD_ROUTE:
-			ipmi_route_add(event->data);
-			break;
-		case EVT_HBX_CLOSED:
-			cluster_hbx_closed();
-			break;
-		case EVT_RELEASE_POOLS:
-			handle_release_pools_event(event->data, event->size);
-			break;
-		case EVT_CLUSTERSAN_SYNC_CMD:
-			cluster_do_remote_cmd(event->data, event->size);
-			break;
-		case EVT_CLUSTER_IMPORT:
-			cluster_import_event_handler(event->data, event->size);
-			break;
-		case EVT_POWEROFF_REMOTEHOST:
-			cluster_poweroff_remote_event_handler(event->data, event->size);
-			break;
-		case EVT_POWERON_REMOTEHOST:
-			cluster_poweron_remote_event_handler(event->data, event->size);
-			break;
-		case EVT_CLUSTERNAS_FAILOVER_CTL:
-			/*clusternas_failover_ctl(event->data, event->size);*/
-			break;
-		case EVT_CLUSTER_CLOSE_RDMA_RPC: {
-#if	0
-				int rpc_upid = *((int *)event->data);
-				syslog(LOG_ERR, "cluster event close rpc process, pid:%d",
-					rpc_upid);
-				if (rpc_upid != 0) {
-					kill(rpc_upid, SIGKILL);
-				}
-				break;
-#endif
-			}
-		default:
-			break;
-		}
-
-		cluster_clear_hbx_event(event);
 	}
 }
 
@@ -3025,7 +3026,7 @@ add_todo_import_pool(const char *name, uint64_t guid)
 
 	pool = (todo_import_pool_node_t *) malloc(sizeof(todo_import_pool_node_t));
 	if (!pool) {
-		syslog(LOG_ERR, "alloc todo_import_pool_node_t failed");
+		c_log(LOG_ERR, "alloc todo_import_pool_node_t failed");
 		return (NULL);
 	}
 	strlcpy(pool->poolname, name, ZPOOL_MAXNAMELEN);
@@ -3047,7 +3048,7 @@ get_disk_owners(char **disks, int diskcount, int *owners)
 	int lun_count, i;
 
 	if (dmg_get_disk(&luns, &lun_count) != 1) {
-		syslog(LOG_ERR, "dmg_get_disk error");
+		c_log(LOG_ERR, "dmg_get_disk error");
 		return (-1);
 	}
 
@@ -3095,7 +3096,7 @@ choose_critical_disk(char **disks, int diskcount)
 	int lun_count, i;
 
 	if (dmg_get_disk(&luns, &lun_count) != 1) {
-		syslog(LOG_ERR, "dmg_get_disk error");
+		c_log(LOG_ERR, "dmg_get_disk error");
 		return (NULL);
 	}
 
@@ -3189,7 +3190,7 @@ void cluster_check_pool_disk(nvlist_t *pool_root,
 		} else {
 			ret = nvlist_lookup_string(child[i], ZPOOL_CONFIG_PATH, &path);
 			if (ret != 0) {
-				syslog(LOG_ERR, "pool get config path failed");
+				c_log(LOG_ERR, "pool get config path failed");
 				continue;
 			}
 			(*disk_total)++;
@@ -3234,20 +3235,20 @@ cluster_get_remote_pools(uint64_t remoteid)
 	char *poolname;
 
 	if ((libzfs = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "libzfs_init error");
+		c_log(LOG_ERR, "libzfs_init error");
 		return (NULL);
 	}
 
 	state = zfs_clustersan_get_nvlist(libzfs, ZFS_CLUSTERSAN_STATE, NULL, 0);
 	if (state == NULL) {
-		syslog(LOG_ERR, "get clustersan state failed");
+		c_log(LOG_ERR, "get clustersan state failed");
 		libzfs_fini(libzfs);
 		return (NULL);
 	}
 
 	verify(nvlist_lookup_uint32(state, CS_NVL_STATE, &cs_state) == 0);
 	if (cs_state == 0) {
-		syslog(LOG_WARNING, "clustersan disabled");
+		c_log(LOG_WARNING, "clustersan disabled");
 		libzfs_fini(libzfs);
 		return (NULL);
 	}
@@ -3286,7 +3287,7 @@ cluster_get_remote_pools(uint64_t remoteid)
 					}
 				}
 			} else
-				syslog(LOG_ERR, "%s: get host state failed, hostinfo=%p",
+				c_log(LOG_ERR, "%s: get host state failed, hostinfo=%p",
 					__func__, hostinfo);
 		}
 	}
@@ -3294,7 +3295,7 @@ cluster_get_remote_pools(uint64_t remoteid)
 	libzfs_fini(libzfs);
 	return (remote_pools);
 nomem:
-	syslog(LOG_ERR, "out of memory");
+	c_log(LOG_ERR, "out of memory");
 	if (remote_pools)
 		nvlist_free(remote_pools);
 	libzfs_fini(libzfs);
@@ -3335,12 +3336,12 @@ cluster_get_local_pools(void)
 	libzfs_handle_t	*hdl;
 
 	if ((hdl = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "%s: libzfs_init() error", __func__);
+		c_log(LOG_ERR, "%s: libzfs_init() error", __func__);
 		return (NULL);
 	}
 
 	if (zpool_iter(hdl, zpool_iter_cb, &poollist) != 0) {
-		syslog(LOG_ERR, "%s: zpool_iter() error", __func__);
+		c_log(LOG_ERR, "%s: zpool_iter() error", __func__);
 		if (poollist != NULL) {
 			free_link_list(poollist, 1);
 			poollist = NULL;
@@ -3483,7 +3484,7 @@ cluster_import_event_handler(const void *buffer, int bufsize)
 	uint64_t hostid;
 
 	if (bufsize != sizeof(cluster_import_msg_t)) {
-		syslog(LOG_ERR, "invalid message: size=%d", bufsize);
+		c_log(LOG_ERR, "invalid message: size=%d", bufsize);
 		return (-1);
 	}
 
@@ -3494,14 +3495,14 @@ cluster_import_event_handler(const void *buffer, int bufsize)
 			hostid = gethostid();
 			if (hostid > 0 && (pool->import_state == CLUSTER_IMPORT_RUN
 				|| hostid < msg->hostid)) {
-				syslog(LOG_WARNING, "%s pool '%s', stop other host %llu",
+				c_log(LOG_WARNING, "%s pool '%s', stop other host %llu",
 					pool->import_state == CLUSTER_IMPORT_RUN ?
 					"importing" : "ready import",
 					pool->name, (unsigned long long)msg->hostid);
 				cluster_import_response(msg->pool_guid, hostid, msg->hostid);
 			}
 		} else if (cluster_pool_in_local(NULL, msg->pool_guid)) {
-			syslog(LOG_ERR, "NOTICE: pool %llu imported, stop other host %llu",
+			c_log(LOG_ERR, "NOTICE: pool %llu imported, stop other host %llu",
 				(unsigned long long)msg->pool_guid, (unsigned long long)msg->hostid);
 			hostid = gethostid();
 			cluster_import_response(msg->pool_guid, hostid, msg->hostid);
@@ -3510,11 +3511,11 @@ cluster_import_event_handler(const void *buffer, int bufsize)
 	case CLUSTER_IMPORT_MSGTYPE_RESPONSE:
 		pool = cluster_search_import(NULL, NULL, msg->pool_guid, B_FALSE);
 		if (pool == NULL) {
-			syslog(LOG_ERR, "NOTICE: invalid response or too late!");
+			c_log(LOG_ERR, "NOTICE: invalid response or too late!");
 		} else if (pool->import_state != CLUSTER_IMPORT_READY) {
-			syslog(LOG_ERR, "NOTICE: response too late or a bug here!");
+			c_log(LOG_ERR, "NOTICE: response too late or a bug here!");
 		} else {
-			syslog(LOG_WARNING, "host %llu ready import '%s' too, cancel import",
+			c_log(LOG_WARNING, "host %llu ready import '%s' too, cancel import",
 				(unsigned long long)msg->hostid, pool->name);
 			pthread_mutex_lock(&pool->import_lock);
 			cluster_import_imported(pool, CLUSTER_IMPORT_CANCEL);
@@ -3523,7 +3524,7 @@ cluster_import_event_handler(const void *buffer, int bufsize)
 		}
 		break;
 	default:
-		syslog(LOG_ERR, "invalid message: msgtype=%d", msg->msgtype);
+		c_log(LOG_ERR, "invalid message: msgtype=%d", msg->msgtype);
 		return (-1);
 	}
 
@@ -3543,13 +3544,13 @@ cluster_get_ipmi_addr(libzfs_handle_t *hdl, uint32_t hostid,
 	ret = zfs_ioctl(hdl, ZFS_IOC_HBX, &zc);
 
 	if ((ret != 0) || (zc.zc_value[0] == '\0')) {
-		syslog(LOG_ERR, "%s: get host(%d) ipmi ip addr failed", 
+		c_log(LOG_ERR, "%s: get host(%d) ipmi ip addr failed", 
 			__func__, hostid);
 		return (-1);
 	} 
 
 	strncpy(ipmi_ipaddr, zc.zc_value, sizeof(zc.zc_value));
-	syslog(LOG_NOTICE, "%s: get host(%d)'s ipmi ip = %s",
+	c_log(LOG_NOTICE, "%s: get host(%d)'s ipmi ip = %s",
 		__func__, hostid, ipmi_ipaddr);
 	return (0);
 }
@@ -3567,7 +3568,7 @@ cluster_poweroff_remote_event_handler(const void *buffer, int bufsize)
 
 	hdl = libzfs_init();
 	if (!hdl) {
-		syslog(LOG_ERR, "%s Failed to get libzfs handle", __func__);
+		c_log(LOG_ERR, "%s Failed to get libzfs handle", __func__);
 		return (-1);
 	}	
 
@@ -3583,7 +3584,7 @@ cluster_poweroff_remote_event_handler(const void *buffer, int bufsize)
 
 		if (ipmi_remote_power_off(ipmi_ipaddr) == 0) {
 			poweroff_byme = 1;
-			syslog(LOG_NOTICE, "%s host(%d) is poweroff by me", __func__, hostid);
+			c_log(LOG_NOTICE, "%s host(%d) is poweroff by me", __func__, hostid);
 		}
 		
 		for (i = 0; i < 10; i++) {
@@ -3601,11 +3602,11 @@ cluster_poweroff_remote_event_handler(const void *buffer, int bufsize)
 	}
 
 	if (try_cnt == 3) {
-		syslog(LOG_WARNING, "%s power off host(%d) failed, please check the net config",
+		c_log(LOG_WARNING, "%s power off host(%d) failed, please check the net config",
 			__func__, hostid);
 	} else {
 		poweroff_success = 1;
-		syslog(LOG_NOTICE, "%s host(%d) is power off success", __func__, hostid);
+		c_log(LOG_NOTICE, "%s host(%d) is power off success", __func__, hostid);
 	}
 
 	/*ret = zfs_notify_avs_poweronoff_result(hdl, hostid, 0, poweroff_byme, 
@@ -3626,7 +3627,7 @@ cluster_poweron_remote_event_handler(const void *buffer, int bufsize)
 
 	hdl = libzfs_init();
 	if (!hdl) {
-		syslog(LOG_ERR, "%s Failed to get libzfs handle", __func__);
+		c_log(LOG_ERR, "%s Failed to get libzfs handle", __func__);
 		return (-1);
 	}	
 
@@ -3637,7 +3638,7 @@ cluster_poweron_remote_event_handler(const void *buffer, int bufsize)
 
 		if (ipmi_remote_power_on(ipmi_ipaddr) == 0) {
 			poweron_byme = 1;
-			syslog(LOG_NOTICE, "%s host(%d) is poweron by me", __func__, hostid);
+			c_log(LOG_NOTICE, "%s host(%d) is poweron by me", __func__, hostid);
 		}
 		
 		for (i = 0; i < 10; i++) {
@@ -3655,11 +3656,11 @@ cluster_poweron_remote_event_handler(const void *buffer, int bufsize)
 	}
 
 	if (try_cnt == 3) {
-		syslog(LOG_WARNING, "%s power on host(%d) failed, please check the net config",
+		c_log(LOG_WARNING, "%s power on host(%d) failed, please check the net config",
 			__func__, hostid);
 	} else {
 		poweron_success = 1;
-		syslog(LOG_NOTICE, "%s host(%d) is power on success", __func__, hostid);
+		c_log(LOG_NOTICE, "%s host(%d) is power on success", __func__, hostid);
 	}
 
 	/*ret = zfs_notify_avs_poweronoff_result(hdl, hostid, 1, poweron_byme,
@@ -3682,7 +3683,7 @@ cluster_read_stamp(zpool_stamp_t *stamp, nvlist_t *pool_root, char *path)
                 if (error == 0)
                         break;
                 else
-                        syslog(LOG_ERR, "%s: error=%d", __func__, error);
+                        c_log(LOG_ERR, "%s: error=%d", __func__, error);
 
                 retry++;
                 sleep(1);
@@ -3705,7 +3706,7 @@ cluster_write_stamp(zpool_stamp_t *stamp, nvlist_t *pool_root, char *path)
                 if (error > 0)
                         break;
                 else
-                        syslog(LOG_ERR, "%s: error=%d", __func__, error);
+                        c_log(LOG_ERR, "%s: error=%d", __func__, error);
 
                 retry++;
                 sleep(1);
@@ -3808,10 +3809,10 @@ cluster_check_pool_replicas(uint64_t pool_guid, char **search_disks, int nsearch
 			err = nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_VDEV_STATS,
 			    (uint64_t **)&vs, &vsc);
 			if (err != 0) {
-				syslog(LOG_ERR, "nvlist_lookup(ZPOOL_CONFIG_VDEV_STATS) = %d", err);
+				c_log(LOG_ERR, "nvlist_lookup(ZPOOL_CONFIG_VDEV_STATS) = %d", err);
 				continue;
 			}
-			syslog(LOG_WARNING, "pool %lu state=%lu", pool_guid, vs->vs_state);
+			c_log(LOG_WARNING, "pool %lu state=%lu", pool_guid, vs->vs_state);
 			if (vs->vs_state > VDEV_STATE_CANT_OPEN) {
 				if (pool_root != NULL && nvlist_dup(nvroot, pool_root, 0) != 0)
 					ret = -1;
@@ -3872,7 +3873,7 @@ choose_critical_disk(nvlist_t *pool_root)
 				if (rval == 0)
 					efi_free(vtoc);
 				else
-					syslog(LOG_WARNING, "efi_alloc_and_read error %d", rval);
+					c_log(LOG_WARNING, "efi_alloc_and_read error %d", rval);
 				close(fd);
 				if (rval == 0)
 					return (path);
@@ -4001,13 +4002,13 @@ cluster_check_pool_disks_common(nvlist_t *root,
 			struct stat sb;
 
 			if (nvlist_lookup_string(child[i], ZPOOL_CONFIG_PATH, &path) != 0) {
-				syslog(LOG_ERR, "pool get config path failed");
+				c_log(LOG_ERR, "pool get config path failed");
 				continue;
 			}
 			(*total)++;
 
 			if (lstat(path, &sb) != 0) {
-				syslog(LOG_ERR, "access disk %s error %d", path, errno);
+				c_log(LOG_ERR, "access disk %s error %d", path, errno);
 				continue;
 			}
 
@@ -4027,7 +4028,7 @@ cluster_check_pool_disks(nvlist_t *pool_root)
 	cluster_check_pool_disks_common(pool_root, &total, &active, &local);
 
 	if (local == 0 || active < total / 2) {
-		syslog(LOG_WARNING, "disks not satisfied: total=%d, active=%d, local=%d",
+		c_log(LOG_WARNING, "disks not satisfied: total=%d, active=%d, local=%d",
 			total, active, local);
 		return (B_FALSE);
 	}
@@ -4063,9 +4064,11 @@ cluster_compete_pool(void *arg)
 	cluster_import_pool_t *cip = NULL;
 	timespec_t ts;
 	int check_replicas_trytimes = 0;
+	boolean_t is_failover = param->import_state != NULL;
+	boolean_t update_stamp_ok = B_FALSE;
 
 	if (!config) {
-		syslog(LOG_WARNING, "NULL config");
+		c_log(LOG_WARNING, "NULL config");
 		goto exit_thr;
 	}
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
@@ -4078,21 +4081,21 @@ cluster_compete_pool(void *arg)
 	hostid = get_system_hostid();
 #if 0
 	if (hostid > 255) {
-		syslog(LOG_ERR, "Invalid host id: %"PRId64"", hostid);
+		c_log(LOG_ERR, "Invalid host id: %"PRId64"", hostid);
 		return (NULL);
 	}
 
 	host_total[0] = host_active[0] = 0;
 	cluster_check_pool_disk(nvroot, &disk_total, &disk_active,
 		host_total, host_active, disks);
-	syslog(LOG_WARNING, "%s: pool %s disk total=%u, active=%u", __func__,
+	c_log(LOG_WARNING, "%s: pool %s disk total=%u, active=%u", __func__,
 		poolname, disk_total, disk_active);
 
 	if (param->import_state == NULL) {/* Initial boot import */
 		/* The cluster has remote hosts, beyond double control. */
 		while (disk_active <= disk_total/2) {
 			/* Wait until most of the pool disk became active */
-			syslog(LOG_WARNING, "cluster check pool '%s': wait for disk up", poolname);
+			c_log(LOG_WARNING, "cluster check pool '%s': wait for disk up", poolname);
 			sleep(5);
 			for (i = 0; i < disk_active; i++)
 				free(disks[i]);
@@ -4100,18 +4103,18 @@ cluster_compete_pool(void *arg)
 			host_total[0] = host_active[0] = 0;
 			cluster_check_pool_disk(nvroot, &disk_total, &disk_active,
 				host_total, host_active, disks);
-			syslog(LOG_WARNING, "%s: pool %s disk total=%u, active=%u", __func__,
+			c_log(LOG_WARNING, "%s: pool %s disk total=%u, active=%u", __func__,
 				poolname, disk_total, disk_active);
 		}
 
 		owners = malloc(disk_active * sizeof(int));
 		if (owners == NULL) {
-			syslog(LOG_ERR, "out of memory");
+			c_log(LOG_ERR, "out of memory");
 			goto exit_thr;
 		}
 
 		if (get_disk_owners(disks, disk_active, owners) < 0) {
-			syslog(LOG_ERR, "get disk owners failed");
+			c_log(LOG_ERR, "get disk owners failed");
 			goto exit_thr;
 		}
 		for (i = 0; i < disk_active; i++) {
@@ -4119,12 +4122,12 @@ cluster_compete_pool(void *arg)
 				break;
 		}
 		if (i == disk_active) {
-			syslog(LOG_WARNING, "haven't local disk in pool '%s', exit", poolname);
+			c_log(LOG_WARNING, "haven't local disk in pool '%s', exit", poolname);
 			goto exit_thr;
 		}
 
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_HOSTID, &poolhostid) == 0) {
-			syslog(LOG_WARNING, "pool '%s' last accessed by hostid %llu",
+			c_log(LOG_WARNING, "pool '%s' last accessed by hostid %llu",
 				poolname, poolhostid);
 			if (hostid != poolhostid) {
 				if (cluster_get_host_state(poolhostid) == 1) {
@@ -4133,7 +4136,7 @@ cluster_compete_pool(void *arg)
 					 * we still can compete the pool
 					 */
 					if (!cluster_pool_in_remote(poolhostid, poolname, 0)) {
-						syslog(LOG_WARNING, "other host %d is chosen to import pool '%s'",
+						c_log(LOG_WARNING, "other host %d is chosen to import pool '%s'",
 							poolhostid, poolname);
 						goto exit_thr;
 					}
@@ -4144,7 +4147,7 @@ cluster_compete_pool(void *arg)
 
 		chosen = get_smallest_owner(owners, disk_active);
 		if (chosen > 0 && chosen < (hostid + 1) / 2) {
-			syslog(LOG_WARNING, "other node %d is chosen to import pool '%s'",
+			c_log(LOG_WARNING, "other node %d is chosen to import pool '%s'",
 				chosen, poolname);
 			goto exit_thr;
 		}
@@ -4154,33 +4157,33 @@ cluster_compete_pool(void *arg)
 #if	defined(__sw_64)
 	counter = 0;
 	while (cluster_check_pool_disks(nvroot) == B_FALSE && counter < 20) {
-		syslog(LOG_WARNING, "disks of pool '%s' not satisfied", poolname);
+		c_log(LOG_WARNING, "disks of pool '%s' not satisfied", poolname);
 		counter++;
 		sleep(5);
 	}
-	if (counter >= 20)
+	if (!is_failover && counter >= 20)
 		goto exit_thr;
 #endif
 
 check_remote:
-	if (cluster_pool_in_remote(0, NULL, guid)) {
-		syslog(LOG_WARNING, "pool '%s' in remote, exit", poolname);
+	if (!is_failover && cluster_pool_in_remote(0, NULL, guid)) {
+		c_log(LOG_WARNING, "pool '%s' in remote, exit", poolname);
 		goto exit_thr;
 	}
 
 	if (cluster_pool_in_local(poolname, 0)) {
-		syslog(LOG_WARNING, "a same name pool '%s' already imported", poolname);
+		c_log(LOG_WARNING, "a same name pool '%s' already imported", poolname);
 		goto exit_thr;
 	}
 
 ready_import:
 	if ((cip = cluster_ready_import(poolname, guid)) == NULL) {
-		syslog(LOG_ERR, "cluster_ready_import: out of memory");
+		c_log(LOG_ERR, "cluster_ready_import: out of memory");
 		goto exit_thr;
 	}
 	if (cip->guid != guid) {
 		int ref, import_state;
-		syslog(LOG_WARNING, "a same name pool '%s' is ready or importing",
+		c_log(LOG_WARNING, "a same name pool '%s' is ready or importing",
 			poolname);
 
 		pthread_mutex_lock(&cip->import_lock);
@@ -4208,7 +4211,7 @@ ready_import:
 	}
 
 	if (cluster_import_broadcast(guid, hostid) < 0) {
-		syslog(LOG_ERR, "cluster_import_broadcast failed");
+		c_log(LOG_ERR, "cluster_import_broadcast failed");
 		goto exit_thr;
 	}
 
@@ -4233,42 +4236,44 @@ ready_import:
 			pthread_cond_broadcast(&cip->import_cv);
 			pthread_mutex_unlock(&cip->import_lock);
 		}
-		syslog(LOG_WARNING, "other host ready import '%s', exit", poolname);
+		c_log(LOG_WARNING, "other host ready import '%s', exit", poolname);
 		goto exit_thr;
 	}
 
 	cluster_run_import(cip);
 	pthread_mutex_unlock(&cip->import_lock);
 
-	err = cluster_check_pool_replicas(guid, NULL, 0, NULL);
-	if (err == 0) {
-		syslog(LOG_WARNING, "pool '%s' not satisfy replicas", poolname);
-		if (check_replicas_trytimes >= 3)
+	if (!is_failover) {
+		err = cluster_check_pool_replicas(guid, NULL, 0, NULL);
+		if (err == 0) {
+			c_log(LOG_WARNING, "pool '%s' not satisfy replicas", poolname);
+			if (check_replicas_trytimes >= 3)
+				goto exit_thr;
+			check_replicas_trytimes++;
+			/*
+			 * If replicas not satisfied, we wait new node join cluster
+			 * or timeout; then we will re-compete.
+			 */
+			pthread_mutex_lock(&cluster_import_replicas_lock);
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_sec += 60;
+			pthread_cond_timedwait(&cluster_import_replicas_cv,
+				&cluster_import_replicas_lock, &ts);
+			pthread_mutex_unlock(&cluster_import_replicas_lock);
+
+			pthread_mutex_lock(&cip->import_lock);
+			pthread_mutex_lock(&cluster_import_poollist_lock);
+			list_remove(&cluster_import_poollist_run, cip);
+			list_insert_head(&cluster_import_poollist_ready, cip);
+			cip->import_state = CLUSTER_IMPORT_READY;
+			pthread_mutex_unlock(&cluster_import_poollist_lock);
+			pthread_mutex_unlock(&cip->import_lock);
+
+			goto check_remote;
+		} else if (err < 0) {
+			c_log(LOG_WARNING, "pool '%s' not exists or error", poolname);
 			goto exit_thr;
-		check_replicas_trytimes++;
-		/*
-		 * If replicas not satisfied, we wait new node join cluster
-		 * or timeout; then we will re-compete.
-		 */
-		pthread_mutex_lock(&cluster_import_replicas_lock);
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += 60;
-		pthread_cond_timedwait(&cluster_import_replicas_cv,
-			&cluster_import_replicas_lock, &ts);
-		pthread_mutex_unlock(&cluster_import_replicas_lock);
-
-		pthread_mutex_lock(&cip->import_lock);
-		pthread_mutex_lock(&cluster_import_poollist_lock);
-		list_remove(&cluster_import_poollist_run, cip);
-		list_insert_head(&cluster_import_poollist_ready, cip);
-		cip->import_state = CLUSTER_IMPORT_READY;
-		pthread_mutex_unlock(&cluster_import_poollist_lock);
-		pthread_mutex_unlock(&cip->import_lock);
-
-		goto check_remote;
-	} else if (err < 0) {
-		syslog(LOG_WARNING, "pool '%s' not exists or error", poolname);
-		goto exit_thr;
+		}
 	}
 
 	bzero(used_index1, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
@@ -4276,7 +4281,7 @@ ready_import:
 	
 	real_nquantum1 = zpool_read_used(nvroot, used_index1, SPA_NUM_OF_QUANTUM);
 	if (real_nquantum1 == 0) {
-		syslog(LOG_WARNING, "Can't find quantum disk in pool \"%s\"", poolname);
+		c_log(LOG_WARNING, "Can't find quantum disk in pool \"%s\"", poolname);
 		path = choose_critical_disk(nvroot);
 		if (path == NULL)
 			goto exit_thr;
@@ -4285,7 +4290,7 @@ ready_import:
 		path = buf;
 		stamp = (zpool_stamp_t *) malloc(sizeof(zpool_stamp_t));
 		if (stamp == NULL) {
-			syslog(LOG_ERR, "alloc zpool_stamp_t failed");
+			c_log(LOG_ERR, "alloc zpool_stamp_t failed");
 			goto exit_thr;
 		}
 
@@ -4297,7 +4302,8 @@ ready_import:
 		stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
 		stamp->para.company_name = COMPANY_NAME;
 
-		(void) cluster_write_stamp(stamp, NULL, path);
+		if (cluster_write_stamp(stamp, NULL, path) > 0)
+			update_stamp_ok = B_TRUE;
 
 		pool_root = NULL;
 	} else {
@@ -4313,7 +4319,7 @@ ready_import:
 
 		if (B_TRUE == zpool_used_index_changed(used_index1, real_nquantum1,
 			used_index2, &real_nquantum2)) {
-			syslog(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
+			c_log(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
 			goto exit_thr;
 		}
 	}
@@ -4321,14 +4327,13 @@ ready_import:
 	if (stamp == NULL) {
 		stamp = (zpool_stamp_t *) malloc(sizeof(zpool_stamp_t));
 		if (!stamp) {
-			syslog(LOG_ERR, "alloc zpool_stamp_t failed");
+			c_log(LOG_ERR, "alloc zpool_stamp_t failed");
 			goto exit_thr;
 		}
 		if (cluster_read_stamp(stamp, pool_root, path) == 0) {
 			stamp->para.pool_current_owener = hostid;
 			stamp->para.pool_progress[0] = ZPOOL_NO_PROGRESS;
 			stamp->para.pool_progress[1] = ZPOOL_NO_PROGRESS;
-			(void) cluster_write_stamp(stamp, pool_root, path);
 		} else {
 			bzero(stamp, sizeof (zpool_stamp_t));
 			stamp->para.pool_magic = ZPOOL_MAGIC;
@@ -4340,20 +4345,30 @@ ready_import:
 		}
 	}
 
+	if (!update_stamp_ok &&
+		(cluster_write_stamp(stamp, pool_root, path) > 0)) {
+		update_stamp_ok = B_TRUE;
+	}
+
 	counter = CONFLICT_DURATION;
 	conflict_cnt = 0;
 	while (counter--) {
 		usleep(UPDATE_STAMP_INTERVAL);
 
-		if (cluster_read_stamp(stamp, pool_root, path) == 0) {
+		if (!update_stamp_ok &&
+			(cluster_write_stamp(stamp, pool_root, path) > 0)) {
+			update_stamp_ok = B_TRUE;
+		}
+
+		if (update_stamp_ok && cluster_read_stamp(stamp, pool_root, path) == 0) {
 			if (stamp->para.pool_current_owener != hostid) {
 				conflict_cnt++;
 				if (conflict_cnt >= 3) {
-					syslog(LOG_ERR, "maybe there is a bug!!");
+					c_log(LOG_ERR, "maybe there is a bug!!");
 					goto exit_thr;
 				}
 				if (stamp->para.pool_progress[0] == ZPOOL_ON_PROGRESS) {
-					syslog(LOG_WARNING, "remote already start import the pool");
+					c_log(LOG_WARNING, "remote already start import the pool");
 					goto exit_thr;
 				}
 				if (stamp->para.pool_real_owener == hostid) {
@@ -4364,7 +4379,7 @@ ready_import:
 					(void) cluster_write_stamp(stamp, pool_root, path);
 					continue;
 				}
-				syslog(LOG_WARNING, "remote won, exit");
+				c_log(LOG_WARNING, "remote won, exit");
 				goto exit_thr;
 			}
 		}
@@ -4385,7 +4400,7 @@ ready_import:
 		failover_pool_import_state_t *import_state = param->import_state;
 
 		pthread_cond_signal(&import_state->cond);
-		syslog(LOG_WARNING, "compete won.");
+		c_log(LOG_WARNING, "compete won.");
 	}
 
 	for (counter = 0; counter < CONFLICT_DURATION;) {
@@ -4491,7 +4506,7 @@ cluster_import_pools(int *failover_remote)
 	err = pthread_create(&import_thr_id, NULL, 
 		&cluster_import_pools_thr, NULL);
 	if (err != 0) {
-		syslog(LOG_ERR, "pthread_create error: %d, %s", err, strerror(err));
+		c_log(LOG_ERR, "pthread_create error: %d, %s", err, strerror(err));
 		goto exit_func;
 	}
 
@@ -4513,7 +4528,7 @@ cluster_import_pools(int *failover_remote)
 			continue;
 		thr_node = (thr_list_node_t *) malloc(sizeof(thr_list_node_t));
 		if (!thr_node) {
-			syslog(LOG_ERR, "alloc thr_list_node_t failed");
+			c_log(LOG_ERR, "alloc thr_list_node_t failed");
 			err = ENOMEM;
 			goto exit_func;
 		}
@@ -4523,7 +4538,7 @@ cluster_import_pools(int *failover_remote)
 		err = pthread_create(&thr_node->thrid, NULL,
 			&cluster_compete_pool, &thr_node->param);
 		if (err != 0) {
-			syslog(LOG_ERR, "pthread_create error: %d, %s", err, strerror(err));
+			c_log(LOG_ERR, "pthread_create error: %d, %s", err, strerror(err));
 			free(thr_node);
 			goto exit_func;
 		}
@@ -4554,7 +4569,7 @@ exit_func:
 	cluster_zpool_search_free(pools);
 
 	if (!list_is_empty(&import_thr_conf.todo_import_pools)) {
-		syslog(LOG_WARNING, "WARN: todo_import_pools not empty!!");
+		c_log(LOG_WARNING, "WARN: todo_import_pools not empty!!");
 		for (todo_node = list_head(&import_thr_conf.todo_import_pools);
 			todo_node;) {
 			tmp_todo_node= todo_node;
@@ -4594,21 +4609,23 @@ cluster_check_sessions(void)
 	int session_count, trys = 0;
 
 	if ((libzfs = libzfs_init()) == NULL) {
-		syslog(LOG_ERR, "libzfs_init error");
+		c_log(LOG_ERR, "libzfs_init error");
 		return;
 	}
 
-	while (trys < check_try_times) {
+	while (trys++ < check_try_times) {
+		sleep(5);
+
 		state = zfs_clustersan_get_nvlist(libzfs, ZFS_CLUSTERSAN_STATE, NULL, 0);
 		if (state == NULL) {
-			syslog(LOG_ERR, "get clustersan state failed");
-			break;
+			c_log(LOG_ERR, "get clustersan state failed");
+			continue;
 		}
 
 		verify(nvlist_lookup_uint32(state, CS_NVL_STATE, &cs_state) == 0);
 		if (cs_state == 0) {
-			syslog(LOG_WARNING, "clustersan disabled");
-			break;
+			c_log(LOG_WARNING, "clustersan disabled");
+			continue;
 		}
 
 		session_count = 0;
@@ -4626,7 +4643,7 @@ cluster_check_sessions(void)
 						verify(nvpair_value_nvlist(session, &nvl_session) == 0);
 						verify(nvlist_lookup_uint32(nvl_session,
 							CS_NVL_SESS_LINK_STATE, &link_state) == 0);
-						syslog(LOG_WARNING, "%s %s", sessname,
+						c_log(LOG_WARNING, "%s %s", sessname,
 							link_state == 0 ? "down" : "up");
 						if (link_state != 0)
 							session_count++;
@@ -4636,11 +4653,9 @@ cluster_check_sessions(void)
 		}
 
 		if (session_count >= check_min_sessions) {
-			syslog(LOG_WARNING, "%d sessions connected", session_count);
+			c_log(LOG_WARNING, "%d sessions connected", session_count);
 			break;
 		}
-		trys++;
-		sleep(1);
 	}
 
 	libzfs_fini(libzfs);
@@ -4659,7 +4674,7 @@ cluster_task_setup(void *arg)
 
 	ret = cluster_import_pools(&failover_remote);
 	if (ret != 0 && ret != -2) {
-		syslog(LOG_ERR, "cluster_import_pools error: %d", ret);
+		c_log(LOG_ERR, "cluster_import_pools error: %d", ret);
  	} else
 		init_zpool_failover_conf();
 
@@ -4773,23 +4788,23 @@ cluster_deref(hbx_door_para_t *para)
 		}
 		break;
 	case EVT_LOCAL_REBOOT_BY_MPTSAS:
-		syslog(LOG_ERR, "mptsas failed   ZFS_HBX_MPTSAS_DOWN");
+		c_log(LOG_ERR, "mptsas failed   ZFS_HBX_MPTSAS_DOWN");
 	/*	cmn_err(CE_NOTE, "mptsas failed   ZFS_HBX_MPTSAS_DOWN ");*/
 		hbx_do_cluster_cmd(NULL, 0, ZFS_HBX_MPTSAS_DOWN);
 		reboot_self(host_id, para->event, devs, dev_num);
 		break;
 	case EVT_LOCAL_REBOOT_BY_FC_LOOP_FAILED:
 		if(para->link_state == LINK_DOWN){
-			syslog(LOG_ERR, "the event EVT_LOCAL_REBOOT_BY_FC_LOOP_FAILED happend,but partner down, ignore it");
-			syslog(LOG_ERR, "major : %d     link_state:  %d",para->major,para->link_state);
+			c_log(LOG_ERR, "the event EVT_LOCAL_REBOOT_BY_FC_LOOP_FAILED happend,but partner down, ignore it");
+			c_log(LOG_ERR, "major : %d     link_state:  %d",para->major,para->link_state);
 		 	break;
 		}
-		syslog(LOG_ERR, "fc Loop failed ZFS_HBX_FC_DOWN  ");
+		c_log(LOG_ERR, "fc Loop failed ZFS_HBX_FC_DOWN  ");
 	/*	cmn_err(CE_NOTE, "fc Loop failed ZFS_HBX_FC_DOWN ");*/
 		hbx_do_cluster_cmd(NULL, 0, ZFS_HBX_FC_DOWN);
-		syslog(LOG_ERR, "fc Loop failed : before  reboot_self ");
+		c_log(LOG_ERR, "fc Loop failed : before  reboot_self ");
 		reboot_self(host_id, para->event, devs, dev_num);
-		syslog(LOG_ERR, "fc Loop failed : after reboot_self ");
+		c_log(LOG_ERR, "fc Loop failed : after reboot_self ");
 		break;
 	case EVT_LOCAL_REBOOT_BY_MEMORY:
 	case EVT_LOCAL_REBOOT_BY_HB:
@@ -4797,7 +4812,7 @@ cluster_deref(hbx_door_para_t *para)
 		reboot_self(host_id, para->event, NULL, 0);
 		break;
 	case EVT_LOCAL_REBOOT_BY_RAID_OS_DISK:
-		syslog(LOG_ERR, "os raid broken, do something!");
+		c_log(LOG_ERR, "os raid broken, do something!");
 		system(CLUSTER_OS_RAID);
 		break;
 	default:
@@ -4816,7 +4831,7 @@ clusterd_cn_rcv(void *data, int len)
 	hbx_door_para_t *para;
 
 	if (data == NULL || len < sizeof(hbx_door_para_t)) {
-		syslog(LOG_ERR, "clusterd_cn_rcv(): invalid args, data=%p, len=%d",
+		c_log(LOG_ERR, "clusterd_cn_rcv(): invalid args, data=%p, len=%d",
 			data, len);
 		return;
 	}
@@ -4841,7 +4856,7 @@ clusterd_doorfunc(void *cookie, char *argp, size_t arg_size,
 	clusterd_door_res_t door_res = {0, 0, '\0'};
 
 	if ((argp == NULL) || (arg_size == 0)) {
-		syslog(LOG_ERR, "cluster door func error");
+		c_log(LOG_ERR, "cluster door func error");
 		door_return(NULL, 0, NULL, 0);
 		/* NOTREACHED */
 	}
@@ -4860,7 +4875,7 @@ start_clusterd_svcs()
 
 	if ((doorfd = door_create(clusterd_doorfunc, NULL,
 	    DOOR_REFUSE_DESC|DOOR_NO_CANCEL)) == -1) {
-		syslog(LOG_ERR, "Unable to create door");
+		c_log(LOG_ERR, "Unable to create door");
 		return (1);
 	}
 
@@ -4870,7 +4885,7 @@ start_clusterd_svcs()
 
 	if ((dfd = open(CLUSTERD_DOOR, O_RDWR|O_CREAT|O_TRUNC,
 	    S_IRWXU|S_IWUSR|S_IRWXG|S_IRWXO)) == -1) {
-		syslog(LOG_ERR, "unable to open %s", CLUSTERD_DOOR);
+		c_log(LOG_ERR, "unable to open %s", CLUSTERD_DOOR);
 		(void) close(doorfd);
 		return (1);
 	}
@@ -4886,7 +4901,7 @@ start_clusterd_svcs()
 	 * Register in the kernel namespace for door_ki_open().
 	 */
 	if (fattach(doorfd, CLUSTERD_DOOR) == -1) {
-		syslog(LOG_ERR, "Unable to fattach door %s", CLUSTERD_DOOR);
+		c_log(LOG_ERR, "Unable to fattach door %s", CLUSTERD_DOOR);
 		(void) close(doorfd);
 		(void) close(dfd);
 		return (1);
@@ -4918,13 +4933,13 @@ ifplumb(const char *linkname, const char *ifname, int af)
 
 	retval = dlpi_open(linkname, &dh_ip, dlpi_flags);
 	if (retval != DLPI_SUCCESS) {
-		syslog(LOG_ERR, "cannot open link %s, error: %d", linkname, retval);
+		c_log(LOG_ERR, "cannot open link %s, error: %d", linkname, retval);
 		return (-1);
 	}
 
 	ip_fd = dlpi_fd(dh_ip);
 	if (ioctl(ip_fd, I_PUSH, IP_MOD_NAME) == -1) {
-		syslog(LOG_ERR, "%s I_PUSH, error: %d", IP_MOD_NAME, errno);
+		c_log(LOG_ERR, "%s I_PUSH, error: %d", IP_MOD_NAME, errno);
 		return (-1);
 	}
 
@@ -4935,7 +4950,7 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	 */
 	lifr.lifr_name[0] = '\0';
 	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1) {
-		syslog(LOG_ERR, "ifplumb: SIOCGLIFFLAGS, error %d", errno);
+		c_log(LOG_ERR, "ifplumb: SIOCGLIFFLAGS, error %d", errno);
 		return (-1);
 	}
 
@@ -4948,7 +4963,7 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	}
 
 	if (!ifparse_ifspec(ifname, &ifsp) || ifsp.ifsp_lunvalid) {
-		syslog(LOG_ERR, "invalid IP interface name %s", ifname);
+		c_log(LOG_ERR, "invalid IP interface name %s", ifname);
 		return (-1);
 	}
 
@@ -4958,13 +4973,13 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	retval = ioctl(ip_fd, SIOCSLIFNAME, &lifr);
 
 	if (retval == -1) {
-		syslog(LOG_ERR, "SIOCSLIFNAME for ip, error %d", errno);
+		c_log(LOG_ERR, "SIOCSLIFNAME for ip, error %d", errno);
 		return (-1);
 	}
 
 	/* Get the full set of existing flags for this stream */
 	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1) {
-		syslog(LOG_ERR, "ifplumb: SIOCGLIFFLAGS, error %d", errno);
+		c_log(LOG_ERR, "ifplumb: SIOCGLIFFLAGS, error %d", errno);
 		return (-1);
 	}
 
@@ -4982,18 +4997,18 @@ ifplumb(const char *linkname, const char *ifname, int af)
 
 	/* open arp on udp */
 	if ((mux_fd = open(udp_dev_name, O_RDWR)) == -1) {
-		syslog(LOG_ERR, "open %s error %d", udp_dev_name, errno);
+		c_log(LOG_ERR, "open %s error %d", udp_dev_name, errno);
 		return (-1);
 	}
 	errno = 0;
 	while (ioctl(mux_fd, I_POP, 0) != -1)
 		;
 	if (errno != EINVAL) {
-		syslog(LOG_ERR, "pop %s, error %d", udp_dev_name, errno);
+		c_log(LOG_ERR, "pop %s, error %d", udp_dev_name, errno);
 		close(mux_fd);
 		return (-1);
 	} else if (ioctl(mux_fd, I_PUSH, ARP_MOD_NAME) == -1) {
-		syslog(LOG_ERR, "arp PUSH, error %d", udp_dev_name, errno);
+		c_log(LOG_ERR, "arp PUSH, error %d", udp_dev_name, errno);
 		close(mux_fd);
 		return (-1);
 	}
@@ -5005,7 +5020,7 @@ ifplumb(const char *linkname, const char *ifname, int af)
 		 * without tearing down the stream.
 		 */
 		if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1) {
-			syslog(LOG_ERR, "I_PLINK for ip, error %d", errno);
+			c_log(LOG_ERR, "I_PLINK for ip, error %d", errno);
 			return (-1);
 		}
 		(void) close(mux_fd);
@@ -5018,13 +5033,13 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	 */
 	retval = dlpi_open(linkname, &dh_arp, dlpi_flags);
 	if (retval != DLPI_SUCCESS) {
-		syslog(LOG_ERR, "cannot open link %s, error %d", linkname, retval);
+		c_log(LOG_ERR, "cannot open link %s, error %d", linkname, retval);
 		return (-1);
 	}
 
 	arp_fd = dlpi_fd(dh_arp);
 	if (ioctl(arp_fd, I_PUSH, ARP_MOD_NAME) == -1) {
-		syslog(LOG_ERR, "%s I_PUSH, error %d", ARP_MOD_NAME, errno);
+		c_log(LOG_ERR, "%s I_PUSH, error %d", ARP_MOD_NAME, errno);
 		return (-1);
 	}
 
@@ -5039,10 +5054,10 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	ioc.ic_dp = (char *)&lifr;
 	if (ioctl(arp_fd, I_STR, (char *)&ioc) == -1) {
 		if (errno != EEXIST) {
-			syslog(LOG_ERR, "SIOCSLIFNAME for arp, error %d", errno);
+			c_log(LOG_ERR, "SIOCSLIFNAME for arp, error %d", errno);
 			return (-1);
 		}
-		syslog(LOG_ERR, "SIOCSLIFNAME for arp, error %d", errno);
+		c_log(LOG_ERR, "SIOCSLIFNAME for arp, error %d", errno);
 		goto out;
 	}
 
@@ -5051,12 +5066,12 @@ ifplumb(const char *linkname, const char *ifname, int af)
 	 * without tearing down the stream.
 	 */
 	if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1) {
-		syslog(LOG_ERR, "I_PLINK for ip, error %d", errno);
+		c_log(LOG_ERR, "I_PLINK for ip, error %d", errno);
 		return (-1);
 	}
 	if ((arp_muxid = ioctl(mux_fd, I_PLINK, arp_fd)) == -1) {
 		(void) ioctl(mux_fd, I_PUNLINK, ip_muxid);
-		syslog(LOG_ERR, "I_PLINK for arp, error %d", errno);
+		c_log(LOG_ERR, "I_PLINK for arp, error %d", errno);
 		return (-1);
 	}
 
@@ -5083,14 +5098,14 @@ get_all_ifs(char **ifs_req, unsigned *ifs_req_len)
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0) {
-		syslog(LOG_ERR, "socket error: %d", s);
+		c_log(LOG_ERR, "socket error: %d", s);
 		return (-1);
 	}
 
 	lifn.lifn_family = AF_UNSPEC;
 	lifn.lifn_flags = LIFC_NOXMIT|LIFC_TEMPORARY|LIFC_ALLZONES|LIFC_UNDER_IPMP;
 	if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		syslog(LOG_ERR, "Could not determine number"
+		c_log(LOG_ERR, "Could not determine number"
 		    " of interfaces: %d", errno);
 		close(s);
 		return (-1);
@@ -5099,7 +5114,7 @@ get_all_ifs(char **ifs_req, unsigned *ifs_req_len)
 
 	bufsize = numifs * sizeof (struct lifreq);
 	if ((buf = malloc(bufsize)) == NULL) {
-		syslog(LOG_ERR, "out of memory: %d", errno);
+		c_log(LOG_ERR, "out of memory: %d", errno);
 		close(s);
 		return (-1);
 	}
@@ -5110,7 +5125,7 @@ get_all_ifs(char **ifs_req, unsigned *ifs_req_len)
 	lifc.lifc_buf = buf;
 
 	if (ioctl(s, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		syslog(LOG_ERR, "SIOCGLIFCONF: %d", errno);
+		c_log(LOG_ERR, "SIOCGLIFCONF: %d", errno);
 		close(s);
 		free(buf);
 		return (-1);
@@ -5131,12 +5146,12 @@ get_if_flags(struct lifreq *lifrp)
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0) {
-		syslog(LOG_ERR, "socket error: %d", s);
+		c_log(LOG_ERR, "socket error: %d", s);
 		return (-1);
 	}
 
 	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t) lifrp) < 0) {
-		syslog(LOG_ERR, "status: SIOCGLIFFLAGS");
+		c_log(LOG_ERR, "status: SIOCGLIFFLAGS");
 		close(s);
 		return (-1);
 	}
@@ -5155,7 +5170,7 @@ check_ip_addr(const char *addrstr, char *dst)
 	if (inet_aton(addrstr, &addr)) {
 		if (dst) {
 			if (inet_ntop(AF_INET, &addr, dst, INET_ADDRSTRLEN) == NULL) {
-				syslog(LOG_ERR, "inet_ntop error: %d", errno);
+				c_log(LOG_ERR, "inet_ntop error: %d", errno);
 				return (-1);
 			}
 		}
@@ -5164,7 +5179,7 @@ check_ip_addr(const char *addrstr, char *dst)
 	if (inet_pton(AF_INET6, addrstr, (void *)&addr6) == 1) {
 		if (dst) {
 			if (inet_ntop(AF_INET6, &addr, dst, INET6_ADDRSTRLEN) == NULL) {
-				syslog(LOG_ERR, "inet_ntop error: %d", errno);
+				c_log(LOG_ERR, "inet_ntop error: %d", errno);
 				return (-1);
 			}
 		}
@@ -5245,7 +5260,7 @@ handle_failover_set(cluster_mq_message_t *msg)
 		for (l = p->head; l != NULL; l = l->next) {
 			r = l->ptr;
 			if (strncmp(r->pool_name, conf.zpool_name, ZPOOL_MAXNAMELEN) == 0) {
-				syslog(LOG_WARNING, "handle_failover_set: skip pool failover,"
+				c_log(LOG_WARNING, "handle_failover_set: skip pool failover,"
 					" poolname=%s, ip=%s, msgtype=%d",
 					conf.zpool_name, conf.ip_addr, msg->msgtype);
 				pthread_mutex_unlock(&p->lock);
@@ -5264,7 +5279,7 @@ handle_failover_set(cluster_mq_message_t *msg)
 			do_ip_restore(&conf);
 			break;
 		default:
-			syslog(LOG_ERR, "Invalid msgtype: %d", msg->msgtype);
+			c_log(LOG_ERR, "Invalid msgtype: %d", msg->msgtype);
 			return (-1);
 		}
 	}
@@ -5319,7 +5334,7 @@ ifconfig_up(const char *cmd, int af, const char *ifname, const char *ipaddr,
 
 	ret = excute_ifconfig(cmd);
 	if (ret != 0) {
-		syslog(LOG_ERR, "excute_ifconfig return %d", ret);
+		c_log(LOG_ERR, "excute_ifconfig return %d", ret);
 		return -1;
 	}
 #if	0
@@ -5330,7 +5345,7 @@ ifconfig_up(const char *cmd, int af, const char *ifname, const char *ipaddr,
 	if (ret != 0)
 		return (ret);
 	if (strncmp(ifname, r_ifname, strlen(ifname)) != 0) {
-		syslog(LOG_ERR, "ifconfig failed: ifname=%s, r_ifname=%s",
+		c_log(LOG_ERR, "ifconfig failed: ifname=%s, r_ifname=%s",
 			ifname, r_ifname);
 		return (-1);
 	}
@@ -5343,7 +5358,7 @@ ifconfig_up(const char *cmd, int af, const char *ifname, const char *ipaddr,
 
 		ret = excute_ifconfig(upcmd);
 		if (ret != 0) {
-			syslog(LOG_ERR, "excute_ifconfig return %d", ret);
+			c_log(LOG_ERR, "excute_ifconfig return %d", ret);
 			return (0);
 		}
 		sleep(1);
@@ -5386,7 +5401,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	struct link_list *node;
 	int err = 0;
 
-	syslog(LOG_WARNING, "%s: conf=(pool=%s, eth=%s, ip=%s), flag=%d",
+	c_log(LOG_WARNING, "%s: conf=(pool=%s, eth=%s, ip=%s), flag=%d",
 		__func__, conf->zpool_name, conf->eth, conf->ip_addr, flag);
 	if (!conf || strlen(conf->eth) == 0 || strlen(conf->ip_addr) == 0)
 		return (EINVAL);
@@ -5396,7 +5411,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 			ifp; 
 			ifp = list_next(&failover_ip_list, ifp)) {
 		if (strcmp(ifp->ip_addr, conf->ip_addr) == 0) {
-			syslog(LOG_WARNING, "ip %s is exist on host", ifp->ip_addr);
+			c_log(LOG_WARNING, "ip %s is exist on host", ifp->ip_addr);
 			if (flag == 2)
 				break;
 			ifp->refs++;
@@ -5410,7 +5425,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	}
 
 	if (check_ip_exist(conf->af, conf->eth, conf->ip_addr)) {
-		syslog(LOG_WARNING, "ip %s is exist on if %s", conf->ip_addr, conf->eth);
+		c_log(LOG_WARNING, "ip %s is exist on if %s", conf->ip_addr, conf->eth);
 		ip_on_link = 1;
 		if (flag == 2)
 			goto exit_func;
@@ -5425,12 +5440,12 @@ do_ip_failover(failover_conf_t *conf, int flag)
 			alias, conf->eth);
 		if ((err = ifconfig_up(cmd, conf->af, conf->eth, conf->ip_addr,
 				3)) < 0) {
-			syslog(LOG_ERR, "%s: excute ifconfig addif error: %d",
+			c_log(LOG_ERR, "%s: excute ifconfig addif error: %d",
 				__func__, err);
 			err = -1;
 			goto exit_func;
 		} else if (err == 0) {
-			syslog(LOG_WARNING, "%s: excute ifconfig addif failed, ip down",
+			c_log(LOG_WARNING, "%s: excute ifconfig addif failed, ip down",
 				__func__);
 		}
 	}
@@ -5439,13 +5454,13 @@ do_ip_failover(failover_conf_t *conf, int flag)
 		goto exit_func;
 
 	if ((err = add_monitor_ifs(conf->eth)) != 0) {
-		syslog(LOG_WARNING, "add_monitor_ifs() failed: %s",
+		c_log(LOG_WARNING, "add_monitor_ifs() failed: %s",
 			strerror(-err));
 	}
 
 	ifp = (service_if_t *) malloc(sizeof(service_if_t));
 	if (ifp == NULL) {
-		syslog(LOG_ERR, "alloc service_if_t failed");
+		c_log(LOG_ERR, "alloc service_if_t failed");
 		err = ENOMEM;
 		goto exit_func;
 	}
@@ -5476,7 +5491,7 @@ add_zpool:
 	if (!zp) {
 		zp = (service_zpool_t *) malloc(sizeof(service_zpool_t));
 		if (!zp) {
-			syslog(LOG_ERR, "alloc service_zpool_t failed");
+			c_log(LOG_ERR, "alloc service_zpool_t failed");
 			err = ENOMEM;
 			goto exit_func;
 		}
@@ -5487,7 +5502,7 @@ add_zpool:
 	}
 
 	if ((node = create_link(zp)) == NULL) {
-		syslog(LOG_ERR, "alloc ifp->zpool_list node failed");
+		c_log(LOG_ERR, "alloc ifp->zpool_list node failed");
 		err = ENOMEM;
 		goto exit_func;
 	}
@@ -5495,7 +5510,7 @@ add_zpool:
 	ifp->zpool_list = node;
 
 	if ((node = create_link(ifp)) == NULL) {
-		syslog(LOG_ERR, "alloc zp->if_list node failed");
+		c_log(LOG_ERR, "alloc zp->if_list node failed");
 		err = ENOMEM;
 		goto exit_func;
 	}
@@ -5556,7 +5571,7 @@ do_ip_restore(failover_conf_t *conf)
 					conf->prefixlen > 0 ? conf->prefixlen : 24,
 					conf->eth);
 				if ((err = excute_ifconfig(cmd)) != 0) {
-					syslog(LOG_ERR, "removeif error - %d", err);
+					c_log(LOG_ERR, "removeif error - %d", err);
 #if	0
 					ifp->refs++;
 					pthread_mutex_unlock(&failover_list_lock);
@@ -5578,7 +5593,7 @@ do_ip_restore(failover_conf_t *conf)
 			goto update_zpool;
 		}
 	}
-	syslog(LOG_WARNING, "ip %s not exist", conf->ip_addr);
+	c_log(LOG_WARNING, "ip %s not exist", conf->ip_addr);
 	pthread_mutex_unlock(&failover_list_lock);
 	return (-1);
 
@@ -5695,7 +5710,7 @@ cluster_link_down_timer_add(const char *linkname)
 
 	for (p = cluster_link_down_timers; p; p = p->next) {
 		if (strncmp(p->linkname, linkname, IFNAMSIZ) == 0) {
-			syslog(LOG_ERR, "%s: link %s is exists", __func__, linkname);
+			c_log(LOG_ERR, "%s: link %s is exists", __func__, linkname);
 			pthread_mutex_unlock(&cluster_link_down_timers_lock);
 			return (-1);
 		}
@@ -5703,7 +5718,7 @@ cluster_link_down_timer_add(const char *linkname)
 
 	p = malloc(sizeof(struct cluster_link_down_timer));
 	if (!p) {
-		syslog(LOG_ERR, "%s: out of memory", __func__);
+		c_log(LOG_ERR, "%s: out of memory", __func__);
 		pthread_mutex_unlock(&cluster_link_down_timers_lock);
 		return (-1);
 	}
@@ -5715,7 +5730,7 @@ cluster_link_down_timer_add(const char *linkname)
 	pthread_cond_init(&p->cv, NULL);
 	if (pthread_create(&p->tid, NULL,
 		&cluster_link_down_timer_thread, NULL) != 0) {
-		syslog(LOG_ERR, "%s: create thread failed - %d", __func__, errno);
+		c_log(LOG_ERR, "%s: create thread failed - %d", __func__, errno);
 		free(p);
 		pthread_mutex_unlock(&cluster_link_down_timers_lock);
 		return (-1);
@@ -5755,7 +5770,7 @@ cluster_link_down_failover_restore(const char *linkname)
 {
 	service_if_t *ifp;
 
-	syslog(LOG_WARNING, "%s: linkname=%s", __func__, linkname);
+	c_log(LOG_WARNING, "%s: linkname=%s", __func__, linkname);
 	pthread_mutex_lock(&failover_list_lock);
 	for (ifp = list_head(&failover_ip_list); 
 			ifp; 
@@ -5773,7 +5788,7 @@ static void
 cluster_monitor_dev_state_change(const char *dev,
 	unsigned state, unsigned oldstate)
 {
-	syslog(LOG_WARNING, "%s: dev=%s, state=%d, oldstate=%d",
+	c_log(LOG_WARNING, "%s: dev=%s, state=%d, oldstate=%d",
 		__func__, dev, state, oldstate);
 	if (state == ils_down && oldstate != ils_down)
 		cluster_link_down_timer_add(dev);
@@ -6033,7 +6048,7 @@ release_zfs_iter_cb(zfs_handle_t *zhp, void *data)
 			continue;
 		err = nvlist_lookup_nvlist(user_props, nvpair_name(elem), &propval);
 		if (err != 0) {
-			syslog(LOG_ERR, "get property error: %d", err);
+			c_log(LOG_ERR, "get property error: %d", err);
 			zfs_close(zhp);
 			return (err);
 		}
@@ -6075,13 +6090,13 @@ get_release_pool_param(release_pool_param_t *pool_param)
 
 	hdl = libzfs_init();
 	if (!hdl) {
-		syslog(LOG_ERR, "%s: failed to get libzfs handle", __func__);
+		c_log(LOG_ERR, "%s: failed to get libzfs handle", __func__);
 		return (-1);
 	}
 	strlcpy(cbdata.root_zfsname, pool_param->pool_name, ZFS_MAXNAMELEN);
 	cbdata.failoverprops_list = NULL;
 	if (zfs_iter_root(hdl, release_zfs_iter_cb, &cbdata) != 0) {
-		syslog(LOG_ERR, "%s: iter zfs error", __func__);
+		c_log(LOG_ERR, "%s: iter zfs error", __func__);
 		if (cbdata.failoverprops_list != NULL) {
 			free_link_list(cbdata.failoverprops_list, 1);
 		}
@@ -6209,12 +6224,12 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 
 	/* get the todo import pools */
 	if (unpack_release_pool_param_list(buffer, bufsiz, &pool_list) != 0) {
-		syslog(LOG_ERR, "%s: unpack event message failed", __func__);
+		c_log(LOG_ERR, "%s: unpack event message failed", __func__);
 		return (-1);
 	}
 
 	if (check_share_service() != 1) {
-		syslog(LOG_ERR, "%s: share service inactive", __func__);
+		c_log(LOG_ERR, "%s: share service inactive", __func__);
 		return (-1);
 	}
 
@@ -6223,7 +6238,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	 * do ip failover in this function.
 	 */
 	if (!shielding_failover_poollist(pool_list)) {
-		syslog(LOG_ERR, "%s: shielding failover pools failed,"
+		c_log(LOG_ERR, "%s: shielding failover pools failed,"
 			" ensure no concurrent release process.", __func__);
 		err = -1;
 		goto exit_func;
@@ -6232,7 +6247,12 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	/* step 2: import the pools */
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
-		if ((err = cluster_do_import(param->pool_name, 0)) != 0) {
+		for (i = 0; i < 10; i++) {
+			err = cluster_do_import(param->pool_name, 0);
+			if (err == 0)
+				break;
+		}
+		if (err != 0) {
 			err = -1;
 			unshielding_failover_poollist(pool_list);
 			goto exit_func;
@@ -6243,7 +6263,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < param->failover_num; i++) {
 			if (parse_failover_conf(param->failover[i], &fconf) != 0) {
-				syslog(LOG_WARNING, "%s: invalid failover prop '%s'",
+				c_log(LOG_WARNING, "%s: invalid failover prop '%s'",
 					__func__, param->failover[i]);
 				continue;
 			}
@@ -6312,14 +6332,14 @@ handle_release_message_common(release_pools_message_t *r_msg)
 	}
 
 	if (err != 0) {
-		syslog(LOG_ERR, "%s: handle release message failed", __func__);
+		c_log(LOG_ERR, "%s: handle release message failed", __func__);
 	} else {
 		/*
 		 * We have released the failover ips, now shielding the pools,
 		 * then we export them later and do_ip_restore() will skip them.
 		 */
 		if (!shielding_failover_poollist(pool_list)) {
-			syslog(LOG_ERR, "%s: shielding failover pools failed,"
+			c_log(LOG_ERR, "%s: shielding failover pools failed,"
 				" ensure no concurrent release process.", __func__);
 			err = -1;
 			goto exit_release;
@@ -6357,7 +6377,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 				bufsize = MAX_RELEASE_POOLS_MSGSIZE;
 				if (pack_release_pool_param_list(pool_list, 
 					buffer, &bufsize) != 0) {
-					syslog(LOG_ERR, "%s: pack pool_list failed", __func__);
+					c_log(LOG_ERR, "%s: pack pool_list failed", __func__);
 					err = -1;
 				} else
 					err = hbx_do_cluster_cmd_ex(buffer, bufsize,
@@ -6388,13 +6408,22 @@ handle_release_message(cluster_mq_message_t *mq_message)
 	int i, ret;
 
 	if (unpack_mq_release_pools_message(mq_message, &r_msg) != 0) {
-		syslog(LOG_ERR, "%s: invalid message", __func__);
+		c_log(LOG_ERR, "%s: invalid message", __func__);
 		return (-1);
 	}
 	ret = handle_release_message_common(&r_msg);
 	for (i = 0; i < r_msg.pools_num; i++)
 		free(r_msg.pools_list[i]);
 	return (ret);
+}
+
+static int
+handle_export_pool_message(cluster_mq_message_t *mq_message)
+{
+	uint32_t hostid = 0;
+
+	hbx_do_cluster_cmd((char *) &hostid, sizeof (hostid), ZFS_HBX_SYNC_POOL);
+	return (0);
 }
 
 struct mq_message_args {
@@ -6419,16 +6448,34 @@ handle_mq_message_thread(void *arg)
 	free(argp->buf);
 	free(argp);
 	if (msg.msglen < 0 || msg.msglen >= CLUSTER_MQ_MSGSIZ) {
-		syslog(LOG_ERR, "Invalid message: msglen=%d", msg.msglen);
+		c_log(LOG_ERR, "Invalid message: msglen=%d", msg.msglen);
 		return (NULL);
 	}
 
-	if (msg.msgtype == cluster_msgtype_release) {
+	switch (msg.msgtype) {
+	case cluster_msgtype_mount:
+	case cluster_msgtype_umount:
+	case cluster_msgtype_set_failover:
+	case cluster_msgtype_remove_failover:
+		handle_failover_set(&msg);
+		break;
+
+	case cluster_msgtype_release:
 		pthread_mutex_lock(&handle_release_lock);
 		handle_release_message(&msg);
 		pthread_mutex_unlock(&handle_release_lock);
-	} else
-		handle_failover_set(&msg);
+		break;
+
+	case cluster_msgtype_import:
+	case cluster_msgtype_export:
+		(void) handle_export_pool_message(&msg);
+		break;
+
+	default:
+		c_log(LOG_ERR, "Invalid message type %d", msg.msgtype);
+		break;
+	}
+
 	return (NULL);
 }
 
@@ -6444,36 +6491,36 @@ handle_mq_notify(union sigval sv)
 
 	while (1) {
 	 	if (mq_getattr(mqdes, &attr) == -1) {
-			syslog(LOG_ERR, "mq_getattr error: %d", errno);
+			c_log(LOG_ERR, "mq_getattr error: %d", errno);
 			break;
 		}
 		if (attr.mq_msgsize <= 0) {
-			syslog(LOG_WARNING, "mqueue is empty now");
+			c_log(LOG_WARNING, "mqueue is empty now");
 			break;
 		}
 
 		buf = malloc(attr.mq_msgsize);
 		if (buf == NULL) {
-			syslog(LOG_ERR, "alloc buf failed");
+			c_log(LOG_ERR, "alloc buf failed");
 			break;
 		}
 	 	nr = mq_receive(mqdes, buf, attr.mq_msgsize, NULL);
 		if (nr == -1) {
-			syslog(LOG_ERR, "mq_receive error: %d", errno);
+			c_log(LOG_ERR, "mq_receive error: %d", errno);
 			free(buf);
 			break;
 		}
 
 		arg = malloc(sizeof(struct mq_message_args));
 		if (!arg) {
-			syslog(LOG_ERR, "%s: out of memory", __func__);
+			c_log(LOG_ERR, "%s: out of memory", __func__);
 			free(buf);
 			break;
 		}
 		arg->buf = buf;
 		arg->nr = nr;
 		if (pthread_create(&tid, NULL, handle_mq_message_thread, arg) != 0) {
-			syslog(LOG_ERR, "%s: create thread failed", __func__);
+			c_log(LOG_ERR, "%s: create thread failed", __func__);
 			free(buf);
 			break;
 		}
@@ -6501,7 +6548,7 @@ initialize_cluster_mqueue(void)
 	attr.mq_curmsgs = 0;
 	mqd = mq_open(CLUSTER_MQ_NAME, O_RDONLY|O_CREAT|O_EXCL, 0644, &attr);
 	if (mqd == (mqd_t) -1) {
-		syslog(LOG_ERR, "mq_open %s error: %d", CLUSTER_MQ_NAME, errno);
+		c_log(LOG_ERR, "mq_open %s error: %d", CLUSTER_MQ_NAME, errno);
 		return (errno);
 	}
 	
@@ -6510,7 +6557,7 @@ initialize_cluster_mqueue(void)
    	sev.sigev_notify_attributes = NULL;
    	sev.sigev_value.sival_ptr = &mqd;	 /* Arg. to thread func. */
    	if (mq_notify(mqd, &sev) == -1) {
-		syslog(LOG_ERR, "mq_notify error: %d", errno);
+		c_log(LOG_ERR, "mq_notify error: %d", errno);
 		return (errno);
 	}
 	return (0);
@@ -6523,7 +6570,7 @@ cluster_thread_exit(void)
 
 	ret = pthread_join(cls_thread.cls_tid, NULL);
 	if (ret != 0) {
-		syslog(LOG_ERR, "cluster thread join failed");
+		c_log(LOG_ERR, "cluster thread join failed");
 	}
 
 	if (cls_thread.running) {
@@ -6549,17 +6596,17 @@ cluster_thread_create(void)
 static void
 usage(void)
 {
-	syslog(LOG_ERR, "Usage: %s", MyName);
-	syslog(LOG_ERR, "\t[-v]\t\tverbose error messages");
-	syslog(LOG_ERR, "\t[-d]\t\tdisable daemonize");
-	syslog(LOG_ERR, "\t[-S]\t\tStart clusterd daemon in systemd");
+	c_log(LOG_ERR, "Usage: %s", MyName);
+	c_log(LOG_ERR, "\t[-v]\t\tverbose error messages");
+	c_log(LOG_ERR, "\t[-d]\t\tdisable daemonize");
+	c_log(LOG_ERR, "\t[-S]\t\tStart clusterd daemon in systemd");
 	exit(1);
 }
 
 static void
 warn_hup(int i)
 {
-	syslog(LOG_ERR, "SIGHUP received: ignored");
+	c_log(LOG_ERR, "SIGHUP received: ignored");
 	(void) signal(SIGHUP, warn_hup);
 }
 
@@ -6575,7 +6622,7 @@ fix_command_path(void)
 
 	if (stat(which, &sb) == -1) {
 		if (stat("/bin/which", &sb) == -1) {
-			syslog(LOG_ERR, "No 'which' command");
+			c_log(LOG_ERR, "No 'which' command");
 			return;
 		} else
 			sprintf(which, "/bin/which");
@@ -6626,6 +6673,9 @@ main(int argc, char *argv[])
 	int c, error;
 	char *defval;
 	pthread_t tid;
+	char *log_path = NULL;
+	int log_level = 0;
+	int log_flags = 0;
 
 	/*
 	 * There is no check for non-global zone and Trusted Extensions.
@@ -6654,12 +6704,6 @@ main(int argc, char *argv[])
 		if ((defval = defread("IPMI_PASSWD=")) != NULL) {
 			strlcpy(ipmi_passwd, defval, 16);
 		}
-		if ((defval = defread("LOG_LEVEL=")) != NULL) {
-			errno = 0;
-			clusterd_log_lvl = strtol(defval, (char **)NULL, 10);
-			if (errno != 0)
-				clusterd_log_lvl = 0;
-		}
 		if ((defval = defread("HOSTID=")) != NULL) {
 			long hostid;
 			errno = 0;
@@ -6686,6 +6730,27 @@ main(int argc, char *argv[])
 			sprintf(zpool_export_cmd, "%s/zpool export -f", sbindir);
 			sprintf(clusterd_cmd, "%s/clusterd", sbindir);
 		}
+		if ((defval = defread("LOG_PATH=")) != NULL) {
+			log_path = strdup(defval);
+		}
+		if ((defval = defread("LOG_LEVEL=")) != NULL) {
+			long lvl;
+			errno = 0;
+			lvl = strtol(defval, (char **)NULL, 10);
+			if (errno != 0)
+				syslog(LOG_ERR, "Invalid LOG_LEVEL");
+			else
+				log_level = lvl;
+		}
+		if ((defval = defread("LOG_FLAG=")) != NULL) {
+			long val;
+			errno = 0;
+			val = strtol(defval, (char **)NULL, 10);
+			if (errno != 0)
+				syslog(LOG_ERR, "Invalid LOG_FLAG");
+			else
+				log_flags = val;
+		}
 
 		defopen(NULL);
 	}
@@ -6694,7 +6759,7 @@ main(int argc, char *argv[])
 		strlcpy(ipmi_user, IPMI_USER_NAME, 16);
 	if (ipmi_passwd[0] == '\0')
 		strlcpy(ipmi_passwd, ipmi_user, 16);
-	c_log(LOG_ERR, "ipmi_use_lanplus=%d, ipmi_user=%s, ipmi_passwd=%s",
+	syslog(LOG_ERR, "ipmi_use_lanplus=%d, ipmi_user=%s, ipmi_passwd=%s",
 		ipmi_use_lanplus, ipmi_user, ipmi_passwd);
 
 	fix_command_path();
@@ -6719,7 +6784,8 @@ main(int argc, char *argv[])
 
 	host_id = get_system_hostid();
 
-	openlog(MyName, LOG_PID | LOG_NDELAY, LOG_DAEMON);
+	cluster_log_init(MyName, log_path, log_level, log_flags);
+	c_log(LOG_WARNING, "clusterd enabled.");
 	(void) signal(SIGHUP, warn_hup);
 
 	g_zfs_init();
@@ -6736,7 +6802,7 @@ main(int argc, char *argv[])
 
 	error = initialize_cluster_mqueue();
 	if (error != 0) {
-		syslog(LOG_ERR, "initialize mqueue failed: %d", error);
+		c_log(LOG_ERR, "initialize mqueue failed: %d", error);
 		exit(1);
 	}
 
@@ -6746,12 +6812,12 @@ main(int argc, char *argv[])
 	/* create cluster thread to process event */
 	error= cluster_thread_create();
 	if (error != 0){
-		syslog(LOG_ERR, "clusterd create thread failed, exit");
+		c_log(LOG_ERR, "clusterd create thread failed, exit");
 		exit(1);
 	}
 
 	if ((error = cn_cluster_init(clusterd_cn_rcv)) != 0) {
-		syslog(LOG_ERR, "cn_cluster_init() failed: error=%d", error);
+		c_log(LOG_ERR, "cn_cluster_init() failed: error=%d", error);
 		exit(1);
 	}
 
@@ -6759,11 +6825,11 @@ main(int argc, char *argv[])
 	system(CLUSTER_SMF_INIT);
 
 	if (pthread_create(&tid, NULL, cluster_task_setup, NULL) != 0) {
-		syslog(LOG_ERR, "pthread_create(): create cluster_task_setup failed");
+		c_log(LOG_ERR, "pthread_create(): create cluster_task_setup failed");
 		exit(1);
 	}
 
-	syslog(LOG_ERR, "cluster svc start ...");
+	c_log(LOG_ERR, "cluster svc start ...");
 	/*
 	 * Wait for incoming calls
 	 */

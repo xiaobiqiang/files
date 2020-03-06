@@ -82,6 +82,7 @@ typedef struct slot_record {
 	struct slot_record *sr_next;
 	char sr_serial[ARGS_LEN];
 	char sr_guid[ARGS_LEN];
+	char sr_addr[ARGS_LEN];
 } slot_record_t;
 
 typedef struct slot_map {
@@ -138,6 +139,8 @@ static void enable_share_services(int, int);
 static int zpool_do_cluster(int argc, char **argv);
 static int zpool_do_scanthin(int argc, char **argv);
 static void zpool_init_efi(char *path);
+
+static int send_cluster_message(cluster_mq_message_t *);
 
 xmlDocPtr pool_doc;
 xmlNodePtr pool_root_node;
@@ -1733,6 +1736,32 @@ enable_share_services(int sharenfs, int sharesmb)
 		(void) excute_cmd_result(enable_smb_service, NULL);
 }
 
+static int
+send_import_export_to_clusterd(const char *poolname, uint64_t guid,
+	boolean_t is_import)
+{
+	import_export_pool_message_t *message;
+	cluster_mq_message_t *mq_message;
+	int error;
+
+	mq_message = malloc(sizeof(cluster_mq_message_t));
+	if (mq_message == NULL)
+		return (ENOMEM);
+
+	message = (import_export_pool_message_t *)mq_message->msg;
+	message->guid = guid;
+	strlcpy(message->poolname, poolname, ZPOOL_MAXNAMELEN);
+
+	mq_message->msglen = offsetof(import_export_pool_message_t, poolname) +
+		strlen(poolname)+1;
+	mq_message->msgtype = is_import ? cluster_msgtype_import :
+		cluster_msgtype_export;
+	error = send_cluster_message(mq_message);
+
+	free(mq_message);
+	return (error);
+}
+
 typedef struct export_cbdata {
 	boolean_t force;
 	boolean_t hardforce;
@@ -1745,6 +1774,8 @@ int
 zpool_export_one(zpool_handle_t *zhp, void *data)
 {
 	export_cbdata_t *cb = data;
+	nvlist_t *config;
+	uint64_t guid = 0;
 
 	if (zpool_disable_datasets(zhp, cb->force) != 0)
 		return (1);
@@ -1760,6 +1791,13 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	} else if (zpool_export(zhp, cb->force, history_str) != 0) {
 		return (1);
 	}
+
+	config = zpool_get_config(zhp, NULL);
+	if (config) {
+		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
+			&guid) == 0);
+	}
+	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 
 	return (0);
 }
@@ -2067,7 +2105,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
                 sprintf(en_buf, "%d", di.dk_enclosure);
                 sprintf(slot_buf, "%d", di.dk_slot);
         #else   //for kylinxos, need to test 
-                strcpy(g_di_cur.dk_serial, name);
+                strcpy(g_di_cur.dk_scsid, name);
                 slot_map_find_value_guid(&g_sm, &g_di_cur);
                 sprintf(en_buf, "%d", g_di_cur.dk_enclosure);
                 sprintf(slot_buf, "%d", g_di_cur.dk_slot);
@@ -2867,6 +2905,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	char *name;
 	uint64_t state;
 	uint64_t version;
+	uint64_t guid;
 
 	/* write stamp */
 	int host_id;
@@ -2995,6 +3034,9 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	syslog(LOG_NOTICE, "%s: all volume create minor finished, start to import lu", __func__);
 	zfs_import_all_lus(g_zfs, name);
 	zfs_enable_avs(g_zfs, name, 1);
+
+	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) == 0);
+	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 	zpool_close(zhp);
 	return (0);
 }
@@ -7468,7 +7510,6 @@ release_callback(zpool_handle_t *zhp, void *data)
 	config = zpool_get_config(zhp, NULL);
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
-	verify (zpool_read_stamp(nvroot, stamp) == 0);
 
 	host_id = get_system_hostid();
 

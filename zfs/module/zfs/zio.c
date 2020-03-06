@@ -1716,6 +1716,8 @@ zio_suspend(spa_t *spa, zio_t *zio)
 		    ZIO_FLAG_GODFATHER);
 
 	spa->spa_suspended = B_TRUE;
+	cmn_err(CE_WARN, "%s pool(%s) suspend, io_err=%d io_flags=0x%x", __func__, 
+		spa->spa_name, zio->io_error, zio->io_flags);
 
 	if (zio != NULL) {
 		ASSERT(!(zio->io_flags & ZIO_FLAG_GODFATHER));
@@ -3367,7 +3369,12 @@ zio_done(zio_t *zio)
 
 			zio->io_cksum_report = zcr->zcr_next;
 			zcr->zcr_next = NULL;
-			zcr->zcr_finish(zcr, abuf);
+			if (zcr->zcr_together) {				
+				zcr->zcr_finish(zcr, zcr->zcr_good);
+			} else {
+				zcr->zcr_finish(zcr, abuf);
+			}
+			
 			zfs_ereport_free_checksum(zcr);
 
 			if (asize != zio->io_size)
@@ -3377,8 +3384,7 @@ zio_done(zio_t *zio)
 
 	zio_pop_transforms(zio);	/* note: may set zio->io_error */
 
-	if (zio->io_aggre_io == NULL || zio->io_aggre_root)
-		vdev_stat_update(zio, zio->io_size);
+	vdev_stat_update(zio, zio->io_size);
 
 	/*
 	 * If this I/O is attached to a particular vdev is slow, exceeding

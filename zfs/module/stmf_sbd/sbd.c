@@ -2090,13 +2090,12 @@ sbd_transition_to_active_lu(char *data_fname)
 	if (sret == SBD_SUCCESS) {
 		cmn_err(CE_NOTE, "%s: access_state(%d), lu(%s)",
 			__func__, sl->sl_access_state, data_fname);
-		/*
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
 			cmn_err(CE_PANIC, "%s: lu can't be standby, data_fname=%s",
 				__func__, data_fname);
 			sl->sl_trans_op = SL_OP_NONE;
 			return (EIO);
-		}*/
+		}
 
 		if (sl->sl_access_state == SBD_LU_ACTIVE) {
 			sl->sl_trans_op = SL_OP_NONE;
@@ -2126,12 +2125,6 @@ sbd_transition_to_active_lu(char *data_fname)
 
 		hostid = zone_get_hostid(NULL);
 		sl->sl_active_hostid = hostid;
-
-		if (sl->sl_alias) {
-			lu->lu_alias = sl->sl_alias;
-		} else {
-			lu->lu_alias = sl->sl_name;
-		}
 		
 		sl->sl_trans_op = SL_OP_NONE;
 		new = NULL;
@@ -2359,12 +2352,9 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret, boolean_t proxy_re
 	}
 	
 	lu->lu_id = (scsi_devid_desc_t *)sl->sl_device_id;
-	/* MATIS-2758 */
-	if (sl->sl_name) {
-		lu->lu_alias = sl->sl_name;
-	} else {
-		lu->lu_alias = sl->sl_alias;
-	}
+
+	/* from sl_name for full path name */
+	lu->lu_alias = sl->sl_name;
 
 	/* set proxy_reg_cb_arg to meta filename */
 	if (sl->sl_meta_filename) {
@@ -3035,6 +3025,8 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 			kmem_alloc(sl->sl_data_fname_alloc_size, KM_SLEEP);
 			(void) strcpy(sl->sl_data_filename, namebuf + slu->slu_data_fname_off);
 
+			/* from sl_name for full path name */
+			sl->sl_lu->lu_alias = sl->sl_name;
 			cmn_err(CE_NOTE, "%s: already created data_filename = %s, access_state: %d",
 				__func__, sl->sl_name, sl->sl_access_state);
 		} else {
@@ -3089,15 +3081,13 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		if (sbd_is_zvol(sl->sl_data_filename)) {
 			sl->sl_flags |= SL_ZFS_META;
 			sl->sl_meta_offset = 0;
-			sl->sl_name = sl->sl_data_filename;
-			sl->sl_alias = strrchr(sl->sl_data_filename, '/') + 1;
 		} else {
 			sl->sl_flags |= SL_SHARED_META;
 			sl->sl_data_offset = SHARED_META_DATA_SIZE;
 			sl->sl_total_meta_size = SHARED_META_DATA_SIZE;
 			sl->sl_meta_size_used = 0;
-			sl->sl_alias = sl->sl_name = sl->sl_data_filename;
 		}
+		sl->sl_alias = sl->sl_name = sl->sl_data_filename;
 	}
 	if (slu->slu_alias_valid) {
 		sl->sl_alias_alloc_size = strlen(namebuf + slu->slu_alias_off) + 1;
@@ -3477,7 +3467,7 @@ sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg, uint32_t proxy_reg_arg_len,
 
 			if (sl->sl_access_state == SBD_LU_ACTIVE) {
 				sl->sl_trans_op = SL_OP_NONE;
-				cmn_err(CE_PANIC, "%s: lu(%s)'s sl_access_state is active,"
+				cmn_err(CE_WARN, "%s: lu(%s)'s sl_access_state is active,"
 					" can't change to standby directly",
 					__func__, sl->sl_name);
 				stret = STMF_FAILURE;
@@ -3779,9 +3769,9 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 				sl->sl_mgmt_url_alloc_size = 0;
 			}
 			sl->sl_name = sl->sl_alias = sl->sl_meta_filename;
-			if (sbd_is_zvol(sl->sl_meta_filename)) {
-				sl->sl_alias = strrchr(sl->sl_meta_filename, '/') + 1;
-			}
+			/* from sl_name for full path name */
+			sl->sl_lu->lu_alias = sl->sl_name;
+			sl->sl_alias = sl->sl_name;
 		} else {
 			*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
 			bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);
@@ -4137,11 +4127,8 @@ sim_sli_loaded:
 #endif
 
 	if (standby) {
-		if (sl->sl_alias) {
-			lu->lu_alias = sl->sl_alias;
-		} else {
-			lu->lu_alias = sl->sl_name;
-		}
+		/* from sl_name for full path name */
+		lu->lu_alias = sl->sl_name;
 	}
 
 	/* config avs */
@@ -4313,7 +4300,8 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 		(void) strcpy(sl->sl_alias, (char *)mlu->mlu_buf +
 		    mlu->mlu_alias_off);
 		lu = sl->sl_lu;
-		lu->lu_alias = sl->sl_alias;
+		/* from sl_name for full path name */
+		lu->lu_alias = sl->sl_name;
 		mutex_exit(&sl->sl_lock);
 	}
 
@@ -4556,7 +4544,9 @@ sbd_delete_lu(sbd_delete_lu_t *dlu, int struct_sz, uint32_t *err_ret,
 	}
 
 	cmn_err(CE_NOTE, "%s: lu(%s)", __func__, sl->sl_name);
-
+	
+	/* use stmfadm delete-lu -c xxxxx to deregister all luns, so standby lu should be deregisterd */
+	#if 0
 	if (!proxy_del) {
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
 			sl->sl_trans_op = SL_OP_NONE;
@@ -4568,6 +4558,7 @@ sbd_delete_lu(sbd_delete_lu_t *dlu, int struct_sz, uint32_t *err_ret,
 			return (0);
 		}
 	}
+	#endif
 
 	ssi.st_rflags = STMF_RFLAG_USER_REQUEST;
 	ssi.st_additional_info = "sbd_delete_lu call (ioctl)";

@@ -16,7 +16,9 @@ enum cluster_mq_msg_type {
 	cluster_msgtype_umount,
 	cluster_msgtype_set_failover,
 	cluster_msgtype_remove_failover,
-	cluster_msgtype_release
+	cluster_msgtype_release,
+	cluster_msgtype_import,
+	cluster_msgtype_export
 };
 
 typedef struct cluster_mq_message {
@@ -30,6 +32,11 @@ typedef struct release_pools_message {
 	int pools_num;
 	char *pools_list[ZPOOL_MAXNAMELEN];
 } release_pools_message_t;
+
+typedef struct import_export_pool_message {
+	uint64_t	guid;
+	char	poolname[ZPOOL_MAXNAMELEN];
+} import_export_pool_message_t;
 
 #ifdef __cplusplus
 }

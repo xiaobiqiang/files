@@ -28,7 +28,17 @@ main()
 	local sas_addr=`sg_inq -i $sg_name|awk '/\[0x/ {print substr($1,4,16)}'|sed -n '2p'`
 	local enc=$(get_enc $sas_addr)
 	local slot=`sg_ses --sas-addr=0x$sas_addr $enc|awk -F: '/device slot number:/ {print substr($4,2)}'`
-	sg_ses --dev-slot-num=$slot --set=$ops  $enc
+	
+	if [ "$ops"x == "fault"x ];then
+		sg_ses --dev-slot-num=$slot --set=fault  $enc
+	elif [ "$ops"x == "active"x ];then
+		sg_ses --dev-slot-num=$slot --clear=fault  $enc
+	elif [ "$ops"x == "force_active"x ];then
+		sg_ses --dev-slot-num=$slot --clear=ident  $enc
+		sg_ses --dev-slot-num=$slot --clear=locate  $enc
+		sg_ses --dev-slot-num=$slot --clear=fault  $enc
+		sg_ses --dev-slot-num=$slot --clear=missing  $enc
+	fi
 }
 
 main $1 $2

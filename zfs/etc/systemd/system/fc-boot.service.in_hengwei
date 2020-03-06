@@ -4,11 +4,13 @@ DefaultDependencies=no
 After=stmf-boot.service
 After=pppt-boot.service
 After=stmf-svc.service
+After=zfs-clusterd.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=/usr/sbin/rmmod qla2xxx
+ExecStartPre=sleep 3
 ExecStart=/sbin/modprobe qlf_hengwei
 
 [Install]

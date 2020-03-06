@@ -92,7 +92,8 @@ typedef enum {
 	STMF_ID_TYPE_TARGET,
 	STMF_ID_TYPE_LU_GUID,
 	STMF_ID_TYPE_HOST_GROUP,
-	STMF_ID_TYPE_TARGET_GROUP
+	STMF_ID_TYPE_TARGET_GROUP,
+	STMF_ID_TYPE_VE_OP
 } stmf_id_type_t;
 
 typedef struct stmf_id_list {
@@ -146,6 +147,19 @@ typedef enum {
 	MERGE_FLAG_RETURN_NEW_MAP	= 0x02, /* Does not modify dst */
 	MERGE_FLAG_NONE			= 0
 } stmf_merge_flags_t;
+
+extern void
+stmf_append_id(stmf_id_list_t *idlist, stmf_id_data_t *id);
+extern void
+stmf_remove_id(stmf_id_list_t *idlist, stmf_id_data_t *id);
+extern stmf_id_data_t *
+stmf_alloc_id(uint16_t id_size, uint16_t type, uint8_t *id_data,
+			uint32_t additional_size);
+extern void
+stmf_free_id(stmf_id_data_t *id);
+
+extern int
+stmf_add_ve_nonload(stmf_view_op_entry_t *voe, uint32_t *err_detail);
 
 int stmf_add_group_member(uint8_t *grpname, uint16_t grpname_size,
 		uint8_t	*entry_ident, uint16_t entry_size,

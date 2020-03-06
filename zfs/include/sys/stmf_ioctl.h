@@ -77,6 +77,7 @@ extern "C" {
 #define	STMF_IOCTL_LIST_ALL_LUNS		(STMF_IOCTL | 43)
 #define STMF_IOCTL_SET_KBPS				(STMF_IOCTL | 44)
 #define STMF_IOCTL_GET_KBPS				(STMF_IOCTL | 45)
+#define STMF_IOCTL_ADD_NONLOAD_VIEW_ENTRY	(STMF_IOCTL | 46)
 
 typedef	struct stmf_iocdata {
 	uint32_t	stmf_version;

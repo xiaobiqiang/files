@@ -262,6 +262,33 @@ void dbuf_aggre_leaf(void **drarray, uint8_t ntogether)
 	}
 }
 
+int
+raidz_aggre_parity_report_cksum(zio_t *zio)
+{
+	zio_cksum_report_t *report;
+	int nparity = zio->io_vd->vdev_nparity;
+	int ret = 0;
+
+	if (zio->io_type != ZIO_TYPE_READ)
+		return (0);
+
+	if (!zio->io_logical)
+		return (0);
+
+	report = zio->io_logical->io_cksum_report;
+	while (report) {
+		if (report->zcr_together &&
+			report->zcr_io == zio &&
+			report->zcr_cbinfo < nparity) {
+			ret = 1;
+			break;
+		}
+		report = report->zcr_next;
+	}
+
+	return (ret);
+}
+
 int dva_alloc_aggre = 1;
 raidz_map_t *
 raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
@@ -280,6 +307,7 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 
 	dva_t *dva = zio->io_bp->blk_dva;
 	uint64_t dvaasize;
+	int doall = 0;
 	
 	if (zio->io_type == ZIO_TYPE_WRITE) {
         if(zio->io_prop.zp_type != DMU_OT_PLAIN_FILE_CONTENTS &&
@@ -290,23 +318,38 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	dvaasize = DVA_GET_ASIZE(dva);
 	tot = s * dcols ;
 	if ((dvaasize >> unit_shift) < tot){
-		cmn_err(CE_PANIC,"%s %p type (%d) asize error %ld %ld ",__func__, zio, zio->io_type, (long)(asize >> unit_shift) ,(long)tot);	
+		cmn_err(CE_PANIC,"%s %p type (%d) totcheck err dvaasize=%lx s=%lx dcols=%lx unit_shift=%lx nparity=%lx",
+            		__func__, zio, zio->io_type,(long)dvaasize, (long)s, (long)dcols, (long)unit_shift, (long)nparity);   
+
 	}
 
 	bc = (dvaasize >> unit_shift) - tot;
 	if (bc > nparity + 1) {
-		cmn_err(CE_PANIC,"%s %p type (%d) nparity error %ld %ld ",__func__, zio, zio->io_type, (long)(asize >> unit_shift) ,(long)tot);	
-	}
-	
-	if (zio->io_type == ZIO_TYPE_WRITE && indexid == 0) {
-	        acols = scols = 1 + nparity;
-            firstdatacol =  nparity;
-	} else {
-	        acols = scols = 1;
-            firstdatacol = 0;
+		cmn_err(CE_PANIC,"%s %p type (%d) bccheck err dvaasize=%lx s=%lx dcols=%lx unit_shift=%lx nparity=%lx",
+            		__func__, zio, zio->io_type,(long)dvaasize, (long)s, (long)dcols, (long)unit_shift, (long)nparity);   
 	}
 
-	rm = kmem_alloc(offsetof(raidz_map_t, rm_col[scols]), KM_SLEEP);
+	if (zio->io_type == ZIO_TYPE_WRITE) {
+		if (indexid == 0) {
+			acols = scols = 1 + nparity;
+			firstdatacol =	nparity;
+		} else {
+			acols = scols = 1;
+			firstdatacol = 0;
+		}
+	} else {
+		if (raidz_aggre_parity_report_cksum(zio)) {
+			/* read all */
+			acols = scols = dcols;
+			firstdatacol = nparity;
+			doall = 1;
+		} else {
+			acols = scols = 1;
+			firstdatacol = 0;
+		}
+	}
+
+	rm = kmem_zalloc(offsetof(raidz_map_t, rm_col[scols]), KM_SLEEP);
 
 	rm->rm_cols = acols;
 	rm->rm_scols = scols;
@@ -316,10 +359,12 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	rm->rm_missingparity = 0;
 	rm->rm_firstdatacol = firstdatacol;
 	rm->rm_datacopy = NULL;
+	rm->rm_datacopycount = 0;
 	rm->rm_reports = 0;
 	rm->rm_freed = 0;
 	rm->rm_ecksuminjected = 0;
     rm->rm_aggre_col = 0;
+	rm->rm_aggre_doall = doall;
 	rm->rm_nskip = 0;
 	
 	asize = 0;
@@ -347,6 +392,7 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 		rm->rm_col[c].rc_error = 0;
 		rm->rm_col[c].rc_tried = 0;
 		rm->rm_col[c].rc_skipped = 0;
+		rm->rm_col[c].rc_need_try = 0;
         rm->rm_col[c].rc_size = zio->io_size;
 
 		asize += rm->rm_col[c].rc_size;
@@ -357,7 +403,19 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	for (c = 0; c < rm->rm_firstdatacol; c++)
 		rm->rm_col[c].rc_data = zio_buf_alloc(rm->rm_col[c].rc_size);
 
-	rm->rm_col[c].rc_data = zio->io_data;
+	if (doall) {
+		for (; c < rm->rm_cols; c++) {
+			if (c - rm->rm_firstdatacol == indexid) {
+				rm->rm_col[c].rc_data = zio->io_data;
+				rm->rm_aggre_col = c;
+			} else {
+				rm->rm_col[c].rc_data = zio_buf_alloc(rm->rm_col[c].rc_size);
+			}
+		}
+
+	} else {
+		rm->rm_col[c].rc_data = zio->io_data;
+	}
 
 	//for (c = c + 1; c < acols; c++)
 	//	rm->rm_col[c].rc_data = (char *)rm->rm_col[c - 1].rc_data +
@@ -460,8 +518,23 @@ void raidz_aggre_raidz_done(zio_t *zio, raidz_map_t ** rmp_old)
     vdev_t *cvd;
     uint64_t coff, col;
 
-    if ((*rmp_old)->rm_cols == dcols)
-    return;
+    if ((*rmp_old)->rm_cols == dcols) {
+		rm = *rmp_old;
+        for (c = 0; c < scols; c++) {
+	    	col = f + c;
+            if (col >= dcols) {
+				col -= dcols;
+            }
+            cvd = vd->vdev_child[col];
+            if (vdev_dtl_contains(cvd, DTL_MISSING, zio->io_txg, 1) &&
+				rm->rm_col[c].rc_need_try) {
+	        	rm->rm_col[c].rc_tried = 0;
+				rm->rm_col[c].rc_need_try = 0;
+            }
+		}
+		return;
+    }
+
 
     rm = kmem_zalloc(offsetof(raidz_map_t, rm_col[scols]), KM_SLEEP);
     rm->rm_cols = scols;
@@ -515,8 +588,8 @@ void raidz_aggre_raidz_done(zio_t *zio, raidz_map_t ** rmp_old)
                 rm->rm_missingparity++;
             rm->rm_col[c].rc_error = ESTALE;
             rm->rm_col[c].rc_skipped = 1;
-            rm->rm_col[c].rc_tried = 1;    /* don't even try */
-                
+            rm->rm_col[c].rc_tried = 1;
+			rm->rm_col[c].rc_need_try = 1;
             continue;
         }
     }
@@ -1059,8 +1132,10 @@ raidz_aggre_process_elem(spa_t *spa, uint64_t pos, aggre_map_elem_t *elem,
 	}
 
 	if (dbp) {
-		for (i = 0; i < elem->valid_num; i++)
-			dbuf_rele(dbp[i], FTAG);
+		for (i = 0; i < elem->valid_num; i++) {
+			if (dbp[i])
+				dbuf_rele(dbp[i], FTAG);
+		}
 
 		kmem_free(dbp, size);
 	}

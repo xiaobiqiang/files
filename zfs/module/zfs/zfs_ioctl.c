@@ -201,6 +201,12 @@
 #include "zfs_deleg.h"
 #include "zfs_comutil.h"
 
+#include <sys/fmd_transport.h>
+
+#include <linux/notifier.h>
+extern struct atomic_notifier_head mpt3sas_notifier_list;
+extern struct notifier_block vdev_disk_notifier;
+
 kmutex_t zfsdev_state_lock;
 zfsdev_state_t *zfsdev_state_list;
 extern int ZFS_GROUP_DTL_ENABLE;
@@ -212,6 +218,7 @@ extern int cluster_proto_unregister(void);
 extern void start_travese_migrate_thread(char *fsname, uint64_t flags, uint64_t start_obj, msg_orig_type_t cmd_type);
 extern void stop_travese_migrate_thread(char *fsname, msg_orig_type_t cmd_type);
 extern void status_travese_migrate_thread(char *fsname, char *state, uint64_t *total_to_migrate, uint64_t *total_migrated);
+
 
 uint_t zfs_fsyncer_key;
 extern uint_t rrw_tsd_key;
@@ -7262,6 +7269,8 @@ _init(void)
 	zfs_ioctl_init();
 	lun_migrate_init();
 
+	zfs_udb_init();
+
 	if ((error = zfs_attach()) != 0)
 		goto out;
 
@@ -7269,6 +7278,9 @@ _init(void)
 	tsd_create(&rrw_tsd_key, rrw_tsd_destroy);
 	tsd_create(&zfs_allow_log_key, zfs_allow_log_destroy);
 	cluster_proto_register();
+
+    zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
+				       &vdev_disk_notifier);
 
 	printk(KERN_NOTICE "ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
@@ -7281,6 +7293,7 @@ _init(void)
 	return (0);
 
 out:
+	zfs_udb_fini();
 	zfs_fini();
 	spa_fini();
 	lun_migrate_fini();
@@ -7296,11 +7309,15 @@ static void __exit
 _fini(void)
 {
 	zfs_detach();
+	zfs_udb_fini();
 	zfs_fini();
 	spa_fini();
 	lun_migrate_fini();
 	zvol_fini();
 	cluster_proto_unregister();
+    
+    zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
+				       &vdev_disk_notifier);
 
 	tsd_destroy(&zfs_fsyncer_key);
 	tsd_destroy(&rrw_tsd_key);

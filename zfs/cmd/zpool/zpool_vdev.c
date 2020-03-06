@@ -78,6 +78,7 @@
 #include <sys/vtoc.h>
 #include <sys/mntent.h>
 #include <uuid/uuid.h>
+#include <syslog.h>
 #ifdef HAVE_LIBBLKID
 #include <blkid/blkid.h>
 #else
@@ -342,6 +343,8 @@ check_file(const char *file, boolean_t force, boolean_t isspare)
 			return (0);
 
 		if (state == POOL_STATE_ACTIVE ||
+			state == POOL_STATE_EXPORTED ||
+			state == POOL_STATE_POTENTIALLY_ACTIVE ||
 		    state == POOL_STATE_SPARE || !force) {
 			switch (state) {
 			case POOL_STATE_SPARE:
@@ -933,7 +936,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 	uint_t c, children;
 	nvlist_t *nv;
 	char *type;
-	replication_level_t lastrep = { 0 }, rep, *ret;
+	replication_level_t lastrep, rep, *ret;
 	boolean_t dontreport;
 
 	ret = safe_malloc(sizeof (replication_level_t));
@@ -956,7 +959,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &is_log);
 		if (is_log)
 			continue;
-
+		
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_META, &is_meta);
 		if (is_meta) {
 			rep.zprl_type = "disk";
@@ -968,7 +971,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 			rep.zprl_type = "disk";
 			continue;
 		}
-
+		
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE,
 		    &type) == 0);
 		if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -1029,7 +1032,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 				 * If this is a replacing or spare vdev, then
 				 * get the real first child of the vdev.
 				 */
-				if (strcmp(childtype,
+				while (strcmp(childtype,
 				    VDEV_TYPE_REPLACING) == 0 ||
 				    strcmp(childtype, VDEV_TYPE_SPARE) == 0 ||
 				    strcmp(childtype, VDEV_TYPE_METASPARE) == 0 ||
@@ -1040,7 +1043,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 					verify(nvlist_lookup_nvlist_array(cnv,
 					    ZPOOL_CONFIG_CHILDREN, &rchild,
 					    &rchildren) == 0);
-					assert(rchildren == 2);
+					assert(rchildren > 1);
 					cnv = rchild[0];
 
 					verify(nvlist_lookup_string(cnv,
@@ -1243,6 +1246,7 @@ check_replication(nvlist_t *config, nvlist_t *newroot)
 	 * the current pool.
 	 */
 	ret = 0;
+	
 	if (current != NULL) {
 		if (strcmp(current->zprl_type, new->zprl_type) != 0) {
 			vdev_error(gettext(
@@ -1671,6 +1675,62 @@ is_grouping(const char *type, int *mindev, int *maxdev)
 	return (NULL);
 }
 
+static int verify_disk_company_mark(char *path)
+{
+	int fd, ret = -1,len;
+	uint64_t stamp_offset = 0;	
+	zpool_stamp_t *stamp;
+	char tmp_path[1024];
+	stamp = malloc(sizeof(zpool_stamp_t));
+	if (strncmp(path, "/dev/dsk/", 9) == 0){
+		path += 9;
+		sprintf(tmp_path, "/dev/rdsk/%s", path);
+	}
+	else if (strncmp(path, "/devices", 8) == 0 ||
+		strncmp(path, "/dev/rdsk/", 10) == 0 ||
+		strncmp(path, "/dev/disk/by-id/", 16) == 0 ||
+		strncmp(path, "/dev/", 5) == 0){
+		sprintf(tmp_path, "%s", path);
+	}
+	else {
+		sprintf(tmp_path, "/dev/disk/by-id/%s", path);
+	}
+
+	len = strlen(tmp_path);
+	if (*(tmp_path + len - 2) == 'p') {
+		*(tmp_path + len -2) = '\0';
+	}
+	
+	fd = open(tmp_path, O_RDONLY|O_NDELAY);
+	if (fd > 0) {
+		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
+			syslog(LOG_ERR, "read stamp, get stamp offset failed");
+			close(fd);
+			return (ret);
+		}
+		stamp_offset += stamp_offset/STAMP_OFFSET;
+		if (pread(fd, stamp, sizeof(zpool_stamp_t), stamp_offset)
+			== sizeof(zpool_stamp_t)) {
+			if (stamp->para.company_name == COMPANY_NAME) {
+				ret = 0;
+			} else {
+				syslog(LOG_ERR, "the disk:%s, pool company name check failed:0x%x", tmp_path, stamp->para.company_name);
+			}
+		} else {
+			(void) fprintf(stderr, gettext("read stamp failed"));
+			syslog(LOG_ERR, "read stamp failed");
+		}
+		close(fd);
+				
+	}
+	else{
+		(void) fprintf(stderr, gettext("can not open the disk is %s"),tmp_path);
+		syslog(LOG_ERR,"can not open the disk is %s",tmp_path);
+		}
+	return (ret);
+}
+
+
 /*
  * Construct a syntactically valid vdev specification,
  * and ensure that all devices and files exist and can be opened.
@@ -1687,7 +1747,9 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 	boolean_t seen_logs;
 	boolean_t seen_metas;
 	boolean_t seen_lows;
-
+	char *typetmp;
+	int ret;
+	
 	top = NULL;
 	toplevels = 0;
 	spares = NULL;
@@ -1874,6 +1936,14 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
 					zpool_no_memory();
+
+				ret = verify_disk_company_mark(argv[c]);
+				if(ret == -1){
+					(void) fprintf(stderr, gettext("The disk %s "
+					    "is not ceresdata company\n"), argv[c]);	
+					return (NULL);
+				}
+				
 				if ((nv = make_leaf_vdev(props, argv[c],
 				    B_FALSE, is_meta, is_spare, is_low, is_mirrorspare)) == NULL)
 					return (NULL);
@@ -1952,6 +2022,17 @@ construct_spec(nvlist_t *props, int argc, char **argv)
 			if ((nv = make_leaf_vdev(props, argv[0],
 			    is_log, is_meta, 0, is_low, 0)) == NULL)
 				return (NULL);
+
+			verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &typetmp) == 0);
+			if (strcmp(typetmp, VDEV_TYPE_DISK) == 0) {
+				ret = verify_disk_company_mark(argv[0]);
+				if(ret == -1){
+					(void) fprintf(stderr, gettext("The disk %s "
+						    "is not ceresdata company\n"), argv[0]);
+					return (NULL);
+				}
+			}
+			
 			if (is_log)
 				nlogs++;
 			argc--;

@@ -8,6 +8,8 @@
 #include <net/sock.h>
 #include <sys/fmd_transport.h>
 
+#include <linux/notifier.h>
+
 #define MAX_PAYLOAD 256
 #define MAX_CLIENT  50
 #define HAND_MSG	"connect ok"
@@ -91,6 +93,18 @@ int fmd_kernel_send_msg(const fmd_msg_t *fmsg)
 
 	return (ret);
 }
+
+int zfs_ev_notify_chain_register(struct atomic_notifier_head *nh, struct notifier_block *n)
+{
+    return atomic_notifier_chain_register(nh, n);
+}
+EXPORT_SYMBOL(zfs_ev_notify_chain_register);
+
+int zfs_ev_notify_chain_unregister(struct atomic_notifier_head *nh, struct notifier_block *n)
+{
+    return atomic_notifier_chain_unregister(nh, n);
+}
+EXPORT_SYMBOL(zfs_ev_notify_chain_unregister);
 
 static void fmd_if_rx(struct sk_buff *skb)
 {

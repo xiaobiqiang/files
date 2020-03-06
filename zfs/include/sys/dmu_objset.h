@@ -80,6 +80,10 @@ struct dmu_buf_impl;
 #define OS_NODE_TYPE_MASTER3	3
 #define OS_NODE_TYPE_MASTER4	4
 
+#define ZVOL_COPYING	0X0
+#define ZVOL_COPYED		0X1
+#define MIRROR_NAME_LEN	0x201
+
 typedef struct objset_phys {
 	dnode_phys_t os_meta_dnode;
 	zil_header_t os_zil_header;
@@ -293,10 +297,33 @@ struct objset {
 	boolean_t	os_will_be_master;
 	wrc_data_t	os_wrc;
 #endif
+	krwlock_t	mirror_record_lock;
 };
 
+typedef struct mirror_tree_data
+{
+	avl_node_t data_link;
+	uint64_t start_addr;
+	uint64_t data_len;
+	uint32_t count;
+	uint8_t type;
+} mirror_tree_data_t;
 
+typedef struct mirror_tree
+{
+	list_node_t data_node;
+	uint64_t hash_key;
+	objset_t *list_os;
+	avl_tree_t record_tree;
+} mirror_tree_t;
 
+typedef struct mirror_lun_list
+{
+	int list_num;
+	list_t mirror_data_list;
+} mirror_lun_list_t;
+
+extern mirror_lun_list_t *g_mirror_data;
 
 #define	DMU_META_OBJSET		0
 #define	DMU_META_DNODE_OBJECT	0
@@ -355,7 +382,8 @@ void dmu_objset_evict_done(objset_t *os);
 #ifdef _KERNEL
 int objset_notify_system_space(objset_t *os);
 
-void dmu_objset_replay_all_cache(objset_t *os);
+void dmu_objset_replay_all_cache(objset_t *os, kcondvar_t *zv_cp, 
+		uint8_t *zv_cp_state, int type);
 void dmu_objset_insert_data(objset_t *os, dmu_buf_impl_t *db,
     struct dbuf_segs_data *seg_data);
 void dmu_objset_insert_record(objset_t *os, dmu_buf_impl_t *db);
