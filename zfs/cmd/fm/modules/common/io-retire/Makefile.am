@@ -11,6 +11,7 @@ DEFAULT_INCLUDES += \
 
 libio_retire_la_LTLIBRARIES = libio-retire.la
 
+EXTRA_DIST = io-retire.conf
 
 USER_C = \
 	rio_main.c

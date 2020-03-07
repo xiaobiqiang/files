@@ -11,7 +11,7 @@ sbin_PROGRAMS = drbdctl
 
 drbdctl_SOURCES = 	\
 	drbdctl.c	\
-	cmdparse.c
+	../common/cmdparse.c
 
 drbdctl_LDADD = \
 	$(top_builddir)/lib/libzfs_core/libzfs_core.la

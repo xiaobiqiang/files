@@ -14,7 +14,16 @@ clumgt_SOURCES = \
 	clumgt.c \
 	clu_cmd.c \
 	clu_link.c \
-	clu_sync.c
+	clu_sync.c \
+	clu_cmd.h \
+	clumgt.h \
+	clu_sync.h \
+	clumgt_impl.h \
+	message.h
+
+EXTRA_DIST = \
+	clumgt_cmdlist.config \
+	clumgt.config
 
 clumgt_files = \
 	clumgt_cmdlist.config \

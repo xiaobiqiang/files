@@ -11,11 +11,12 @@ DEFAULT_INCLUDES += \
 sbin_PROGRAMS = configd
 
 configd_SOURCES = \
-	systemd_util.c \
+	../common/systemd_util.c \
 	configd.c \
 	configd_stmf.c \
 	store.c \
-	db_store.c
+	db_store.c \
+	store.h
 
 configd_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \

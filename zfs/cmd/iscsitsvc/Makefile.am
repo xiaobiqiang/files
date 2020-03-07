@@ -11,7 +11,7 @@ sbin_PROGRAMS = iscsitsvc
 
 iscsitsvc_SOURCES = \
 	iscsitsvc.c \
-	cmdparse.c
+	../common/cmdparse.c
 
 iscsitsvc_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la

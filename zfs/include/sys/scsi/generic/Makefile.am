@@ -5,7 +5,12 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/scsi/generic/inquiry.h \
 	$(top_srcdir)/include/sys/scsi/generic/persist.h \
 	$(top_srcdir)/include/sys/scsi/generic/sense.h \
-	$(top_srcdir)/include/sys/scsi/generic/status.h 
+	$(top_srcdir)/include/sys/scsi/generic/status.h \
+	$(top_srcdir)/include/sys/scsi/generic/dad_mode.h \
+	$(top_srcdir)/include/sys/scsi/generic/message.h \
+	$(top_srcdir)/include/sys/scsi/generic/mode.h \
+	$(top_srcdir)/include/sys/scsi/generic/sas.h \
+	$(top_srcdir)/include/sys/scsi/generic/smp_frames.h
 
 USER_H =
 

@@ -4,7 +4,6 @@ AM_CFLAGS += $(DEBUG_STACKFLAGS) $(FRAME_LARGER_THAN)
 
 DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/include \
-	-I$(top_srcdir)/lib/libdiskmgt/include \
 	-I$(top_srcdir)/lib/libspl/include
 
 noinst_LTLIBRARIES = libdiskmgt.la

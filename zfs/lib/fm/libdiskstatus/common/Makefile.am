@@ -15,6 +15,13 @@ USER_C = 		\
 	ds_scsi_sim.c	\
 	ds_scsi.c
 
+EXTRA_DIST = \
+	ds_impl.h \
+	ds_scsi.h \
+	ds_scsi_sim.h \
+	ds_scsi_uscsi.h \
+	libdiskstatus.h
+
 dist_libdiskstatus_la_SOURCES = \
 	$(USER_C)
 

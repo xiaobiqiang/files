@@ -13,6 +13,12 @@ USER_C = 		\
 	fmd_rpc.c	\
 	fmd_xdr.c
 
+EXTRA_DIST = \
+	fmd_adm.h \
+	fmd_adm_impl.h \
+	fmd_rpc_adm.h \
+	fmd_rpc.h
+
 dist_libfmd_adm_la_SOURCES = \
 	$(USER_C)
 

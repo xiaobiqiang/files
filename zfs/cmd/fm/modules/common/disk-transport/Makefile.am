@@ -14,7 +14,7 @@ DEFAULT_INCLUDES += \
 libdisk_transport_la_LTLIBRARIES = libdisk_transport.la
 
 USER_C = \
-	disk-transport.c
+	disk-transport.c 
 
 libdisk_transport_la_LIBADD = 					\
 	$(top_builddir)/lib/fm/topo/libtopo/common/libtopo.la
@@ -22,4 +22,5 @@ libdisk_transport_la_LIBADD = 					\
 libdisk_transport_la_LIBADD +=  -lxml2 
 
 dist_libdisk_transport_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
+	disk-transport.h

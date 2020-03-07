@@ -1,1 +1,1 @@
-SUBDIRS = ipmi fac_prov_ipmi link disk
+SUBDIRS = ipmi fac_prov_ipmi link disk fanpsu

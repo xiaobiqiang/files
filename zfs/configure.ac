@@ -106,7 +106,6 @@ AC_CONFIG_FILES([
 	lib/libzfs_core/Makefile
 	lib/libstmf/Makefile
 	lib/libshare/Makefile
-	lib/libclumgt/Makefile
 	lib/fm/Makefile
 	lib/fm/libdiagcode/Makefile
 	lib/fm/libdiagcode/common/Makefile
@@ -135,6 +134,7 @@ AC_CONFIG_FILES([
 	lib/libipmi/Makefile
 	lib/libiscsit/Makefile
 	cmd/Makefile
+        cmd/common/Makefile
 	cmd/zdb/Makefile
 	cmd/zhack/Makefile
 	cmd/zfs/Makefile
@@ -155,7 +155,6 @@ AC_CONFIG_FILES([
 	cmd/sas3show/Makefile
 	cmd/perf_stat/Makefile
 	cmd/clusterd/Makefile
-	cmd/clumgt/Makefile
 	cmd/pmm/Makefile
 	cmd/disk/Makefile
 	cmd/synckey/Makefile
@@ -249,6 +248,10 @@ AC_CONFIG_FILES([
 	include/sys/fm/fs/Makefile
 	include/sys/idm/Makefile
 	include/sys/iscsit/Makefile
+	include/sys/scsi/Makefile
+	include/sys/scsi/generic/Makefile
+	include/sys/scsi/impl/Makefile
+	include/ipmitool/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

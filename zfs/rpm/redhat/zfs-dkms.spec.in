@@ -69,3 +69,6 @@ exit 0
 %changelog
 * %(date "+%a %b %d %Y") %packager %{version}-%{release}
 - Automatic build by DKMS
+
+%define _unpackaged_files_terminate_build 0
+%define _binaries_in_noarch_packages_terminate_build 0

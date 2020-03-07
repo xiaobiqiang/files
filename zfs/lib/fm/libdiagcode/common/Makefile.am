@@ -12,5 +12,8 @@ USER_C = \
 USER_H = \
 	diagcode.h
 
+EXTRA_DIST = \
+	diagcode.h
+
 dist_libdiagcode_la_SOURCES = \
 	$(USER_C)

@@ -306,6 +306,10 @@ exit 0
 %{_datadir}/pkgconfig/libzfs.pc
 %{_datadir}/pkgconfig/libzfs_core.pc
 %{_libdir}/*.so
+%{_libdir}/*.so.*
+/usr/local/lib/fmd/*
+/usr/local/lib/fmd/schemes/*
+/usr/local/lib/topo/plugins/*
 %{_includedir}/*
 %doc AUTHORS COPYRIGHT DISCLAIMER
 %doc OPENSOLARIS.LICENSE README.markdown
