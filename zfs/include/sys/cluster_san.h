@@ -6,6 +6,8 @@
 #include <sys/modhash.h>
 #include <sys/modhash_impl.h>
 #include <sys/fs/zfs.h>
+#include <sys/list.h>
+#include <sys/zfs_context.h>
 #define	CLUSTER_SAN_MEMFREE_DEALAY				0
 
 #define	TARGET_PROTOCOL_MIRROR					0x1

@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#include <sys/zfs_context.h>
 #ifndef	_FCT_IMPL_H
 #define	_FCT_IMPL_H
 
