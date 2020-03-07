@@ -173,15 +173,10 @@ AC_CONFIG_FILES([
 	cmd/fm/modules/common/zfs-diagnosis/Makefile
 	cmd/fm/modules/common/fanpsu-transport/Makefile
 	cmd/fm/modules/common/disk-transport/Makefile
-	cmd/fm/modules/common/snmp-trapgen/Makefile
 	cmd/fm/modules/common/link-transport/Makefile
 	cmd/fm/modules/common/pool-transport/Makefile
 	cmd/fm/modules/common/eversholt/Makefile
 	cmd/fm/modules/common/eversholt/files/Makefile
-	cmd/fm/modules/common/disk-sense-de/Makefile
-	cmd/fm/modules/common/io-retire/Makefile 
-	cmd/fm/modules/common/noresponse-disk-de/Makefile 
-	cmd/fm/modules/common/slow-io-de/Makefile
 	cmd/fm/fmd/schemes/Makefile
 	cmd/fm/fmd/schemes/zfs/Makefile
 	cmd/fm/dicts/Makefile
