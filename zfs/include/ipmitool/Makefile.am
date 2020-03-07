@@ -41,7 +41,7 @@ USER_H = \
 	$(top_srcdir)/include/ipmitool/ipmi_sel.h \
 	$(top_srcdir)/include/ipmitool/log.h \
 	$(top_srcdir)/include/ipmitool/ipmi_delloem.h \
-	$(top_srcdir)/include/ipmitool/ipmi_mc.h \ 
+	$(top_srcdir)/include/ipmitool/ipmi_mc.h \
 	$(top_srcdir)/include/ipmitool/ipmi_sensor.h
 
 EXTRA_DIST = $(COMMON_H) $(KERNEL_H) $(USER_H)

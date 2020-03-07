@@ -126,15 +126,15 @@ AC_CONFIG_FILES([
 	lib/fm/topo/modules/common/Makefile
 	lib/fm/topo/modules/common/ipmi/Makefile
 	lib/fm/topo/modules/common/fac_prov_ipmi/Makefile
-	lib/fm/topo/modules/common/fanpsu/Makefile
 	lib/fm/topo/modules/common/link/Makefile
 	lib/fm/topo/modules/common/disk/Makefile
+	lib/fm/topo/modules/common/fanpsu/Makefile
 	lib/fm/topo/maps/Makefile
 	lib/fm/topo/maps/i86pc/Makefile
 	lib/libipmi/Makefile
 	lib/libiscsit/Makefile
 	cmd/Makefile
-        cmd/common/Makefile
+	cmd/common/Makefile
 	cmd/zdb/Makefile
 	cmd/zhack/Makefile
 	cmd/zfs/Makefile
