@@ -99,6 +99,16 @@ BuildRequires: systemd
 %description
 This package contains the ZFS command line utilities.
 
+%package -n libcm
+Summary:        Solaris name-value library for Linux
+Group:          System Environment/Kernel
+
+%description -n libcm
+This package contains the CM command line utilities.
+
+%post -n libcm
+/usr/cm/script/cm_rpm.sh
+
 %package -n libzpool2
 Summary:        Native ZFS pool library for Linux
 Group:          System Environment/Kernel
@@ -289,6 +299,9 @@ exit 0
 %config(noreplace) %{_initconfdir}/zfs
 %endif
 %config(noreplace) %{_sysconfdir}/%{name}
+
+%files -n libcm
+/usr/cm/*
 
 %files -n libzpool2
 %{_libdir}/libzpool.so.*
