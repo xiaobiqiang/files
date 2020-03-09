@@ -4,6 +4,7 @@ source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
 ZVOL_DIR='/dev/zvol'
 PROC_DISKSTATS='/proc/diskstats'
+FC_DIR='/sys/class/fc_host/'
 #==============================================================================
 #调用说明
 #./cm_shell_exec.sh <functionname> <arg1> <arg2> <...>
@@ -74,10 +75,37 @@ function cm_pmm_node_stat()
 #500143800637a024 Initiator qlc online 1Gb2Gb4Gb 4Gb
 #500143800637a026 Initiator qlc online 1Gb2Gb4Gb 4Gb
 #==============================================================================
+function cm_cnm_fcinfo_count()
+{
+    local num
+    if [ ! -d "$FC_DIR" ];then
+        echo 0
+        return $?
+    fi
+    num=`ls $FC_DIR|wc -l`
+    echo $num
+    return $?
+}
+
 function cm_cnm_fcinfo_getbatch()
 {
-    fcinfo hba-port |egrep 'Port WWN|Port Mode|State|Driver Name|Supported Speeds|Current Speed'|awk -F':' '{print $2}'|awk  'NR%6!=0{printf $1$2$3$4" "} NR%6==0{print $1}'
-    return $?
+#   fcinfo hba-port |egrep 'Port WWN|Port Mode|State|Driver Name|Supported Speeds|Current Speed'|awk -F':' '{print $2}'|awk  'NR%6!=0{printf $1$2$3$4" "} NR%6==0{print $1}'
+#   return $?
+    local host=(`ls $FC_DIR`)
+    local host_num=${#host[@]}
+    for ((i=0; i<$host_num; i++))
+    do
+        local WWN=`cat $FC_DIR/${host[i]}/port_name`
+        local MODE=`cat $FC_DIR/${host[i]}/tgtid_bind_type|sed 's/ //g'`
+        local STATE=`cat $FC_DIR/${host[i]}/port_state`
+        local DRV_NAME=`cat $FC_DIR/${host[i]}/symbolic_name|awk '{print $3}'`
+        local SUP_SPEED=`cat $FC_DIR/${host[i]}/supported_speeds|sed 's/ //g'`
+        local SPEED=`cat $FC_DIR/${host[i]}/speed`
+        
+        echo "$WWN $MODE $DRV_NAME $STATE $SUP_SPEED $SPEED"
+      
+    done
+    return $?  
 }
 
 function cm_log_backup()
