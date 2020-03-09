@@ -222,7 +222,7 @@ cat >> $am <<EOF
 ceres_cli_LDADD = \\
 	\$(top)/config/libcfg.la \\
 	\$(top)/base/libcmbase.la
-ceres_cli_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cli_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 }
@@ -267,7 +267,7 @@ function make_am_cmd()
 cat >> $am <<EOF
 ceres_cmd_LDADD = \\
 	\$(top)/base/libcmbase.la
-ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
@@ -350,7 +350,7 @@ function make_am_exec()
 cat >> $am <<EOF
 ceres_exec_LDADD = \\
 	\$(top)/base/libcmbase.la
-ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
@@ -397,7 +397,7 @@ cat >> $am <<EOF
 ceres_cm_LDADD = \\
 	\$(top)/config/libcfg.la \\
 	\$(top)/base/libcmbase.la
-ceres_cm_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=\$(prefix)/lib
+ceres_cm_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=\$(prefix)/lib
 
 EOF
 
