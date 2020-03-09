@@ -819,14 +819,7 @@ static sint32 cm_cnm_fcinfo_local_get_each(void *arg, sint8 **cols, uint32 col_n
     CM_VSPRINTF(info->driver_name,sizeof(info->driver_name),"%s",cols[2]);
     CM_VSPRINTF(info->state,sizeof(info->state),"%s",cols[3]);
     CM_VSPRINTF(info->speed,sizeof(info->speed),"%s",cols[4]);
-    if(NULL != strstr(cols[5],"not"))
-    {
-        CM_VSPRINTF(info->cur_speed,sizeof(info->cur_speed),"%s established",cols[5]);    
-    } 
-    else
-    {
-        CM_VSPRINTF(info->cur_speed,sizeof(info->cur_speed),"%s",cols[5]);
-    }
+    CM_VSPRINTF(info->cur_speed,sizeof(info->cur_speed),"%s",cols[5]);
     info->nid = cm_node_get_id();
     return CM_OK;
 }
@@ -836,7 +829,7 @@ sint32  cm_cnm_fcinfo_local_getbatch(
     void **ppAck, uint32 *pAckLen)
 {
     sint32 iRet = CM_OK;
-    iRet = cm_cnm_exec_get_list("/var/cm/script/cm_shell_exec.sh cm_cnm_fcinfo_getbatch",
+    iRet = cm_cnm_exec_get_list(CM_SHELL_EXEC" cm_cnm_fcinfo_getbatch",
         cm_cnm_fcinfo_local_get_each,(uint32)offset,sizeof(cm_cnm_fcinfo_info_t),ppAck,&total);
     if(CM_OK != iRet)
     {
@@ -852,7 +845,7 @@ sint32 cm_cnm_fcinfo_local_count(
     void **ppAck, uint32 *pAckLen)
 {
     uint64 cnt = 0;
-    cnt = cm_exec_int("fcinfo hba-port|grep -w 'HBA Port WWN'|wc -l");
+    cnt = cm_exec_int(CM_SHELL_EXEC" cm_cnm_fcinfo_count");
     return cm_cnm_ack_uint64(cnt,ppAck,pAckLen);
 }
 sint32 cm_cnm_fcinfo_count(
