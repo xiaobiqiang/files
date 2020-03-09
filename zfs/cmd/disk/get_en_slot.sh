@@ -24,7 +24,7 @@ do
         grep 'device slot number' -A6|
         grep  -v attached|
         awk -F: '/device slot number/{printf "%d %s ",'"$index"',$4};/SAS address/{printf "%s \n",$2};'|
-        grep -v 0x00000000
+        grep -v 0x0
         index=$(($index+1))
 done > $SASDISK
 
