@@ -139,6 +139,7 @@ typedef struct zvol_replay_arg
 #define	ZVOL_RDONLY	0x1
 #define	ZVOL_WCE	0x8
 #define	ZVOL_WANT_REMOVE	0x10
+#define	ZVOL_CLOSING	0x20
 
 static int zvol_wait_create_done(zvol_state_t *zv);
 static void zvol_objset_replay_all_cache(void *arg);
@@ -1201,7 +1202,10 @@ zvol_last_close(zvol_state_t *zv)
 	dmu_buf_rele(zv->zv_dbuf, zvol_tag);
 	zv->zv_dbuf = NULL;
 
+	zv->zv_flags |= ZVOL_CLOSING;
     zvol_wait_create_done(zv);
+	VERIFY(MUTEX_HELD(&zv->zv_state_lock));
+	VERIFY(zv->zv_objset != NULL);
 
 	/*
 	 * Evict cached data
@@ -1215,6 +1219,7 @@ zvol_last_close(zvol_state_t *zv)
 
 	dmu_objset_disown(zv->zv_objset, zvol_tag);
 	zv->zv_objset = NULL;
+	zv->zv_flags &= ~ZVOL_CLOSING;
 }
 
 static int
@@ -1302,17 +1307,18 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 	int drop_mutex = 0;
 
 	if (zv!=NULL) {
-		printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);
+		printk(KERN_WARNING "%s %s\n", __func__, zv->zv_name);
 	}
 	else{
 		printk(KERN_WARNING "%s data_opened zv is null \n", __func__);
 		goto out_release;
 	}
 
-	if (zv->zv_open_count == 0 ||
-		zv->zv_disk == NULL ||
+	if (zv->zv_open_count == 0 &&
+		zv->zv_disk == NULL &&
 		zv->zv_state == ZVOL_UNINITIALIZED) {
 		printk(KERN_WARNING "%s zvol %p freed\n", __func__, zv);
+		dump_stack();
 		goto out_release;
 	}
 
@@ -2729,7 +2735,7 @@ zvol_objset_replay_all_cache(void *arg)
 	}
 
 	mutex_enter(&zv->zv_state_lock);
-	if (zv->zv_open_count == 0) {
+	if (zv->zv_open_count == 0 && !(zv->zv_flags & ZVOL_CLOSING)) {
 		dmu_objset_disown(zv->zv_objset, zvol_tag);
 		zv->zv_objset = NULL;
 	}
