@@ -2517,7 +2517,7 @@ static sint32 cm_cnm_dirlowdata_get_each(void* ptemp,const sint8* dir,const sint
 
 
     CM_MEM_ZERO(info,sizeof(cm_cnm_dirlowdata_info_t));
-    CM_VSPRINTF(info->dir,sizeof(info->dir),name);
+    CM_VSPRINTF(info->dir,sizeof(info->dir),"%s",name);
     (void)cm_exec_tmout(list_dl,CM_STRING_128,CM_CMT_REQ_TMOUT,"%s dirget %s %s",cm_cnm_lowdata_sh,nas,name);
     
     p = strtok(list_dl," ");
@@ -2725,7 +2725,7 @@ sint32 cm_cnm_dirlowdata_local_get(
         return iRet;
     }
 
-    CM_VSPRINTF(data->dir,sizeof(data->dir),info->dir);
+    CM_VSPRINTF(data->dir,sizeof(data->dir),"%s",info->dir);
     *ppAck = data;
     *pAckLen = sizeof(cm_cnm_dirlowdata_info_t);
     return CM_OK;
