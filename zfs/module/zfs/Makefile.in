@@ -121,3 +121,4 @@ $(MODULE)-objs += lun_migrate.o
 $(MODULE)-objs += wrcache.o
 $(MODULE)-objs += clist.o
 $(MODULE)-objs += raidz_aggre.o
+$(MODULE)-objs += zfs_udb.o

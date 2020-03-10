@@ -82,6 +82,7 @@ typedef struct slot_record {
 	struct slot_record *sr_next;
 	char sr_serial[ARGS_LEN];
 	char sr_guid[ARGS_LEN];
+	char sr_addr[ARGS_LEN];
 } slot_record_t;
 
 typedef struct slot_map {
@@ -2104,7 +2105,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
                 sprintf(en_buf, "%d", di.dk_enclosure);
                 sprintf(slot_buf, "%d", di.dk_slot);
         #else   //for kylinxos, need to test 
-                strcpy(g_di_cur.dk_serial, name);
+                strcpy(g_di_cur.dk_scsid, name);
                 slot_map_find_value_guid(&g_sm, &g_di_cur);
                 sprintf(en_buf, "%d", g_di_cur.dk_enclosure);
                 sprintf(slot_buf, "%d", g_di_cur.dk_slot);

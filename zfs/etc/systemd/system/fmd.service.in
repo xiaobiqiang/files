@@ -3,6 +3,8 @@ Description=faulty management service
 DefaultDependencies=no
 Requires=NetworkManager.service rpcbind.service
 After=zfs.target rpcbind.service
+After=stmf-svc.service
+After=zfs-clusterd.service
 
 [Service]
 ExecStart=@sbindir@/fmd

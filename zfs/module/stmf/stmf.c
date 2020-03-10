@@ -1113,6 +1113,7 @@ stmf_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case STMF_IOCTL_VALIDATE_VIEW:
 	case STMF_IOCTL_ADD_VIEW_ENTRY:
+	case STMF_IOCTL_ADD_NONLOAD_VIEW_ENTRY:
 		if (stmf_state.stmf_config_state == STMF_CONFIG_NONE) {
 			ret = EACCES;
 			iocd->stmf_error = STMF_IOCERR_UPDATE_NEED_CFG_INIT;
@@ -1148,7 +1149,9 @@ stmf_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			    &veid,
 			    ve->ve_lu_nbr,
 			    &iocd->stmf_error);
-		} else {  /* STMF_IOCTL_VALIDATE_VIEW */
+		} else if (cmd == STMF_IOCTL_ADD_NONLOAD_VIEW_ENTRY){
+			ret = stmf_add_ve_nonload(ve, &iocd->stmf_error);
+		} else {/* STMF_IOCTL_VALIDATE_VIEW */
 			ret = stmf_validate_lun_ve(ve->ve_host_group.name,
 			    ve->ve_host_group.name_size,
 			    ve->ve_target_group.name,
@@ -2326,11 +2329,13 @@ stmf_msg_rx(stmf_ic_msg_t *msg)
 	mutex_exit(&stmf_state.stmf_lock);
 
 	switch (msg->icm_msg_type) {
+		/* set alua 1, remote lu is not active */
 		case STMF_ICM_REGISTER_LUN:
 			(void) stmf_ic_lu_reg(
 			    (stmf_ic_reg_dereg_lun_msg_t *)msg->icm_msg,
 			    STMF_MSG_LU_REGISTER, msg->icm_sess);
 			break;
+		/* set alua 1, remote lu is active */
 		case STMF_ICM_LUN_ACTIVE:
 			(void) stmf_ic_lu_reg(
 			    (stmf_ic_reg_dereg_lun_msg_t *)msg->icm_msg,
@@ -4629,8 +4634,11 @@ stmf_register_lu(stmf_lu_t *lu, boolean_t proxy_reg)
 	stmf_i_lu_t *ilu;
 	uint8_t *p1, *p2;
 	stmf_state_change_info_t ssci;
-	stmf_id_data_t *luid;
-
+	stmf_id_data_t *luid, *nonload_lu_ve;
+	stmf_view_op_entry_t *ve_op;
+	uint32_t error_detail = 0;
+	int res = 0;
+	
 	if ((lu->lu_id->ident_type != ID_TYPE_NAA) ||
 	    (lu->lu_id->ident_length != 16) ||
 	    ((lu->lu_id->ident[0] & 0xf0) != 0x60)) {
@@ -4707,6 +4715,31 @@ stmf_register_lu(stmf_lu_t *lu, boolean_t proxy_reg)
 				}
 			}
 		}
+	}
+
+	while ((nonload_lu_ve = stmf_lookup_id(
+			&stmf_state.stmf_nonload_lu_ve_list,
+			lu->lu_id->ident_length, 
+			lu->lu_id->ident)) != NULL) {
+			
+		stmf_remove_id(&stmf_state.stmf_nonload_lu_ve_list,
+			nonload_lu_ve);
+		
+		ve_op = nonload_lu_ve->id_impl_specific;
+		VERIFY(ve_op->ve_lu_number_valid == 1);
+		VERIFY(ve_op->ve_ndx_valid == 1);
+		/*
+		 * we don't need to care whether succeed or not.
+		 * add all view entries for this lu instead.
+		 */
+		(void) stmf_add_ve(ve_op->ve_host_group.name,
+			ve_op->ve_host_group.name_size,
+			ve_op->ve_target_group.name,
+			ve_op->ve_target_group.name_size,
+			ve_op->ve_guid, &ve_op->ve_ndx,
+			ve_op->ve_lu_nbr, &error_detail);
+
+		stmf_free_id(nonload_lu_ve);
 	}
 	mutex_exit(&stmf_state.stmf_lock);
 
@@ -6401,7 +6434,6 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	uint32_t mutex_ishold = mutex_owned(&ilu->ilu_task_lock);
 
 	ASSERT(rw_lock_held(iss->iss_lockp));
-	itask->itask_worker = NULL;
 	itask->itask_flags = ITASK_IN_FREE_LIST;
 	itask->itask_proxy_msg_id = 0;
 
@@ -7288,16 +7320,10 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		return;
 	}
 
-	if (w==NULL){
-		cmn_err(CE_WARN, "WNULL Unexpected xfer completion task %p dbuf %p",
-		    (void *)task, (void *)dbuf);
-		return;
-	}
-
 	mutex_enter(&w->worker_lock);
 	do {
 		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
+		if (old & (ITASK_BEING_ABORTED | ITASK_IN_FREE_LIST)) {
 			mutex_exit(&w->worker_lock);
 			return;
 		}

@@ -318,12 +318,15 @@ raidz_aggre_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	dvaasize = DVA_GET_ASIZE(dva);
 	tot = s * dcols ;
 	if ((dvaasize >> unit_shift) < tot){
-		cmn_err(CE_PANIC,"%s %p type (%d) asize error %ld %ld ",__func__, zio, zio->io_type, (long)(asize >> unit_shift) ,(long)tot);	
+		cmn_err(CE_PANIC,"%s %p type (%d) totcheck err dvaasize=%lx s=%lx dcols=%lx unit_shift=%lx nparity=%lx",
+            		__func__, zio, zio->io_type,(long)dvaasize, (long)s, (long)dcols, (long)unit_shift, (long)nparity);   
+
 	}
 
 	bc = (dvaasize >> unit_shift) - tot;
 	if (bc > nparity + 1) {
-		cmn_err(CE_PANIC,"%s %p type (%d) nparity error %ld %ld ",__func__, zio, zio->io_type, (long)(asize >> unit_shift) ,(long)tot);	
+		cmn_err(CE_PANIC,"%s %p type (%d) bccheck err dvaasize=%lx s=%lx dcols=%lx unit_shift=%lx nparity=%lx",
+            		__func__, zio, zio->io_type,(long)dvaasize, (long)s, (long)dcols, (long)unit_shift, (long)nparity);   
 	}
 
 	if (zio->io_type == ZIO_TYPE_WRITE) {

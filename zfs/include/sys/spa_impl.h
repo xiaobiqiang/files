@@ -307,6 +307,7 @@ struct spa {
 	 */
 	spa_config_lock_t spa_config_lock[SCL_LOCKS]; /* config changes */
 	refcount_t	spa_refcount;		/* number of opens */
+	refcount_dbg_t	spa_dbg_refcount;	/*to print the spa's holders*/
 
     kmutex_t	spa_do_zvol_lock;
     kcondvar_t	spa_do_zvol_cv;

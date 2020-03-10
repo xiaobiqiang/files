@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 function usage ()
 {
@@ -7,13 +7,33 @@ function usage ()
 }
 
 #echo $#
-if [[ $# -gt 0 ]] ; then 
+if [[ $# -gt 0 ]] ; then
     usage
 fi
 
-sas3show | awk -F: '/Enclosure/{print $1, ":", substr($2,3,6)}; /Slot/{print $1, ":", $2}; /sas_address/{print "Addr :", substr($2,3,15)}'
-qemu-x86_64 /usr/gnemul/qemu-x86_64/bin/MegaCli64 -PDList -aAll | awk -F: '/Enclosure Device ID/{print "Enclosure :", substr($2,2)}; /Slot Number/{print "Slot :", substr($2,2)}; /WWN:/{sub(/^[ \t\r\n]+/,"",$2); print "Addr :", substr($2,1,15)}'
-#qemu-x86_64 /usr/gnemul/qemu-x86_64/bin/MegaCli64 -PDList -aAll | awk -F: '/Slot Number/{print "Slot :", $2}'
-#qemu-x86_64 /usr/gnemul/qemu-x86_64/bin/MegaCli64 -PDList -aAll | awk -F: '/WWN/{print "WWN :", $2;}'
-#qemu-x86_64 /usr/gnemul/qemu-x86_64/bin/MegaCli64 -PDList -aAll | awk -F: '/Inquiry Data/{ serial_num=substr($2,1,8); print "Serial :", serial_num;}'
-#qemu-x86_64 /usr/gnemul/qemu-x86_64/bin/MegaCli64 -PDList -aAll | awk -F: -v wwn=$dk_wwn '/Enclosure Device ID/{en=$2};/Slot Number/{slot=$2}; /WWN/{if($2 == " "wwn) print en,slot,$2;}'
+LSSCSI=/tmp/.lsscsi.txt
+SASDISK=/tmp/.sasdisk
+
+lsscsi -git > $LSSCSI 2>/dev/null
+[  -f $LSSCSI ]&&enclosus=$(awk -F' ' '/enclosu/{print $6};' $LSSCSI)
+index=22
+
+for enc in $enclosus
+do
+        sg_ses -j $enc|
+        grep 'device slot number' -A6|
+        grep  -v attached|
+        awk -F: '/device slot number/{printf "%d %s ",'"$index"',$4};/SAS address/{printf "%s \n",$2};'|
+        grep -v 0x00000000
+        index=$(($index+1))
+done > $SASDISK
+
+[  -f $SASDISK ]&&while read line
+    do
+        diskinfos=($line)
+        addr=$(grep ${diskinfos[2]} $LSSCSI|awk -F' ' '{print $5};')
+
+        echo "Enclosure : ${diskinfos[0]}"
+        echo "Slot : ${diskinfos[1]}"
+        echo "Addr : ${addr:1:15}"
+    done < $SASDISK

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Permissions>
+    <CommandsDef>
+        <Command id="0" name="GetBatch" />
+        <Command id="1" name="Get" />
+        <Command id="2" name="Count" />
+        <Command id="3" name="Insert" />
+        <Command id="4" name="Update" />
+        <Command id="5" name="Delete" />
+    </CommandsDef>
+    <Levels>
+        <Level id="0" name="SuperAdmin" />
+        <Level id="1" name="Level1" />
+        <Level id="2" name="Level2" />
+        <Level id="3" name="Level3" />
+        <Level id="4" name="Level4" />
+    </Levels>
+    <Objects>
+        <Object name="cluster" id="1">
+            <Command name="Update" admins="Level1" />
+        </Object>
+        <Object name="node" id="2">
+            <Command name="Insert" admins="Level1" />
+            <Command name="Delete" admins="Level1" />
+        </Object>
+    </Objects>
+</Permissions>
+
+

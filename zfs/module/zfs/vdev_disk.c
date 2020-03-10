@@ -164,10 +164,12 @@ static int wwnstr_match(char *s1, char *s2)
 
 static int wwn_match(u64 mgt_wwn, u64 tgt_wwn)
 {
-    if(mgt_wwn > tgt_wwn)
+    /*if(mgt_wwn > tgt_wwn)
         return (mgt_wwn - tgt_wwn) < 4;
 
-    return (tgt_wwn - mgt_wwn) < 4;
+    return (tgt_wwn - mgt_wwn) < 4;*/
+    
+    return (mgt_wwn > tgt_wwn) ? (mgt_wwn - tgt_wwn) < 4 : (tgt_wwn - mgt_wwn) < 4 ;
 }
 
 
@@ -974,11 +976,16 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
         return NOTIFY_DONE;     /* Don't care */
     }
 
+    printk( "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
+                evt_type, sas_address, vd->vdev_path, __FILE__, __LINE__);
+
 	switch(val) {
     case SAS_EVT_DEV_REMOVE:
-        printk( "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
-                    evt_type, sas_address, vd->vdev_path, __FILE__, __LINE__);
         zfs_post_remove(vd->vdev_spa, vd);
+        break;
+
+    case SAS_EVT_DEV_MERR:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_MERR, vd->vdev_spa, vd, NULL, 0, 0);
         break;
 
     default :
