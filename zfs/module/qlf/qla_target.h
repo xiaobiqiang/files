@@ -1195,6 +1195,11 @@ struct qla_fct_event_msg {
 	uint8_t event;
 };
 
+struct qla_fct_logout_msg {
+	struct work_struct fct_event_work;
+	fc_port_t *fcport;
+};
+
 struct qla_fct_shutdown_msg {
 	struct work_struct fct_shutdown_work;
 	struct scsi_qla_host *vha;
@@ -1209,6 +1214,11 @@ struct as
 };
 
 extern struct qla_tgt_data qla_target;
+
+extern struct kmem_cache *fct_logout_msg_cachep;
+
+extern struct workqueue_struct *qla_tgt_fct_event_wq;
+
 /*
  * Internal function prototypes
  */
@@ -1307,6 +1317,8 @@ extern struct qla_ctio_msg * qlt_alloc_ctio_cmd_response_done_msg(
 	fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags);
 extern void qlt_free_ctio_msg(struct qla_ctio_msg * msg);
 extern void qlt_handle_fct_event(scsi_qla_host_t *vha, uint8_t event);
+
+extern void qla2x00_do_fct_logout_port(struct work_struct *fct_event_work);
 
 
 #endif /* __QLA_TARGET_H */

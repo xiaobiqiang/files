@@ -79,6 +79,8 @@
 #include <linux/delay.h>
 
 static uint32_t ql_dbg_offset = 0x800;
+int ql2x_dbg_default_mask = QL_DBG_DEFAULT1_MASK;
+
 
 static inline void
 qla2xxx_prep_dump(struct qla_hw_data *ha, struct qla2xxx_fw_dump *fw_dump)
@@ -2718,3 +2720,6 @@ ql_dump_buffer(uint32_t level, scsi_qla_host_t *vha, int32_t id,
 	if (cnt % 16)
 		ql_dbg(level, vha, id, "\n");
 }
+
+module_param(ql2x_dbg_default_mask, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(ql2x_dbg_default_mask,	"qla2xxx debug default mask");

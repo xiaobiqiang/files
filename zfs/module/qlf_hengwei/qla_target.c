@@ -77,6 +77,11 @@ struct kmem_cache *abort_msg_cachep;
 struct kmem_cache *fct_event_msg_cachep;
 
 /*
+ * FCT LOGOUT msg allocation cache
+ */
+struct kmem_cache *fct_logout_msg_cachep;
+
+/*
  * FCT SHUTDOWN msg allocation cache
  */
 struct kmem_cache *fct_shutdown_msg_cachep;
@@ -183,9 +188,8 @@ static struct workqueue_struct *qla_tgt_wq;
 static struct workqueue_struct *qla_tgt_ctio_wq;
 static struct workqueue_struct *qla_tgt_atio_wq;
 static struct workqueue_struct *qla_tgt_abort_wq;
-static struct workqueue_struct *qla_tgt_fct_event_wq;
 static struct workqueue_struct *qla_tgt_fct_shutdown_wq;
-
+struct workqueue_struct *qla_tgt_fct_event_wq;
 
 static DEFINE_MUTEX(qla_tgt_mutex);
 static LIST_HEAD(qla_tgt_glist);
@@ -4454,6 +4458,16 @@ qlt_do_fct_event(struct work_struct *fct_event_work)
 
 	kmem_cache_free(fct_event_msg_cachep, msg);
 }
+
+void
+qla2x00_do_fct_logout_port(struct work_struct *fct_event_work)
+{
+	struct qla_fct_logout_msg *msg;
+	msg = (struct qla_fct_logout_msg *)fct_event_work;
+	qla2x00_fct_logout_port(msg->fcport);
+	kmem_cache_free(fct_logout_msg_cachep, msg);
+}
+
 
 static void
 qlt_do_fct_shutdown(struct work_struct *fct_shutdown_work)
@@ -8942,6 +8956,15 @@ int __init qlt_init(void)
 		return -ENOMEM;
 	}
 
+	fct_logout_msg_cachep = kmem_cache_create("fct_logout_msg_cachep",
+		   sizeof(struct qla_fct_logout_msg), __alignof__(struct
+		   qla_fct_logout_msg), 0, NULL);
+	if (!fct_event_msg_cachep) {
+	   ql_log(ql_log_fatal, NULL, 0xe06d,
+		   "kmem_cache_create for qla_fct_logout_msg failed\n");
+	   return -ENOMEM;
+	}
+	
 	fct_shutdown_msg_cachep = kmem_cache_create("fct_shutdown_msg_cachep",
 	    sizeof(struct qla_fct_shutdown_msg), __alignof__(struct
 	    qla_fct_shutdown_msg), 0, NULL);
@@ -9028,6 +9051,16 @@ void qlt_exit(void)
 	destroy_workqueue(qla_tgt_ctio_wq);
 	destroy_workqueue(qla_tgt_atio_wq);
 	destroy_workqueue(qla_tgt_abort_wq);
+	destroy_workqueue(qla_tgt_fct_event_wq);
+	destroy_workqueue(qla_tgt_fct_shutdown_wq);	
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
+
 	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
+	kmem_cache_destroy(ctio_msg_cachep);
+	kmem_cache_destroy(atio_msg_cachep);
+	kmem_cache_destroy(atio_cachep);
+	kmem_cache_destroy(abort_msg_cachep);
+	kmem_cache_destroy(fct_event_msg_cachep);
+	kmem_cache_destroy(fct_logout_msg_cachep);
+	kmem_cache_destroy(fct_shutdown_msg_cachep);	
 }
