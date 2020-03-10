@@ -69,6 +69,11 @@ struct kmem_cache *abort_msg_cachep;
 struct kmem_cache *fct_event_msg_cachep;
 
 /*
+ * FCT LOGOUT msg allocation cache
+ */
+struct kmem_cache *fct_logout_msg_cachep;
+
+/*
  * FCT SHUTDOWN msg allocation cache
  */
 struct kmem_cache *fct_shutdown_msg_cachep;
@@ -153,8 +158,6 @@ static void qlt_do_atio(struct work_struct *abort_work);
 static void qlt_do_fct_event(struct work_struct *fct_event_work);
 static void qlt_do_fct_shutdown(struct work_struct *fct_shutdown_work);
 
-
-
 /*
  * Global Variables
  */
@@ -165,8 +168,8 @@ static struct workqueue_struct *qla_tgt_wq;
 static struct workqueue_struct *qla_tgt_ctio_wq;
 static struct workqueue_struct *qla_tgt_atio_wq;
 static struct workqueue_struct *qla_tgt_abort_wq;
-static struct workqueue_struct *qla_tgt_fct_event_wq;
 static struct workqueue_struct *qla_tgt_fct_shutdown_wq;
+struct workqueue_struct *qla_tgt_fct_event_wq;
 
 
 static DEFINE_MUTEX(qla_tgt_mutex);
@@ -1872,6 +1875,7 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 		(cmd->dma_data_direction != DMA_FROM_DEVICE)) {
 		prm->residual = cmd->data_length - cmd->bufflen;
 		prm->rq_result |= SS_RESIDUAL_UNDER;
+		/*
 		printk("%s prm->rq_result = 0x%x, prm->residual = 0x%x, "
 			"cmd->data_length = 0x%x, cmd->bufflen = 0x%x\n",
 			__func__,
@@ -1879,6 +1883,7 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 			prm->residual,
 			cmd->data_length,
 			cmd->bufflen);
+		*/
 	}
 
 #if 0
@@ -3157,6 +3162,15 @@ qlt_do_fct_event(struct work_struct *fct_event_work)
 	fct_handle_event(vha->qlt_port, msg->event, 0, 0);
 
 	kmem_cache_free(fct_event_msg_cachep, msg);
+}
+
+void
+qla2x00_do_fct_logout_port(struct work_struct *fct_event_work)
+{
+	struct qla_fct_logout_msg *msg;
+	msg = (struct qla_fct_logout_msg *)fct_event_work;
+	qla2x00_fct_logout_port(msg->fcport);
+	kmem_cache_free(fct_logout_msg_cachep, msg);
 }
 
 static void
@@ -6945,6 +6959,14 @@ int __init qlt_init(void)
 		goto out;
 	}
 
+	fct_logout_msg_cachep = kmem_cache_create("fct_logout_msg_cachep",
+		   sizeof(struct qla_fct_logout_msg), __alignof__(struct
+		   qla_fct_logout_msg), 0, NULL);
+	if (!fct_event_msg_cachep) {
+	   ql_log(ql_log_fatal, NULL, 0xe06d,
+		   "kmem_cache_create for qla_fct_logout_msg failed\n");
+	   return -ENOMEM;
+	}
 
 	fct_shutdown_msg_cachep = kmem_cache_create("fct_shutdown_msg_cachep",
 	    sizeof(struct qla_fct_shutdown_msg), __alignof__(struct
@@ -7036,7 +7058,17 @@ void qlt_exit(void)
 	destroy_workqueue(qla_tgt_ctio_wq);
 	destroy_workqueue(qla_tgt_atio_wq);
 	destroy_workqueue(qla_tgt_abort_wq);
+	destroy_workqueue(qla_tgt_fct_event_wq);
+	destroy_workqueue(qla_tgt_fct_shutdown_wq); 	
 	mempool_destroy(qla_tgt_mgmt_cmd_mempool);
+
 	kmem_cache_destroy(qla_tgt_mgmt_cmd_cachep);
 	kmem_cache_destroy(qla_tgt_cmd_cachep);
+	kmem_cache_destroy(ctio_msg_cachep);
+	kmem_cache_destroy(atio_msg_cachep);
+	kmem_cache_destroy(atio_cachep);
+	kmem_cache_destroy(abort_msg_cachep);
+	kmem_cache_destroy(fct_event_msg_cachep);
+	kmem_cache_destroy(fct_logout_msg_cachep);
+	kmem_cache_destroy(fct_shutdown_msg_cachep);	
 }
