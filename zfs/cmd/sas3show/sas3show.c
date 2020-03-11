@@ -59,6 +59,10 @@ struct mpt3sas_dev_info {
     unsigned long long  wwid;
     unsigned long long  enclosure_id;
     unsigned long long  slot;
+    unsigned short enclosure_hdl;
+    unsigned short pad1;
+    unsigned short pad2;
+    unsigned short pad3;  
 };
 
 struct mpt3_sas_devinfo_buffer {
@@ -239,8 +243,8 @@ int main(int argc, char **argv)
             syslog(LOG_ERR, "Success to fetch info on mpt device %d", cmd->hdr.ioc_number);
             for(i = 0; i < cmd->sas_dev_cnt; i++)
             {
-                printf("Enclosure:%lld\nSlot:%llu\nwwid:0x%llx\nsas_address:0x%llx\n",
-                    cmd->buffer[i].enclosure_id & 0xffff, 
+                printf("Enclosure:%d\nSlot:%llu\nwwid:0x%llx\nsas_address:0x%llx\n",
+                    cmd->buffer[i].enclosure_hdl, 
                     cmd->buffer[i].slot & 0xffff, 
                     cmd->buffer[i].wwid,
                     cmd->buffer[i].sas_address);

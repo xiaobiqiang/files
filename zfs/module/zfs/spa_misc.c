@@ -605,6 +605,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	spa->spa_deadman_synctime = MSEC2NSEC(zfs_deadman_synctime_ms);
 
 	refcount_create(&spa->spa_refcount);
+	refcount_dbg_create(&spa->spa_dbg_refcount);
 	spa_config_lock_init(spa);
 	spa_stats_init(spa);
 
@@ -721,6 +722,7 @@ spa_remove(spa_t *spa)
 	spa_config_set(spa, NULL);
 
 	refcount_destroy(&spa->spa_refcount);
+	refcount_dbg_destroy(&spa->spa_dbg_refcount);
 
 	spa_stats_destroy(spa);
 	spa_config_lock_destroy(spa);
@@ -812,6 +814,7 @@ spa_open_ref(spa_t *spa, void *tag)
 	ASSERT(refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
 	(void) refcount_add(&spa->spa_refcount, tag);
+	(void) refcount_dbg_add(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -824,6 +827,7 @@ spa_close(spa_t *spa, void *tag)
 	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
 	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) refcount_dbg_remove(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -838,6 +842,7 @@ void
 spa_async_close(spa_t *spa, void *tag)
 {
 	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) refcount_dbg_remove(&spa->spa_dbg_refcount, tag);
 }
 
 /*
@@ -2440,6 +2445,73 @@ spa_get_group_flags(spa_t *spa)
 	return (spa->spa_disable_group);
 }
 
+static size_t
+sprintf_refcount(refcount_dbg_t *rc, char *buf, size_t len)
+{
+        int n;
+        size_t off = 0;
+        reference_dbg_t *ref;
+		char buffer[64];
+
+        n = snprintf(buf, len, "refcount_t at %p has %llu current holds, "
+            "%llu recently released holds\n",
+            rc, (longlong_t)rc->rc_count, (longlong_t)rc->rc_removed_count);
+        off += n;
+
+        if (rc->rc_count > 0) {
+                n = snprintf(buf + off, len - off, "current holds:\n");
+                off += n;
+                for (ref = list_head(&rc->rc_list); ref != NULL;
+                        ref = list_next(&rc->rc_list, ref)) {
+                        n = snprintf(buf + off, len - off,
+                                "reference %p holder %p number %llu removed %p\n",
+                                ref, ref->ref_holder, (u_longlong_t)ref->ref_number,
+                                ref->ref_removed);
+                        off += n;
+                }
+        }
+
+        if (rc->rc_removed_count > 0) {
+                n = snprintf(buf + off, len - off, "released holds:\n");
+                off += n;
+                for (ref = list_head(&rc->rc_removed); ref != NULL;
+                        ref = list_next(&rc->rc_removed, ref)) {
+                        n = snprintf(buf + off, len - off,
+                                "reference %p holder %p number %llu removed %p\n",
+                                ref, ref->ref_holder, (u_longlong_t)ref->ref_number,
+                                ref->ref_removed);
+                        off += n;
+                }
+        }
+
+        return (off);
+}
+
+size_t
+sprintf_spa_refcount(spa_t *spa, char *buf, size_t len)
+{
+	size_t n;
+
+	n = snprintf(buf, len, "spa name %s:\n", spa_name(spa));
+
+	return (sprintf_refcount(&spa->spa_dbg_refcount, buf + n, len - n) + n);
+}
+
+void
+sprintf_all_spa_refcount(char *buf, size_t len)
+{
+	spa_t *spa = NULL;
+	size_t off = 0, n;
+
+	mutex_enter(&spa_namespace_lock);
+	while ((spa = spa_next(spa)) != NULL) {
+		n = sprintf_spa_refcount(spa, buf + off, len - off);
+		off += n;
+	}
+	mutex_exit(&spa_namespace_lock);
+	if (off == 0)
+		strncpy(buf, "no spa", len);
+}
 
 #if defined(_KERNEL) && defined(HAVE_SPL)
 /* Namespace manipulation */

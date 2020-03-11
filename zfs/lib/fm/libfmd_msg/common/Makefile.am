@@ -12,6 +12,9 @@ USER_C = \
 USER_H = \
 	fmd_msg.h
 
+EXTRA_DIST = \
+	fmd_msg.h
+
 dist_libfmd_msg_la_SOURCES = \
 	$(USER_C)
 

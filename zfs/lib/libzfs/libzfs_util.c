@@ -64,6 +64,7 @@
 #define	ZFS_ILU_MAX_NTHREAD		64
 #define NETCONFIG_FILE			"/dev/tcp"
 #define	IFCONFIG_CMD			"/usr/sbin/ifconfig"
+#define DELETE_LU_CMD	"stmfadm delete-lu -c"
 
 typedef struct zfs_ilu_list{
 	struct zfs_ilu_list *next;
@@ -2739,7 +2740,6 @@ void* zfs_import_lu(void *arg)
 	ret = stmfImportLu(STMF_DISK, dev_buf, &createdGuid);
 	if (ret == 0) {
 		stmfOnlineLogicalUnit(&createdGuid);
-		stmfNotifyLuActive(dev_buf);
 		syslog(LOG_INFO, " import lu success, %s", lu_name);
  	} else {
  		syslog(LOG_ERR, " import lu failed, %s, ret:0x%x", lu_name, ret);
@@ -2955,19 +2955,21 @@ zfs_destroy_lu(char *dataset)
 	stmfGuidList *lu_list;
 	stmfViewEntryList *view_entry_list; 
 	stmfGuid lu_guid;
+	int i;
+	int len;
 	int ret;
 	int lu_num;
 	int view_num;
-	luResource hdl = NULL;
-	/*boolean_t b_destroy_partner = B_TRUE;*/
-	boolean_t b_del_partion = B_FALSE;
-	stmf_remove_proxy_view_t *proxy_remove_view_entry;
+	luResource hdl = NULL;	
+	char cmdbuf[512] = {0};
+	char buf[256];
+	char sGuid[32 + 1] = {0};
+	FILE *fp;
 
 	sprintf(dev_path, "%s%s", ZVOL_FULL_DIR, dataset);
 	ret = stmfGetLogicalUnitList(&lu_list);
 	if (ret == STMF_STATUS_SUCCESS) {
 		for (lu_num = 0; lu_num < lu_list->cnt; lu_num ++) {
-			b_del_partion = B_TRUE;
 			lu_guid = lu_list->guid[lu_num];
 			ret = stmfGetLuResource(&lu_guid, &hdl);
 			if (ret != STMF_STATUS_SUCCESS) {
@@ -2981,28 +2983,7 @@ zfs_destroy_lu(char *dataset)
 				syslog(LOG_ERR, "Acquire LU Metadata Resource Fails ");
 				continue;
 			}
-			if (strcmp(dev_path, prop_val) == 0) {
-				
-				ret = stmfGetViewEntryList(&lu_guid, &view_entry_list);
-				if (ret != STMF_STATUS_SUCCESS) {
-					syslog(LOG_ERR, "Acquire LU Partition Resource Fails ");
-					b_del_partion = B_FALSE;
-				}
-				if (b_del_partion) {
-					for (view_num = 0; view_num < view_entry_list->cnt; view_num ++) {
-						stmfRemoveViewEntry(&lu_guid,
-						     view_entry_list->ve[view_num].veIndex);
-						proxy_remove_view_entry = malloc(sizeof(stmf_remove_proxy_view_t));
-						bzero(proxy_remove_view_entry, sizeof(stmf_remove_proxy_view_t));
-						proxy_remove_view_entry->head.op_type = STMF_OP_DELETE;
-						proxy_remove_view_entry->head.item_type = STMF_VIEW_OP;
-						bcopy(&lu_guid, &proxy_remove_view_entry->lu_guid, sizeof(stmfGuid));
-						proxy_remove_view_entry->view_index = view_num;
-						free(proxy_remove_view_entry);
-					}
-					stmfFreeMemory(view_entry_list);
-				}
-				
+			if (strcmp(dev_path, prop_val) == 0) {				
 				ret = stmfOfflineLogicalUnit(&lu_guid);
 				if (ret != STMF_STATUS_SUCCESS) {
 					(void) stmfFreeLuResource(hdl);
@@ -3011,12 +2992,21 @@ zfs_destroy_lu(char *dataset)
 					syslog(LOG_ERR, "In Delete  lu progress, Offline Lun Fails ");
 					return (1);
 				}
-				ret = stmfDeleteLu(&lu_guid);
-				if (ret != STMF_STATUS_SUCCESS) {
-					syslog(LOG_ERR, "Delete LU  Fails ");
-					(void) stmfFreeLuResource(hdl);
-					hdl = NULL;
-					continue;
+
+				len = 0;
+				memset(sGuid, 0, sizeof(sGuid));
+				for (i = 0; i < 16; i++) {
+					len += snprintf(sGuid + len, sizeof(sGuid) - len, "%02x", lu_guid.guid[i]);
+				}
+				
+				memset(cmdbuf, 0, sizeof(cmdbuf));
+				snprintf(cmdbuf, sizeof(cmdbuf), "%s %s", DELETE_LU_CMD, sGuid);
+				fp = popen(cmdbuf, "r");
+				if (fp != NULL) {
+					while (fgets(buf, 256, fp) != NULL) {
+						syslog(LOG_NOTICE, "%s", buf);
+					}
+					pclose(fp);
 				}
 				
 				(void) stmfFreeLuResource(hdl);

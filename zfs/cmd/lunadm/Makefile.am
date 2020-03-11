@@ -12,7 +12,8 @@ sbin_PROGRAMS = lunadm
 
 lunadm_SOURCES = \
 	lunadm.c \
-	cmdparse.c 
+	../common/cmdparse.c \
+	lunadm.h
 
 lunadm_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \

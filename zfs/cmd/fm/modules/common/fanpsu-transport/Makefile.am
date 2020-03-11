@@ -18,7 +18,12 @@ libfanpsu_transport_la_LIBADD = 					\
 	$(top_builddir)/lib/fm/topo/libtopo/common/libtopo.la
 
 dist_libfanpsu_transport_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
+	fanpsu-transport.h
+
+EXTRA_DIST = \
+	config \
+	fmd_get_info.sh
 
 install-exec-hook:
 	[ -d /var/fm/fmd/script/ ]||mkdir -p /var/fm/fmd/script/

@@ -20,7 +20,7 @@ clusterd_SOURCES = \
 	cn_cluster.h \
 	deflt.c \
 	deflt.h \
-	systemd_util.c \
+	../common/systemd_util.c \
 	if_util/dnet_ntop.c \
 	if_util/dnet_pton.c \
 	if_util/hlist.h \

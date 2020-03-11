@@ -14,7 +14,7 @@ DEFAULT_INCLUDES += \
 	-I/usr/include/libxml2
 
 libpool_transport_la_LTLIBRARIES = libpool_transport.la
-libpool_transport_la_DATA = libpool_transport.conf
+dist_libpool_transport_la_DATA = libpool_transport.conf
 
 USER_C =  pool_transport.c pt_zfs.c
 
@@ -28,4 +28,5 @@ libpool_transport_la_LIBADD = 					\
 libpool_transport_la_LIBADD += -lxml2 -luutil
 
 dist_libpool_transport_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
+	pt_zfs.h

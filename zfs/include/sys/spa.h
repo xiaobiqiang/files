@@ -981,6 +981,12 @@ extern void spa_update_raidz_aggre_vdev_state(spa_t *spa,
 	int aggre_num, int state);
 extern int spa_raidz_aggre_vdev_state(spa_t * spa, int aggre_num);
 
+extern size_t sprintf_spa_refcount(spa_t *spa, char *buf, size_t len);
+extern void sprintf_all_spa_refcount(char *buf, size_t len);
+
+extern int zfs_udb_init(void);
+extern void zfs_udb_fini(void);
+
 #ifdef	__cplusplus
 }
 #endif

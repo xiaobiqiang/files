@@ -18,6 +18,8 @@ USER_C = \
 libdisk_sense_de_la_LIBADD = 					\
 	$(top_builddir)/lib/fm/topo/libtopo/common/libtopo.la
 
+EXTRA_DIST = disk-sense-de.conf
+
 libdisk_sense_de_la_LIBADD +=  -lxml2 
 
 dist_libdisk_sense_de_la_SOURCES = \

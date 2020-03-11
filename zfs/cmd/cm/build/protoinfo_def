@@ -1,0 +1,40 @@
+# packaging files
+
+#svc config
+d none var 755 root sys
+d none var/svc 755 root sys
+d none var/svc/manifest 755 root sys
+d none var/svc/manifest/system 755 root sys
+f none var/svc/manifest/system/ceres_cm.xml 0444 root sys
+f none var/svc/manifest/system/cm_multi.xml 0444 root sys
+
+#CM
+d none var/cm 755 root sys
+d none var/cm/data 755 root sys
+d none var/cm/log 755 root sys
+d none var/cm/static 755 root sys
+d none var/cm/script 755 root sys
+
+#CM bin
+d none usr 755 root sys
+d none usr/sbin 755 root sys
+f none usr/sbin/ceres_cli 755 root bin
+f none usr/sbin/ceres_cmd 755 root bin
+f none usr/sbin/ceres_exec 755 root bin
+f none usr/sbin/sqlite3 755 root bin
+s none usr/sbin/cm_multi_exec=../../var/cm/script/cm_multi_exec.py
+s none usr/sbin/cm_multi_send=../../var/cm/script/cm_multi_send.py
+s none usr/sbin/cm_disk=../../var/cm/script/cm_disk.sh
+s none usr/sbin/cm_topo=../../var/cm/script/cm_topo.sh
+
+d none usr/local 755 root sys
+d none usr/local/cm 755 root sys
+d none usr/local/cm/script 755 root sys
+s none usr/sbin/cm_sysinit=../local/cm/script/cm_node_init.sh
+
+#CM lib
+d none lib 755 root sys
+d none usr/lib 755 root sys
+f none usr/lib/ceres_cm 755 root bin
+f none lib/libcmjni.so 755 root bin
+f none lib/libcmopensrc.so 755 root bin

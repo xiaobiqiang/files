@@ -10,6 +10,9 @@ pmm_SOURCES = \
 pmm_files = \
 	ceres_pmm.conf
 
+EXTRA_DIST = \
+	ceres_pmm.conf
+
 pmm_LDADD = -lpthread
 pmm_LDFLAGS = -pthread
 

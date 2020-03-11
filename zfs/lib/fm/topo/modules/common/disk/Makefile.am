@@ -15,6 +15,9 @@ libdisk_la_LTLIBRARIES = libdisk.la
 USER_C = \
 	disk_enum.c
 
+EXTRA_DIST = \
+	disk_enum.h
+
 libdisk_la_LIBADD = $(top_builddir)/lib/libnvpair/libnvpair.la \
 			$(top_builddir)/lib/libdiskmgt/libdiskmgt.la \
 			$(top_builddir)/lib/fm/libdiskstatus/common/libdiskstatus.la

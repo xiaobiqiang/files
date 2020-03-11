@@ -19,3 +19,5 @@ libnoresponse_disk_de_la_LIBADD = 					\
 
 dist_libnoresponse_disk_de_la_SOURCES = \
 	$(USER_C)
+
+EXTRA_DIST = noresponse-disk-de.conf

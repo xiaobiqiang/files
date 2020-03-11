@@ -11,6 +11,13 @@ sbin_PROGRAMS = disk
 disk_SOURCES = 	\
 	disk.c
 
+EXTRA_DIST = \
+	sas2ircu \
+	sas3ircu \
+	get_en_slot.sh \
+	sg_led_disk.sh \
+	lsiraid-2018-03-05.tar.bz2
+
 disk_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \
 	$(top_builddir)/lib/libuutil/libuutil.la \

@@ -51,6 +51,8 @@
 #include <sys/stmf_sbd.h>
 #include <sys/stmf_impl.h>
 #include <sys/sbd_impl.h>
+#include <sys/dbuf.h>
+#include <sys/zfs_mirror.h>
 
 #define	SCSI2_CONFLICT_FREE_CMDS(cdb)	( \
 	/* ----------------------- */                                      \
@@ -100,6 +102,8 @@ void sbd_handle_short_write_xfer_completion(scsi_task_t *task,
     stmf_data_buf_t *dbuf);
 void sbd_handle_short_write_transfers(scsi_task_t *task,
     stmf_data_buf_t *dbuf, uint32_t cdb_xfer_size);
+void sbd_handle_standby_short_write_xfer_completion(struct scsi_task *task, 
+	struct stmf_data_buf *dbuf);
 void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
     uint32_t buflen);
 void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
@@ -949,8 +953,13 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	int fast_path = 0;
+	int flag = 0;
 
-	sbd_zvol_mirror_replay_wait(sl);
+	if (zfs_mirror_mdata_enable())
+		flag = sbd_zvol_mdata_mirror_replay_wait(sl);
+	else
+		sbd_zvol_mirror_replay_wait(sl);
+	
 	if (op == SCMD_READ) {
 		lba = READ_SCSI21(&task->task_cdb[1], uint64_t);
 		len = (uint32_t)task->task_cdb[4];
@@ -981,6 +990,23 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
+	}
+
+	if (flag) {
+		dnode_t *mdn;
+		int check_result;
+		objset_t *os;
+		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		
+		mdn = DB_DNODE(db);
+		os = mdn->dn_objset;
+		dmu_mirror_lock(RW_READER);
+		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
+		dmu_mirror_unlock();
+		if (check_result) {
+			cmn_err(CE_WARN, "%s line %d %s mirror read wait", __func__, __LINE__, sl->sl_name);
+			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
+		}
 	}
 
 	task->task_cmd_xfer_length = len;
@@ -1717,7 +1743,6 @@ sbd_handle_standby_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd
 	}
 
 	//sbd_free_proxy_dbuf(task_dbuf);
-	stmf_free_dbuf(task, dbuf);
 	task->task_dbuf = NULL;
 	return;
 }
@@ -1750,6 +1775,41 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 	#endif
 	return;
 }
+
+void
+sbd_handle_standby_short_write_xfer_completion(struct scsi_task *task,
+    struct stmf_data_buf *dbuf)
+{
+	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
+
+	if (scmd->nbufs > 0) {
+		/*
+		 * Decrement the count to indicate the port xfer
+		 * into the dbuf has completed even though the buf is
+		 * still in use here in the LU provider.
+		 */
+		scmd->nbufs--;
+	}
+
+	if (dbuf->db_xfer_status != STMF_SUCCESS) {
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    dbuf->db_xfer_status, NULL, SBD_HANDLE_STANDBY_SHORT_WRITE_XFER_COMPLETION);
+		return;
+	}
+
+	task->task_nbytes_transferred += dbuf->db_data_size;
+	
+	/* We've got all the data we need, let's proxy the command. */
+	scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+
+	stmf_proxy_scsi_data_res(task, dbuf);
+	
+	stmf_free_dbuf(task, dbuf);
+	task->task_dbuf = NULL;
+	return;
+}
+
+
 
 /*
  * Return true if copy avoidance is beneficial.
@@ -1808,8 +1868,13 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	uint8_t	sync_wr_flag = 0, do_zcopy = 0, is_meta_data = 0;
+	int flag = 0;
 
-	sbd_zvol_mirror_replay_wait(sl);  
+	if (zfs_mirror_mdata_enable())
+		flag = sbd_zvol_mdata_mirror_replay_wait(sl);
+	else
+		sbd_zvol_mirror_replay_wait(sl);
+	
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_WRITE_PROTECTED);
@@ -1864,6 +1929,23 @@ sbd_handle_active_write(struct scsi_task *task, struct stmf_data_buf *initial_db
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
+	}
+
+	if (flag) {
+		dnode_t *mdn;
+		int check_result;
+		objset_t *os;
+		dmu_buf_impl_t *db = (dmu_buf_impl_t *)sl->sl_zvol_bonus_hdl;
+		
+		mdn = DB_DNODE(db);
+		os = mdn->dn_objset;
+		dmu_mirror_lock(RW_READER);
+		check_result = dmu_check_mirror_repeat_data(os, laddr, len);
+		dmu_mirror_unlock();
+		if (check_result) {
+			cmn_err(CE_WARN, "%s line %d %s mirror write wait", __func__, __LINE__, sl->sl_name);
+			zvol_mirror_replay_wait(sl->sl_zvol_minor_hdl);
+		}
 	}
 
 	task->task_cmd_xfer_length = len;
@@ -2247,6 +2329,7 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 	sbd_cmd_t *scmd;
 	stmf_status_t st_ret;
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 
 	/*
 	 * For now lets assume we will get only one sglist element
@@ -2282,8 +2365,12 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 		}
 		break;
 	case SCMD_UNMAP:
-		sbd_handle_unmap_xfer(task,
-		    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		if (itask->itask_flags & ITASK_PROXY_TASK) {
+			sbd_handle_standby_short_write_xfer_completion(task, dbuf);
+		} else {
+			sbd_handle_unmap_xfer(task,
+				dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		}
 		break;
 	case SCMD_PERSISTENT_RESERVE_OUT:
 		if (sl->sl_access_state == SBD_LU_STANDBY) {
@@ -3626,6 +3713,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_it_data_t *it;
 	uint8_t cdb0, cdb1;
 	stmf_status_t st_ret;
+	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 
 	if ((it = task->task_lu_itl_handle) == NULL) {
 		mutex_enter(&sl->sl_lock);
@@ -3765,7 +3853,11 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
-		
+
+	cmn_err(CE_NOTE, "zjn %s task=%p iflags=%x aflags=%x cdb=%02x%02x%02x", 
+		__func__, task, itask->itask_flags, task->task_additional_flags,
+		cdb0, cdb1, task->task_cdb[2]);
+	
 	if (sl->sl_access_state == SBD_LU_STANDBY || sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
 		task->task_max_nbufs = 1;
 		if (cdb0 != SCMD_INQUIRY &&
@@ -3818,7 +3910,11 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			case SCMD_WRITE_G5:
 				break;
 			default:
-				st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK);
+				if (cdb0 == SCMD_UNMAP)
+					st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_PROXY_TASK);
+				else
+					st_ret = stmf_proxy_scsi_cmd(task,initial_dbuf, ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK);
+
 				if (st_ret != STMF_SUCCESS) {
 					//stmf_scsilib_send_status(task, STATUS_CHECK,STMF_SAA_LU_NO_ACCESS_UNAVAIL);
 					cdb0 = task->task_cdb[0] & 0x1F;
@@ -4083,6 +4179,18 @@ sbd_dbuf_xfer(struct scsi_task *task, uint32_t relative_offset, uint32_t len)
 	sbd_cmd_t *scmd;
 	//stmf_data_buf_t	*task_dbuf;
 
+	if (task->task_cdb[0] == SCMD_UNMAP) {
+		/*This (cdb[0] == SCMD_UNMAP && dbuf == NULL) happens when we mkfs the lun
+		* by standby multipath. The standby-lu ending will receive SCMD_UNMAP,
+		* and then xfer to active-lu ending by pppt. Then the active-lu ending
+		* xfer a STMF_ICM_SCSI_DATA_REQ msg to standby-lu ending. So we at here.
+		*Handle SCMD_UNMAP that active-lu ending xfer to standby-lu ending
+		* by pppt
+		*/
+		sbd_handle_unmap(task, NULL);
+		return;
+	}
+
 	if (task->task_lu_private) {
 		scmd = (sbd_cmd_t *)task->task_lu_private;
 		bzero(scmd, sizeof(*scmd));
@@ -4127,8 +4235,11 @@ void
 sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 {
 	sbd_cmd_t *scmd = (sbd_cmd_t *)task->task_lu_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 
-	sbd_zvol_mirror_replay_wait((sbd_lu_t *)task->task_lu->lu_provider_private);
+	if (!zfs_mirror_mdata_enable())
+		sbd_zvol_mirror_replay_wait(sl);		
+	
 	if (dbuf->db_flags & DB_LU_DATA_BUF) {
 		/*
 		 * Buffers passed in from the LU always complete

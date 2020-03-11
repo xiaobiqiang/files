@@ -430,6 +430,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	nvlist_t *detector;
 	boolean_t isresource;
 	char *fru, *type;
+    char *fm_class;
 	/*
 	 * We subscribe to notifications for vdev or pool removal.  In these
 	 * cases, there may be cases that no longer apply.  Purge any cases
@@ -489,6 +490,10 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		    strcmp(type, VDEV_TYPE_FILE) != 0)
 			return;
 	}
+
+    if(nvlist_lookup_string(nvl, FM_CLASS, &fm_class) == 0) {
+        syslog(LOG_ERR, "%s received by zfs-diagnose\n", fm_class);
+    }
 
 	/*
 	 * Determine if this ereport corresponds to an open case.  Previous
@@ -661,10 +666,15 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		 */
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.log_replay", B_TRUE);
 	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.*")) {
-		/*
-		 * Device fault.
-		 */
-		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device",  B_TRUE);
+        syslog(LOG_ERR, "%s vdev fault\n", fm_class);
+        if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.merr")) {
+            zfs_case_solve(hdl, zcp, "fault.fs.zfs.dev.merr",  B_TRUE);
+        } else {
+            /*
+    		 * Device fault.
+    		 */
+    		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device",  B_TRUE);
+        }
 	} else if (fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO)) ||
 	    fmd_nvl_class_match(hdl, nvl,

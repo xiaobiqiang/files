@@ -33,6 +33,7 @@
 #include <sys/iscsit/radius_protocol.h>
 #include <linux/net.h>
 #include <crypto/hash.h>
+#include <sys/zfs_context.h>
 
 #include "radius_auth.h"
 

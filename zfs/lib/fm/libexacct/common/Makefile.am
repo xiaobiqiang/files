@@ -11,6 +11,12 @@ USER_C = \
 	exacct_ops.c \
 	exacct_core.c
 
+EXTRA_DIST = \
+	exacct_core.h \
+	exacct_impl.h \
+	exacct.h \
+	exacct_ops.h
+
 dist_libexacct_la_SOURCES = \
 	$(USER_C)
 libexacct_la_LIBDADD = \

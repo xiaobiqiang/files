@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<tasks>
+    <task type="0" num="6" desc="task of snapshot_backup, from nid[$5] to node ip[$2], the first source snapshot path is $3, the second one is #6, the destination path is $4." /> 
+    <task type="1" num="5" desc="task of lun_backup updating, from nid[$4] to node ip[$2], the source lun path is $1, the destination path is $3 and it's a $5 task." /> 
+    <task type="2" num="1" desc="task of lun_migrate" />
+</tasks>
