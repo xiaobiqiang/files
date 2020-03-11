@@ -54,7 +54,7 @@ typedef struct os_fc_map {
 static char *fc_drv = NULL;
 static os_fc_map_t os_fc_map[] = {
 	{"NeoKylin Server release 5.0 (Sunway)", FC_DRV_SW},
-	{"CentOS Linux release 7.4.1708 (Core)", FC_DRV_X86},
+	{"CentOS Linux release 7.3.1611 (Core)", FC_DRV_X86},
 	{NULL, NULL}
 };
 
