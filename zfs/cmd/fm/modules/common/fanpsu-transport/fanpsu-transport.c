@@ -11,6 +11,13 @@
 #include <sys/fm/protocol.h>
 #include <fanpsu_enum.h>
 #include "fanpsu-transport.h"
+#include "st_zfs.h"
+
+
+#define		ZFS_SET_EACH_SYNC	"zfs set sync=%s %s "
+
+#define		MAX_COMMAND_LENGTH	512
+
 
 static void fpt_timeout(fmd_hdl_t *hdl, unsigned int id, void *data);
 
@@ -67,6 +74,169 @@ static void fpt_post_ereport(fmd_hdl_t *hdl, fmd_xprt_t *xprt, const char *proto
 	}
 }
 
+static int
+st_set_callback(zfs_handle_t *zhp, int depth, void *data, boolean_t flag)
+{
+	char buf[ZFS_MAXPROPLEN];
+	char rbuf[ZFS_MAXPROPLEN];
+	char zfs_set_sync_cmd[MAX_COMMAND_LENGTH];
+	zprop_source_t sourcetype;
+	char source[ZFS_MAXNAMELEN];
+	zprop_get_cbdata_t *cbp = data;
+	nvlist_t *user_props = zfs_get_user_props(zhp);
+	zprop_list_t *pl = cbp->cb_proplist;
+	nvlist_t *propval;
+	char *strval;
+	char *sourceval;
+	boolean_t is_fs = B_FALSE;
+	boolean_t received = is_recvd_column(cbp);
+
+	LOG("setdataset:%s,%d\n",zfs_get_name(zhp), flag);
+	for (; pl != NULL; pl = pl->pl_next) {
+		char *recvdval = NULL;
+		/*
+		 * Skip the special fake placeholder.  This will also skip over
+		 * the name property when 'all' is specified.
+		 */
+		if (pl->pl_prop == ZFS_PROP_NAME &&
+		    pl == cbp->cb_proplist)
+			continue;
+
+		if (pl->pl_prop != ZPROP_INVAL) 	{
+			if (zfs_prop_get(zhp, pl->pl_prop, buf,
+			    sizeof (buf), &sourcetype, source,
+			    sizeof (source),
+			    cbp->cb_literal) != 0) {
+				if (pl->pl_all)
+					continue;
+				if (!zfs_prop_valid_for_type(pl->pl_prop,
+				    ZFS_TYPE_DATASET,B_FALSE)) {
+					(void) syslog(LOG_ERR, "No such property '%s'\n",
+					    zfs_prop_to_name(pl->pl_prop));
+					continue;
+				}
+				sourcetype = ZPROP_SRC_NONE;
+				(void) strlcpy(buf, "-", sizeof (buf));
+			}
+
+			if (received && (zfs_prop_get_recvd(zhp,
+			    zfs_prop_to_name(pl->pl_prop), rbuf, sizeof (rbuf),
+			    cbp->cb_literal) == 0)) {
+				recvdval = rbuf;
+			}
+		} else {
+			if (nvlist_lookup_nvlist(user_props,
+			    pl->pl_user_prop, &propval) != 0) {
+				if (pl->pl_all)
+					continue;
+				sourcetype = ZPROP_SRC_NONE;
+				strval = "-";
+			} else {
+				verify(nvlist_lookup_string(propval,
+				    ZPROP_VALUE, &strval) == 0);
+				verify(nvlist_lookup_string(propval,
+				    ZPROP_SOURCE, &sourceval) == 0);
+
+				if (strcmp(sourceval,
+				    zfs_get_name(zhp)) == 0) {
+					sourcetype = ZPROP_SRC_LOCAL;
+				} else if (strcmp(sourceval,
+				    ZPROP_SOURCE_VAL_RECVD) == 0) {
+					sourcetype = ZPROP_SRC_RECEIVED;
+				} else {
+					sourcetype = ZPROP_SRC_INHERITED;
+					(void) strlcpy(source,
+					    sourceval, sizeof (source));
+				}
+			}
+
+			if (received && (zfs_prop_get_recvd(zhp,
+			    pl->pl_user_prop, rbuf, sizeof (rbuf),
+			    cbp->cb_literal) == 0))
+				recvdval = rbuf;
+			
+			LOG("  %10s %10s type:%d,%d\n", pl->pl_user_prop, strval, sourcetype, 
+received);
+			if ((strcmp(pl->pl_user_prop, "origin:sync") == 0)
+				&& (strcmp(strval, "-") != 0)) {
+				bzero(zfs_set_sync_cmd, MAX_COMMAND_LENGTH);
+				if (flag && is_fs)
+					sprintf(zfs_set_sync_cmd, ZFS_SET_EACH_SYNC, "always", zfs_get_name(zhp));
+				else if (flag && !is_fs)
+					sprintf(zfs_set_sync_cmd, ZFS_SET_EACH_SYNC, "disk", zfs_get_name(zhp));
+				else
+					sprintf(zfs_set_sync_cmd, ZFS_SET_EACH_SYNC, strval, zfs_get_name(zhp));
+				system(zfs_set_sync_cmd);
+				LOG("  st_set_callback: %s\n", zfs_set_sync_cmd);
+			}
+		}
+		if (strcmp(zfs_prop_to_name(pl->pl_prop), "type") == 0) {
+			if (strcmp("filesystem", buf) == 0) {
+				is_fs = B_TRUE;
+			} else {
+				is_fs = B_FALSE;
+			}
+		}
+	}
+	
+	return (0);
+}
+
+static int
+st_walk_zfs_dataset(st_zfs_iter_cb callback, boolean_t flag)
+{
+	zprop_get_cbdata_t cb = { 0 };
+	int i, c, flags = 0;
+	char *value;
+	char fields[22];	
+	int ret = 0;
+	int limit = 0;
+	zprop_list_t fake_name = { 0 };
+
+	cb.cb_sources = ZPROP_SRC_ALL;
+	cb.cb_columns[0] = GET_COL_NAME;
+	cb.cb_columns[1] = GET_COL_PROPERTY;
+	cb.cb_columns[2] = GET_COL_VALUE;
+	cb.cb_columns[3] = GET_COL_SOURCE;
+	cb.cb_type = ZFS_TYPE_DATASET;
+
+	bzero(fields, 22);
+	bcopy("type,sync,origin:sync", fields, 22);
+
+	if ((g_zfs = libzfs_init()) == NULL) {
+		(void) syslog(LOG_ERR, "fmd sensor transport error: failed to "
+		    "initialize ZFS library");
+		return (-1);
+	}
+	
+	if (zprop_get_list(g_zfs, fields, &cb.cb_proplist, ZFS_TYPE_DATASET)
+	    != 0) {
+		syslog (LOG_ERR, "zfs get list failed");
+		return (-1);
+	}
+
+	if (cb.cb_proplist != NULL) {
+		fake_name.pl_prop = ZFS_PROP_NAME;
+		fake_name.pl_width = strlen("NAME");
+		fake_name.pl_next = cb.cb_proplist;
+		cb.cb_proplist = &fake_name;
+	}
+
+	cb.cb_first = B_TRUE;
+	
+	/* run for each object */
+	ret = st_zfs_for_each(flags, ZFS_TYPE_DATASET, NULL,
+	    &cb.cb_proplist, limit, callback, &cb, flag);
+
+	if (cb.cb_proplist == &fake_name)
+		zprop_free_list(fake_name.pl_next);
+	else
+		zprop_free_list(cb.cb_proplist);
+
+	
+	libzfs_fini(g_zfs);
+	return ret;
+}
 
 static int fpt_check(topo_hdl_t *thp, tnode_t *node, void *arg){
 	nvlist_t *fmri;
@@ -98,6 +268,10 @@ static int fpt_check(topo_hdl_t *thp, tnode_t *node, void *arg){
 		syslog(LOG_ERR, "state update successed.\n");
 
 	if(resault){
+		if(strcasestr(name,"FAN") != NULL){
+			(void) st_walk_zfs_dataset(st_set_callback, B_TRUE);
+		}
+		
 		fpt_post_ereport(fpmp->fpm_hdl, fpmp->fpm_xprt, "sensor", "failure", ena, fmri, resault);
 		nvlist_free(resault);
 	}else{

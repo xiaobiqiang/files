@@ -159,6 +159,7 @@ static inline void
 qla2x00_set_fcport_state(fc_port_t *fcport, int state)
 {
 	int old_state;
+	struct qla_fct_logout_msg *msg;
 
 	old_state = atomic_read(&fcport->state);
 	atomic_set(&fcport->state, state); 
@@ -176,7 +177,16 @@ qla2x00_set_fcport_state(fc_port_t *fcport, int state)
 	if(old_state == FCS_ONLINE &&
        state == FCS_DEVICE_LOST &&
        fcport->port_type == FCT_INITIATOR) {
- 	   qla2x00_fct_logout_port(fcport);
+		msg = kmem_cache_zalloc(fct_logout_msg_cachep, GFP_ATOMIC);
+					
+		if (!msg) {
+			printk("%s alloc cache failed!\n", __func__);
+			return;
+			
+		}
+		msg->fcport = fcport;
+		INIT_WORK(&msg->fct_event_work, qla2x00_do_fct_logout_port);
+		queue_work(qla_tgt_fct_event_wq, &msg->fct_event_work);
     }
 }
 

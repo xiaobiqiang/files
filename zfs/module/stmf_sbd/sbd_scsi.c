@@ -1743,7 +1743,6 @@ sbd_handle_standby_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd
 	}
 
 	//sbd_free_proxy_dbuf(task_dbuf);
-	stmf_free_dbuf(task, dbuf);
 	task->task_dbuf = NULL;
 	return;
 }
@@ -3714,6 +3713,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_it_data_t *it;
 	uint8_t cdb0, cdb1;
 	stmf_status_t st_ret;
+	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 
 	if ((it = task->task_lu_itl_handle) == NULL) {
 		mutex_enter(&sl->sl_lock);
@@ -3853,7 +3853,11 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
-		
+
+	cmn_err(CE_NOTE, "zjn %s task=%p iflags=%x aflags=%x cdb=%02x%02x%02x", 
+		__func__, task, itask->itask_flags, task->task_additional_flags,
+		cdb0, cdb1, task->task_cdb[2]);
+	
 	if (sl->sl_access_state == SBD_LU_STANDBY || sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
 		task->task_max_nbufs = 1;
 		if (cdb0 != SCMD_INQUIRY &&

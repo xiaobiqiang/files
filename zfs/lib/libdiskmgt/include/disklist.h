@@ -71,7 +71,7 @@ typedef struct disk_table {
 
 extern int disk_scan_lun(void);
 extern int disk_get_info(disk_table_t *di);
-extern void disk_get_system(char* name);
+extern int disk_get_system(char* name);
 extern int disk_get_slotid(disk_info_t *di);
 extern void disk_get_status(disk_info_t *di);
 extern int disk_get_vendor(disk_info_t *di);
