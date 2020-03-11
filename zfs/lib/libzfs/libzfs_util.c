@@ -64,7 +64,7 @@
 #define	ZFS_ILU_MAX_NTHREAD		64
 #define NETCONFIG_FILE			"/dev/tcp"
 #define	IFCONFIG_CMD			"/usr/sbin/ifconfig"
-#define DELETE_LU_CMD	"/usr/sbin/stmfadm delete-lu -c"
+#define DELETE_LU_CMD	"stmfadm delete-lu -c"
 
 typedef struct zfs_ilu_list{
 	struct zfs_ilu_list *next;
