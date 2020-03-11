@@ -4276,6 +4276,8 @@ ready_import:
 		}
 	}
 
+	uint_t check_times = 0;
+quantum_check:
 	bzero(used_index1, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
 	bzero(used_index2, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
 	
@@ -4312,6 +4314,8 @@ ready_import:
 
 		/* wait a moment, then check index of quantum disk */
 		usec = ZFS_QUANTUM_INTERVAL_TICK * 20 * 1000;
+		if(check_times != 0)
+			usec *= 5;	//wait 5 s and check again
 		while (usleep(usec) != 0) {
 			if (errno != EINTR)
 				goto exit_thr;
@@ -4319,8 +4323,15 @@ ready_import:
 
 		if (B_TRUE == zpool_used_index_changed(used_index1, real_nquantum1,
 			used_index2, &real_nquantum2)) {
-			c_log(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
-			goto exit_thr;
+			if(check_times < 10) {
+				 check_times++;
+				 c_log(LOG_WARNING, "pool \"%s\" in use, you have tried %d times,"
+					"wait 5 seconds and try again.", poolname, check_times);
+				 goto quantum_check;
+			} else {
+				c_log(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
+				goto exit_thr;
+			}
 		}
 	}
 
