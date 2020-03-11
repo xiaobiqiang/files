@@ -3313,6 +3313,7 @@ print_dataset(zfs_handle_t *zhp, list_cbdata_t *cb)
 	nvlist_t *userprops = zfs_get_user_props(zhp);
 	nvlist_t *propval;
 	char *propstr = NULL;
+    char *tmppropstr = NULL;
 	boolean_t right_justify;
 	int err = 0;
 
@@ -3362,9 +3363,11 @@ print_dataset(zfs_handle_t *zhp, list_cbdata_t *cb)
 			if (nvlist_lookup_nvlist(userprops,
 			    pl->pl_user_prop, &propval) != 0)
 				strcpy(propstr, "-");
-			else
+			else{
 				verify(nvlist_lookup_string(propval,
-				    ZPROP_VALUE, &propstr) == 0);
+				    ZPROP_VALUE, &tmppropstr) == 0);
+                strcpy(propstr, tmppropstr);
+            }    
 			right_justify = B_FALSE;
 		}
 
