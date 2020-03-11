@@ -1460,16 +1460,13 @@ int disk_scan_lun()
 int disk_get_info(disk_table_t *dt)
 {
 	FILE *fd = NULL;
-	int i = 0;
 	int len = 0;
 	slot_map_t sm;
 	char *ptr = NULL;
 	disk_info_t *di_cur = NULL;
-	disk_info_t *di_ptr = NULL;
 	char buf_scsi[ARGS_LEN] = {0};
 	char buf_dev[ARGS_LEN] = {0};
 	char buf_other[ARGS_LEN] = {0};
-	char sysdisk[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
 	fd = popen(DISK_BY_ID, "r");
