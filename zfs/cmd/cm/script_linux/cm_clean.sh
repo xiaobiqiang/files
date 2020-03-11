@@ -8,7 +8,7 @@ svcadm disable ceres_cm
 sleep 1
 
 echo "stop cluster nas"
-zfs multiclus -vd
+zfs multiclus -d
 echo "stop cluster san"
 zfs clustersan disable -c -f
     

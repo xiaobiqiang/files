@@ -262,7 +262,7 @@ sint32 cm_cnm_ntp_init(void)
         return CM_OK;
     }else
     {
-        CM_VSPRINTF(cm_cnm_ntp_ip,sizeof(cm_cnm_ntp_ip),ntpserver);
+        CM_VSPRINTF(cm_cnm_ntp_ip,sizeof(cm_cnm_ntp_ip),"%s",ntpserver);
     }
     
     
@@ -360,7 +360,7 @@ sint32 cm_cnm_ntp_get(const void * pDecodeParam,void ** ppAckData,uint32 * pAckL
 
     if(cm_cnm_ntp_ip[0] != '\0')
     {
-        CM_VSPRINTF(info->ip,sizeof(info->ip),cm_cnm_ntp_ip);
+        CM_VSPRINTF(info->ip,sizeof(info->ip),"%s",cm_cnm_ntp_ip);
     }else
     {
         *ppAckData = NULL;
@@ -442,7 +442,7 @@ sint32 cm_cnm_ntp_sync_request(uint64 data_id, void *pdata, uint32 len)
 
     (void)cm_ini_set_ext(CM_CLUSTER_INI, CM_CNM_CLUSTER_CFG_SECTION,
                          CM_CNM_CLUSTER_CFG_NTPSERVER, info->ip);
-    CM_VSPRINTF(cm_cnm_ntp_ip,sizeof(cm_cnm_ntp_ip),info->ip);
+    CM_VSPRINTF(cm_cnm_ntp_ip,sizeof(cm_cnm_ntp_ip),"%s",info->ip);
     return CM_OK;
 }
 
@@ -466,7 +466,7 @@ sint32 cm_cnm_ntp_sync_get(uint64 data_id, void **pdata, uint32 *plen)
         return CM_FAIL;
     }
 
-    CM_VSPRINTF(info->ip,sizeof(info->ip),cm_cnm_ntp_ip);
+    CM_VSPRINTF(info->ip,sizeof(info->ip),"%s",cm_cnm_ntp_ip);
 
     *pdata = info;
     *plen = sizeof(cm_cnm_ntp_info_t);

@@ -19,3 +19,5 @@ libslow_io_de_la_LIBADD = 					\
 
 dist_libslow_io_de_la_SOURCES = \
 	$(USER_C)
+
+EXTRA_DIST = slow-io-de.conf

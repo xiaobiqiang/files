@@ -35,6 +35,7 @@
 #include <linux/tcp.h>
 #include <linux/inet.h>
 #include <sys/nvpair.h>
+#include <sys/zfs_context.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>

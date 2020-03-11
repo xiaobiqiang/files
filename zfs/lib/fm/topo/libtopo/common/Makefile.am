@@ -43,6 +43,36 @@ USER_C = \
 	hc.c		\
 	legacy_hc.c	
 
+EXTRA_DIST = \
+	cpu.h \
+	dev.h \
+	fmd.h \
+	hc.h \
+	legacy_hc.h \
+	LHL_DEBUG.h \
+	libtopo.h \
+	mem.h \
+	mod.h \
+	pkg.h \
+	svc.h \
+	topo_alloc.h \
+	topo_builtin.h \
+	topo_error.h \
+	topo_file.h \
+	topo_fmri.h \
+	topo_fruhash.h \
+	topo_hc.h \
+	topo_list.h \
+	topo_method.h \
+	topo_mod.h \
+	topo_module.h \
+	topo_parse.h \
+	topo_prop.h \
+	topo_protocol.h \
+	topo_string.h \
+	topo_subr.h \
+	topo_tree.h \
+	zfs.h
 
 libtopo_la_LIBADD = $(top_builddir)/lib/libnvpair/libnvpair.la	\
 		    $(top_builddir)/lib/libipmi/libipmi.la	\

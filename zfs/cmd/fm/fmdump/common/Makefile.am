@@ -16,7 +16,8 @@ fmdump_SOURCES =		\
 	error.c			\
 	fault.c			\
 	fmdump.c		\
-	scheme.c
+	scheme.c		\
+	fmdump.h
 
 fmdump_LDADD = \
         $(top_builddir)/lib/libnvpair/libnvpair.la		\

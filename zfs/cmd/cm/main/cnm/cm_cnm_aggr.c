@@ -336,7 +336,7 @@ sint32 cm_cnm_aggr_local_update(
 
     if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_AGGR_IP))
     {
-        CM_VSPRINTF(ip,sizeof(ip),info->ip);
+        CM_VSPRINTF(ip,sizeof(ip),"%s",info->ip);
     }else
     {
         CM_VSPRINTF(ip,sizeof(ip),"null");
@@ -344,7 +344,7 @@ sint32 cm_cnm_aggr_local_update(
 
     if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_AGGR_NETMASK))
     {
-        CM_VSPRINTF(netmask,sizeof(netmask),info->netmask);
+        CM_VSPRINTF(netmask,sizeof(netmask),"%s",info->netmask);
     }else
     {
         CM_VSPRINTF(netmask,sizeof(netmask),"null");

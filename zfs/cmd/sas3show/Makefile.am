@@ -7,7 +7,8 @@ DEFAULT_INCLUDES += \
 sbin_PROGRAMS = sas3show
 
 sas3show_SOURCES = 	\
-	sas3show.c
+	sas3show.c \
+	mpt3sas_ctl.h
 
 
 sas3show_LDADD = $(ZLIB) -lrt

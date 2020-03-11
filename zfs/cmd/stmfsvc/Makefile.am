@@ -12,7 +12,7 @@ sbin_PROGRAMS = stmfsvc
 
 stmfsvc_SOURCES = \
 	stmfsvc.c \
-	cmdparse.c 
+	../common/cmdparse.c 
 
 stmfsvc_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \

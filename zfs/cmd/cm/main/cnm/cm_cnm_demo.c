@@ -503,7 +503,7 @@ static uint32 strrepchr(sint8* strSrc,sint8 chrSrc,sint8 chrDes,uint32 trunLen)
                 break;
             }
         }
-        CM_VSPRINTF(tmpSrc,strlen(tmpSrc) + 1,strtail);
+        CM_VSPRINTF(tmpSrc,strlen(tmpSrc) + 1,"%s",strtail);
     }
     return CM_OK;
 }

@@ -14,7 +14,7 @@ sbin_PROGRAMS = perf_stat
 perf_stat_SOURCES = \
 	parse_cmd.c \
 	parse_cmd.h \
-	systemd_util.c \
+	../common/systemd_util.c \
 	perf_stat.c \
 	perf_stat_cpu.c \
 	perf_stat.h \

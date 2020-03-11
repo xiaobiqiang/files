@@ -34,6 +34,14 @@ USER_C = \
 	helper.c	\
 	log.c
 
+EXTRA_DIST = \
+	config.h \
+	ipmi_impl.h \
+	ipmitool_md5.h \
+	ipmitool_open.h \
+	ipmitool_sdr.h \
+	libipmi.h
+
 libipmi_la_LDFLAGS = -lc -lm
 
 libipmi_la_LIBADD = $(top_builddir)/lib/libnvpair/libnvpair.la

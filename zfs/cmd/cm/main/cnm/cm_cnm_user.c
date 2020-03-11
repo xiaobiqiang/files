@@ -1044,7 +1044,7 @@ static void cm_cnm_explorer_get_name(sint8* buf, sint32 len, const sint8* name)
     sint32 lenth=len-5; /* Ô¤Áô5¸ö×Ö½Ú */
     if (strlen(name) <= lenth)
     {
-        CM_VSPRINTF(buf,len,name);
+        CM_VSPRINTF(buf,len,"%s",name);
         return;
     }
     while((*name != '\0') && (lenth > 0))
@@ -1261,7 +1261,7 @@ static sint32 cm_cnm_explorer_local_get_each(void *arg, sint8 **cols, uint32 col
     cm_cnm_explorer_info_t *info=arg;
     if(col_num > 0)
     {
-        CM_VSPRINTF(info->name,sizeof(info->name),*cols);
+        CM_VSPRINTF(info->name,sizeof(info->name),"%s",*cols);
         return CM_OK;
     }
     return CM_FAIL;

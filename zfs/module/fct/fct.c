@@ -48,7 +48,7 @@
 #include <linux/utsname_compat.h>
 #include <sys/fct_impl.h>
 #include <sys/discovery.h>
-//#include <sys/zfs_context.h>
+#include <sys/zfs_context.h>
 #ifdef SOLARIS
 static int fct_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int fct_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);

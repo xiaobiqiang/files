@@ -18,7 +18,8 @@ fmadm_SOURCES =		\
 	fmadm.c		\
 	gc.c		\
 	load.c		\
-	reset.c
+	reset.c		\
+	fmadm.h
 fmadm_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la              \
 	$(top_builddir)/lib/fm/libfmd_adm/common/libfmd_adm.la  \

@@ -5,15 +5,19 @@ source '/var/cm/script/cm_common.sh'
 function cm_port_local_getbatch()
 {
     local mid=`cm_get_localid`
-    stmfadm list-target |awk '{print $2}'|while read line
+    stmfadm list-target -v |sed 's/ //g' \
+        |egrep "Target|OperationalStatus|ProviderName|Protocol|Sessions" \
+        |xargs -n5 |grep -v pppt \
+        |sed 's/Target://g' \
+        |sed 's/OperationalStatus://g' \
+        |sed 's/ProviderName://g' \
+        |sed 's/Protocol://g' \
+        |sed 's/Sessions://g' \
+        |while read line
     do
-        local portname=$line
-        local info=`stmfadm list-target -v $portname |sed 's/ //g' |egrep "OperationalStatus|ProviderName|Protocol|Sessions" |awk -F':' '{print $2}' |xargs -n4`
-        if [[ "$info" == *"pppt"* ]]; then
-            continue
-        fi
-        echo "$portname $info $mid"
+        echo "$line $mid"
     done
+        
     return 0
 }
 

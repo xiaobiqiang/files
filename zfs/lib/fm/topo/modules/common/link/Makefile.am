@@ -14,6 +14,10 @@ USER_C = \
 	link_methods.c	\
 	conn_node.c	
 
+EXTRA_DIST = \
+	link_enum.h \
+	mptsas_method.h
+
 liblink_la_LIBADD = $(top_builddir)/lib/libnvpair/libnvpair.la \
 			$(top_builddir)/lib/libipmi/libipmi.la
 

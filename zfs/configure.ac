@@ -106,7 +106,6 @@ AC_CONFIG_FILES([
 	lib/libzfs_core/Makefile
 	lib/libstmf/Makefile
 	lib/libshare/Makefile
-	lib/libclumgt/Makefile
 	lib/fm/Makefile
 	lib/fm/libdiagcode/Makefile
 	lib/fm/libdiagcode/common/Makefile
@@ -127,14 +126,15 @@ AC_CONFIG_FILES([
 	lib/fm/topo/modules/common/Makefile
 	lib/fm/topo/modules/common/ipmi/Makefile
 	lib/fm/topo/modules/common/fac_prov_ipmi/Makefile
-	lib/fm/topo/modules/common/fanpsu/Makefile
 	lib/fm/topo/modules/common/link/Makefile
 	lib/fm/topo/modules/common/disk/Makefile
+	lib/fm/topo/modules/common/fanpsu/Makefile
 	lib/fm/topo/maps/Makefile
 	lib/fm/topo/maps/i86pc/Makefile
 	lib/libipmi/Makefile
 	lib/libiscsit/Makefile
 	cmd/Makefile
+	cmd/common/Makefile
 	cmd/zdb/Makefile
 	cmd/zhack/Makefile
 	cmd/zfs/Makefile
@@ -155,7 +155,6 @@ AC_CONFIG_FILES([
 	cmd/sas3show/Makefile
 	cmd/perf_stat/Makefile
 	cmd/clusterd/Makefile
-	cmd/clumgt/Makefile
 	cmd/pmm/Makefile
 	cmd/disk/Makefile
 	cmd/scsi_tools/Makefile
@@ -175,15 +174,10 @@ AC_CONFIG_FILES([
 	cmd/fm/modules/common/zfs-diagnosis/Makefile
 	cmd/fm/modules/common/fanpsu-transport/Makefile
 	cmd/fm/modules/common/disk-transport/Makefile
-	cmd/fm/modules/common/snmp-trapgen/Makefile
 	cmd/fm/modules/common/link-transport/Makefile
 	cmd/fm/modules/common/pool-transport/Makefile
 	cmd/fm/modules/common/eversholt/Makefile
 	cmd/fm/modules/common/eversholt/files/Makefile
-	cmd/fm/modules/common/disk-sense-de/Makefile
-	cmd/fm/modules/common/io-retire/Makefile 
-	cmd/fm/modules/common/noresponse-disk-de/Makefile 
-	cmd/fm/modules/common/slow-io-de/Makefile
 	cmd/fm/fmd/schemes/Makefile
 	cmd/fm/fmd/schemes/zfs/Makefile
 	cmd/fm/dicts/Makefile
@@ -250,6 +244,10 @@ AC_CONFIG_FILES([
 	include/sys/fm/fs/Makefile
 	include/sys/idm/Makefile
 	include/sys/iscsit/Makefile
+	include/sys/scsi/Makefile
+	include/sys/scsi/generic/Makefile
+	include/sys/scsi/impl/Makefile
+	include/ipmitool/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

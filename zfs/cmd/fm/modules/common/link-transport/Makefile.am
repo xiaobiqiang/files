@@ -11,7 +11,7 @@ DEFAULT_INCLUDES += \
 	-I/usr/include/libxml2
 
 liblink_transport_la_LTLIBRARIES = liblink_transport.la
-liblink_transport_la_DATA = liblink_transport.conf
+dist_liblink_transport_la_DATA = liblink_transport.conf
 
 USER_C = \
 	link_transport.c
@@ -23,4 +23,5 @@ liblink_transport_la_LIBADD = 					\
 liblink_transport_la_LIBADD += -lxml2
 
 dist_liblink_transport_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
+	link_enum.h

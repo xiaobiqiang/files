@@ -12,7 +12,8 @@ sbin_PROGRAMS = stmfadm
 
 stmfadm_SOURCES = \
 	stmfadm.c \
-	cmdparse.c 
+	../common/cmdparse.c \
+	stmfadm.h
 
 stmfadm_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \

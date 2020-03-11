@@ -59,20 +59,14 @@ static sint32 cm_cnm_pmm_lun_local_get_each(void *arg, sint8 **cols, uint32 col_
 void cm_pmm_lun_get_data(const sint8 *name,void* data) 
 {
     cm_cnm_pmm_lun_info_t* info = (cm_cnm_pmm_lun_info_t *)data;
-    sint8 id[CM_STRING_128] = {0};
     sint32 iRet = CM_OK;
     CM_MEM_ZERO(info,sizeof(cm_cnm_pmm_lun_info_t));
-    cm_cnm_lun_get_stmf_lu(name,id);
-    if(id[0] != '\0')
+    iRet = cm_cnm_exec_get_col(cm_cnm_pmm_lun_local_get_each,info,
+            CM_SHELL_EXEC" cm_pmm_lun %s",name);  
+    if(CM_OK != iRet)
     {
-        //CM_LOG_ERR(CM_MOD_CNM,"lun_num:%s",id);
-        iRet = cm_cnm_exec_get_col(cm_cnm_pmm_lun_local_get_each,info,
-            CM_SHELL_EXEC" cm_pmm_lun %s",id);  
-        if(CM_OK != iRet)
-        {
-            CM_LOG_ERR(CM_MOD_CNM,"iRet[%d] get_lun_col_fail",iRet);
-            return;
-        }
+        CM_LOG_ERR(CM_MOD_CNM,"iRet[%d] get_lun_col_fail",iRet);
+        return;
     }
     return;
 }

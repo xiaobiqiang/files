@@ -11,8 +11,8 @@ DEFAULT_INCLUDES += \
 sbin_PROGRAMS = itadm
 
 itadm_SOURCES = \
-	base64.c	\
-	bufsplit.c	\
+	../common/base64.c	\
+	../common/bufsplit.c	\
 	itadm.c
 	
 itadm_LDADD = \

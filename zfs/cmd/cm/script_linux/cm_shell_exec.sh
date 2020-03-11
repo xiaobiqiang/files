@@ -2,6 +2,9 @@
 
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
+ZVOL_DIR='/dev/zvol'
+PROC_DISKSTATS='/proc/diskstats'
+FC_DIR='/sys/class/fc_host/'
 #==============================================================================
 #调用说明
 #./cm_shell_exec.sh <functionname> <arg1> <arg2> <...>
@@ -72,10 +75,37 @@ function cm_pmm_node_stat()
 #500143800637a024 Initiator qlc online 1Gb2Gb4Gb 4Gb
 #500143800637a026 Initiator qlc online 1Gb2Gb4Gb 4Gb
 #==============================================================================
+function cm_cnm_fcinfo_count()
+{
+    local num
+    if [ ! -d "$FC_DIR" ];then
+        echo 0
+        return $?
+    fi
+    num=`ls $FC_DIR|wc -l`
+    echo $num
+    return $?
+}
+
 function cm_cnm_fcinfo_getbatch()
 {
-    fcinfo hba-port |egrep 'Port WWN|Port Mode|State|Driver Name|Supported Speeds|Current Speed'|awk -F':' '{print $2}'|awk  'NR%6!=0{printf $1$2$3$4" "} NR%6==0{print $1}'
-    return $?
+#   fcinfo hba-port |egrep 'Port WWN|Port Mode|State|Driver Name|Supported Speeds|Current Speed'|awk -F':' '{print $2}'|awk  'NR%6!=0{printf $1$2$3$4" "} NR%6==0{print $1}'
+#   return $?
+    local host=(`ls $FC_DIR`)
+    local host_num=${#host[@]}
+    for ((i=0; i<$host_num; i++))
+    do
+        local WWN=`cat $FC_DIR/${host[i]}/port_name`
+        local MODE=`cat $FC_DIR/${host[i]}/tgtid_bind_type|sed 's/ //g'`
+        local STATE=`cat $FC_DIR/${host[i]}/port_state`
+        local DRV_NAME=`cat $FC_DIR/${host[i]}/symbolic_name|awk '{print $3}'`
+        local SUP_SPEED=`cat $FC_DIR/${host[i]}/supported_speeds|sed 's/ //g'`
+        local SPEED=`cat $FC_DIR/${host[i]}/speed`
+        
+        echo "$WWN $MODE $DRV_NAME $STATE $SUP_SPEED $SPEED"
+      
+    done
+    return $?  
 }
 
 function cm_log_backup()
@@ -199,6 +229,8 @@ function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
+    
+    /var/cm/script/cm_cnm_node_servce.sh iscsi_check
     return 0
 }
 
@@ -405,8 +437,35 @@ function cm_pmm_get_lu()
 
 function cm_pmm_lun()
 {
-    local stmf_id=$1
-    kstat -m stmf -n $stmf_id|egrep 'reads|writes|nread|nwritten'| awk '{printf $2" "}'
+    local full_name=$1
+    local pool_name=`echo $full_name|awk -F'/' '{print $1}'`
+    local lu_name=`echo $full_name|awk -F'/' '{print $2}'`
+    local pool_num=`ls $ZVOL_DIR|grep -w $pool_name|wc -l`
+    local nwritten=0
+    local nread=0
+    if [ $pool_num -eq 1 ];then
+        local sd=`ls -l $ZVOL_DIR/$pool_name|grep -w $lu_name|awk -F'/' '{print $3}'`
+        if [ "X$sd" == "X" ];then
+            return $CM_ERR_NOT_EXISTS;
+        fi
+    else
+        return $CM_ERR_NOT_EXISTS;
+    fi
+    local data=(`cat $PROC_DISKSTATS|awk '$3=="'$sd'"{print $1" "$5}'`)
+    local writes=${data[1]}
+    local reads=${data[0]}
+    local blocksize=`zfs get -H -o value volblocksize $full_name`
+    local val=`echo $blocksize| awk '{print int($1)}'`
+    local unit=`echo $blocksize|sed 's/$val//g'`
+    if [ "X$unit" == "XK" ];then
+        unit=1000
+    else
+        unit=1
+    fi
+    ((blocksize=$val*$unit))
+    ((nwritten=$writes*$blocksize))
+    ((nread=$reads*$blocksize))
+    echo "$nread $nwritten $reads $writes"
     return $?
 }
 

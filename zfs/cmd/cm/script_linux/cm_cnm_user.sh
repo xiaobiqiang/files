@@ -222,5 +222,184 @@ function cm_cnm_user_isexist()
     fi
 }    
 
-cm_cnm_user_$*
+function cm_cnm_user_cache_getbatch()
+{
+    local domain=$1
+    local type=$2
+    
+    if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
+        return $CM_PARAM_ERR
+    fi
+    if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
+        if [ $type -eq $CM_NAME_USER ]; then
+            cat /etc/passwd |awk -F':' '($3>=100&&$3<=60000){print $3" "$1}'
+        else
+            cat /etc/group |awk -F':' '($3>=100&&$3<=60000){print $3" "$1}'
+        fi
+    elif [ $domain -eq $CM_DOMAIN_AD ]; then
+        local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
+        if [ "X$dname" == "X" ]; then
+            return $CM_OK
+        fi
+        if [ $type -eq $CM_NAME_USER ]; then
+            idmap dump -n |egrep "^winuser:.*@"$dname |awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
+        else
+            idmap dump -n |egrep "^wingroup:.*@"$dname |awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
+        fi
+    else
+        return $CM_OK
+    fi
+    return $CM_OK
+}
+
+function cm_cnm_user_cache_count()
+{
+    local domain=$1
+    local type=$2
+    
+    if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
+        return $CM_PARAM_ERR
+    fi
+    if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
+        if [ $type -eq $CM_NAME_USER ]; then
+            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>=100&&$3<=60000){cnt++}END{print cnt}'
+        else
+            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>=100&&$3<=60000){cnt++}END{print cnt}'
+        fi
+    elif [ $domain -eq $CM_DOMAIN_AD ]; then
+        local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
+        if [ "X$dname" == "X" ]; then
+            echo '0'
+            return $CM_OK
+        fi
+        if [ $type -eq $CM_NAME_USER ]; then
+            idmap dump -n |egrep "^winuser:.*@"$dname |wc -l |awk '{print $1}'
+        else
+            idmap dump -n |egrep "^wingroup:.*@"$dname |wc -l |awk '{print $1}'
+        fi
+    else
+        echo '0'
+    fi
+    return $CM_OK
+}
+
+function cm_cnm_user_ad_getidbyname()
+{
+    local uname=$2
+    local utype=$1
+    
+    if [ "X$utype" == "X" ] || [ "X$uname" == "X" ]; then
+        return $CM_PARAM_ERR
+    fi
+    
+    if [ $utype -eq $CM_NAME_USER ]; then
+        utype="winuser"
+    else
+        utype="wingroup"
+    fi
+    #»ñÈ¡ÓòÃû
+    local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
+    if [ "X$dname" == "X" ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}] $utype $uname domain null"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    local uid=`idmap show -c ${utype}:"${uname}"@${dname} 2>/dev/null|awk -F':' '{print $3}'`
+    if [ "X$uid" == "X60001" ];then
+        CM_LOG "[${FUNCNAME}:${LINENO}] $utype $uname $uid"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    echo "$uid"
+    return $CM_OK
+}
+
+function cm_cnm_user_getnamebyid_ad()
+{
+    local uid=$2
+    local utype=$1
+    local idtype=""
+    local utypestr=""
+    
+    if [ "X$utype" == "X" ] || [ "X$uid" == "X" ]; then
+        return $CM_PARAM_ERR
+    fi
+    
+    if [ $utype -eq $CM_NAME_USER ]; then
+        utypestr="winuser"
+        idtype="uid"
+    else
+        utypestr="wingroup"
+        idtype="gid"
+    fi
+    local uname=`idmap show -c ${idtype}:${uid} ${utypestr} 2>/dev/null |awk -F':' '{print $3}' |awk -F'@' '{print $1}'`
+    if [ "X$uname" == "X" ]; then
+        uname="$uid"
+    fi
+    echo "$uname"
+    return $CM_OK
+}
+
+function cm_cnm_user_getnamebyid()
+{
+    local uid=$2
+    local utype=$1
+    local idtype=""
+    local utypestr=""
+    
+    if [ "X$utype" == "X" ] || [ "X$uid" == "X" ]; then
+        return $CM_PARAM_ERR
+    fi
+    
+    cm_check_isnum "$uid"
+    local iret=$?
+    if [ $iret -eq 1 ]; then
+        echo "$CM_DOMAIN_LOCAL $utype $uid"
+        return $CM_OK
+    fi
+    
+    if [ $utype -eq $CM_NAME_USER ]; then
+        utypestr="winuser"
+        idtype="uid"
+    else
+        utypestr="wingroup"
+        idtype="gid"
+    fi
+    local uname=`idmap show -c ${idtype}:${uid} ${utypestr} 2>/dev/null |awk -F':' '{print $3}' |awk -F'@' '{print $1}'`
+    if [ "X$uname" == "X" ]; then
+        echo "$CM_DOMAIN_LOCAL $utype $uid"
+    else
+        echo "$CM_DOMAIN_AD $utype $uname"
+    fi
+    return $CM_OK
+}
+
+function cm_cnm_user_test()
+{
+    local uname=$3
+    local utype=$2
+    local domain=$1
+    local cnt=0
+    if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
+        if [ $utype -eq $CM_NAME_USER ]; then
+            cnt=`egrep "^${uname}:" /etc/passwd |wc -l |awk '{print $1}'`
+        else
+            cnt=`egrep "^${uname}:" /etc/group |wc -l |awk '{print $1}'`
+        fi
+    elif [ $domain -eq $CM_DOMAIN_AD ]; then
+        cm_cnm_user_ad_getidbyname "$utype" "$uname" >/dev/null
+        if [ $? -eq $CM_OK ]; then
+            cnt=1
+        else
+            cnt=0
+        fi
+    else
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ $cnt -eq 0 ]; then
+        return $CM_ERR_NOT_EXISTS
+    fi
+    return $CM_OK
+}
+
+cm_cnm_user_"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$7"
 exit $?

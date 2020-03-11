@@ -817,5 +817,762 @@ function cm_cnm_snapshot_rollback()
     return $iret
 }
 
-${CM_MOD_NAME}"_"$*
+function cm_cnm_filedir_create()
+{
+    local ftype=$2
+    local parentdir=$1
+    local fname=$3
+    local fperm=$4
+    
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$ftype" == "X" ] || [ "X$fname" == "X" ] || [ "X$ftype" != "X1" ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$ftype:$fname err"
+        return $CM_PARAM_ERR
+    fi
+    mkdir "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    local iRet=$?
+    if [ $iRet -eq $CM_OK ] && [ "X$fperm" != "X" ] && [ $fperm -gt 0 ]; then
+        chmod $fperm "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    fi
+    if [ $iRet -eq 2 ]; then
+        iRet=$CM_ERR_ALREADY_EXISTS
+    fi
+    return $iRet
+}
+
+function cm_cnm_filedir_update()
+{
+    local nname=$4
+    local parentdir=$1
+    local fname=$2
+    local fperm=$3
+    local iRet=$CM_OK
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$fname" == "X" ] ; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$fname err"
+        return $CM_PARAM_ERR
+    fi
+    if [ "X$fperm" != "X" ] && [ $fperm -gt 0 ]; then
+        chmod $fperm "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X$nname" == "X" ]; then
+        mv "${parentdir}"/"${fname}" "${parentdir}"/"${nname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    return $iRet
+}
+
+function cm_cnm_filedir_delete()
+{
+    local parentdir=$1
+    local fname=$2
+    local iRet=$CM_OK
+    if [ "X$parentdir" == "X"] || [ ! -d ${parentdir} ]; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]parentdir $parentdir err"
+        return $CM_ERR_NOT_EXISTS
+    fi
+    
+    if [ "X$fname" == "X" ] ; then
+        CM_LOG "[${FUNCNAME}:${LINENO}]$fname err"
+        return $CM_PARAM_ERR
+    fi
+    rm -rf "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
+    iRet=$?
+    return $iRet
+}
+
+function cm_cnm_localtask_sql()
+{
+    local nid='null'
+    local progress='null'
+    local status='null'
+    local starttm='null'
+    local endtm='null'
+    local params=$1
+    if [ "X$params" != "X" ]; then
+        params=`echo "$params" |sed 's/,/ /g'`
+        params=($params)
+        nid=${params[0]}
+        progress=${params[1]}
+        status=${params[2]}
+        starttm=${params[3]}
+        endtm=${params[4]}
+    fi
+    local cond=""
+    
+    if [ "X$progress" != "X" ] && [ "$progress" != "null" ]; then
+        cond=" WHERE progress=$progress"
+    fi
+    
+    if [ "X$status" != "X" ] && [ "$status" != "null" ]; then
+        if [ "X$cond" == "X" ]; then
+            cond=" WHERE status=$status"
+        else
+            cond=" AND status=$status"
+        fi
+    fi
+    
+    if [ "X$starttm" != "X" ] && [ "$starttm" != "null" ]; then
+        if [ "X$cond" == "X" ]; then
+            cond=" WHERE start>=$starttm"
+        else
+            cond=" AND start>=$starttm"
+        fi
+    fi
+    
+    if [ "X$endtm" != "X" ] && [ "$endtm" != "null" ]; then
+        if [ "X$cond" == "X" ]; then
+            cond=" WHERE end<=$endtm"
+        else
+            cond=" AND end<=$endtm"
+        fi
+    fi
+    echo "$cond"
+    return 0
+}
+function cm_cnm_localtask_getbatch()
+{
+    local dbfile="/var/cm/data/cm_localtask.db"
+    local params=$1
+    local cond=`cm_cnm_localtask_sql "$params"`
+    local sql="SELECT * FROM record_t $cond"
+    local nid=`echo $params |awk -F',' '{print $1}'`
+    
+    #"tid|nid|progress|status|start|end|desc"
+    if [ "X$nid" == "X" ] || [ "X$nid" == "Xnull" ] || [ "X$nid" == "X0" ]; then
+        cm_multi_exec "sqlite3 $dbfile '$sql'" |sed 's/\|/ /g' |sort -nrk 5
+    else
+        nid=`sqlite3 $CM_NODE_DB_FILE "SELECT name FROM record_t WHERE id=$nid LIMIT 1"`
+        if [ "X$nid" != "X" ]; then
+            cm_multi_exec $nid "sqlite3 $dbfile '$sql'" |sed 's/\|/ /g' |sort -nrk 5
+        fi
+    fi
+    return 0
+}
+
+function cm_cnm_localtask_count()
+{
+    local dbfile="/var/cm/data/cm_localtask.db"
+    local params=$1
+    local cond=`cm_cnm_localtask_sql "$params"`
+    local sql="SELECT COUNT(tid) FROM record_t $cond"
+    local nid=`echo $params |awk -F',' '{print $1}'`
+    
+    if [ "X$nid" == "X" ] || [ "X$nid" == "Xnull" ] || [ "X$nid" == "X0" ]; then
+        cm_multi_exec "sqlite3 $dbfile '$sql'" |awk 'BEGIN{s=0}{s+=$1}END{print s}'
+    else
+        nid=`sqlite3 $CM_NODE_DB_FILE "SELECT name FROM record_t WHERE id=$nid LIMIT 1"`
+        if [ "X$nid" == "X" ]; then
+            echo "0"
+        else
+            cm_multi_exec $nid "sqlite3 $dbfile '$sql'"
+        fi
+    fi
+    return 0
+}
+
+function cm_cnm_utctime()
+{
+    sqlite3 ${CM_NODE_DB_FILE} "select strftime('%s','now')"
+    return 0
+}
+
+function cm_cnm_localtask_exec()
+{
+    local dbfile="/var/cm/data/cm_localtask.db"
+    local taskid=$1
+    local taskcmd=$2
+    
+    CM_LOG "[${FUNCNAME}:${LINENO}]start [$taskid] $taskcmd"
+    sqlite3 $dbfile "UPDATE record_t SET progress=progress+5,status=1 WHERE tid=$taskid"
+    
+    $taskcmd
+    local iret=$?
+    CM_LOG "[${FUNCNAME}:${LINENO}]finish [$taskid] iret=$iret"
+    local status=2
+    if [ $iret -ne $CM_OK ]; then
+        status=3
+    fi
+    local utcnow=`cm_cnm_utctime`
+    sqlite3 $dbfile "UPDATE record_t SET progress=100,status=$status,end=$utcnow WHERE tid=$taskid"
+    return $CM_OK
+}
+
+function cm_cnm_localtask_create()
+{
+    local dbfile="/var/cm/data/cm_localtask.db"
+    local taskname="$1"
+    local taskcmd="$2"
+    local nid=`/var/cm/script/cm_shell_exec.sh cm_get_localcmid`
+    local taskid=`sqlite3 $dbfile "SELECT seq+1 FROM sqlite_sequence WHERE name='record_t'"`
+    if [ "X$taskid" == "X" ]; then
+        taskid=1
+    fi
+    CM_LOG "[${FUNCNAME}:${LINENO}]task:$taskname [$taskid] $taskcmd"
+    local utcnow=`cm_cnm_utctime`
+    sqlite3 $dbfile "INSERT INTO record_t (nid,progress,status,start,end,desc) VALUES($nid,0,0,$utcnow,0,'$taskname')"
+    
+    echo "taskid: $taskid"
+    cm_cnm_localtask_exec "$taskid" "$taskcmd" 1>/dev/null 2>/dev/null &
+    
+    return $CM_OK
+}
+
+function cm_cnm_lun_delete()
+{
+    local params="$1"
+    local lunname=`echo $params |awk -F'|' '{print $1}'`
+    local poolname=`echo $lunname |awk -F'/' '{print $1}'`
+    lunname=`echo $lunname |awk -F'/' '{print $2}'`
+    
+    CM_LOG "[${FUNCNAME}:${LINENO}]$poolname/$lunname"
+    
+    local taskname="delete lun $poolname/$lunname"
+    local taskcmd="/var/cm/script/cm_shell_exec.sh cm_lun_delete $poolname $lunname"
+    
+    #cm_cnm_localtask_create "$taskname" "$taskcmd" |awk '{print $2}'
+    $taskcmd
+    return $?
+}
+
+function cm_cnm_lun_create_exec()
+{
+    #lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val
+    local params="$1"
+    local paramnull="-"
+    params=`echo "$params" |sed 's/|/ /g'`
+    params=($params)
+    local lunname=${params[0]}
+    local lunsize=${params[1]}
+    local is_single=${params[2]}
+    local blocksize=${params[3]}
+    local is_compress=${params[4]}
+    local is_hot=${params[5]}
+    local write_policy=${params[6]}
+    local dedup=${params[7]}
+    local is_double=${params[8]}
+    local thold=${params[9]}
+    local qos=${params[10]}
+    local qos_val=${params[11]}
+    
+    local option=""
+    if [ "X${is_single}" != "X" ] && [ "X${is_single}" != "X${paramnull}" ] && [ $is_single -eq 1 ]; then
+        option=${option}" -s"
+    fi
+    
+    if [ "X${blocksize}" != "X" ] && [ "X${blocksize}" != "X${paramnull}" ]; then
+        option=${option}" -b ${blocksize}K"
+    fi
+    
+    if [ "X${is_compress}" != "X" ] && [ "X${is_compress}" != "X${paramnull}" ]; then
+        if [ $is_compress -eq 1 ]; then
+            is_compress="on"
+        else
+            is_compress="off"
+        fi
+        option=${option}" -o compression=${is_compress}"
+    fi
+    
+    if [ "X${is_hot}" != "X" ] && [ "X${is_hot}" != "X${paramnull}" ]; then
+        if [ $is_hot -eq 1 ]; then
+            is_hot="on"
+        else
+            is_hot="off"
+        fi
+        option=${option}" -o appmeta=${is_hot}"
+    fi
+    
+    if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
+        option=${option}" -o origin:sync=${write_policy}"
+    fi
+    
+    local cmd="zfs create ${option} -V ${lunsize} ${lunname}"
+    CM_EXEC_CMD "$cmd"
+    local iRet=$?
+    if [ $iRet -ne $CM_OK ]; then
+        return $iRet
+    fi
+    
+    if [ "X${dedup}" != "X" ] && [ "X${dedup}" != "X${paramnull}" ]; then
+        if [ $dedup -eq 1 ]; then
+            dedup="on"
+        else
+            dedup="off"
+        fi
+        CM_EXEC_CMD "zfs set dedup=${dedup} ${lunname}"
+    fi
+    
+    if [ "X${is_double}" != "X" ] && [ "X${is_double}" != "X${paramnull}" ]; then
+        if [ $is_double -eq 1 ]; then
+            is_double=0
+        else
+            is_double=1
+        fi
+        CM_EXEC_CMD "zfs set zfs:single_data=${is_double} ${lunname}"
+    fi
+    
+    local sfver=`cm_systerm_version_get`
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_V7R16} ]; then
+        return $CM_OK
+    fi
+    
+    if [ "X${thold}" != "X" ] && [ "X${thold}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set thold=${thold} ${lunname}"
+    fi
+    
+    if [ "X${qos}" == "X" ] || [ "X${qos}" == "X${paramnull}" ]; then
+        return $CM_OK
+    fi
+    
+    local subcmd="set-kbps"
+    if [ ${qos} -eq 1 ]; then
+        subcmd="set-iops-limit"
+    fi
+    if [ "X${qos_val}" == "X" ] || [ "X${qos_val}" == "X${paramnull}" ]; then
+        qos_val="0"
+    fi
+    local stmfid=`stmfadm list-all-luns 2>/dev/null |awk '$2=="'$lunname'"{print $1}'`
+    if [ "X$stmfid" == "X" ]; then
+        return $CM_OK
+    fi
+    cmd="stmfadm $subcmd -c -l $stmfid -n $qos_val"
+    CM_EXEC_CMD "$cmd"
+    return $CM_OK
+}
+function cm_cnm_lun_create()
+{
+    local params=$1
+    local lunname=`echo $params |awk -F'|' '{print $1}'`
+    
+    #cm_cnm_localtask_create "create lun $lunname" "cm_cnm_lun_create_exec $params" |awk '{print $2}'
+    cm_cnm_lun_create_exec "$params"
+    return $?
+}
+
+function cm_cnm_lun_update_exec()
+{
+    #lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val
+    local params="$1"
+    local paramnull="-"
+    params=`echo "$params" |sed 's/\|/ /g'`
+    params=($params)
+    local lunname=${params[0]}
+    local lunsize=${params[1]}
+    local is_single=${params[2]}
+    local blocksize=${params[3]}
+    local is_compress=${params[4]}
+    local is_hot=${params[5]}
+    local write_policy=${params[6]}
+    local dedup=${params[7]}
+    local is_double=${params[8]}
+    local thold=${params[9]}
+    local qos=${params[10]}
+    local qos_val=${params[11]}
+    local iRet=$CM_OK
+    local stmfid=""
+    
+    if [ "X${lunsize}" != "X" ] && [ "X${lunsize}" != "X${paramnull}" ]; then
+        stmfid=`stmfadm list-all-luns 2>/dev/null |awk '$2=="'$lunname'"{print $1}'`
+        if [ "X$stmfid" == "X" ]; then
+            CM_LOG "[${FUNCNAME}:${LINENO}]$lunname stmfid null"
+            return $CM_FAIL
+        fi
+        CM_EXEC_CMD "stmfadm modify-lu -c -s $lunsize $stmfid"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+        CM_EXEC_CMD "zfs set volsize=$lunsize $lunname"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X${is_compress}" != "X" ] && [ "X${is_compress}" != "X${paramnull}" ]; then
+        if [ $is_compress -eq 1 ]; then
+            is_compress="on"
+        else
+            is_compress="off"
+        fi
+        CM_EXEC_CMD "zfs set compression=${is_compress} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X${is_hot}" != "X" ] && [ "X${is_hot}" != "X${paramnull}" ]; then
+        if [ $is_hot -eq 1 ]; then
+            is_hot="on"
+        else
+            is_hot="off"
+        fi
+        CM_EXEC_CMD "zfs set appmeta=${is_hot} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set origin:sync=${is_hot} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+
+    if [ "X${dedup}" != "X" ] && [ "X${dedup}" != "X${paramnull}" ]; then
+        if [ $dedup -eq 1 ]; then
+            dedup="on"
+        else
+            dedup="off"
+        fi
+        CM_EXEC_CMD "zfs set dedup=${dedup} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X${is_double}" != "X" ] && [ "X${is_double}" != "X${paramnull}" ]; then
+        if [ $is_double -eq 1 ]; then
+            is_double=0
+        else
+            is_double=1
+        fi
+        CM_EXEC_CMD "zfs set zfs:single_data=${is_double} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    local sfver=`cm_systerm_version_get`
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_V7R16} ]; then
+        return $CM_OK
+    fi
+    
+    if [ "X${thold}" != "X" ] && [ "X${thold}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set thold=${thold} ${lunname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            return $iRet
+        fi
+    fi
+    
+    if [ "X${qos}" == "X" ] || [ "X${qos}" == "X${paramnull}" ]; then
+        return $CM_OK
+    fi
+    
+    local subcmd="set-kbps"
+    if [ ${qos} -eq 1 ]; then
+        subcmd="set-iops-limit"
+    fi
+    if [ "X${qos_val}" == "X" ] || [ "X${qos_val}" == "X${paramnull}" ]; then
+        qos_val="0"
+    fi
+    if [ "X$stmfid" == "X" ]; then
+        stmfid=`stmfadm list-all-luns 2>/dev/null |awk '$2=="'$lunname'"{print $1}'`
+        if [ "X$stmfid" == "X" ]; then
+            CM_LOG "[${FUNCNAME}:${LINENO}]$lunname stmfid null"
+            return $CM_FAIL
+        fi
+    fi
+    cmd="stmfadm $subcmd -c -l $stmfid -n $qos_val"
+    CM_EXEC_CMD "$cmd"
+    return $?
+}
+
+function cm_cnm_lun_update()
+{
+    local params=$1
+    local lunname=`echo $params |awk -F'|' '{print $1}'`
+    CM_LOG "[${FUNCNAME}:${LINENO}]$lunname"
+    cm_cnm_lun_update_exec "$1"
+    return $?
+}
+
+function cm_cnm_nas_set()
+{
+    #nasname|blocksize|access|write_policy|is_compress|dedup|smb|abe|aclinherit|quota|qos|qos_avs
+    local params=$1
+    local failnum=0
+    local paramnull="-"
+    params=`echo "$params" |sed 's/|/ /g'`
+    #The charactor '|' is no need to escape on Linux command 'sed'    
+    params=($params)
+    local nasname=${params[0]}
+    local blocksize=${params[1]}
+    local laccess=${params[2]}
+    local write_policy=${params[3]}
+    local is_compress=${params[4]}
+    
+    local dedup=${params[5]}
+    local sharesmb=${params[6]}
+    local abe=${params[7]}
+    local aclinherit=${params[8]}
+    local quota=${params[9]}
+    
+    local qos=${params[10]}
+    local qos_avs=${params[11]}
+    
+    if [ "X${blocksize}" != "X" ] && [ "X${blocksize}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set recordsize=${blocksize}K ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ "X${laccess}" != "X" ] && [ "X${laccess}" != "X${paramnull}" ]; then
+        chmod ${laccess} /${nasname}
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi  
+    
+    if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
+        local wp=("unkown" "disk" "poweroff" "mirror" "standard" "always")
+        CM_EXEC_CMD "zfs set origin:sync=${wp[${write_policy}]} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ "X${is_compress}" != "X" ] && [ "X${is_compress}" != "X${paramnull}" ]; then
+        if [ ${is_compress} -eq 1 ]; then
+            is_compress="on"
+        else
+            is_compress="off"
+        fi
+        CM_EXEC_CMD "zfs set compression=${is_compress} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ "X${dedup}" != "X" ] && [ "X${dedup}" != "X${paramnull}" ]; then
+        if [ ${dedup} -eq 1 ]; then
+            dedup="on"
+        else
+            dedup="off"
+        fi
+        CM_EXEC_CMD "zfs set dedup=${dedup} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ "X${sharesmb}" != "X" ] && [ "X${sharesmb}" != "X${paramnull}" ]; then
+        if [ ${sharesmb} -eq 1 ]; then
+            if [ "X${abe}" != "X" ] && [ "X${abe}" != "X${paramnull}" ] && [ $abe -eq 1 ]; then
+                sharesmb="abe=true"
+            else
+                sharesmb="on"
+            fi
+        else
+            sharesmb="off"
+        fi
+        CM_EXEC_CMD "zfs set sharesmb=${sharesmb} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        else
+            if [ "X${abe}" != "X" ] && [ "X${abe}" != "X${paramnull}" ]; then
+                /var/cm/script/cm_shell_exec.sh cm_set_abe ${nasname} "${abe}"
+            fi
+        fi
+    fi
+    
+    if [ "X${aclinherit}" != "X" ] && [ "X${aclinherit}" != "X${paramnull}" ]; then
+        local wp=("discard" "noallow" "restricted" "passthrough" "passthrough-x")
+        CM_EXEC_CMD "zfs set origin:sync=${wp[$aclinherit]} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ "X${quota}" != "X" ] && [ "X${quota}" != "X${paramnull}" ]; then
+        local wp=("unkown" "disk" "poweroff" "mirror" "standard" "always")
+        CM_EXEC_CMD "zfs set quota=${quota} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    local sfver=`cm_systerm_version_get`
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_V7R16} ]; then
+        return $failnum
+    fi
+    
+    if [ "X${qos}" != "X" ] && [ "X${qos}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set bandwidth=${qos} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
+        return $failnum
+    fi
+    
+    if [ "X${qos_avs}" != "X" ] && [ "X${qos_avs}" != "X${paramnull}" ]; then
+        CM_EXEC_CMD "zfs set nasavsbw=${qos_avs} ${nasname}"
+        iRet=$?
+        if [ $iRet -ne $CM_OK ]; then
+            ((failnum=$failnum+1))
+        fi
+    fi
+    return $failnum
+}
+
+function cm_cnm_nas_create_exec()
+{
+    local params="$1"
+    local nasname=`echo $params |awk -F'|' '{print $1}'`
+    local iRet=$CM_OK
+    local sfver=`cm_systerm_version_get`
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
+        /var/cm/script/cm_shell_exec.sh cm_nas_create "$nasname"
+        iRet=$?
+    else
+        CM_EXEC_CMD "zfs create ${nasname}"
+        iRet=$?
+    fi
+    
+    if [ $iRet -ne $CM_OK ]; then
+        return $iRet
+    fi
+    cm_cnm_nas_set "$params"
+    return $iRet
+}
+
+function cm_cnm_nas_create()
+{
+    local params=$1
+    local nasname=`echo $params |awk -F'|' '{print $1}'`
+    
+    #cm_cnm_localtask_create "create nas $nasname" "cm_cnm_nas_create_exec $params" |awk '{print $2}'
+    cm_cnm_nas_create_exec "$params"
+    return $?
+}
+
+function cm_cnm_nas_update()
+{
+    local params=$1
+    local nasname=`echo $params |awk -F'|' '{print $1}'`
+    
+    #cm_cnm_localtask_create "update nas $nasname" "cm_cnm_nas_set $params" |awk '{print $2}'
+    cm_cnm_nas_set "$params"
+    if [ $? -ne 0 ]; then
+        return $CM_FAIL
+    fi
+    return $CM_OK
+}
+
+function cm_cnm_nas_delete()
+{
+    local params=$1
+    local nasname=`echo $params |awk -F'|' '{print $1}'`
+    
+    #cm_cnm_localtask_create "delete nas $nasname" "zfs destroy -rRf $nasname" |awk '{print $2}'
+    CM_EXEC_CMD "zfs destroy -rRf $nasname"
+    return $?
+}
+
+function cm_cnm_nas_getbatch_v7()
+{
+    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit"
+    local nasname=$1
+    zfs list -H -t filesystem -o $opt $nasname |grep '/' \
+        |while read line
+    do
+        local arr=($line)
+        local name=${arr[0]}
+        local laccess=`stat /${name} |grep Uid |cut -b 11-13`
+        if [ "X$laccess" == "X" ]; then
+            laccess=755
+        fi
+        echo "$line none none $laccess"
+    done
+    return 0
+}
+
+function cm_cnm_nas_getbatch_nomaster()
+{
+    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit,bandwidth"
+    local nasname=$1
+    zfs list -H -t filesystem -o $opt $nasname |grep '/' \
+        |while read line
+    do
+        local arr=($line)
+        local name=${arr[0]}
+        local laccess=`stat /${name} |grep Uid |cut -b 11-13`
+        if [ "X$laccess" == "X" ]; then
+            laccess=755
+        fi
+        echo "$line none $laccess"
+    done
+    return 0
+}
+
+function cm_cnm_nas_getbatch_def()
+{
+    local opt="name,used,avail,quota,recordsize,compression,sync,dedup,sharesmb,aclinherit"
+    local nasname=$1
+    zfs list -H -t filesystem -o $opt $nasname |grep '/' \
+        |while read line
+    do
+        local arr=($line)
+        local name=${arr[0]}
+        local laccess=`stat /${name} |grep Uid |cut -b 11-13`
+        if [ "X$laccess" == "X" ]; then
+            laccess=755
+        fi
+        echo "$line $laccess"
+    done
+    return 0
+}
+
+function cm_cnm_nas_getbatch()
+{
+    local sfver=`cm_systerm_version_get`
+    local nasname="$1"
+    
+    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
+        cm_cnm_nas_getbatch_nomaster "$nasname"
+    elif [ $sfver -eq ${CM_SYS_VER_SOLARIS_V7R16} ]; then
+        cm_cnm_nas_getbatch_v7 "$nasname"
+    else
+        cm_cnm_nas_getbatch_def "$nasname"
+    fi
+    return 0
+}
+
+${CM_MOD_NAME}"_$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
 exit $?

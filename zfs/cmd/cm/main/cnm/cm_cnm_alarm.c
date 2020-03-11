@@ -1293,7 +1293,7 @@ static void cm_cnm_alarm_commom_sas_get_param(const sint8* param,uint32 enid,sin
 
     return;
 }
-
+/*
 static void cm_cnm_alarm_commom_sas_fenge(uint32 sas_val[],sint8 sas[])
 {
     sint8* p = NULL;
@@ -1433,7 +1433,7 @@ static void cm_cnm_alarm_commom_sas(void)
     cm_ini_set_ext(cm_cnm_alarm_config_file,"config","sas",cm_cnm_alarm_sas); 
     return;
 }
-
+*/
 void cm_cnm_alarm_common_thread(void)
 {
     uint32 count = 0;

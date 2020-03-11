@@ -62,7 +62,47 @@ fmd_SOURCES =		\
 	fmd_xdr_api.c 	\
 	fmd_rpc_adm.c	\
 	fmd_rpc_api.c	\
-	systemd_util.c
+	../../../common/systemd_util.c
+
+EXTRA_DIST = \
+	fmd_alloc.h \
+	fmd_api.h \
+	fmd_asru.h \
+	fmd_buf.h \
+	fmd_builtin.h \
+	fmd_case.h \
+	fmd_channel.h \
+	fmd_ckpt.h \
+	fmd_conf.h \
+	fmd_ctl.h \
+	fmd_dispq.h \
+	fmd_dr.h \
+	fmd_error.h \
+	fmd_event.h \
+	fmd_eventq.h \
+	fmd_fmri.h \
+	fmd.h \
+	fmd_idspace.h \
+	fmd_list.h \
+	fmd_log.h \
+	fmd_module.h \
+	fmd_protocol.h \
+	fmd_rpc_adm.h \
+	fmd_rpc_api.h \
+	fmd_rpc.h \
+	fmd_scheme.h \
+	fmd_serd.h \
+	fmd_string.h \
+	fmd_subr.h \
+	fmd_thread.h \
+	fmd_time.h \
+	fmd_timerq.h \
+	fmd_topo.h \
+	fmd_trace.h \
+	fmd_ustat.h \
+	fmd_xprt.h \
+	fmd_api.map \
+	fmd_fmri.map
 
 fmd_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la			\

@@ -8,7 +8,7 @@ DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/lib/libspl/include
 
 libzfs_diagnose_la_LTLIBRARIES = libzfs_diagnose.la
-libzfs_diagnose_la_DATA = libzfs_diagnose.conf
+dist_libzfs_diagnose_la_DATA = libzfs_diagnose.conf
 
 USER_C = \
 	zfs_de.c

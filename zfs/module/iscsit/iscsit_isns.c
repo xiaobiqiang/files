@@ -32,6 +32,7 @@
 #include <linux/tcp.h>
 #include <linux/in6.h>
 #include <sys/sdt.h>
+#include <sys/zfs_context.h>
 
 #include <sys/atomic.h>
 #include <sys/stmf.h>

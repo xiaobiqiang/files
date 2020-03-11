@@ -476,7 +476,7 @@ sint32 cm_cnm_localtask_create(
         CM_LOG_ERR(CM_MOD_CNM,"malloc fail");
         return CM_FAIL;
     }
-    CM_VSPRINTF(param->cmd,iRet,cmd);
+    CM_VSPRINTF(param->cmd,iRet,"%s",cmd);
     CM_MUTEX_LOCK(&gCmLocalTaskMutex);
     (void)cm_db_exec_get_count(gCmLocalTaskHandle, &taskid,
         "SELECT seq+1 FROM sqlite_sequence WHERE name='record_t'"); 
@@ -740,7 +740,7 @@ static sint32 cm_cnm_localtask_db_get_each(
     info->status= atoi(col_vals[2]);
     info->start= atoi(col_vals[3]);
     info->end= atoi(col_vals[4]);
-    CM_VSPRINTF(info->desc,sizeof(info->desc),col_vals[5]);
+    CM_VSPRINTF(info->desc,sizeof(info->desc),"%s",col_vals[5]);
     return CM_OK;
 }
 

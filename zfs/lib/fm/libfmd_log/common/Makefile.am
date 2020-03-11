@@ -13,6 +13,11 @@ USER_C = \
 	fmd_log.c	\
 	gmatch.c
 
+EXTRA_DIST = \
+	fmd_log_impl.h \
+	fmd_log.h \
+	gmatch.h
+
 dist_libfmd_log_la_SOURCES = \
 	$(USER_C)
 

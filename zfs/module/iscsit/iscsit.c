@@ -34,6 +34,7 @@
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
 #include <sys/nvpair.h>
+#include <sys/zfs_context.h>
 
 #include <sys/stmf.h>
 #include <sys/stmf_ioctl.h>

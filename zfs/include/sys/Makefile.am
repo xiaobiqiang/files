@@ -1,4 +1,4 @@
-SUBDIRS = fm fs idm iscsit
+SUBDIRS = fm fs idm iscsit scsi
 
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \
@@ -6,6 +6,8 @@ COMMON_H = \
 	$(top_srcdir)/include/sys/avl.h \
 	$(top_srcdir)/include/sys/avl_impl.h \
 	$(top_srcdir)/include/sys/cluster_san.h \
+	$(top_srcdir)/include/sys/cluster_target_mac.h \
+	$(top_srcdir)/include/sys/cluster_target_socket.h \
 	$(top_srcdir)/include/sys/cn_hbx.h \
 	$(top_srcdir)/include/sys/fmd_transport.h \
 	$(top_srcdir)/include/sys/blkptr.h \
@@ -106,7 +108,28 @@ COMMON_H = \
 	$(top_srcdir)/include/sys/zio_impl.h \
 	$(top_srcdir)/include/sys/zrlock.h \
 	$(top_srcdir)/include/sys/lun_migrate.h \
-	$(top_srcdir)/include/sys/ipmi_notify_if.h
+	$(top_srcdir)/include/sys/ipmi_notify_if.h \
+	$(top_srcdir)/include/sys/stmf.h \
+	$(top_srcdir)/include/sys/stmf_defines.h \
+	$(top_srcdir)/include/sys/stmf_impl.h \
+	$(top_srcdir)/include/sys/stmf_ioctl.h \
+	$(top_srcdir)/include/sys/stmf_sbd.h \
+	$(top_srcdir)/include/sys/stmf_sbd_ioctl.h \
+	$(top_srcdir)/include/sys/portif.h \
+	$(top_srcdir)/include/sys/fct.h \
+	$(top_srcdir)/include/sys/fct_defines.h \
+	$(top_srcdir)/include/sys/fct_impl.h \
+	$(top_srcdir)/include/sys/fctio.h \
+	$(top_srcdir)/include/sys/discovery.h \
+	$(top_srcdir)/include/sys/lpif.h \
+	$(top_srcdir)/include/sys/pppt_ic_if.h \
+	$(top_srcdir)/include/sys/pppt_ioctl.h \
+	$(top_srcdir)/include/sys/pci.h \
+	$(top_srcdir)/include/sys/pci_ids.h \
+	$(top_srcdir)/include/sys/sbd_impl.h \
+	$(top_srcdir)/include/sys/raidz_aggre.h \
+	$(top_srcdir)/include/sys/clist.h \
+	$(top_srcdir)/include/sys/wrcache.h
 	
 
 KERNEL_H = \
