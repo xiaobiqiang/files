@@ -934,7 +934,7 @@ static void cm_cnm_explorer_encode_each(cm_omi_obj_t item, void* eachdata, void*
     
  
     cm_cnm_encode_str(item,field,cols_str,sizeof(cols_str)/sizeof(cm_cnm_map_value_str_t));
-    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_str_t));
+    cm_cnm_encode_num(item,field,cols_num,sizeof(cols_num)/sizeof(cm_cnm_map_value_num_t));
     if(CM_OMI_FIELDS_FLAG_ISSET(field,CM_OMI_FIELD_EXPLORER_SIZE))
     {
         (void)cm_omi_obj_key_set_u64_ex(item,CM_OMI_FIELD_EXPLORER_SIZE,info->size);
