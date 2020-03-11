@@ -7316,8 +7316,6 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		stmf_print_task_audit(itask);
 		printk(KERN_WARNING "Unexpected xfer completion task %p dbuf %p",
 		    (void *)task, (void *)dbuf);
-		cmn_err(CE_PANIC, "Unexpected xfer completion task %p dbuf %p",
-		    (void *)task, (void *)dbuf);
 		return;
 	}
 
