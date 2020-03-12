@@ -1,7 +1,7 @@
 include $(top_srcdir)/config/Rules.am
 
-$(shell chmod 755 ./copy_snmp_headers.sh)
-$(shell ./copy_snmp_headers.sh)
+$(chmod 755 ./copy_snmp_headers.sh)
+$(./copy_snmp_headers.sh)
 
 libsnmp_trapgen_ladir=/usr/local/lib/fmd
 
@@ -20,6 +20,10 @@ DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/lib/fm/topo/modules/common/disk \
 	-I/usr/include/libxml2
 
+dist_libsnmp_trapgen_la_DATA = \
+	copy_snmp_headers.sh \
+	net-snmp.tar
+
 libsnmp_trapgen_la_LTLIBRARIES = libsnmp_trapgen.la
 
 USER_C = \
@@ -32,4 +36,6 @@ libsnmp_trapgen_la_LIBADD +=  -lxml2 -lnetsnmp -lnetsnmpagent
 
 dist_libsnmp_trapgen_la_SOURCES = \
 	$(USER_C)
+	snmp-trangen.h \
+	snmp-trapgen.h
 

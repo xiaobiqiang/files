@@ -178,6 +178,7 @@ AC_CONFIG_FILES([
 	cmd/fm/modules/common/pool-transport/Makefile
 	cmd/fm/modules/common/eversholt/Makefile
 	cmd/fm/modules/common/eversholt/files/Makefile
+	cmd/fm/modules/common/snmp-trapgen/Makefile
 	cmd/fm/fmd/schemes/Makefile
 	cmd/fm/fmd/schemes/zfs/Makefile
 	cmd/fm/dicts/Makefile

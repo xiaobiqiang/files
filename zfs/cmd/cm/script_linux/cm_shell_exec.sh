@@ -207,6 +207,9 @@ function cm_get_nodeinfo()
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`
     myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
+    if [ "X"$myip = "X" ]; then
+        myip='0.0.0.0'
+    fi
     local snum=16
     if [ "X$devtype" == "XAIC" ]; then
         devtype=1
