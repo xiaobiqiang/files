@@ -48,6 +48,7 @@ sint32 cm_cnm_dirquota_decode(
 }
 
 /*divide "/pool/nas/dirpath..." into "/pool/nas" and "/dirpath..."*/
+/*
 static uint32 cm_cnm_dirquota_anlysis_path(
     const sint8 *src,sint8 *nas,uint32 nas_size,sint8 *dir,uint32 dir_size)
 {
@@ -84,6 +85,36 @@ static uint32 cm_cnm_dirquota_anlysis_path(
     if(NULL != dir && dir_size > 0)
     {
         strncpy(dir,(tp+1),dir_size);
+    }
+    CM_FREE(tmp_path);
+    return CM_OK;
+}
+*/
+static uint32 cm_cnm_dirquota_anlysis_path(
+    const sint8 *src,sint8 *nas,uint32 nas_size,sint8 *dir,uint32 dir_size)
+{
+    if(NULL == src)
+    {
+        return CM_FAIL;
+    }
+    uint32 size = strlen(src) + 1;
+    sint8 * tp = NULL;
+    sint8 * tmp_path = CM_MALLOC(size);
+    CM_MEM_CPY(tmp_path,size,src,size);
+    tp = strtok(tmp_path,"/");
+    if(tp)
+    {
+        CM_SNPRINTF_ADD(nas, CM_STRING_256, "%s/", tp);
+    }
+    tp = strtok(NULL,"/");
+    if(tp)
+    { 
+        CM_SNPRINTF_ADD(nas, CM_STRING_256, "%s", tp);
+    }
+    tp = strtok(NULL,"/");
+    if(tp)
+    { 
+        CM_SNPRINTF_ADD(dir, CM_STRING_256, "%s", tp);
     }
     CM_FREE(tmp_path);
     return CM_OK;
@@ -172,7 +203,8 @@ sint32 cm_cnm_dirquota_delete(
 static sint32 cm_cnm_dirquota_local_get_each(void *arg, sint8 **cols, uint32 col_num)
 {
     cm_cnm_dirquota_info_t *dirquota_info = arg;
-    const uint32 def_num = 5;    
+    const uint32 def_num = 3;    
+    float used, rest, quota;
     if(def_num != col_num)
     {
         CM_LOG_WARNING(CM_MOD_CNM,"col_num[%u] def_num[%u]",col_num,def_num);
@@ -182,8 +214,18 @@ static sint32 cm_cnm_dirquota_local_get_each(void *arg, sint8 **cols, uint32 col
     CM_MEM_CPY(dirquota_info->dir_path,sizeof(dirquota_info->dir_path),cols[0],strlen(cols[0])+1);
     CM_MEM_CPY(dirquota_info->quota,sizeof(dirquota_info->quota),cols[1],strlen(cols[1])+1);
     CM_MEM_CPY(dirquota_info->used,sizeof(dirquota_info->used),cols[2],strlen(cols[2])+1);
-    CM_MEM_CPY(dirquota_info->rest,sizeof(dirquota_info->rest),cols[3],strlen(cols[3])+1);
-    dirquota_info->per_used = atof(cols[4]);
+    if(atoi(cols[2]) != 0)
+    {
+        used = (float)cm_cnm_trans_result(cols[2]);
+    }
+    else
+    {
+        used = 0.0;
+    }
+    quota = (float)cm_cnm_trans_result(cols[1]);
+    rest = quota - used;
+    CM_SNPRINTF_ADD(dirquota_info->rest, sizeof(dirquota_info->rest),"%fM",rest);
+    dirquota_info->per_used = used / quota;   
     dirquota_info->nid = cm_node_get_id();
 
     return CM_OK;
