@@ -31,7 +31,6 @@
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
 #include <sys/sdt.h>
-#include <sys/zfs_context.h>
 
 #include <linux/socket.h>
 //#include <sys/strsubr.h>

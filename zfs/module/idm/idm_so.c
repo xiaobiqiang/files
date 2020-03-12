@@ -53,7 +53,6 @@
 #include <sys/idm/idm_so.h>
 #include <sys/idm/idm_text.h>
 #include <sys/in.h>
-#include <sys/zfs_context.h>
 
 #define	IN_PROGRESS_DELAY	1
 

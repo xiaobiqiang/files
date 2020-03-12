@@ -31,7 +31,6 @@
 //#include <sys/strsubr.h>
 #include <sys/note.h>
 #include <sys/sdt.h>
-#include <sys/zfs_context.h>
 
 #define	IDM_CONN_SM_STRINGS
 #define	IDM_CN_NOTIFY_STRINGS

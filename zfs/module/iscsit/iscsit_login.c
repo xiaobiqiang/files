@@ -31,7 +31,6 @@
 #include <sys/modctl.h>
 #include <sys/scsi/generic/persist.h>
 #include <sys/scsi/impl/commands.h>
-#include <sys/zfs_context.h>
 
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
