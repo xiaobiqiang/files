@@ -39,6 +39,8 @@
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
+#include <sys/cmn_err.h>
+
 
 #define	IDM_NAME_VERSION	"iSCSI Data Mover"
 

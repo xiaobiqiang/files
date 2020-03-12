@@ -27,6 +27,8 @@
 #include <sys/cluster_san.h>
 #include <sys/kobj.h>
 #include <sys/stmf_impl.h>
+#include <sys/cmn_err.h>
+
 #include "lun_map.h"
 #include "stmf_state.h"
 #include "stmf_stats.h"

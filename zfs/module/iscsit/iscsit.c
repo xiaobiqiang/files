@@ -42,6 +42,8 @@
 #include <sys/idm/idm_conn_sm.h>
 #include <sys/scsi/generic/status.h>
 #include <linux/miscdevice.h>
+#include <sys/cmn_err.h>
+
 
 #include "iscsit_isns.h"
 #include "iscsit.h"

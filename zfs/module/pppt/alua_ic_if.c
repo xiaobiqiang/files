@@ -36,6 +36,8 @@
 #include <sys/byteorder.h>
 #include <sys/nvpair.h>
 /* #include <sys/door.h> */
+#include <sys/cmn_err.h>
+
 
 #include <sys/stmf.h>
 #include <sys/lpif.h>

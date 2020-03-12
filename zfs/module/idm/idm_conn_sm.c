@@ -35,6 +35,8 @@
 #define	IDM_CONN_SM_STRINGS
 #define	IDM_CN_NOTIFY_STRINGS
 #include <sys/idm/idm.h>
+#include <sys/cmn_err.h>
+
 
 //#ifdef DEBUG
 boolean_t	idm_sm_logging = B_TRUE;
