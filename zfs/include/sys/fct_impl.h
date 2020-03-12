@@ -28,7 +28,10 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-#include <sys/cm_err.h>
+#include <sys/cmn_err.h>
+#include <sys/taskq.h>
+#include <condvar.h>
+
 
 #define	RSCN_OPTION_VERIFY	0x0001
 

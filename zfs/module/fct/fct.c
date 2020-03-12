@@ -48,9 +48,6 @@
 #include <linux/utsname_compat.h>
 #include <sys/fct_impl.h>
 #include <sys/discovery.h>
-#include <sys/cmn_err.h>
-#include <sys/taskq.h>
-
 
 //#include <sys/zfs_context.h>
 #ifdef SOLARIS
