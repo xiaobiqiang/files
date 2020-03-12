@@ -30,7 +30,6 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/sysmacros.h>
-#include <sys/zfs_context.h>
 #include <sys/scsi/generic/persist.h>
 
 #include <linux/socket.h>

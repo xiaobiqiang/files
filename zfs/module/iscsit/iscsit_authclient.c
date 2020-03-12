@@ -27,7 +27,6 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/zfs_context.h>
 
 #include <linux/socket.h>
 #include <linux/tcp.h>

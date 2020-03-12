@@ -35,7 +35,7 @@ libsnmp_trapgen_la_LIBADD = 					\
 libsnmp_trapgen_la_LIBADD +=  -lxml2 -lnetsnmp -lnetsnmpagent
 
 dist_libsnmp_trapgen_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
 	snmp-trangen.h \
 	snmp-trapgen.h
 

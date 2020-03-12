@@ -29,7 +29,6 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
-#include <sys/zfs_context.h>
 
 #include <linux/socket.h>
 //#include <sys/strsubr.h>

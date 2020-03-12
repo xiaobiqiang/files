@@ -1186,7 +1186,7 @@ zfs_rpc_cmd(zfs_rpc_arg_t *arg)
 #ifdef USE_HENGWEI
 		fd = open(arg->propname, O_CREAT | O_RDWR | O_TRUNC, 0777);
 #else
-		fd = open(arg->propname, O_CREAT | O_RDWR | O_TRUNC, 0777);
+		fd = open(arg->propname, O_CREAT | O_RDWR | O_TRUNC);
 #endif
 		if (fd < 0) {
 			syslog(LOG_ERR, "Open local file failed");

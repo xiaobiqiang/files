@@ -29,7 +29,6 @@
 #include <sys/sunddi.h>
 #include <sys/cpuvar.h>
 #include <sys/sdt.h>
-#include <sys/zfs_context.h>
 
 #include <linux/socket.h>
 //#include <sys/strsubr.h>
