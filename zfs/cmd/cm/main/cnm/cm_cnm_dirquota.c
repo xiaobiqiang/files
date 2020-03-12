@@ -48,48 +48,7 @@ sint32 cm_cnm_dirquota_decode(
 }
 
 /*divide "/pool/nas/dirpath..." into "/pool/nas" and "/dirpath..."*/
-/*
-static uint32 cm_cnm_dirquota_anlysis_path(
-    const sint8 *src,sint8 *nas,uint32 nas_size,sint8 *dir,uint32 dir_size)
-{
-    if(NULL == src)
-    {
-        return CM_FAIL;
-    }
-    uint32 size = strlen(src) + 1;
-    sint8 * tp = NULL;
-    sint8 * const tmp_path = CM_MALLOC(size);
-    CM_MEM_CPY(tmp_path,size,(src + 1),size);
-    tp = strchr(tmp_path,'/');
-    if(NULL == tp)
-    {
-        CM_FREE(tmp_path);
-        return CM_FAIL;
-    }
-    tp = strchr((tp+1),'/');
-    if(NULL == tp)
-    {
-        CM_FREE(tmp_path);
-        return CM_FAIL;
-    }
-    if('\0' == *(tp + 1))
-    {
-        CM_FREE(tmp_path);
-        return CM_FAIL;
-    }
-    *tp = 0;
-    if(NULL != nas && nas_size > 0)
-    {
-        strncpy(nas,tmp_path,nas_size);
-    }
-    if(NULL != dir && dir_size > 0)
-    {
-        strncpy(dir,(tp+1),dir_size);
-    }
-    CM_FREE(tmp_path);
-    return CM_OK;
-}
-*/
+
 static uint32 cm_cnm_dirquota_anlysis_path(
     const sint8 *src,sint8 *nas,uint32 nas_size,sint8 *dir,uint32 dir_size)
 {
