@@ -27,7 +27,6 @@
 #include <sys/sunddi.h>
 #include <sys/iscsit/iscsi_if.h>
 //#include <sys/md5.h>
-#include <sys/zfs_context.h>
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>

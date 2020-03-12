@@ -36,7 +36,6 @@
 #include <sys/byteorder.h>
 #include <sys/nvpair.h>
 /* #include <sys/door.h> */
-#include <sys/zfs_context.h>
 
 #include <sys/stmf.h>
 #include <sys/lpif.h>
