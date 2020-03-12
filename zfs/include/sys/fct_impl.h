@@ -28,7 +28,7 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-#include <sys/zfs_context.h>
+#include <sys/cm_err.h>
 
 #define	RSCN_OPTION_VERIFY	0x0001
 
