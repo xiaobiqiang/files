@@ -38,7 +38,6 @@
 /* #include <sys/door.h> */
 #include <sys/cmn_err.h>
 
-
 #include <sys/stmf.h>
 #include <sys/lpif.h>
 #include <sys/stmf_ioctl.h>

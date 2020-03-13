@@ -35,7 +35,6 @@
 #include <crypto/hash.h>
 #include <sys/cmn_err.h>
 
-
 #include "radius_auth.h"
 
 /* Forward declaration */

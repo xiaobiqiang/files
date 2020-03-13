@@ -55,7 +55,6 @@
 #include <sys/in.h>
 #include <sys/cmn_err.h>
 
-
 #define	IN_PROGRESS_DELAY	1
 
 /*
