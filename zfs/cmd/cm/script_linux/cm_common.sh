@@ -186,7 +186,7 @@ function cm_get_localmanageip()
     local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
     local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
     
-    if [ ! -f ${cfgfile} ] || [`cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
+    if [ ! -f ${cfgfile} ] || [ `cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
         ifconfig eth0|grep 'inet '|awk '{print $2}'
         return 0
     fi
