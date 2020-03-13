@@ -1,8 +1,8 @@
 #!/bin/bash
 
-threshold_cfg_xml_file="../../static/comm/alarm_threshold_cfg.xml"
-alarm_cfg_xml_file="../../static/comm/alarm_cfg.xml"
-alarm_cfg_db_file="../../static/comm/cm_alarm_cfg.db"
+threshold_cfg_xml_file="/var/cm/static/comm/alarm_threshold_cfg.xml"
+alarm_cfg_xml_file="/var/cm/static/comm/alarm_cfg.xml"
+alarm_cfg_db_file="/var/cm/static/comm/cm_alarm_cfg.db"
 
 SQLITE=sqlite3
 
@@ -23,7 +23,7 @@ function alarm_init_db()
     local table_threshold="CREATE TABLE IF NOT EXISTS threshold_t (alarm_id INT, threshold INT, recoverval INT)"
     rm -f $alarm_cfg_db_file
     touch $alarm_cfg_db_file
-    chmod +x $SQLITE
+    #chmod +x $SQLITE
     $SQLITE $alarm_cfg_db_file "$table_config"
     $SQLITE $alarm_cfg_db_file "$table_record"
     $SQLITE $alarm_cfg_db_file "$table_cache"
