@@ -7498,55 +7498,17 @@ static int
 release_callback(zpool_handle_t *zhp, void *data)
 {
 	release_cbdata_t *cbp = data;
-	nvlist_t *config, *nvroot;
 	int partner_id;
 	const char *pool_name;
 	struct link_list *node;
-	zpool_stamp_t *stamp;
-	uint64_t host_id;
-
-	stamp = malloc(sizeof(zpool_stamp_t));
-	bzero(stamp, sizeof(zpool_stamp_t));
-	config = zpool_get_config(zhp, NULL);
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-
-	host_id = get_system_hostid();
 
 	pool_name = zpool_get_name(zhp);
-	/*partner_id = cbp->cb_rid > 0 ? cbp->cb_rid :
-		((host_id % 2) + 1); */
 	partner_id = get_partner_id(g_zfs, cbp->cb_rid);
 	if (partner_id == 0) {
 		fprintf(stderr, "don't known where to release, please give remote"
 			" hostid use option '-s hostid'\n");
 		return (1);
 	}
-
-	if (!cbp->cb_allpools) {
-		if (strcmp(pool_name, cbp->cb_pool_name) == 0) {
-			/*
-			 *  release pool to the partner
-			 */
-			stamp->para.pool_current_owener = partner_id;
-		} else {
-			if (stamp->para.pool_real_owener == host_id) {
-				/* local own pool, do nothing */
-				nvlist_free(nvroot);
-				return (0);
-			} else {
-				/* remote's pool, do release */
-				stamp->para.pool_current_owener = partner_id;
-			}
-		}
-	} else {
-		/* release all pools to partner */
-		stamp->para.pool_current_owener = partner_id;
-	}
-	
-	verify(zpool_write_stamp(nvroot, stamp, SPA_NUM_OF_QUANTUM) != 0);
-	free(stamp);
-	nvlist_free(nvroot);
 
 	if (cbp->cb_clusterd) {
 		node = malloc(sizeof(struct link_list));
@@ -7561,28 +7523,20 @@ release_callback(zpool_handle_t *zhp, void *data)
 		return (0);
 	}
 
-	/* zfs_narrow_dirty_mem(); */
-	syslog(LOG_NOTICE, "wait 10s to standby all luns");
-	sleep(10);
-	syslog(LOG_NOTICE, "wait 10s end");
-	
 	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
 	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	if (zpool_disable_datasets(zhp, B_TRUE) != 0) {
-		/*zfs_restore_dirty_mem();*/
 		syslog(LOG_ERR, "zpool disable datasets failed, errno:%d", errno);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_export %s",zpool_get_name(zhp));
 	if (zpool_export(zhp, B_TRUE, history_str) != 0) {
-		/*zfs_restore_dirty_mem();*/
 		syslog(LOG_ERR, "zpool export force failed, errno:%d", errno);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
-	/*zfs_restore_dirty_mem();*/
 	return (0);
 }
 
