@@ -455,90 +455,9 @@ cat > /usr/sbin/cluster_init.sh <<_CLUSTERINIT_
 #
 # Cluster system, to initialize zfs mirror port
 #
-#/usr/local/sbin/zfs mirror -e ixgbe0
+#[ -f /var/cm/script/cm_cluster_init.sh ]&&/var/cm/script/cm_cluster_init.sh
 _CLUSTERINIT_
 
-	HOSTITEM=
-	echo "Cluster san setting... "
-	while [ -z $MIRRORID ]
-	do
-		gettext "Enter a mirror hostid: "
-		read MIRRORID
-	done
-	HOSTITEM='\/usr\/local\/sbin\/zfs mirror -e '$MIRRORID
-
-	sed "s/.*usr\/local\/sbin\/zfs mirror.*/${HOSTITEM}/g" /usr/sbin/cluster_init.sh > /tmp/cluster_init.sh
-	sed 's/.*sleep.*/sleep 5/g' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-
-	i=1
-	SANNAME=
-	NICNAME=
-	sed '/zfs clustersan enable*/d' /usr/sbin/cluster_init.sh > /tmp/cluster_init.sh
-
-	while [ -z $SANNAME ]
-	do
-		gettext "Enter a clustersan name: "
-		read SANNAME
-	done
-
-	echo "/usr/local/sbin/zfs clustersan enable -n $SANNAME" >> /tmp/cluster_init.sh
-
-	while true
-	do
-		gettext "Enter nic $i name for clustersan(<CR> to exit): "
-		read NICNAME
-		if [ -z "$NICNAME" ] ; then
-			break;
-		fi
-
-		echo "/usr/local/sbin/zfs clustersan enable -l $NICNAME" >> /tmp/cluster_init.sh            
-
-		i=`expr $i + 1`
-	done
-
-	if [ $clusterflag -eq 2 ];then
-		echo 
-		echo
-		response=
-		gettext "Do you wish to ENABLE cluster nas?[y/n] (default: n) "
-		read response
-
-		if [ -z $response ]||[ $response != "y" -a $response != "Y" ];then
-			echo "not enable cluster nas ! "
-			sed '/zfs multiclus*/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-			cp /usr/sbin/cluster_init.sh /tmp/cluster_init.sh
-		else
-			sed '/zfs multiclus -e/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-			echo "/usr/local/sbin/zfs multiclus -e" >> /usr/sbin/cluster_init.sh            
-			cp /usr/sbin/cluster_init.sh /tmp/cluster_init.sh
-
-			response=
-			gettext "Do you wish to ENABLE DOUBLE_DATA mode?[y/n] (default: n) "
-			read response
-			if [ -z $response ] || [ $response != "y" -a $response != "Y" ];then
-				sed '/zfs multiclus set*/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-				echo "/usr/local/sbin/zfs multiclus set double_data off" >> /usr/sbin/cluster_init.sh
-				cp /usr/sbin/cluster_init.sh /tmp/cluster_init.sh
-			else
-				sed '/zfs multiclus set*/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-				echo "/usr/local/sbin/zfs multiclus set double_data on" >> /usr/sbin/cluster_init.sh
-				cp /usr/sbin/cluster_init.sh /tmp/cluster_init.sh
-			fi
-		fi
-	fi
-
-	echo""
-	echo""
-	response=
-	gettext "Do you wish to ENABLE route for partner IPMI? [y/n] (default: n) "
-	read response
-	if [ -z $response ]||[ $response != "y" -a $response != "Y" ];then
-		echo "not set route for partner IPMI! "
-		sed '/zfs clustersan set ipmi*/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-	else
-		sed '/zfs clustersan set ipmi*/d' /tmp/cluster_init.sh > /usr/sbin/cluster_init.sh
-		echo "/usr/local/sbin/zfs clustersan set ipmi=on" >> /usr/sbin/cluster_init.sh
-	fi
 
 	chmod 755 /usr/sbin/cluster_init.sh
 }

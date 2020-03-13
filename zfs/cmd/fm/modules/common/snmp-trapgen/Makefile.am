@@ -1,8 +1,5 @@
 include $(top_srcdir)/config/Rules.am
 
-$(chmod 755 ./copy_snmp_headers.sh)
-$(./copy_snmp_headers.sh)
-
 libsnmp_trapgen_ladir=/usr/local/lib/fmd
 
 ROOTNETSNMPDIR = /etc/net-snmp/snmp
