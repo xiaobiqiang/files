@@ -210,6 +210,8 @@ AC_CONFIG_FILES([
 	cmd/cm/static/res_en/Makefile
 	cmd/cm/static/task/Makefile
 	cmd/cm/build/Makefile
+	cmd/cm/tools/Makefile
+	cmd/cm/tools/alarm_tool/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

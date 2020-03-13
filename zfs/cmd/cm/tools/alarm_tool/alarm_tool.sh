@@ -4,7 +4,7 @@ threshold_cfg_xml_file="../../static/comm/alarm_threshold_cfg.xml"
 alarm_cfg_xml_file="../../static/comm/alarm_cfg.xml"
 alarm_cfg_db_file="../../static/comm/cm_alarm_cfg.db"
 
-SQLITE=./sqlite3
+SQLITE=sqlite3
 
 CM_ALATM_TYPE_FAULT=0
 CM_ALATM_TYPE_EVENT=1

@@ -49,3 +49,5 @@ if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
     systemctl enable cm_multi_server
 fi
 
+/var/cm/script/alarm_tool.sh
+
