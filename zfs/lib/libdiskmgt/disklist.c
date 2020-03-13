@@ -1523,7 +1523,7 @@ int disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	fp = popen("blkid | grep ceressystemlabel", "r");
+	fp = popen("blkid | grep ceres_sys", "r");
 	if (fp == NULL) {
 		return; 
 	}
