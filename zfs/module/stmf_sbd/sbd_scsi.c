@@ -3854,10 +3854,6 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
 
-	cmn_err(CE_NOTE, "zjn %s task=%p iflags=%x aflags=%x cdb=%02x%02x%02x", 
-		__func__, task, itask->itask_flags, task->task_additional_flags,
-		cdb0, cdb1, task->task_cdb[2]);
-	
 	if (sl->sl_access_state == SBD_LU_STANDBY || sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
 		task->task_max_nbufs = 1;
 		if (cdb0 != SCMD_INQUIRY &&
