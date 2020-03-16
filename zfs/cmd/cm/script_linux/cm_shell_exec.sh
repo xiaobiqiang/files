@@ -206,6 +206,9 @@ function cm_get_nodeinfo()
     
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`
+    if [ "X"$mport = "X" ]; then
+        mport=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
+    fi
     myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
     if [ "X"$myip = "X" ]; then
         myip='0.0.0.0'
