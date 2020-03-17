@@ -1202,7 +1202,7 @@ function cm_cnm_lun_update_exec()
     #lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val
     local params="$1"
     local paramnull="-"
-    params=`echo "$params" |sed 's/\|/ /g'`
+    params=`echo "$params" |sed 's/|/ /g'`
     params=($params)
     local lunname=${params[0]}
     local lunsize=${params[1]}
@@ -1225,7 +1225,7 @@ function cm_cnm_lun_update_exec()
             CM_LOG "[${FUNCNAME}:${LINENO}]$lunname stmfid null"
             return $CM_FAIL
         fi
-        CM_EXEC_CMD "stmfadm modify-lu -c -s $lunsize $stmfid"
+        CM_EXEC_CMD "stmfadm modify-lu -s $lunsize $stmfid"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             return $iRet
