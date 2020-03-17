@@ -357,7 +357,8 @@ function cm_masterip_release()
         return 0
     fi
     local mport=`cm_get_localmanageport`
-    ifconfig $mport removeif $tmp 1>/dev/null 2>/dev/null
+    #ifconfig $mport removeif $tmp 1>/dev/null 2>/dev/null
+    ip addr del $tmp dev $mport 1>/dev/null 2>/dev/null
     return $?
 }
 
