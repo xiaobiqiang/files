@@ -2,6 +2,7 @@
 
 threshold_cfg_xml_file="/var/cm/static/comm/alarm_threshold_cfg.xml"
 alarm_cfg_xml_file="/var/cm/static/comm/alarm_cfg.xml"
+alarm_cfg_period_file="/var/cm/static/comm/alarm_period_cfg.xml"
 alarm_cfg_db_file="/var/cm/static/comm/cm_alarm_cfg.db"
 
 SQLITE=sqlite3
