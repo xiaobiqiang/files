@@ -1329,8 +1329,6 @@ int cluster_target_mac_port_init(
 		target_port_array[1].dev = port_mac->dev;
 	} else {
 		dev_put(port_mac->dev);
-		mutex_destroy(&port_mac->mac_tx_mtx);
-		cv_destroy(&port_mac->mac_tx_cv);
 		spin_unlock_irq(&target_port_lock);
 		ret = -EPERM;
 		goto get_dev_by_name_failed;
