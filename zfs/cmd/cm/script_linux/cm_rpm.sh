@@ -50,4 +50,5 @@ if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
 fi
 
 /var/cm/script/alarm_tool.sh
+cp /usr/bin/ceres_* /usr/local/bin
 
