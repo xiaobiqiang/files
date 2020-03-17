@@ -446,6 +446,7 @@ typedef struct cluster_san {
 
 	cs_sync_cmd_list_t cs_sync_cmd;
 
+	kmem_cache_t *cts_para_cache;
 	uint32_t cs_state;
 	uint64_t refcount;
 } cluster_san_t;

@@ -1129,7 +1129,7 @@ static void ctp_mac_rx_worker_handle(void *arg)
 						cluster_target_session_rele(cts, "cts_find");
 					#else
 						cts_w = &cts->sess_rx_worker[ct_head->index % cts->sess_rx_worker_n];
-						cts_para = kmem_zalloc(sizeof(cts_worker_para_t), KM_SLEEP);
+						cts_para = kmem_cache_alloc(clustersan->cts_para_cache, KM_SLEEP);
 						cts_para->msg_type = ct_head->msg_type;
 						cts_para->worker = cts_w;
 						cts_para->fragment = fragment;

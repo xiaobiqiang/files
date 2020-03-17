@@ -1097,7 +1097,9 @@ int cluster_san_init()
 	mutex_init(&clustersan->cs_sync_cmd.sync_cmd_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&clustersan->cs_sync_cmd.sync_cmd_list,
 		sizeof(cs_sync_cmd_node_t), offsetof(cs_sync_cmd_node_t, node));
-
+	
+	clustersan->cts_para_cache = kmem_cache_create("cts_para_cache",
+		sizeof(cts_worker_para_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 	clustersan->cs_async_taskq = taskq_create("clustersan_async_tq",
 		1, minclsyspri, 1, CLUSTER_SAN_ASYNC_THREAD_MAX, TASKQ_PREPOPULATE);
 
@@ -1129,6 +1131,7 @@ void cluster_san_fini()
 		nvlist_free(clustersan->cs_host.spa_config);
 		clustersan->cs_host.spa_config = NULL;
 	}
+	kmem_cache_destroy(clustersan->cts_para_cache);
 	mutex_destroy(&clustersan->cs_sync_cmd.sync_cmd_lock);
 	list_destroy(&clustersan->cs_sync_cmd.sync_cmd_list);
 	mutex_destroy(&clustersan->cs_failover_host_lock);
@@ -3143,7 +3146,7 @@ cluster_san_host_rxworker_handle(void *arg)
 				if (cs_data != NULL) {
 					cluster_san_host_rx_handle(cs_data);
 				}
-				kmem_free(para, sizeof(cts_worker_para_t));
+				kmem_cache_free(clustersan->cts_para_cache, para);
 			} else {
 				break;
 			}
