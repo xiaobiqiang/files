@@ -267,23 +267,14 @@ function cm_lun_delete()
     if [ "X$stmfid" != "X" ]; then
         local cnt=`stmfadm list-view -l $stmfid 2>/dev/null |wc -l|awk '{print $1}'`
         if [ $cnt -eq 0 ]; then
-            local ostype=`cm_os_type_get`
-            if [ $ostype -eq ${CM_OS_TYPE_ILLUMOS} ]; then
-                stmfadm delete-lu -c $stmfid
-            else
-                local lustate=`stmfadm list-lu -v $stmfid |grep 'Access State' |awk '{printf $4}'`
-                if [ "X$lustate" == "XActive" ]; then
-                    stmfadm delete-lu $stmfid
-                else
-                    cm_multi_exec "stmfadm delete-lu $stmfid"
-                fi
-            fi
+            stmfadm delete-lu -c $stmfid
         else
             return $CM_ERR_LUNMAP_EXISTS
         fi
     else
         return $CM_ERR_NOT_EXISTS
     fi
+    sleep 2
     zfs destroy -rRf $pool/$lun
     return $?
 }
