@@ -1288,6 +1288,11 @@ zfs_write_data2(struct inode *ip, uio_t *uio, int ioflag, cred_t *cr)
 
 		used += nbytes;
 
+		if ((ioflag & (FSYNC | FDSYNC)) ||
+    		(zsb->z_os->os_sync != ZFS_SYNC_STANDARD 
+    			&& write_direct))
+    		zfs_log_write(zilog, tx, TX_WRITE, zp, 
+    			woff, tx_bytes, ioflag, NULL, NULL);
 		dmu_tx_commit(tx);
 
 		if (error != 0)
@@ -1891,6 +1896,11 @@ tx_again:
 		zfs_log_write(zilog, tx, TX_WRITE, zp, woff, tx_bytes, ioflag,
 		    NULL, NULL);
 #endif
+		if ((ioflag & (FSYNC | FDSYNC)) ||
+    		(zsb->z_os->os_sync != ZFS_SYNC_STANDARD 
+    			&& write_direct))
+    		zfs_log_write(zilog, tx, TX_WRITE, zp, 
+    			woff, tx_bytes, ioflag, NULL, NULL);
 
 		dmu_tx_commit(tx);
 

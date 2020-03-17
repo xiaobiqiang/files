@@ -1335,7 +1335,7 @@ dmu_write_bio(objset_t *os, uint64_t object, struct bio *bio, dmu_tx_t *tx,
 			dmu_buf_fill_done(db, tx);
 		
 		if (mirror_success > 0  && b_sync) {
-			dmu_direct_write(db, tx);
+//			dmu_direct_write(db, tx);
 			if (!tx->tx_bdirect)
 				tx->tx_bdirect = B_TRUE;
         }
@@ -1599,7 +1599,7 @@ dmu_write_uio_dnode(dnode_t *dn, uio_t *uio, uint64_t size,
 			break;
 
 		if (mirror_success > 0  && b_sync) {
-			dmu_direct_write(db, tx);
+//			dmu_direct_write(db, tx);
 			if (!tx->tx_bdirect)
 				tx->tx_bdirect = B_TRUE;
 		}		
@@ -1703,7 +1703,7 @@ dmu_return_arcbuf(arc_buf_t *buf)
 /*
  * offset is off at the volume.
  */
-int
+void
 dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
     dmu_tx_t *tx, boolean_t b_sync, boolean_t w_app_meta)
 {
@@ -1739,7 +1739,7 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
         mirror_success = dmu_mirror_write_data(&db->db, (char *)db->db.db_data,
             db->db.db_offset,  db->db.db_size, tx->tx_txg, MIRROR_DATA_ALIGNED);
         if (mirror_success > 0 && b_sync) {
-			dmu_direct_write(&db->db, tx);
+//			dmu_direct_write(&db->db, tx);
             if (!tx->tx_bdirect)
                 tx->tx_bdirect = B_TRUE;
         }
@@ -1755,7 +1755,7 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 		object = dn->dn_object;
 		DB_DNODE_EXIT(dbuf);
 #ifdef _KERNEL
-        ret = dmu_write_mirror(os, &db->db, object, offset, blksz,
+        dmu_write_mirror(os, &db->db, object, offset, blksz,
             buf->b_data, tx, b_sync);
 #else
         dmu_write(os, object, offset, blksz, buf->b_data, tx, B_FALSE);
@@ -1764,7 +1764,6 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 		dmu_return_arcbuf(buf);
 		XUIOSTAT_BUMP(xuiostat_wbuf_copied);
 	}
-	return(ret);
 }
 
 typedef struct {
@@ -2603,7 +2602,7 @@ dmu_mirror_write_data(dmu_buf_t *db, char *data, uint64_t offset,
     return (err);
 }
 
-static int
+static void
 dmu_write_mirror(objset_t *os, dmu_buf_t *db,
     uint64_t object, uint64_t offset, uint64_t size,
     const void *data, dmu_tx_t *tx, boolean_t b_sync)
@@ -2631,11 +2630,10 @@ dmu_write_mirror(objset_t *os, dmu_buf_t *db,
 
     dmu_write(os, object, offset, size, data, tx, b_mirror);
     if (mirror_success > 0  && b_sync) {
-		dmu_direct_write(db, tx);
+//		dmu_direct_write(db, tx);
         if (!tx->tx_bdirect)
             tx->tx_bdirect = B_TRUE;
     }
-	return (0);
 }
 
 int
