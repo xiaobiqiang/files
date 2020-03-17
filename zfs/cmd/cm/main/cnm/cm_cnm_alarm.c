@@ -1073,20 +1073,27 @@ static void cm_cnm_storage_alarm_add(const sint8* name,uint32 type,sint32 used)
 {
     uint32 status = 0;
     sint8 param[128] = {0};
+    sint32 iRet = CM_OK;
 
     cm_cnm_storage_get_alarm_param(param,name,type,used);
     if(used>=cm_storage_alarm_value)
     {
-        CM_ALARM_REPORT(CM_CNM_ALARM_REPORT,param);
+        iRet = CM_ALARM_REPORT(CM_CNM_ALARM_REPORT,param);
         status = CM_CNM_ALARM_STATUS_ALARM;
     }else if(used>=cm_storage_event_value&&used<cm_storage_alarm_value)
     {
-        CM_ALARM_REPORT(CM_CNM_ALARM_EVENT,param);
+        iRet = CM_ALARM_REPORT(CM_CNM_ALARM_EVENT,param);
         status = CM_CNM_ALARM_STATUS_EVENT;
     }else
     {
         status = CM_CNM_ALARM_STATUS_NORMAL;
     }
+
+    if(iRet != CM_OK)
+    {
+        return;
+    }
+    
     if(type == CM_CNM_ALARMA_STORAGE_POOL)
     {
         cm_cnm_storage_link_add(cm_cnm_alarm_pool_nood_root,name,status);
@@ -1106,7 +1113,7 @@ static void cm_cnm_storage_alarm_process(const sint8* name,uint32 type,const sin
     cm_cnm_storage_alarm_node_t *pnode = NULL;
     sint32 used = atoi(percent);
     sint8 param[128] = {0};
-
+    sint32 iRet = CM_OK;
     pnode = cm_cnm_storage_alarm_find(name,type);
     if(pnode == NULL)
     {
@@ -1115,60 +1122,26 @@ static void cm_cnm_storage_alarm_process(const sint8* name,uint32 type,const sin
     }
 
     cm_cnm_storage_get_alarm_param(param,name,type,used);
-    if(pnode->status == CM_CNM_ALARM_STATUS_NORMAL)
+    if(used >= cm_storage_alarm_value)
     {
-        if(used >= cm_storage_alarm_value)
+        CM_ALARM_REPORT(CM_CNM_ALARM_REPORT,param);
+    }
+
+    if(used >= cm_storage_event_value)
+    {
+        if(pnode->status == CM_CNM_ALARM_STATUS_NORMAL)
         {
-            pnode->status = CM_CNM_ALARM_STATUS_ALARM;
-            CM_ALARM_REPORT(CM_CNM_ALARM_REPORT,param);
-            return;
+            iRet = CM_ALARM_REPORT(CM_CNM_ALARM_EVENT,param);
+            if(CM_OK == iRet)
+            {
+                pnode->status = CM_CNM_ALARM_STATUS_EVENT;
+            }
         }
-
-        if(used >= cm_storage_event_value)
-        {
-            pnode->status = CM_CNM_ALARM_STATUS_EVENT;
-            CM_ALARM_REPORT(CM_CNM_ALARM_EVENT,param);
-            return;
-        }
-
-        return;
     }
-
-    if(pnode->status == CM_CNM_ALARM_STATUS_EVENT)
+    else
     {
-       if(used < cm_storage_event_value)
-       {
-            pnode->status = CM_CNM_ALARM_STATUS_NORMAL;
-            return;
-       }
-
-       if(used >= cm_storage_alarm_value)
-       {
-            pnode->status = CM_CNM_ALARM_STATUS_ALARM;
-            CM_ALARM_REPORT(CM_CNM_ALARM_REPORT,param);
-            return;
-       }
-
-       return;
-    }
-
-    if(pnode->status == CM_CNM_ALARM_STATUS_ALARM)
-    {
-       if(used < cm_storage_event_value)
-       {
-           pnode->status = CM_CNM_ALARM_STATUS_NORMAL;
-           CM_ALARM_RECOVERY(CM_CNM_ALARM_REPORT,param);
-           return;
-       }
-
-       if(used < cm_storage_alarm_recovery)
-       {
-           pnode->status = CM_CNM_ALARM_STATUS_EVENT;
-           CM_ALARM_RECOVERY(CM_CNM_ALARM_REPORT,param);
-           return;
-       }
-    }
-
+        pnode->status = CM_CNM_ALARM_STATUS_NORMAL;
+    }    
     return;
 }
 
@@ -1205,7 +1178,6 @@ static void cm_cnm_storage_alarm_fenge(char* node)
     cm_cnm_storage_alarm_process(name,type_s,percent);
     return;
 }
-
 
 
 void cm_cnm_storage_alarm_thread(void)

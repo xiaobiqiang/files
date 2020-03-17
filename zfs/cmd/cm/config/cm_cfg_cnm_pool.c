@@ -38,9 +38,15 @@ const cm_omi_map_cfg_t CmOmiMapPoolRaidType[] =
     {"raid6",CM_RAID6},
     {"raid7",CM_RAID7},
     {"raid10",CM_RAID10},
+    {"raidz_s1",CM_RAIDZ5},
+    {"raidz_s2",CM_RAIDZ6},
+    {"raidz_s3",CM_RAIDZ7},
     {"raid50",CM_RAID50},
+    {"raidz_s10",CM_RAIDZ50},
     {"raid60",CM_RAID60},
+    {"raidz_s20",CM_RAIDZ60},
     {"raid70",CM_RAID70},
+    {"raidz_s30",CM_RAIDZ70},
 };
 
 const cm_omi_map_enum_t CmOmiMapEnumPoolRaidType =

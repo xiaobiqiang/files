@@ -1041,12 +1041,13 @@ static uint32 cm_cnm_explorer_get_type(uint32 mode)
 
 static void cm_cnm_explorer_get_name(sint8* buf, sint32 len, const sint8* name)
 {
-    sint32 lenth=len-5; /* 预留5个字节 */
+    sint32 lenth=len-1; 
     if (strlen(name) <= lenth)
     {
-        CM_VSPRINTF(buf,len,"%s",name);
+        CM_VSPRINTF(buf,len,name);
         return;
     }
+    lenth -= 2; /* 预留2个字节 */
     while((*name != '\0') && (lenth > 0))
     {
         /* 判断是否为汉字 汉字为8bit组成，最高位为1*/
@@ -1136,7 +1137,6 @@ static sint32 cm_cnm_explorer_get_list(
         {
             continue;
         }
-            
         if(cut < offset)
         {
             cut++;
@@ -1159,6 +1159,7 @@ static sint32 cm_cnm_explorer_get_list(
     {
         *total = 0;
         CM_FREE(ptemp);
+        *ppAck = NULL;
     }
     
     if(cut - offset < *total)
@@ -1168,6 +1169,72 @@ static sint32 cm_cnm_explorer_get_list(
     
     return CM_OK;
 }
+
+static sint32 cm_cnm_explorer_get_types(
+    const sint8* dir,uint64 offset,
+    uint32 each_size,void **ppAck,uint32 *total,uint32 types)
+{
+    sint8* ptemp = NULL;
+    sint8 dir_file[CM_STRING_512] = {0};
+    uint32 cut = 0;
+    sint8 cmd[CM_STRING_512]={0};
+    FILE *fp=NULL;
+    sint8* tmpbuff=NULL;
+    sint32 len=0;
+    
+    *ppAck = CM_MALLOC((*total) * each_size);
+    if(NULL == ppAck)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"mollac fail");
+        return CM_FAIL;
+    }
+    ptemp = *ppAck;    
+    CM_SNPRINTF_ADD(cmd,sizeof(cmd),CM_SCRIPT_DIR"cm_cnm.sh filedir_getbatch"
+        " '%s' '%u' '%llu' '%u'",dir,types,offset,*total);
+    fp = popen(cmd,"r");
+    if(NULL == fp)
+    {
+        CM_FREE(ptemp);
+        *ppAck = NULL;
+        CM_LOG_ERR(CM_MOD_CNM,"popen %s  error",dir);
+        return CM_ERR_NOT_EXISTS;
+    }
+    len = CM_SNPRINTF_ADD(dir_file,sizeof(dir_file),"%s/",dir);
+    tmpbuff = dir_file+len;
+    len = sizeof(dir_file)-len;
+    
+    while(cut<*total)
+    {
+        sint32 tmplen=0;
+        tmpbuff[0] = '\0';
+        if(NULL == fgets(tmpbuff,len,fp))
+        {
+            break;
+        }
+        tmplen=strlen(tmpbuff);
+        if(tmplen == 0)
+        {
+            continue;
+        }
+        if(tmpbuff[tmplen-1] == '\n')
+        {
+            tmpbuff[tmplen-1]='\0'; 
+        }        
+        cm_cnm_explorer_get_each((void*)ptemp,dir_file,tmpbuff);
+        cut++;
+        ptemp += each_size;
+    }
+    pclose(fp);
+    *total = cut;
+    if(cut == 0)
+    {
+        *total = 0;
+        CM_FREE(ptemp);
+        *ppAck = NULL;
+    }    
+    return CM_OK;
+}
+
 
 static void cm_cnm_explorer_get_tmpname(sint8 *buff, sint32 len, 
     const sint8* dir,const sint8* find)
@@ -1303,7 +1370,16 @@ sint32 cm_cnm_explorer_local_getbatch(
         return CM_OK;
     }
 
-    iRet = cm_cnm_explorer_get_list(info->dir,offset,sizeof(cm_cnm_explorer_info_t),ppAck,&total);
+    if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_EXPLORER_TYPE)) /*dir*/
+    {
+        iRet=cm_cnm_explorer_get_types(info->dir,offset,sizeof(cm_cnm_explorer_info_t),
+            ppAck,&total,info->type);
+    }
+    else
+    {
+        iRet=cm_cnm_explorer_get_list(info->dir,offset,sizeof(cm_cnm_explorer_info_t),
+            ppAck,&total);
+    }
     if(CM_OK != iRet)
     {
         *pAckLen = 0;
@@ -1344,7 +1420,17 @@ sint32 cm_cnm_explorer_local_count(
         cut = (uint32)cm_exec_int("%s explorer_count %s",cm_cnm_user_sh,tmpname);
         return cm_cnm_ack_uint64(cut, ppAck, pAckLen);
     }
-    cut = (uint32)cm_exec_int("ls -1f %s|egrep -v '^\\.'|wc -l",info->dir);
+
+    if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_EXPLORER_TYPE))
+    {
+        cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm.sh filedir_count"
+                " '%s' '%u'",info->dir,info->type);       
+    }
+    else
+    {
+        cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm.sh filedir_count"
+                " '%s' '-'",info->dir);    
+    }    
 
     return cm_cnm_ack_uint64(cut, ppAck, pAckLen);
 }
@@ -1538,9 +1624,7 @@ sint32 cm_cnm_domain_user_create(const void* pDecodeParam,void** ppAckData,uint3
         return CM_PARAM_ERR;
     }
 
-    id = cm_exec_int("%s count",cm_cnm_domain_user_sh)+1;
-
-    return cm_sync_request(CM_SYNC_OBJ_DOMAIN_USER,id,(void*)info,sizeof(cm_cnm_domain_user_info_t));
+    return cm_system("%s insert %s %s",cm_cnm_domain_user_sh,info->domain_user,info->local_user);
 }
 
 sint32 cm_cnm_domain_user_delete(const void* pDecodeParam,void** ppAckData,uint32* pAckLen)
@@ -1556,29 +1640,17 @@ sint32 cm_cnm_domain_user_delete(const void* pDecodeParam,void** ppAckData,uint3
         return CM_PARAM_ERR;
     }
 
-    id = cm_exec_int("%s get_id %s %s",cm_cnm_domain_user_sh,info->domain_user,info->local_user);
-    if(id == 0)
-    {
-        return CM_PARAM_ERR;
-    }
-
-    return cm_sync_delete(CM_SYNC_OBJ_DOMAIN_USER,id);
+    return cm_system("%s delete %s %s",cm_cnm_domain_user_sh,info->domain_user,info->local_user);;
 }
 
 sint32 cm_cnm_domain_user_sync_request(uint64 data_id,void *pdata,uint32 len)
 {
-    const cm_cnm_domain_user_info_t *info = pdata;
-    if(info == NULL)
-    {
-        return CM_PARAM_ERR;
-    }
-     
-    return cm_system("%s insert %s %s",cm_cnm_domain_user_sh,info->domain_user,info->local_user);
+    return CM_OK;
 }
 
 sint32 cm_cnm_domain_user_sync_delete(uint64 id)
 {
-    return cm_system("%s delete %llu",cm_cnm_domain_user_sh,id);
+    return CM_OK;
 }
 
 static void cm_cnm_domain_user_oplog_report(

@@ -26,8 +26,8 @@ extern uint32 cm_get_local_nid_x(void);
 extern cm_cmt_msg_info_t* cm_cmt_msg_new(uint32 MsgType, uint32 DataLen);
 extern cm_rpc_msg_info_t* cm_cmt_get_rpc_msg(cm_cmt_msg_info_t *pMsg);
 extern sint32 cm_cmt_msg_delete(cm_cmt_msg_info_t *pMsg);
-extern cm_cmt_msg_info_t* cm_cmt_get_msg_from_rpcmsg(cm_rpc_msg_info_t *pRpcMsg);
-
+extern cm_cmt_msg_info_t* cm_cmt_get_msg_from_rpcmsg(cm_rpc_msg_info_t 
+*pRpcMsg);
 
 sint32 cm_cmt_client_init(bool_t isclient)
 {

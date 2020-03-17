@@ -231,12 +231,31 @@ function cm_disk_update_cache()
     return 0
 }
 
+function cm_check_node_offine()
+{
+    local alarmdb="/var/cm/data/cm_alarm.db"
+    sqlite3 ${alarmdb} "SELECT id,param FROM record_t WHERE alarm_id=10000000 AND recovery_time=0" |sed 's/[|]/ /g' |while read line
+    do
+        local info=($line)
+        local aid=${info[0]}
+        local nodename=${info[1]}
+        local chek=`ceres_cmd node |grep -w "$nodename" |grep -w normal`
+        if [ "X$chek" != "X" ]; then
+            local utctime=`/var/cm/script/cm_cnm.sh utctime`
+            sqlite3 ${alarmdb} "UPDATE record_t SET recovery_time=$utctime WHERE id=$aid"
+        fi
+    done
+    return 0
+}
+
 function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
     
     /var/cm/script/cm_cnm_node_servce.sh iscsi_check
+    
+    cm_check_node_offine
     return 0
 }
 

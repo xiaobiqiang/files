@@ -77,7 +77,7 @@ function cm_cnm_numtoip()
 function cm_cnm_phys_ip_getbatch()
 {
     ifconfig -a |grep -v ether |sed 'N;s/\n//g' \
-        |awk '{print $1" "$8" "$10}' |grep -v 'lo0' \
+        |awk '($8!="0.0.0.0")&&($1!="lo0:"){print $1" "$8" "$10}' \
         |while read line
     do
         local info=($line)
@@ -95,9 +95,9 @@ function cm_cnm_phys_ip_count()
     local port=$1
     local len=0
     if [ "X$port" == "X" ]; then
-        len=`ifconfig -a4|grep 'flags='|egrep -v 'lo0'|wc -l`
+        len=`ifconfig -a |grep -v ether |sed 'N;s/\n//g' |awk '($8!="0.0.0.0")&&($1!="lo0:"){print $1" "$8" "$10}' |wc -l`
     else
-        len=`ifconfig -a4 |grep -v ether |sed 'N;s/\n//g' |grep -w $port |wc -l`
+        len=`ifconfig -a |grep -v ether |sed 'N;s/\n//g' |awk '($8!="0.0.0.0")&&($1!="lo0:"){print $1" "$8" "$10}' |grep -w $port |wc -l`
     fi
     echo $len
     return $CM_OK

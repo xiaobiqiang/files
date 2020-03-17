@@ -12,7 +12,7 @@ function cm_cnm_dirquota_getbatch()
         if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
                 zfs dirspace $name 2>/dev/null|sed 's/%//g'
         else
-                zfs dirspace $name 2>/dev/null|sed 's/%//g'
+                zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'
         fi      
     done
     return $CM_OK
@@ -26,14 +26,14 @@ function cm_cnm_dirquota_get()
         if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
                 zfs dirspace $name 2>/dev/null|sed 's/%//g'
         else
-                zfs dirspace $name 2>/dev/null|sed 's/%//g'
+                zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'
         fi    
        return $?
     fi
     if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
             zfs dirspace $name 2>/dev/null|sed 's/%//g'|grep -w $path
     else
-            zfs dirspace $name 2>/dev/null|sed 's/%//g'|grep -w $path
+            zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'|grep -w $path
     fi
     return $?
 }

@@ -7,6 +7,7 @@ CM_LOG_ENABLE=1
 CM_SSHD_CFG_FILE="/etc/ssh/sshd_config"
 CM_USER_ATTR_FILE="/etc/user_attr"
 CM_SSH_KEY_DIR="/etc/root/.ssh"
+CM_ETC_HOSTS="/etc/inet/hosts"
 
 function cm_cnm_snapshot_backup_init_sshd()
 {
@@ -90,8 +91,8 @@ function cm_cnm_snapshot_backup_init_hosts()
 	local lname=$(hostname)
 	local rname=$(timeout 1 ceres_exec $2 'hostname')
 	[ -z "$rname" ]&&return $CM_FAIL
-	echo "$1 $lname loghost" >> /etc/hosts
-	echo "$2 $rname loghost" >> /etc/hosts
+	echo "$1 $lname loghost" >> ${CM_ETC_HOSTS}
+	echo "$2 $rname loghost" >> ${CM_ETC_HOSTS}
 	return $CM_OK
 }
 
@@ -100,8 +101,8 @@ function cm_cnm_snapshot_backup_term_hosts()
 	local local_ip=$1
 	local remote_ip=$2
 	local tmpfile="/etc/hosts.tmp"
-	sed "/$local_ip/d" /etc/hosts > $tmpfile
-	sed "/$remote_ip/d" $tmpfile > /etc/hosts
+	sed "/$local_ip/d" ${CM_ETC_HOSTS} > $tmpfile
+	sed "/$remote_ip/d" $tmpfile > ${CM_ETC_HOSTS}
 	mv $tmpfile
 	return $CM_OK
 }
