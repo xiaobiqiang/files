@@ -1429,25 +1429,25 @@ function cm_cnm_nas_set()
         return $failnum
     fi
     
-    if [ "X${qos}" != "X" ] && [ "X${qos}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set bandwidth=${qos} ${nasname}"
-        iRet=$?
-        if [ $iRet -ne $CM_OK ]; then
-            ((failnum=$failnum+1))
-        fi
-    fi
+    #if [ "X${qos}" != "X" ] && [ "X${qos}" != "X${paramnull}" ]; then
+    #    CM_EXEC_CMD "zfs set bandwidth=${qos} ${nasname}"
+    #    iRet=$?
+    #    if [ $iRet -ne $CM_OK ]; then
+    #        ((failnum=$failnum+1))
+    #    fi
+    #fi
     
-    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
-        return $failnum
-    fi
+    #if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
+    #    return $failnum
+    #fi
     
-    if [ "X${qos_avs}" != "X" ] && [ "X${qos_avs}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set nasavsbw=${qos_avs} ${nasname}"
-        iRet=$?
-        if [ $iRet -ne $CM_OK ]; then
-            ((failnum=$failnum+1))
-        fi
-    fi
+    #if [ "X${qos_avs}" != "X" ] && [ "X${qos_avs}" != "X${paramnull}" ]; then
+    #    CM_EXEC_CMD "zfs set nasavsbw=${qos_avs} ${nasname}"
+    #    iRet=$?
+    #    if [ $iRet -ne $CM_OK ]; then
+    #        ((failnum=$failnum+1))
+    #    fi
+    #fi
     return $failnum
 }
 

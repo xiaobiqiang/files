@@ -1447,6 +1447,7 @@ function cm_cnm_nas_set()
             ((failnum=$failnum+1))
         fi
     fi
+    
     return $failnum
 }
 
