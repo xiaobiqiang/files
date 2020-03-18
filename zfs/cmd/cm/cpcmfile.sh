@@ -41,6 +41,10 @@ if [ ! -f /usr/sbin/cm_topo ]; then
     ln -s /var/cm/script/cm_topo.sh /usr/sbin/cm_topo
 fi
 
+if [ ! -f /usr/sbin/clumgt ]; then
+    ln -s /var/cm/script/cm_cnm_clumgt.sh /usr/sbin/clumgt
+fi
+
 if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
     cp -rf ./build/buildresult/ceres_cm.service /usr/lib/systemd/system/
     cp -rf ./build/buildresult/cm_multi_server.service /usr/lib/systemd/system/

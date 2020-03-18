@@ -700,15 +700,14 @@ function cm_cnm_clumgt_status()
     local stat="online"
     local ip="127.0.0.1"
     local mport=`cm_get_localmanageport`
-    if [ -f /etc/hostname.${mport} ]; then
-        ip=`sed -n 1p /etc/hostname.${mport}`
-    fi
-    local version=`head -n 1 /lib/release | sed 's/^[ t]*//'|cut -d' ' -f5`
+    ip=`ifconfig $mport|grep 'inet '|awk '{print $2}'`
+   
+    local version="zfsonlinux"
     local hostid=`hostid`
     local uptime=`uptime |sed 's/.*up //g'|awk -F',' '{for(i=1;i<NF-3;i++){printf $i}}'`
-    local clusterstat=`clusterinfo|awk '{print $3 }'|sed -n '$p'`
+    #local clusterstat=`clusterinfo|awk '{print $3 }'|sed -n '$p'`
     local systime=`date '+%Y-%m-%d %H:%M'`
-    local mem=`prtconf | grep 'Memory'| cut -d: -f2|sed 's/^ *//'`
+    local mem=`echo $( expr $(head /proc/meminfo | grep MemTotal | grep -o '[0-9]*' ) / 1000 / 1000 ) GB`
     local gui_ver="2.0.0"
     
     echo "------------------------"
@@ -717,7 +716,7 @@ function cm_cnm_clumgt_status()
     echo "ip:$ip"
     echo "version:$version"
     echo "uptime:$uptime"
-    echo "stat:$clusterstat"
+    #echo "stat:$clusterstat"
     echo "hostid:$hostid"
     echo "systime:$systime"
     echo "mem:$mem"
