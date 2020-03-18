@@ -65,6 +65,8 @@ extern "C" {
 
 #define	FM_EREPORT_ZFS_DEVICE_MERR		"vdev.merr"
 #define	FM_EREPORT_ZFS_DEV_REMOVED	  "dev.removed"
+#define	FM_EREPORT_ZFS_DEV_NORESP	    "dev.noresponse"
+
 
 
 #define	FM_EREPORT_PAYLOAD_ZFS_POOL		"pool"
