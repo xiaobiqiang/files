@@ -191,6 +191,7 @@ static int fanpsu_wrong_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t v
 		return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
 	}
 	get_fanpsu_status_by_name_tmp(chp, nodename, state);
+	state[4] = 0;
 #if 0
 	printf("###invoked by fanpsu-transport ###node: %s, state: %s.\n", nodename, state);
 #endif
@@ -522,7 +523,7 @@ get_fanpsu_status_by_name_tmp(fanpsu_handle_t * fp_hdl, const char *name, char *
 	
 	fgets(buff, 128, fp1);
 
-	strncpy(state,4,buff);
+	strncpy(state,buff,4);
 
 	pclose(fp1);
 
