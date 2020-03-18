@@ -100,7 +100,7 @@ function cm_cnm_fcinfo_getbatch()
         local STATE=`cat $FC_DIR/${host[i]}/port_state`
         local DRV_NAME=`cat $FC_DIR/${host[i]}/symbolic_name|awk '{print $3}'`
         local SUP_SPEED=`cat $FC_DIR/${host[i]}/supported_speeds|sed 's/ //g'`
-        local SPEED=`cat $FC_DIR/${host[i]}/speed`
+        local SPEED=`cat $FC_DIR/${host[i]}/speed|sed 's/ //g'`
         
         echo "$WWN $MODE $DRV_NAME $STATE $SUP_SPEED $SPEED"
       
