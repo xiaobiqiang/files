@@ -1129,7 +1129,7 @@ static void ctp_mac_rx_worker_handle(void *arg)
 						cluster_target_session_rele(cts, "cts_find");
 					#else
 						cts_w = &cts->sess_rx_worker[ct_head->index % cts->sess_rx_worker_n];
-						cts_para = kmem_cache_alloc(clustersan->cts_para_cache, KM_SLEEP);
+						cts_para = clustersan_alloc_worker_para(KM_SLEEP);
 						cts_para->msg_type = ct_head->msg_type;
 						cts_para->worker = cts_w;
 						cts_para->fragment = fragment;
@@ -1485,7 +1485,6 @@ void cluster_target_mac_port_destroy(cluster_target_port_t *ctp)
 	cv_destroy(&port_mac->mac_tx_cv);
 	kmem_free(port_mac, sizeof(cluster_target_port_mac_t));
 }
-
 
 #ifndef SOLARIS
 #undef	ether_header

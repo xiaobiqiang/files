@@ -558,6 +558,10 @@ void zfs_mirror_cancel_check_spa_txg(uint32_t hostid);
 void csh_rx_data_free_ext(cs_rx_data_t *cs_data);
 void cluster_san_host_rx_handle(
         cs_rx_data_t *cs_data);
+extern cts_worker_para_t *
+clustersan_alloc_worker_para(int flags);
+extern void
+clustersan_free_worker_para(cts_worker_para_t *cts_para);
 
 #endif/* #ifndef	_SYS_CLUSTER_SAN_H */
 

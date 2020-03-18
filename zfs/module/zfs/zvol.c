@@ -675,8 +675,16 @@ zil_replay_func_t zvol_replay_vector[TX_MAX_TYPE] = {
  */
 ssize_t zvol_immediate_write_sz = 32768;
 
+void 
+zvol_log_write(void *zv_minor, dmu_tx_t *tx, uint64_t offset,
+		uint64_t size, int sync)
+{
+	zvol_state_t *zv = zv_minor;
+	zvol_log_write_impl(zv, tx, offset, size, sync);
+}
+
 static void
-zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, uint64_t offset,
+zvol_log_write_impl(zvol_state_t *zv, dmu_tx_t *tx, uint64_t offset,
     uint64_t size, int sync)
 {
 	uint32_t blocksize = zv->zv_volblocksize;

@@ -59,7 +59,7 @@ static int dmu_mirror_write_data(dmu_buf_t *db,
     char *data, uint64_t offset, uint64_t size,
     uint64_t txg,  zfs_mirror_data_type_t type);
 
-static int dmu_write_mirror(objset_t *os, dmu_buf_t *db,
+static void dmu_write_mirror(objset_t *os, dmu_buf_t *db,
     uint64_t object, uint64_t offset, uint64_t size,
     const void *data, dmu_tx_t *tx, boolean_t b_sync);
 
