@@ -4276,6 +4276,9 @@ ready_import:
 		}
 	}
 
+	uint_t quantum_in_use = 0;
+	uint_t quantum_not_in_use = 0;
+quantum_check:
 	bzero(used_index1, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
 	bzero(used_index2, sizeof(spa_quantum_index_t) * SPA_NUM_OF_QUANTUM) ;
 	
@@ -4319,8 +4322,22 @@ ready_import:
 
 		if (B_TRUE == zpool_used_index_changed(used_index1, real_nquantum1,
 			used_index2, &real_nquantum2)) {
-			c_log(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
-			goto exit_thr;
+			if(quantum_in_use < 60) {
+				 quantum_in_use++;
+				 c_log(LOG_WARNING, "pool \"%s\" in use, you have tried %d times,"
+					"wait 5 seconds and try again.", poolname, quantum_in_use);
+				 goto quantum_check;
+			} else {
+				c_log(LOG_WARNING, "pool \"%s\" in use, exit", poolname);
+				goto exit_thr;
+			}
+		} else {
+			if(quantum_not_in_use < 5) {
+				quantum_not_in_use++;
+				c_log(LOG_WARNING, "pool \"%s\" not in use, check at least 5 times,"
+					"already check %d times.", poolname, quantum_not_in_use);
+				goto quantum_check;
+			}
 		}
 	}
 
