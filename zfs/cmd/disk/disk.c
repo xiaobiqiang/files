@@ -308,9 +308,15 @@ int list_disks(int all)
 	int count = 0;
 	disk_table_t dt = {0};
 	disk_info_t *current = NULL;
+	FILE * fd = NULL;
 
 	create_xml_file();
-
+	fd = fopen("/var/fm/.blkid.txt","r");
+	if(fd == NULL){
+		system("blkid > /var/fm/.blkid.txt");
+	}else{
+		fclose(fd);
+	}
 	error = disk_get_info(&dt);
 	if (error != 0)
 		(void) printf("disk list failed\n");
