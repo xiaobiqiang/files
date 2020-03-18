@@ -1044,7 +1044,7 @@ static void cm_cnm_explorer_get_name(sint8* buf, sint32 len, const sint8* name)
     sint32 lenth=len-1; 
     if (strlen(name) <= lenth)
     {
-        CM_VSPRINTF(buf,len,name);
+        CM_VSPRINTF(buf,len,"%s",name);
         return;
     }
     lenth -= 2; /* Ô¤Áô2¸ö×Ö½Ú */
