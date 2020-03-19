@@ -4,7 +4,9 @@
 #/dev/sde2 /boot xfs rw,relatime,attr2,inode64,noquota 0 0
 #/dev/sda1 / ext4 rw,relatime,data=ordered 0 0
 
-infos=($(cat /etc/mtab|grep /dev/sd))
+infos=($(grep /dev/sd /etc/mtab))
+
+[ "${infos[1]}"x != "/"x ]&&[ "${infos[1]}"x != "/root"x ]&&[ "${infos[1]}"x != "/boot"x ]&&exit
 
 case ${infos[2]} in
         ext*)
