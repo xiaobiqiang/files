@@ -288,9 +288,7 @@ initializeConfig(void)
 		return (STMF_STATUS_SUCCESS);
 	}
 
-	return STMF_STATUS_ERROR;
-
-/*	ret = stmfLoadConfig();
+	ret = stmfLoadConfig();
 	if (ret != STMF_STATUS_SUCCESS) {
 		syslog(LOG_DEBUG,
 		    "initializeConfig:stmfLoadConfig:error(%d)", ret);
@@ -310,7 +308,7 @@ initializeConfig(void)
 		ret = STMF_STATUS_ERROR;
 	}
 
-	return (ret); */
+	return (ret); 
 }
 
 
@@ -5830,7 +5828,7 @@ loadStore(int fd)
 			goto out;
 		}
 		for (j = 0; j < viewEntryList->cnt; j++) {
-			ret = addNonLoadViewEntryIoctl(fd, &guidList->guid[i],
+			ret = addViewEntryIoctl(fd, &guidList->guid[i],
 			    &viewEntryList->ve[j]);
 			if (ret != STMF_STATUS_SUCCESS) {
 				goto out;

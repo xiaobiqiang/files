@@ -11,6 +11,7 @@
 #include <sys/fs/zfs.h>
 #include "zfs_mirror_debug.h"
 
+/*
 #ifdef kmem_cache_t
 #undef kmem_cache_t
 #endif
@@ -30,6 +31,7 @@
 #ifdef kmem_cache_free
 #undef kmem_cache_free
 #endif
+*/
 
 #ifdef USE_HENGWEI
 #define	register_netdevice_notifier_rh	register_netdevice_notifier
@@ -66,7 +68,7 @@ TARGET_PORT_ARRAY_t target_port_array[TARGET_PORT_NUM]=
 	}
 };
 
-static struct kmem_cache *mblk_cache = NULL;
+static kmem_cache_t *mblk_cache = NULL;
 
 //extern pri_t minclsyspri, maxclsyspri;
 int cts_mac_flowcontrol = 1;
@@ -477,7 +479,7 @@ static void cluster_target_mac_tran_data_free(void *fragmentation)
 }
 
 static mblk_t *
-cluster_target_mac_get_mblk(struct sk_buff *skb, gfp_t flags)
+cluster_target_mac_get_mblk(struct sk_buff *skb, int flags)
 {
 	mblk_t *mblk = kmem_cache_alloc(mblk_cache, flags);
 	mblk->skb = skb;
@@ -548,7 +550,7 @@ static int cluster_target_mac_tran_data_fragment(
 				}
 			}
 		}
-		head_mp = cluster_target_mac_get_mblk(NULL, GFP_KERNEL);
+		head_mp = cluster_target_mac_get_mblk(NULL, KM_SLEEP);
 		if (head_mp == NULL) {
 			ret = -1;
 			cmn_err(CE_WARN, "%s: get mblk failed, msgtype: 0x%x",
@@ -633,7 +635,7 @@ static int cluster_target_mac_tran_data_fragment_sgl(
 	ex_len = origin_data->header_len;
 	 
 	do {
-		head_mp = cluster_target_mac_get_mblk(NULL, GFP_KERNEL);
+		head_mp = cluster_target_mac_get_mblk(NULL, KM_SLEEP);
 
 		if (head_mp == NULL) {
 			fragment_cnt = 0;
@@ -905,7 +907,7 @@ static int cluster_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	ct_head = (cluster_target_msg_header_t *)(skb_mac_header(skb) + sizeof(struct ether_header));
 	ctp_w = &port_mac->rx_worker[ct_head->index % port_mac->rx_worker_n];
-	mp = cluster_target_mac_get_mblk(skb, GFP_ATOMIC);
+	mp = cluster_target_mac_get_mblk(skb, KM_NOSLEEP);
 	ctp_mac_rx_worker_wakeup(ctp_w, mp);
 
 #if 0
@@ -974,7 +976,7 @@ static void cts_mac_send_direct_impl(cluster_target_session_t *cts,
 		return;
 	}
 	tx_index = atomic_inc_64_nv(&cshi->host_tx_index);
-	mp = cluster_target_mac_get_mblk(NULL, GFP_KERNEL);
+	mp = cluster_target_mac_get_mblk(NULL, KM_SLEEP);
 	if (mp == NULL) {
 		ctp_tx_rele(ctp);
 		cmn_err(CE_WARN, "%s: get mblk failed, msgtype: 0x%x",
@@ -1129,7 +1131,7 @@ static void ctp_mac_rx_worker_handle(void *arg)
 						cluster_target_session_rele(cts, "cts_find");
 					#else
 						cts_w = &cts->sess_rx_worker[ct_head->index % cts->sess_rx_worker_n];
-						cts_para = kmem_zalloc(sizeof(cts_worker_para_t), KM_SLEEP);
+						cts_para = clustersan_alloc_worker_para(KM_SLEEP);
 						cts_para->msg_type = ct_head->msg_type;
 						cts_para->worker = cts_w;
 						cts_para->fragment = fragment;
@@ -1391,7 +1393,7 @@ int cluster_proto_register(void)
 	register_netdevice_notifier_rh(&cluster_netdev_notifier);
 
 	mblk_cache = kmem_cache_create("mblk_cache",
-		sizeof (mblk_t), 0, SLAB_PANIC | SLAB_HWCACHE_ALIGN, NULL);
+		sizeof (mblk_t), 0, NULL, NULL, NULL, NULL, NULL, KMC_SLAB);
 	return (0);
 }
 int cluster_proto_unregister(void)
@@ -1483,7 +1485,6 @@ void cluster_target_mac_port_destroy(cluster_target_port_t *ctp)
 	cv_destroy(&port_mac->mac_tx_cv);
 	kmem_free(port_mac, sizeof(cluster_target_port_mac_t));
 }
-
 
 #ifndef SOLARIS
 #undef	ether_header

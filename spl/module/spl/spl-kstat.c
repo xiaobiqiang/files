@@ -55,6 +55,9 @@ kstat_waitq_enter(kstat_io_t *kiop)
 	hrtime_t new, delta;
 	ulong_t wcnt;
 
+	if (!virt_addr_valid(kiop))
+		return ;
+
 	new = gethrtime();
 	delta = new - kiop->wlastupdate;
 	kiop->wlastupdate = new;
@@ -72,6 +75,9 @@ kstat_waitq_exit(kstat_io_t *kiop)
 	hrtime_t new, delta;
 	ulong_t wcnt;
 
+	if (!virt_addr_valid(kiop))
+		return ;
+
 	new = gethrtime();
 	delta = new - kiop->wlastupdate;
 	kiop->wlastupdate = new;
@@ -87,6 +93,9 @@ kstat_runq_enter(kstat_io_t *kiop)
 {
 	hrtime_t new, delta;
 	ulong_t rcnt;
+
+	if (!virt_addr_valid(kiop))
+		return ;
 
 	new = gethrtime();
 	delta = new - kiop->rlastupdate;
@@ -105,6 +114,9 @@ kstat_runq_exit(kstat_io_t *kiop)
 	hrtime_t new, delta;
 	ulong_t rcnt;
 
+	if (!virt_addr_valid(kiop))
+		return ;
+
 	new = gethrtime();
 	delta = new - kiop->rlastupdate;
 	kiop->rlastupdate = new;
@@ -120,6 +132,9 @@ kstat_waitq_to_runq(kstat_io_t *kiop)
 {
 	hrtime_t new, delta;
 	ulong_t wcnt, rcnt;
+
+	if (!virt_addr_valid(kiop))
+		return ;
 
 	new = gethrtime();
 
@@ -145,6 +160,9 @@ kstat_runq_back_to_waitq(kstat_io_t *kiop)
 {
 	hrtime_t new, delta;
 	ulong_t wcnt, rcnt;
+
+	if (!virt_addr_valid(kiop))
+		return ;
 
 	new = gethrtime();
 
