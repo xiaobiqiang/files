@@ -84,18 +84,18 @@ function CM_EXEC_CMD()
 
 function cm_systerm_version_get()
 {
-    local issolaris=`uname -a |grep -w Prodigy |wc -l`
-    if [ $issolaris -ne 0 ]; then
-        #Solaris V1110crypt.20.v7.r16.p11
-        local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
-        if [ "X$versions" == "Xv7.r16" ]; then
-            echo $CM_SYS_VER_SOLARIS_V7R16
-            return 0
-        elif [[ "$versions" == *"CDCFS"* ]]; then
-            echo $CM_SYS_VER_SOLARIS_NOMASTER
-            return 0
-        fi
-    fi
+    #local issolaris=`uname -a |grep -w Prodigy |wc -l`
+    #if [ $issolaris -ne 0 ]; then
+    #    #Solaris V1110crypt.20.v7.r16.p11
+    #    local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
+    #    if [ "X$versions" == "Xv7.r16" ]; then
+    #        echo $CM_SYS_VER_SOLARIS_V7R16
+    #        return 0
+    #    elif [[ "$versions" == *"CDCFS"* ]]; then
+    #        echo $CM_SYS_VER_SOLARIS_NOMASTER
+    #        return 0
+    #    fi
+    #fi
     echo $CM_SYS_VER_DEFAULT
     return 0
 }
@@ -186,7 +186,7 @@ function cm_get_localmanageip()
     local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
     local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
     
-    if [ ! -f ${cfgfile} ] || [`cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
+    if [ ! -f ${cfgfile} ] || [ `cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
         ifconfig eth0|grep 'inet '|awk '{print $2}'
         return 0
     fi

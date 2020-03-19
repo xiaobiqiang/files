@@ -19,7 +19,8 @@ libfanpsu_transport_la_LIBADD = 					\
 
 dist_libfanpsu_transport_la_SOURCES = \
 	$(USER_C) \
-	fanpsu-transport.h
+	fanpsu-transport.h \
+	st_zfs.h
 
 EXTRA_DIST = \
 	config \

@@ -1,0 +1,1 @@
+SUBDIRS = alarm_tool

@@ -257,9 +257,9 @@ sint32 cm_cnm_quota_local_getbatch(
     }
 
     CM_VSPRINTF(cmd, CM_STRING_256, CM_SCRIPT_DIR
-        "cm_cnm_quota.sh getbatch '%u' '%s' '%u'", 
-        info->usertype, info->filesystem,info->domain);
-    iRet = cm_cnm_exec_get_list(cmd, cm_cnm_quota_get_each, offset, sizeof(cm_cnm_quota_info_t), ppAck, &total);
+        "cm_cnm_quota.sh getbatch '%u' '%s' '%u' '%llu' '%u'", 
+        info->usertype, info->filesystem,info->domain,offset,total);
+    iRet = cm_cnm_exec_get_list(cmd, cm_cnm_quota_get_each, 0, sizeof(cm_cnm_quota_info_t), ppAck, &total);
 
     if(CM_OK != iRet)
     {

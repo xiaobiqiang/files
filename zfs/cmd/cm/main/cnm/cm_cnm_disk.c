@@ -284,7 +284,7 @@ static uint32 cm_cnm_disk_get_led_state(uint32 enid, const sint8* diskid)
     if(0 == sbbid)
     {
         CM_LOG_INFO(CM_MOD_CNM,"enid[%u]",enid);
-        return CM_CNM_DISK_LED_STATE_UNKNOWN;/* 和CmOmiMapDiskLedType统一 */
+        return CM_CNM_DISK_LED_STATE_NORMAL;/* 和CmOmiMapDiskLedType统一 */
     }
 
     iRet = cm_exec_tmout(buff,sizeof(buff),2,
@@ -293,19 +293,20 @@ static uint32 cm_cnm_disk_get_led_state(uint32 enid, const sint8* diskid)
     if((CM_OK != iRet) || ('\0' == buff[0]))
     {
         CM_LOG_INFO(CM_MOD_CNM,"iRet[%d] buff:%s",iRet,buff);
-        return CM_CNM_DISK_LED_STATE_UNKNOWN;
+        return CM_CNM_DISK_LED_STATE_NORMAL;
     }
     
     iRet = sscanf(buff,"%u\n%u",&nids[0],&nids[1]);
     if(0 == iRet)
     {
-        return CM_CNM_DISK_LED_STATE_UNKNOWN;
+        return CM_CNM_DISK_LED_STATE_NORMAL;
     }
     
     for(iloop=0;iloop<2;iloop++)
     {
         if(CM_NODE_ID_NONE == nids[iloop])
         {
+            states[iloop] = CM_CNM_DISK_LED_STATE_NORMAL;
             continue;
         }
         buff[0] = '\0';
@@ -313,10 +314,11 @@ static uint32 cm_cnm_disk_get_led_state(uint32 enid, const sint8* diskid)
             "sqlite3 "CM_CNM_DISK_FILE" \"SELECT led FROM record_t WHERE id='%s'\"",diskid);
         if('\0' == buff[0])
         {
+            states[iloop] = CM_CNM_DISK_LED_STATE_NORMAL;
             continue;
         }
         buff[strlen(buff)-1] = '\0';
-        states[iloop] = cm_cnm_get_enum(&CmOmiMapEnumDiskLedType,buff,CM_CNM_DISK_LED_STATE_UNKNOWN);
+        states[iloop] = cm_cnm_get_enum(&CmOmiMapEnumDiskLedType,buff,CM_CNM_DISK_LED_STATE_NORMAL);
     }
     
     CM_LOG_INFO(CM_MOD_CNM,"diskid[%s] %u=%u %u=%u",diskid,nids[0],states[0],nids[1],states[1]);
@@ -340,7 +342,7 @@ static uint32 cm_cnm_disk_get_led_state(uint32 enid, const sint8* diskid)
     }
     
     CM_LOG_INFO(CM_MOD_CNM,"state0[%u] state1[%u]",states[0],states[1]);
-    return CM_CNM_DISK_LED_STATE_UNKNOWN;
+    return CM_CNM_DISK_LED_STATE_NORMAL;
 }
 
 cm_omi_obj_t cm_cnm_disk_encode(const void *pDecodeParam, void *pAckData, uint32 AckLen)

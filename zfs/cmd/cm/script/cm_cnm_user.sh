@@ -371,7 +371,7 @@ function cm_cnm_user_getnamebyid()
         idtype="gid"
     fi
     local uname=`idmap show -c ${idtype}:${uid} ${utypestr} 2>/dev/null |awk -F':' '{print $3}' |awk -F'@' '{print $1}'`
-    if [ "X$uname" == "X" ]; then
+    if [ "X$uname" == "X" ] || [[ "X$uname" == "XS-1-"* ]]; then
         echo "$CM_DOMAIN_LOCAL $utype $uid"
     else
         echo "$CM_DOMAIN_AD $utype $uname"

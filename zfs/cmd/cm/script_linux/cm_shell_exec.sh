@@ -100,7 +100,7 @@ function cm_cnm_fcinfo_getbatch()
         local STATE=`cat $FC_DIR/${host[i]}/port_state`
         local DRV_NAME=`cat $FC_DIR/${host[i]}/symbolic_name|awk '{print $3}'`
         local SUP_SPEED=`cat $FC_DIR/${host[i]}/supported_speeds|sed 's/ //g'`
-        local SPEED=`cat $FC_DIR/${host[i]}/speed`
+        local SPEED=`cat $FC_DIR/${host[i]}/speed|sed 's/ //g'`
         
         echo "$WWN $MODE $DRV_NAME $STATE $SUP_SPEED $SPEED"
       
@@ -206,7 +206,13 @@ function cm_get_nodeinfo()
     
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`
+    if [ "X"$mport = "X" ]; then
+        mport=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
+    fi
     myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
+    if [ "X"$myip = "X" ]; then
+        myip='0.0.0.0'
+    fi
     local snum=16
     if [ "X$devtype" == "XAIC" ]; then
         devtype=1
@@ -225,12 +231,31 @@ function cm_disk_update_cache()
     return 0
 }
 
+function cm_check_node_offine()
+{
+    local alarmdb="/var/cm/data/cm_alarm.db"
+    sqlite3 ${alarmdb} "SELECT id,param FROM record_t WHERE alarm_id=10000000 AND recovery_time=0" |sed 's/[|]/ /g' |while read line
+    do
+        local info=($line)
+        local aid=${info[0]}
+        local nodename=${info[1]}
+        local chek=`ceres_cmd node |grep -w "$nodename" |grep -w normal`
+        if [ "X$chek" != "X" ]; then
+            local utctime=`/var/cm/script/cm_cnm.sh utctime`
+            sqlite3 ${alarmdb} "UPDATE record_t SET recovery_time=$utctime WHERE id=$aid"
+        fi
+    done
+    return 0
+}
+
 function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
     
     /var/cm/script/cm_cnm_node_servce.sh iscsi_check
+    
+    cm_check_node_offine
     return 0
 }
 
@@ -242,23 +267,14 @@ function cm_lun_delete()
     if [ "X$stmfid" != "X" ]; then
         local cnt=`stmfadm list-view -l $stmfid 2>/dev/null |wc -l|awk '{print $1}'`
         if [ $cnt -eq 0 ]; then
-            local ostype=`cm_os_type_get`
-            if [ $ostype -eq ${CM_OS_TYPE_ILLUMOS} ]; then
-                stmfadm delete-lu -c $stmfid
-            else
-                local lustate=`stmfadm list-lu -v $stmfid |grep 'Access State' |awk '{printf $4}'`
-                if [ "X$lustate" == "XActive" ]; then
-                    stmfadm delete-lu $stmfid
-                else
-                    cm_multi_exec "stmfadm delete-lu $stmfid"
-                fi
-            fi
+            stmfadm delete-lu -c $stmfid
         else
             return $CM_ERR_LUNMAP_EXISTS
         fi
     else
         return $CM_ERR_NOT_EXISTS
     fi
+    sleep 2
     zfs destroy -rRf $pool/$lun
     return $?
 }
@@ -341,7 +357,8 @@ function cm_masterip_release()
         return 0
     fi
     local mport=`cm_get_localmanageport`
-    ifconfig $mport removeif $tmp 1>/dev/null 2>/dev/null
+    #ifconfig $mport removeif $tmp 1>/dev/null 2>/dev/null
+    ip addr del $tmp dev $mport 1>/dev/null 2>/dev/null
     return $?
 }
 

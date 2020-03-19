@@ -46,14 +46,14 @@
 #ifndef MPT3SAS_BASE_H_INCLUDED
 #define MPT3SAS_BASE_H_INCLUDED
 
-#include "mpi/mpi2_type.h"
-#include "mpi/mpi2.h"
-#include "mpi/mpi2_ioc.h"
-#include "mpi/mpi2_cnfg.h"
-#include "mpi/mpi2_init.h"
-#include "mpi/mpi2_raid.h"
-#include "mpi/mpi2_tool.h"
-#include "mpi/mpi2_sas.h"
+#include "mpi2_type.h"
+#include "mpi2.h"
+#include "mpi2_ioc.h"
+#include "mpi2_cnfg.h"
+#include "mpi2_init.h"
+#include "mpi2_raid.h"
+#include "mpi2_tool.h"
+#include "mpi2_sas.h"
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>

@@ -41,6 +41,10 @@ if [ ! -f /usr/sbin/cm_topo ]; then
     ln -s /var/cm/script/cm_topo.sh /usr/sbin/cm_topo
 fi
 
+if [ ! -f /usr/sbin/clumgt ]; then
+    ln -s /var/cm/script/cm_cnm_clumgt.sh /usr/sbin/clumgt
+fi
+
 if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
     cp -rf "$CM_DIR"build/ceres_cm.service /usr/lib/systemd/system/
     cp -rf "$CM_DIR"build/cm_multi_server.service /usr/lib/systemd/system/
@@ -48,4 +52,7 @@ if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
     systemctl enable ceres_cm
     systemctl enable cm_multi_server
 fi
+
+/var/cm/script/alarm_tool.sh
+cp /usr/bin/ceres_* /usr/local/bin
 

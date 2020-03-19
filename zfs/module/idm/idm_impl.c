@@ -37,6 +37,8 @@
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
+#include <sys/cmn_err.h>
+
 
 #if 0 /*defined(__i386) || defined(__amd_64) || defined(__x86_64)*/
 #include <hd_crc.h>

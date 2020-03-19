@@ -41,6 +41,7 @@
 #include <sys/stmf_ioctl.h>
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
+#include <sys/cmn_err.h>
 
 #define	ISCSIT_SESS_SM_STRINGS
 #include "iscsit.h"

@@ -35,6 +35,7 @@
 //#include <sys/ksocket.h>
 #include <linux/net.h>
 #include <crypto/hash.h>
+#include <sys/cmn_err.h>
 
 
 static void encode_chap_password(int identifier, int chap_passwd_len,

@@ -158,7 +158,6 @@ AC_CONFIG_FILES([
 	cmd/pmm/Makefile
 	cmd/disk/Makefile
 	cmd/fcboot/Makefile
-	cmd/scsi_tools/Makefile
 	cmd/synckey/Makefile
 	cmd/fm/Makefile
 	cmd/fm/fmd/Makefile
@@ -179,6 +178,7 @@ AC_CONFIG_FILES([
 	cmd/fm/modules/common/pool-transport/Makefile
 	cmd/fm/modules/common/eversholt/Makefile
 	cmd/fm/modules/common/eversholt/files/Makefile
+	cmd/fm/modules/common/snmp-trapgen/Makefile
 	cmd/fm/fmd/schemes/Makefile
 	cmd/fm/fmd/schemes/zfs/Makefile
 	cmd/fm/dicts/Makefile
@@ -210,6 +210,8 @@ AC_CONFIG_FILES([
 	cmd/cm/static/res_en/Makefile
 	cmd/cm/static/task/Makefile
 	cmd/cm/build/Makefile
+	cmd/cm/tools/Makefile
+	cmd/cm/tools/alarm_tool/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

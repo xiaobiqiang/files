@@ -729,10 +729,10 @@ function cm_cnm_get_lun_stmfid()
     local ver=`cm_systerm_version_get`
     local lun=$1
     if [ $ver -eq $CM_SYS_VER_SOLARIS_V7R16 ]; then
-        /var/cm/script/cm_shell_exec.sh stmfadm_list_all_luns |egrep $"$lun"^ |awk '{print $1}'
+        /var/cm/script/cm_shell_exec.sh stmfadm_list_all_luns |grep -w "$lun" |awk '{print $1}'
         return 0
     fi
-    stmfadm list-all-luns |egrep $"$lun"^ |awk '{print $1}'
+    stmfadm list-all-luns |grep -w "$lun" |awk '{print $1}'
     return 0
 }
 
@@ -744,7 +744,7 @@ function cm_cnm_snapshot_rollback()
     local ftype=`zfs get type $dir |sed 1d |awk '{print $3}'`
     
     if [ "X$ftype" != "Xvolume" ]; then
-        CM_EXEC_CMD "zfs rollback -rf ${dir}@${snap}"
+        CM_EXEC_CMD "zfs rollback -rRf ${dir}@${snap}"
         return $?
     fi
     
@@ -895,6 +895,38 @@ function cm_cnm_filedir_delete()
     rm -rf "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
     iRet=$?
     return $iRet
+}
+
+function cm_cnm_filedir_getbatch()
+{
+    local dir=$1
+    local type=$2
+    local offset=$3
+    local total=$4
+    ((total=$offset+$total))
+    ((offset=$offset+1))
+    if [ "X$type" == "X" ] || [ "X$type" == "X-" ]; then
+        ls -1F "$dir" |sed -n ${offset},${total}p |sed 's/[*@/]$//g'
+    elif [ $type -eq 1 ]; then
+        ls -1F "$dir" |grep '/$' |sed -n ${offset},${total}p |sed 's/[/]//g'
+    else
+        ls -1F "$dir" |grep -v '/$' |sed -n ${offset},${total}p  |sed 's/[*@]$//g'
+    fi
+    return 0
+}
+
+function cm_cnm_filedir_count()
+{
+    local dir=$1
+    local type=$2
+    if [ "X$type" == "X" ] || [ "X$type" == "X-" ]; then
+        ls -1F "$dir" |wc -l
+    elif [ $type -eq 1 ]; then
+        ls -1F "$dir" |grep '/$' |wc -l
+    else
+        ls -1F "$dir" |grep -v '/$' |wc -l
+    fi
+    return 0
 }
 
 function cm_cnm_localtask_sql()
@@ -1232,7 +1264,7 @@ function cm_cnm_lun_update_exec()
     fi
     
     if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set origin:sync=${is_hot} ${lunname}"
+        CM_EXEC_CMD "zfs set origin:sync=${write_policy} ${lunname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             return $iRet
@@ -1407,7 +1439,7 @@ function cm_cnm_nas_set()
     
     if [ "X${aclinherit}" != "X" ] && [ "X${aclinherit}" != "X${paramnull}" ]; then
         local wp=("discard" "noallow" "restricted" "passthrough" "passthrough-x")
-        CM_EXEC_CMD "zfs set origin:sync=${wp[$aclinherit]} ${nasname}"
+        CM_EXEC_CMD "zfs set aclinherit=${wp[$aclinherit]} ${nasname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             ((failnum=$failnum+1))
@@ -1415,7 +1447,6 @@ function cm_cnm_nas_set()
     fi
     
     if [ "X${quota}" != "X" ] && [ "X${quota}" != "X${paramnull}" ]; then
-        local wp=("unkown" "disk" "poweroff" "mirror" "standard" "always")
         CM_EXEC_CMD "zfs set quota=${quota} ${nasname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
@@ -1570,6 +1601,67 @@ function cm_cnm_nas_getbatch()
     else
         cm_cnm_nas_getbatch_def "$nasname"
     fi
+    return 0
+}
+
+function cm_cnm_phys_getbatch()
+{
+    local offset=$1
+    local total=$2
+    if [ "X$offset" == "X" ]; then
+        offset=0
+    fi
+    if [ "X$total" == "X" ]; then
+        total=100
+    fi
+    ((total=$offset+$total))
+    ((offset=$offset+1))
+    dladm show-phys 2>/dev/null |sed 1d |sed -n ${offset},${total}p |while read line
+    do
+        local info=($line)
+        local phyname=${info[0]}
+        local state=${info[2]}
+        local speed=${info[3]}
+        local duplex=${info[4]}
+        local mtu=`dladm show-link $phyname |sed 1d |awk '{print $3}'`
+        if [ "X$mtu" == "X" ]; then
+            mtu=1500
+        fi
+        local mac=`ifconfig $phyname 2>/dev/null|grep -w ether |awk '{print $2}'`
+        if [ "X$mac" == "X" ]; then
+            mac="-"
+        if
+        echo "$phyname $state $speed $duplex $mtu $mac"
+    done
+    return 0
+}
+
+function cm_cnm_phys_count()
+{
+    dladm show-phys 2>/dev/null |sed 1d | wc -l
+    return 0
+}
+
+function cm_cnm_phys_get()
+{
+    local ifname=$1
+    dladm show-phys $ifname 2>/dev/null |sed 1d|while read line
+    do
+        local info=($line)
+        local phyname=${info[0]}
+        local state=${info[2]}
+        local speed=${info[3]}
+        local duplex=${info[4]}
+        local mtu=`dladm show-link $phyname |sed 1d |awk '{print $3}'`
+        if [ "X$mtu" == "X" ]; then
+            mtu=1500
+        fi
+        local mac=`ifconfig $phyname 2>/dev/null|grep -w ether |awk '{print $2}'`
+        if [ "X$mac" == "X" ]; then
+            mac="-"
+        if
+        echo "$phyname $state $speed $duplex $mtu $mac"
+    done
     return 0
 }
 

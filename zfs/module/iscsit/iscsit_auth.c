@@ -39,6 +39,8 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_text.h>
+#include <sys/cmn_err.h>
+
 
 #include "iscsit.h"
 #include "iscsit_auth.h"

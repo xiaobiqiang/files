@@ -222,16 +222,45 @@ sint32 cm_rpc_request_single(cm_rpc_handle_t Handle,cm_rpc_msg_info_t *pData,
     return cm_rpc_client_recv_each(pClient->fd,ppAckData);
 }
 
+static sint32 cm_rpc_close_wait(void *pNodeData, void *pArg)
+{
+    uint32 *cnt=(uint32*)pArg;
+    (*cnt)++;
+    return CM_OK;    
+}
+static void* cm_rpc_close_thread(void* arg)
+{
+    uint32 cnt=0;
+    void* pdata=NULL;
+    cm_rpc_client_t *pClient = (cm_rpc_client_t*)arg;
+    CM_MUTEX_LOCK(&pClient->mutex);
+    close(pClient->fd);
+    pClient->fd = -1;
+    CM_MUTEX_UNLOCK(&pClient->mutex);
+
+    /* wait for delete msg */
+    do
+    {
+        cnt=0;
+        (void)cm_list_find(pClient->pwait_response, 
+            cm_rpc_close_wait,&cnt,&pdata);
+        CM_SLEEP_S(1);
+    }while(cnt > 0);
+    
+    CM_THREAD_CANCEL(pClient->recv_handle);
+    CM_MUTEX_DESTROY(&pClient->mutex);
+    cm_list_destory(pClient->pwait_response);
+    CM_FREE(pClient);
+    return NULL;
+}
+
 sint32 cm_rpc_close(cm_rpc_handle_t Handle)
 {
     cm_rpc_client_t *pClient = (cm_rpc_client_t*)Handle;
 
     if(pClient->is_mutli)
     {
-        CM_MUTEX_LOCK(&pClient->mutex);
-        CM_THREAD_CANCEL(pClient->recv_handle);
-        CM_MUTEX_DESTROY(&pClient->mutex);
-        cm_list_destory(pClient->pwait_response);
+        return cm_thread_start(cm_rpc_close_thread,Handle);
     }
     close(pClient->fd);
     pClient->fd = -1;

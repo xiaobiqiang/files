@@ -44,6 +44,8 @@
 #include <sys/idm/idm_text.h>
 #include <sys/idm/idm_so.h>
 #include <sys/in.h>
+#include <sys/cmn_err.h>
+
 
 #include "iscsit_isns.h"
 #include "iscsit.h"
