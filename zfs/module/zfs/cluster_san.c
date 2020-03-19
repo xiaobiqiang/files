@@ -1099,7 +1099,7 @@ int cluster_san_init()
 		sizeof(cs_sync_cmd_node_t), offsetof(cs_sync_cmd_node_t, node));
 	
 	clustersan->cts_para_cache = kmem_cache_create("cts_para_cache",
-		sizeof(cts_worker_para_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
+		sizeof(cts_worker_para_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 	clustersan->cs_async_taskq = taskq_create("clustersan_async_tq",
 		1, minclsyspri, 1, CLUSTER_SAN_ASYNC_THREAD_MAX, TASKQ_PREPOPULATE);
 
@@ -3146,7 +3146,7 @@ cluster_san_host_rxworker_handle(void *arg)
 				if (cs_data != NULL) {
 					cluster_san_host_rx_handle(cs_data);
 				}
-				kmem_cache_free(clustersan->cts_para_cache, para);
+				clustersan_free_worker_para(para);
 			} else {
 				break;
 			}
@@ -5861,6 +5861,18 @@ clustersan_vsas_set_levent_callback(cs_vsas_rx_cb_t rx_cb, void *arg)
 	cluster_vsas_event_callback.rx_cb = rx_cb;
 	cluster_vsas_event_callback.arg = arg;
     return 0;
+}
+
+cts_worker_para_t *
+clustersan_alloc_worker_para(int flags)
+{
+	return kmem_cache_alloc(clustersan->cts_para_cache, flags);
+}
+
+void
+clustersan_free_worker_para(cts_worker_para_t *cts_para)
+{
+	kmem_cache_free(clustersan->cts_para_cache, cts_para);
 }
 
 module_param(cluster_target_session_ntranwork, uint, 0644);
