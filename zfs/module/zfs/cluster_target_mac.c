@@ -907,7 +907,7 @@ static int cluster_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	ct_head = (cluster_target_msg_header_t *)(skb_mac_header(skb) + sizeof(struct ether_header));
 	ctp_w = &port_mac->rx_worker[ct_head->index % port_mac->rx_worker_n];
-	mp = cluster_target_mac_get_mblk(skb, GFP_ATOMIC);
+	mp = cluster_target_mac_get_mblk(skb, KM_NOSLEEP);
 	ctp_mac_rx_worker_wakeup(ctp_w, mp);
 
 #if 0
