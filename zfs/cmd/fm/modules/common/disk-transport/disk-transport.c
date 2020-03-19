@@ -1,6 +1,8 @@
 #include <unistd.h>
+#include <fcntl.h>
 #include <ctype.h>
 //#include <umem.h>
+#include <pthread.h>
 #include <fmd_api.h>
 #include <libtopo.h>
 #include <topo_hc.h>
@@ -15,8 +17,10 @@
 #include <topo_list.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <scsi/sg.h>
 
 #include "disk-transport.h"
+#include "disk_db.h"
 
 #define DT_XML
 #ifdef DT_XML
@@ -57,6 +61,12 @@ static xmlNodePtr xml_root_node = NULL;
 #define	DERRDISK	0x10
 #define	MERRDISK	0x20
 
+#define	DISK_SMARTCTL_TEST_CMD	"/usr/sbin/smartctl -d scsi -a %s"
+
+#define	IGNORE_FLAG	255
+
+#define DISK_PATH_LEN 128
+#define MAX_LINE	1024
 
 static struct dt_stat {
 	fmd_stat_t dropped;
@@ -67,6 +77,7 @@ static struct dt_stat {
 typedef struct disk_monitor {
 	fmd_hdl_t	*dm_hdl;
 	fmd_xprt_t	*dm_xprt;
+    disk_db_handle_t dm_dbhdl;
 	id_t		dm_timer;
 	hrtime_t	dm_interval;
 	char		*dm_sim_search;
@@ -75,8 +86,47 @@ typedef struct disk_monitor {
 	boolean_t	dm_update_topo;
 } disk_monitor_t;
 
+/*
+ * disk node information.
+ */
+typedef struct dt_disk_node {
+	topo_list_t	dt_list;	/* list of disks */
+
+	/* the following two fields are always defined */
+	char		*dt_devid;	/* devid of disk */
+	char		*dt_dpath;
+	char		*dt_lpath;	/* logical path (public /dev name) */
+	char		*dt_nblocks;
+	char		*dt_blksize;
+	char		*dt_mfg;	/* misc information about device */
+	char		*dt_model;
+	char		*dt_serial;
+	char		*dt_firm;
+	uint32_t	dt_enc;
+	uint32_t	dt_slot;
+	int			dt_slice_count;
+	uint32_t	dt_rpm;
+	char 		dt_gsize[64];
+	char		dt_dim[24];
+	char		interface_type[12];
+	int         	is_ssd;
+	char 		*dt_busy;	
+} dt_disk_node_t;
+
+/* common callback information for di_walk_node() and di_devlink_walk */
+typedef struct dt_cbdata {
+	topo_list_t		*dcb_list;
+
+	di_devlink_handle_t	dcb_devhdl;
+	dt_disk_node_t		*dcb_dnode;	/* for di_devlink_walk only */
+	topo_hdl_t *thp;
+	fmd_hdl_t *hdl;
+	int count;
+} dt_cbdata_t;
+
 static void
 dt_topo_change(fmd_hdl_t *hdl, topo_hdl_t *thp);
+static int dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp);
 
 #ifdef ADD_SNMP_TRAP
 static void dt_send_snmptrap(fmd_hdl_t *hdl, fmd_xprt_t *xprt, const char *protocol, const char *faultname,
@@ -441,11 +491,12 @@ dt_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 	xml_root_node = xmlNewNode(NULL, BAD_CAST"root");
 	xmlDocSetRootElement(doc, xml_root_node);
 #endif
-
 	dmp->dm_hdl = hdl;
 	dmp->dm_update_topo = B_FALSE;
 
 	thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
+	syslog(LOG_ERR, "dt_update_disk_info");
+	dt_update_disk_info(hdl, thp);
 	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, dt_analyze_disk,
 	    dmp, &err)) == NULL) {
 		fmd_hdl_topo_rele(hdl, thp);
@@ -503,6 +554,119 @@ dt_topo_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	dmp->dm_timer_istopo = B_TRUE;
 }
 
+static void
+dt_insert_disk(fmd_hdl_t *hdl, dt_disk_node_t *dnode)
+{
+    disk_monitor_t *dmp = fmd_hdl_getspecific(hdl);
+
+    if (dmp->dm_dbhdl == NULL)
+        return;
+
+	(void) disk_db_exec_ext(dmp->dm_dbhdl,
+                            "INSERT INTO record_t (id,sn,vendor,nblocks,blksize,gsize,dim,enid,slotid,rpm,status)"
+                            " VALUES ('%s','%s','%s','%s','%s',%s,'%s',%d,%d,%d,'%s')",
+                            dnode->dt_lpath, dnode->dt_serial, dnode->dt_mfg,
+                            "-", "-",
+                            dnode->dt_gsize, dnode->dt_dim,
+                            dnode->dt_enc, dnode->dt_slot,
+                            dnode->dt_rpm,dnode->dt_busy);
+}
+
+static int
+dt_get_scsi_rpm( disk_info_t *disk ) {
+	char *path = disk->dk_name ;
+	uint8_t output[ INQ_REPLY_LEN ] ;
+	uint8_t cmd[] = {0x12, 1, 0xB1, 0, INQ_REPLY_LEN, 0 } ;
+	int fd ;
+	sg_io_hdr_t io_hdr ;
+
+	if( (fd = open( path, O_RDONLY ) ) == -1 ) {
+		fprintf( stderr, "in %s[%d]: cann't open dev<%s> for reading, error( %s )\n", __func__, __LINE__, path, strerror( errno ) ) ;
+		return (-1);
+	}
+
+
+	memset( &io_hdr, 0, sizeof( sg_io_hdr_t ) ) ;
+	io_hdr.interface_id = 'S' ;
+	io_hdr.dxfer_direction = SG_DXFER_FROM_DEV ;
+	io_hdr.dxfer_len = INQ_REPLY_LEN ;
+	io_hdr.dxferp = output ;
+	io_hdr.cmdp = cmd ;
+	io_hdr.cmd_len = 6 ;
+	io_hdr.timeout = 1000 ;
+
+	if( ioctl( fd, SG_IO, &io_hdr ) == -1 ) {
+		close(fd);
+		return (-1);
+	}
+
+	if( ( io_hdr.info & SG_INFO_OK_MASK ) != SG_INFO_OK ) {
+		close(fd);
+		return (-1);
+	}
+
+	close(fd);
+	disk->dk_rpm = output[4] * 256 + output[5] ;
+
+	return (0);
+}
+
+
+static int
+dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
+{
+	dt_cbdata_t		dcb;
+	topo_list_t listp = {NULL, NULL};
+	dt_disk_node_t	dnode;
+    disk_monitor_t *dmp = fmd_hdl_getspecific(hdl);
+	disk_table_t dt = {0};
+	disk_info_t *current = NULL;
+	char * scsid = NULL;
+	int len = 0;
+	syslog(LOG_ERR, "dt_update_disk_info in 1");
+
+	dcb.dcb_list = &listp;
+	dcb.hdl = hdl;
+	dcb.thp = thp;
+	dcb.count = 0;
+
+	disk_get_info(&dt);
+	
+    if(disk_db_init() == 0)
+    {
+        dmp->dm_dbhdl = disk_db_get();
+    }
+	else
+    {
+		return(0);
+	}
+
+	for (current = dt.next; current != NULL; current = current->next) {
+		dt_get_scsi_rpm( current ) ;
+		//dnode->dt_blksize = current->dk_blocks;
+		dnode.dt_slot = current->dk_slot;
+		dnode.dt_enc = current->dk_enclosure;
+		scsid = strstr(current->dk_scsid,"scsi-");
+		if(scsid != NULL)
+			dnode.dt_lpath = scsid;
+		dnode.dt_busy = current->dk_busy;
+		len = strlen(current->dk_gsize);
+		if(len != 0){
+			strncpy(dnode.dt_dim,(char *)((long)current->dk_gsize + len - 1),sizeof(dnode.dt_dim));
+			current->dk_gsize[len - 1] = 0;
+			strncpy(dnode.dt_gsize,current->dk_gsize,sizeof(dnode.dt_gsize));
+		}
+		dnode.dt_rpm = current->dk_rpm;
+		dnode.dt_serial = current->dk_serial;
+		dnode.dt_mfg = current->dk_vendor;
+		dt_insert_disk(hdl, &dnode);
+	}
+	
+    disk_db_close(dmp->dm_dbhdl);
+    dmp->dm_dbhdl = NULL;
+
+    return (0);
+}
 static const fmd_prop_t fmd_props[] = {
 	{ "interval", FMD_TYPE_TIME, "10min" },
 	{ "min-interval", FMD_TYPE_TIME, "1min" },
@@ -600,8 +764,21 @@ void _fmd_init(fmd_hdl_t *hdl)
 
 }
 
-void _fmd_fini(fmd_hdl_t *hdl)
+void
+_fmd_fini(fmd_hdl_t *hdl)
 {
+	disk_monitor_t *dmp;
 
+#ifdef LHL_DBG
+	if(log_file)
+		fclose(log_file);
+#endif
 
+	dmp = fmd_hdl_getspecific(hdl);
+	if (dmp) {
+		fmd_xprt_close(hdl, dmp->dm_xprt);
+		fmd_hdl_strfree(hdl, dmp->dm_sim_search);
+		fmd_hdl_strfree(hdl, dmp->dm_sim_file);
+		fmd_hdl_free(hdl, dmp, sizeof (*dmp));
+	}
 }

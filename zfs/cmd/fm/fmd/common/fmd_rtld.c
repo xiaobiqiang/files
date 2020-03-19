@@ -48,7 +48,9 @@ rtld_init(fmd_module_t *mp)
 
 	if ((dlp = dlopen(mp->mod_path, RTLD_LOCAL | RTLD_NOW)) == NULL) {
 		//fmd_error(EFMD_RTLD_OPEN, "%s\n", dlerror());
-		printf("dlopen %s failed.\n", mp->mod_path);
+		
+		printf("dlopen %s failed error %s.\n", mp->mod_path, dlerror());
+		
 		return (fmd_set_errno(EFMD_RTLD_OPEN));
 	}
 

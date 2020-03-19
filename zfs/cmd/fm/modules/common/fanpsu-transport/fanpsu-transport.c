@@ -22,8 +22,8 @@
 static void fpt_timeout(fmd_hdl_t *hdl, unsigned int id, void *data);
 
 static const fmd_prop_t fmd_fanpsu_props[] = {
-	{ "interval", FMD_TYPE_TIME, "10sec" },
-	{ "min-interval", FMD_TYPE_TIME, "1min" },
+	{ "interval", FMD_TYPE_TIME, "40sec" },
+	{ "min-interval", FMD_TYPE_TIME, "3min" },
 	{ NULL, 0, NULL }
 };
 
@@ -264,12 +264,11 @@ static int fpt_check(topo_hdl_t *thp, tnode_t *node, void *arg){
 		NULL, &resault, &err)){
 		syslog(LOG_ERR, "failed to run topo_method_invoke TOPO_METH_FANPSU_UPDATE_STATE in fpt_check\n");
 		return TOPO_WALK_NEXT;
-	}else
-		syslog(LOG_ERR, "state update successed.\n");
+	}
 
 	if(resault){
-		if(strcasestr(name,"FAN") != NULL){
-			(void) st_walk_zfs_dataset(st_set_callback, B_TRUE);
+		if(strcasestr(name,"PSU") != NULL){
+			//(void) st_walk_zfs_dataset(st_set_callback, B_TRUE);
 		}
 		
 		fpt_post_ereport(fpmp->fpm_hdl, fpmp->fpm_xprt, "sensor", "failure", ena, fmri, resault);

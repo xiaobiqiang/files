@@ -1523,8 +1523,8 @@ int disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	fp = popen("blkid | grep ceres_sys", "r");
-	if (fp == NULL) {
+	fp = popen("grep ceres_sys /var/fm/.blkid.txt", "r");
+	if(fp == NULL) {
 		return; 
 	}
 	while (fgets(tmp, sizeof(tmp), fp)) {
