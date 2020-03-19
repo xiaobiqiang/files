@@ -7804,8 +7804,15 @@ main(int argc, char **argv)
 		ret = 1;
 	}
 
-	if (ret == 0 && log_history)
-		(void) zpool_log_history(g_zfs, history_str);
+	if (ret == 0 && log_history) {
+		/* when zpool clear succeeds but spa suspend before log history,
+			a deadlock will be triggered. Therefore, zpool clear does not
+			need addtional log history. In this way, when zpool clear 
+			successds, but the spa suspend again, zpool clear can still continue.
+		*/
+		if (strcmp(cmdname, "clear") != 0)
+			(void) zpool_log_history(g_zfs, history_str);
+	}
 
 	libzfs_fini(g_zfs);
 
