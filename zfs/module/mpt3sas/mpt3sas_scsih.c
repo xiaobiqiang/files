@@ -56,6 +56,14 @@
 #include <linux/raid_class.h>
 #include <asm/unaligned.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+#include <scsi/scsi_transport_sas.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_dbg.h>
+
 #include "mpt3sas_base.h"
 
 #define RAID_CHANNEL 1
@@ -4444,6 +4452,7 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		scmd->result = DID_NO_CONNECT << 16;
 		goto out;
 	}
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
 	ioc_status = le16_to_cpu(mpi_reply->IOCStatus);
 
 	/*
@@ -8823,6 +8832,46 @@ scsih_pci_mmio_enabled(struct pci_dev *pdev)
 	return PCI_ERS_RESULT_NEED_RESET;
 }
 
+static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
+{
+    struct MPT3SAS_ADAPTER *ioc = shost_priv(scmd->device->host);
+    struct MPT3SAS_DEVICE *sas_device_priv_data;
+    struct _sas_device *sas_device = NULL;
+    struct scsi_target *starget = scmd->device->sdev_target;
+    struct MPT3SAS_TARGET *target_priv_data = starget->hostdata;
+    unsigned long flags;
+    
+    sas_device_priv_data = scmd->device->hostdata;
+    if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
+        sas_device_priv_data->sas_target->deleted) {
+		printk(KERN_WARNING "target been deleted! scmd(%p)\n", scmd);
+		return BLK_EH_NOT_HANDLED;   /* for scsi_times_out to abort this command. */
+	}
+
+    sas_device = sas_device_priv_data->sas_target->sdev;
+
+    printk(KERN_ERR "scmd(%p) no response, [host's target adderess:%llx], [target's host address:%llx], cnt:%ld\n",
+        scmd,
+        sas_device_priv_data->sas_target->sas_address,
+        target_priv_data->sas_address,
+        atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) + 1);
+
+    atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
+    if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 10) {
+        spin_lock_irqsave(&ioc->sas_device_lock, flags);
+        list_del_init(&sas_device->list);		
+        spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+        
+        _scsih_remove_device(ioc, sas_device);
+        sas_device_put(sas_device);   /* in order to implement fmadm repaired, 
+                                       * sas_device should be placed in another list. 
+                                       */
+    }
+
+    return BLK_EH_NOT_HANDLED;   /* for scsi_times_out to abort this command. */
+}
+
+
 /*
  * The pci device ids are defined in mpi/mpi2_cnfg.h.
  */
@@ -9000,9 +9049,11 @@ _mpt3sas_init(void)
 					MPT3SAS_DRIVER_VERSION);
 
 	mpt3sas_transport_template =
-	    sas_attach_transport(&mpt3sas_transport_functions);
+	    sas_attach_transport(&mpt3sas_transport_functions);    
 	if (!mpt3sas_transport_template)
 		return -ENODEV;
+
+    mpt3sas_transport_template->eh_timed_out = mpt3sas_trans_timeout;
 
 	/* No need attach mpt3sas raid functions template
 	 * if hbas_to_enumarate value is one.

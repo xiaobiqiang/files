@@ -373,6 +373,7 @@ struct MPT3SAS_TARGET {
 	u8	deleted;
 	u8	tm_busy;
 	struct _sas_device *sdev;
+    atomic64_t   noresp_cnt;
 };
 
 
