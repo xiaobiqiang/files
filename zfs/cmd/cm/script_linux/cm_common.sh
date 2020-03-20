@@ -16,6 +16,7 @@ CM_LOG_LEVEL=$CM_LOG_LEVEL_ERR
 CM_SYS_VER_DEFAULT=0
 CM_SYS_VER_SOLARIS_V7R16=1
 CM_SYS_VER_SOLARIS_NOMASTER=2
+CM_SYS_VER_LINUX=3
 
 CM_OS_TYPE_SOLARIS=0
 CM_OS_TYPE_ILLUMOS=1
@@ -96,7 +97,7 @@ function cm_systerm_version_get()
     #        return 0
     #    fi
     #fi
-    echo $CM_SYS_VER_DEFAULT
+    echo $CM_SYS_VER_LINUX
     return 0
 }
 

@@ -150,6 +150,8 @@ typedef enum
 {
     CM_SYS_VER_DEFAULT = 0,
     CM_SYS_VER_SOLARIS_V7R16,
+    CM_SYS_VER_SOLARIS_NOMASTER,
+    CM_SYS_VER_LINUX,
 }cm_system_version_e;
 
 

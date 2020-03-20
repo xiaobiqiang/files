@@ -323,6 +323,9 @@ function cm_masterip_bind()
         return 0
     fi    
     local mport=`cm_get_localmanageport`
+    if [ `ifconfig $mport|grep 'inet '|wc -l` -eq 0 ]; then
+        return 0
+    fi
     ifconfig ${mport} add $tmp netmask $ntmsk up 1>/dev/null 2>/dev/null
     ret=$?
     if [ "X$ret" != "X0" ]; then
