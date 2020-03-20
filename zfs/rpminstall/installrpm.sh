@@ -18,7 +18,7 @@ function install()
     cd -
     
     cd $ZFS_RPM
-    rpm -ivh ./*
+    rpm -ivh ./* --nodeps --force
     cd -
 }
 

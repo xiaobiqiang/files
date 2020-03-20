@@ -323,6 +323,8 @@ exit 0
 /usr/local/lib/fmd/*
 /usr/local/lib/fmd/schemes/*
 /usr/local/lib/topo/plugins/*
+/usr/local/sbin/systeminit.sh
+/usr/local/sbin/fc_stat.sh
 %{_includedir}/*
 %doc AUTHORS COPYRIGHT DISCLAIMER
 %doc OPENSOLARIS.LICENSE README.markdown
