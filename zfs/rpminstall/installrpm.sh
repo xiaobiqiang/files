@@ -3,6 +3,27 @@
 RPM_DIR="./rpm"
 SPL_RPM=$RPM_DIR"/spl"
 ZFS_RPM=$RPM_DIR"/zfs"
+GUI_DIR="/gui"
+
+function install_gui()
+{
+    gui_tar=`ls ./ |grep G1`
+    if [  "X"$gui_tar = "X" ]; then
+        echo "no GUI"
+        return
+    fi
+    
+    if [ ! -d $GUI_DIR ]; then
+        mkdir -p $GUI_DIR
+    fi
+    
+    rm -rf $GUI_DIR"/*"
+    cp $gui_tar $GUI_DIR
+    cd $GUI_DIR
+    tar -xvf $gui_tar
+    ./prepare.sh
+    cd -
+}
 
 function install()
 {
@@ -20,12 +41,21 @@ function install()
     cd $ZFS_RPM
     rpm -ivh ./* --nodeps --force
     cd -
+    
+    install_gui
 }
 
 
 function unload()
 {
     rpm -qa | grep 0.6.5.9 |xargs rpm -e
+    
+    rm -rf /usr/local/sbin/*
+    rm -rf /usr/local/lib/*
+    rm -rf /lib/modules/$(uname -r)/extra/*
+    systemctl stop ceres_cm 2>/dev/null
+    rm -rf /usr/local/bin/ceres*
+    rm -rf /var/cm
 }
 
 
