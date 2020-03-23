@@ -123,6 +123,7 @@ int main(int argc, char **argv)
 {
 	init_drv(&fc_drv);
 	loop_load_drv(fc_drv);
+	return (0);
 }
 
 static void init_drv(char **name_ptr)
