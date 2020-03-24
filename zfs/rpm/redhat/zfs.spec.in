@@ -177,6 +177,9 @@ Obsoletes:      zfs-devel
 This package contains the header files needed for building additional
 applications against the ZFS libraries.
 
+%post -n libzfs2-devel
+rpm_install.sh
+
 %package test
 Summary:        Test infrastructure
 Group:          System Environment/Kernel
@@ -323,8 +326,8 @@ exit 0
 /usr/local/lib/fmd/*
 /usr/local/lib/fmd/schemes/*
 /usr/local/lib/topo/plugins/*
-/usr/local/sbin/systeminit.sh
-/usr/local/sbin/fc_stat.sh
+/usr/local/sbin/*.sh
+/usr/local/sbin/initdisk
 %{_includedir}/*
 %doc AUTHORS COPYRIGHT DISCLAIMER
 %doc OPENSOLARIS.LICENSE README.markdown
