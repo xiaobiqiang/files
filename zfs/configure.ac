@@ -153,6 +153,7 @@ AC_CONFIG_FILES([
 	cmd/arc_summary/Makefile
 	cmd/zed/Makefile
 	cmd/sas3show/Makefile
+	cmd/mpt3ctl/Makefile
 	cmd/perf_stat/Makefile
 	cmd/clusterd/Makefile
 	cmd/pmm/Makefile
