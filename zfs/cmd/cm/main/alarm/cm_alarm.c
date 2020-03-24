@@ -977,7 +977,7 @@ void cm_alarm_period_check(void)
         {
             pdata->recovery_time = nowtime;
             pdata->report_time = 0;
-            CM_ALARM_INFO_PRINTF(pinfo);
+            CM_ALARM_INFO_PRINTF(pdata);
             iRet = cm_alarm_cache_add(pinfo,pdata);
             if(CM_OK == iRet)
             {
