@@ -455,7 +455,7 @@ cat > /usr/sbin/cluster_init.sh <<_CLUSTERINIT_
 #
 # Cluster system, to initialize zfs mirror port
 #
-#[ -f /var/cm/script/cm_cluster_init.sh ]&&/var/cm/script/cm_cluster_init.sh
+[ -f /var/cm/script/cm_cluster_init.sh ]&&/var/cm/script/cm_cluster_init.sh
 _CLUSTERINIT_
 
 

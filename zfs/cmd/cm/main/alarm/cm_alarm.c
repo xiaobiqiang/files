@@ -72,7 +72,7 @@ static sint32 cm_alarm_period_add(cm_alarm_global_t *pinfo,
     const cm_alarm_config_t *pcfg,
     cm_alarm_record_t *data);
 
-static void cm_alarm_period_check(cm_alarm_global_t *pinfo);
+extern void cm_alarm_period_check(void);
 
 static sint32 cm_alarm_get_config_each(
     void *arg, sint32 col_cnt, sint8 **col_vals, sint8 **col_names)
@@ -342,9 +342,7 @@ static void* cm_alarm_thread(void *arg)
     
     while(1)
     {
-        CM_SEM_WAIT_TIMEOUT(&pinfo->sem,5,iRet); 
-
-        cm_alarm_period_check(pinfo);
+        CM_SEM_WAIT_TIMEOUT(&pinfo->sem,5,iRet);      
         
         master = cm_node_get_master();
         if(CM_NODE_ID_NONE == master)
@@ -411,7 +409,7 @@ static sint32 cm_alarm_init_threshold_each(
         return CM_FAIL;
     }
     return cm_db_exec_ext(handle,
-                "INSERT INTO threshold_t (alarm_id,threshold,tmout)"
+                "INSERT INTO threshold_t (alarm_id,threshold,recoverval)"
                 " VALUES (%s,%s,%s)",
                 col_vals[0],col_vals[1],col_vals[2]);
 }
@@ -619,7 +617,7 @@ sint32 cm_alarm_report(uint32 alarm_id,const sint8 *param, bool_t is_recovery)
         data.recovery_time = cm_get_time();
     }
     CM_MEM_CPY(data.param,sizeof(data.param),param,strlen(param));
-
+    CM_ALARM_INFO_PRINTF(&data);
     if(CM_OK == cm_alarm_period_add(pinfo,&cfg,&data))
     {
         return CM_OK;
@@ -893,6 +891,7 @@ static sint32 cm_alarm_period_add(cm_alarm_global_t *pinfo,
 {
     cm_alarm_period_cfg_t cfg;
     uint64 cnt=0;
+    uint64 id=0;
     sint32 iRet = CM_OK;
 
     if((CM_ALATM_TYPE_FAULT != pcfg->type)
@@ -907,8 +906,8 @@ static sint32 cm_alarm_period_add(cm_alarm_global_t *pinfo,
     {
         return iRet;
     }
-    cnt = cm_alarm_period_match(pinfo,pcfg,data);
-    if(0 == cnt)
+    id = cm_alarm_period_match(pinfo,pcfg,data);
+    if(0 == id)
     {
         iRet = cm_db_exec_ext(pinfo->db_handle,
                 "INSERT INTO period_cache_t (alarm_id,cnt,tmout,param)"
@@ -920,13 +919,14 @@ static sint32 cm_alarm_period_add(cm_alarm_global_t *pinfo,
         iRet = cm_db_exec_ext(pinfo->db_handle,
                 "UPDATE period_cache_t SET cnt=cnt+1,tmout=%lu"
                 " WHERE id=%llu",
-                data->report_time+cfg.tmout,cnt);
+                data->report_time+cfg.tmout,id);
     }
     if(CM_OK != iRet)
     {
         return iRet;
     }
-    cnt++;
+    (void)cm_db_exec_get_count(pinfo->db_handle,&cnt,
+        "SELECT cnt FROM period_cache_t WHERE id=%llu",id);
     if(cnt < cfg.cnt)
     {
         return CM_OK;
@@ -957,8 +957,9 @@ static sint32 cm_alarm_period_check_get(
     return CM_OK;
 }
 
-static void cm_alarm_period_check(cm_alarm_global_t *pinfo)
+void cm_alarm_period_check(void)
 {
+    cm_alarm_global_t *pinfo=&g_cm_alarm_global;
     cm_alarm_record_t data[10];
     const uint32 max_cnt=sizeof(data)/sizeof(cm_alarm_record_t);
     uint32 cnt=0;
@@ -976,7 +977,7 @@ static void cm_alarm_period_check(cm_alarm_global_t *pinfo)
         {
             pdata->recovery_time = nowtime;
             pdata->report_time = 0;
-            pdata->global_id = 0;
+            CM_ALARM_INFO_PRINTF(pinfo);
             iRet = cm_alarm_cache_add(pinfo,pdata);
             if(CM_OK == iRet)
             {
@@ -990,5 +991,6 @@ static void cm_alarm_period_check(cm_alarm_global_t *pinfo)
 
     return;
 }
+
 
 

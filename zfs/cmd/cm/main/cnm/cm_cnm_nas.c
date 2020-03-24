@@ -3501,6 +3501,11 @@ sint32 cm_cnm_lowdata_volume_sync_request(uint64 data_id, void *pdata, uint32 le
     return CM_OK;
 }
 
+sint32 cm_cnm_lowdata_volume_sync_get(uint64 data_id, void **pdata, uint32 *plen)
+{
+    return cm_cnm_lowdata_volume_get(NULL,pdata,plen);
+}
+
 void cm_cnm_lowdata_volume_thread(void)
 {
     sint8* script = "/var/cm/script/cm_cnm_lowdata.sh";

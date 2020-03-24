@@ -201,7 +201,18 @@ static sint32 cm_cmd_alarm(
     uint32 cnt = sizeof(alarm_type)/sizeof(sint8*);
     uint32 index = 0;
     uint32 alarm_id = 0;
+    static uint32 nodenum=0;
 
+    if(0 == nodenum)
+    {
+        nodenum=cm_node_count();
+    }
+
+    if(0 == nodenum)
+    {
+        return CM_FAIL;
+    }
+    
     /* alarm <report|recovery> <alarm_id> <alarm_param> */
     if(3 != ParamNum)
     {
@@ -650,5 +661,6 @@ static sint32 cm_cmd_starttask(const sint8 **ppParam, uint32 ParamNum, void **pp
     *pAckLen = strlen(pbuff)+1;
     return CM_OK;
 }
+
 
 
