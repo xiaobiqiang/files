@@ -178,7 +178,7 @@ This package contains the header files needed for building additional
 applications against the ZFS libraries.
 
 %post -n libzfs2-devel
-rpm_install.sh
+/usr/local/sbin/rpm_install.sh
 
 %package test
 Summary:        Test infrastructure
