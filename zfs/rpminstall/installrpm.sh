@@ -42,6 +42,9 @@ function install()
     rpm -ivh ./* --nodeps --force
     cd -
     
+    if [ `uname -m` = "sw_64" ]; then
+        cp  /lib/modules/$(uname -r)/extra/zfs/mpt3sas/mpt3sas.ko  /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+    fi
     install_gui
 }
 
