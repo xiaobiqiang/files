@@ -48,7 +48,7 @@ AC_CONFIG_HEADERS([zfs_config.h], [
 AC_ARG_ENABLE(hengwei, 
 		AS_HELP_STRING([--enable-hengwei],
 			[use hengwei platform]))
-enable_hengwei=`uname -p`
+enable_hengwei=`uname -m`
 if test "$enable_hengwei" = "sw_64"; then
 	echo "use hengwei platform"
 	AC_DEFINE([USE_HENGWEI], [], [Use hengwei platform])
