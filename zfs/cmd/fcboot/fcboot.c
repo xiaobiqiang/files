@@ -6,11 +6,11 @@
 #include <fcntl.h>           /* Definition of AT_* constants */
 #include <unistd.h>
 
-#define CMD_imod(mod)		"/usr/sbin/modprobe %s", \
+#define CMD_imod(mod)		"/sbin/modprobe %s", \
 							(mod)
-#define CMD_rmod(mod)		"/usr/sbin/rmmod %s",	\
+#define CMD_rmod(mod)		"/sbin/rmmod %s",	\
 							(mod)
-#define CMD_lmod			"/usr/sbin/lsmod"
+#define CMD_lmod			"/sbin/lsmod"
 #define CMD_emod(mod)		CMD_lmod" | cut -d ' ' -f 1 | grep -w %s | wc -l",	\
 							(mod)
 #define OS_RELEASE			"/etc/os-release"
@@ -123,7 +123,7 @@ static int drv_exist(char *drv)
 int main(int argc, char **argv)
 {
 	init_drv(&fc_drv);
-	fprintf(stdout, "fcboot load fc driver(%s)...", fc_drv);
+	fprintf(stdout, "fcboot load fc driver(%s)...\n", fc_drv);
 	loop_load_drv(fc_drv);
 	return (0);
 }
