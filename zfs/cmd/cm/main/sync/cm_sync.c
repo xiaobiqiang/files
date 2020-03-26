@@ -124,6 +124,10 @@ sint32 cm_sync_cbk_cmt_obj_info(void *pMsg, uint32 Len, void **ppAck, uint32 *pA
         if(CM_SYNC_REQ_UPDATE == db_record.is_delete)
         {
             cfg = &g_cm_sync_config[obj->obj_id];
+            if(NULL == cfg->cbk_get)
+            {
+                return CM_ERR_NOT_SUPPORT;
+            }
             iRet = cfg->cbk_get(db_record.data_id,&pAckData,&AckLen);
             if(CM_OK != iRet)
             {
@@ -332,7 +336,7 @@ static const cm_sync_config_t* cm_sync_get_config(uint32 obj_id)
 static sint32 cm_sync_request_local(cm_sync_global_info_t *pglobal, cm_sync_obj_info_t *pReq)
 {
     const cm_sync_config_t *cfg = cm_sync_get_config(pReq->obj_id);
-    sint32 iRet = CM_OK;
+    sint32 iRet = CM_ERR_NOT_SUPPORT;
     uint64 count = 0;
     if(NULL == cfg)
     {
@@ -342,11 +346,17 @@ static sint32 cm_sync_request_local(cm_sync_global_info_t *pglobal, cm_sync_obj_
 
     if(CM_SYNC_REQ_UPDATE == pReq->is_delete)
     {
-        iRet = cfg->cbk_request(pReq->data_id,pReq->data,pReq->data_len);
+        if(NULL != cfg->cbk_request)
+        {
+            iRet = cfg->cbk_request(pReq->data_id,pReq->data,pReq->data_len);
+        }        
     }    
     else
     {
-        iRet = cfg->cbk_delete(pReq->data_id);
+        if(NULL != cfg->cbk_delete)
+        {
+            iRet = cfg->cbk_delete(pReq->data_id);
+        }        
     }
     
     if(CM_OK != iRet)

@@ -182,3 +182,34 @@ sint32 cm_ini_get_ext_uint32(const sint8 *filename,
     return CM_OK;
 }
 
+sint32 cm_ini_delete_key_ext(const sint8 *filename, 
+    const sint8 *section, const sint8 *key)
+{
+    sint32 iRet = CM_FAIL;
+    cm_ini_handle_t handle = cm_ini_open(filename);
+
+    if(NULL == handle)
+    {
+        handle = cm_ini_new();
+        if(NULL == handle)
+        {
+            CM_LOG_ERR(CM_MOD_NONE,"new ini fail");
+            return CM_FAIL;
+        }
+    }
+
+    if(NULL == key)
+    {
+        cm_ini_delete_section(handle,section);
+    }
+    else
+    {
+        cm_ini_delete_key(handle,section,key);
+    }
+
+    iRet = cm_ini_save(handle,filename);
+    cm_ini_free(handle);
+    return iRet; 
+}
+
+

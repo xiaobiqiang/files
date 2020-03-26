@@ -11,7 +11,9 @@ sbin_PROGRAMS = disk
 disk_SOURCES = 	\
 	disk.c
 
-EXTRA_DIST = \
+diskdir = /usr/local/sbin
+
+dist_disk_SCRIPTS = \
 	initdisk \
 	get_en_slot.sh \
 	sg_led_disk.sh 

@@ -757,6 +757,10 @@ sint32 cm_cnm_disk_local_clear(
     {
         iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
             "echo y|disk initialize -d /dev/rdsk/%s 2>/dev/null",info->id);
+    }else if(g_cm_sys_ver == CM_SYS_VER_LINUX)
+    {
+        iRet = cm_exec_tmout(buff,sizeof(buff),CM_CMT_REQ_TMOUT,
+            "echo y|disk initialize -d /dev/disk/by-id/%s 2>/dev/null",info->id);
     }
     else
     {
@@ -810,9 +814,9 @@ void* cm_cnm_disk_update_thread(void* arg)
         return NULL;
     }
     isrun = CM_TRUE;
-    CM_LOG_WARNING(CM_MOD_CNM,"fmadm genxml -u");
+    CM_LOG_WARNING(CM_MOD_CNM,"zpool status -x");
     (void)cm_cnm_exec_remote(CM_NODE_ID_NONE,CM_FALSE,buff,sizeof(buff),
-        "fmadm genxml -u &",nodename);
+        "zpool status -x &",nodename);
     isrun = CM_FALSE;
     return NULL;
 }

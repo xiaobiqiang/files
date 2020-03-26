@@ -449,10 +449,19 @@ sint32 cm_cnm_dns_sync_request(uint64 enid, void *pdata, uint32 len)
     return CM_OK;
 }
 
+sint32 cm_cnm_dns_sync_get(uint64 enid, void **pdata, uint32 *plen)
+{
+    return cm_cnm_dns_get(NULL,pdata,plen);
+}
+
+sint32 cm_cnm_dns_sync_delete(uint64 enid)
+{
+    return cm_system("%s dnsserver_set '' ''",g_cm_domain_ad_script);
+}
+
 sint32 cm_cnm_dns_get(const void * pDecodeParam,void **ppAckData,uint32 * pAckLen)
 {
     sint32 iRet = CM_OK;
-    const cm_cnm_decode_info_t *dec = pDecodeParam;
     cm_cnm_dns_info_t *pdata = CM_MALLOC(sizeof(cm_cnm_dns_info_t));
     if(pdata == NULL)
     {
