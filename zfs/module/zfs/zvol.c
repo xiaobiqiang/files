@@ -143,6 +143,9 @@ typedef struct zvol_replay_arg
 
 static int zvol_wait_create_done(zvol_state_t *zv);
 static void zvol_objset_replay_all_cache(void *arg);
+static void
+zvol_log_write_impl(zvol_state_t *zv, dmu_tx_t *tx, uint64_t offset,
+    uint64_t size, int sync);
 
 
 rl_t *
@@ -682,6 +685,7 @@ zvol_log_write(void *zv_minor, dmu_tx_t *tx, uint64_t offset,
 	zvol_state_t *zv = zv_minor;
 	zvol_log_write_impl(zv, tx, offset, size, sync);
 }
+EXPORT_SYMBOL(zvol_log_write);
 
 static void
 zvol_log_write_impl(zvol_state_t *zv, dmu_tx_t *tx, uint64_t offset,
