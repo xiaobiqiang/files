@@ -2036,6 +2036,69 @@ _ctl_get_sas_devinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
     return 0;
 }
 
+typedef int (*mpt3_simu_handler)(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 action, void *priv_data);
+
+static int __sas_device_noresp_handler(struct _sas_device *sas_device, u32 action)
+{
+    struct MPT3SAS_TARGET *sas_target_priv_data;
+
+    switch(action) {
+    case noresp_on: /* noresponse on */
+    case noresp_off: /* noresponse off */
+        if (sas_device->starget && sas_device->starget->hostdata) {
+    		sas_target_priv_data = sas_device->starget->hostdata;
+    		sas_target_priv_data->noresp_simu = !action;
+            printk(KERN_ERR "sas devide:%llx noresp_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->noresp_simu);
+	    }
+        break;
+    case noresp_repair: /* noresponse repaired */
+        break;
+    }
+
+    return 0;
+}
+
+static int wwn_match(u64 mgt_wwn, u64 tgt_wwn)
+{
+    return (mgt_wwn > tgt_wwn) ? (mgt_wwn - tgt_wwn) < 4 : (tgt_wwn - mgt_wwn) < 4 ;
+}
+
+
+static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 action, void *priv_data)
+{
+    struct _sas_device *sas_device;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioc->sas_device_lock, flags);
+	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+        if(wwn_match(wwn, sas_device->sas_address)) {
+            __sas_device_noresp_handler(sas_device, action);
+        }
+    }
+    spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+
+    return 0;
+}
+
+mpt3_simu_handler mpt3_simu_handler_arr[] = {
+    &sas_device_noresp_handler,  /*sucmd = 0, noresponse handler*/
+};
+
+static long _ctl_mpt3_simu(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
+{
+    struct mpt3_fault_simu_info karg;
+    mpt3_simu_handler handler;
+
+    if (copy_from_user(&karg, arg, sizeof(karg))) {
+		pr_err("failure at %s:%d/%s()!\n",
+		    __FILE__, __LINE__, __func__);
+		return -EFAULT;
+	}
+
+    handler = mpt3_simu_handler_arr[karg.subcmd];
+
+    return (*handler)(ioc, karg.wwn, karg.action, karg.priv_data);
+}
 
 /**
  * _ctl_diag_read_buffer - request for copy of the diag buffer
@@ -2395,6 +2458,11 @@ _ctl_ioctl_main(struct file *file, unsigned int cmd, void __user *arg,
 		if (_IOC_SIZE(cmd) == sizeof(struct mpt3_sas_devinfo_buffer))
 			ret = _ctl_get_sas_devinfo(ioc, arg);
 		break;
+    case MPT3FAULTSIMU:
+		if (_IOC_SIZE(cmd) == sizeof(struct mpt3_fault_simu_info))
+			ret = _ctl_mpt3_simu(ioc, arg);
+		break;
+    
 	default:
 		dctlprintk(ioc, pr_info(MPT3SAS_FMT
 		    "unsupported ioctl opcode(0x%08x)\n", ioc->name, cmd));

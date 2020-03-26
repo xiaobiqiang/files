@@ -4407,6 +4407,40 @@ out_unlock:
 	goto out;
 }
 
+int mpt3sas_check_noresp_simu(struct MPT3SAS_ADAPTER *ioc, u16 smid)
+{
+    struct scsi_cmnd *scmd;
+    struct MPT3SAS_DEVICE *sas_device_priv_data;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioc->scsi_lookup_lock, flags);
+    scmd = _scsih_scsi_lookup_get(ioc, smid);
+    if (scmd == NULL)
+        goto out;
+
+    sas_device_priv_data = scmd->device->hostdata;
+    if (!sas_device_priv_data || !sas_device_priv_data->sas_target || sas_device_priv_data->sas_target->deleted)
+        goto out;
+
+    /*printk(KERN_ERR "sas devide:%llx noresp_simu :%d\n", 
+                        sas_device_priv_data->sas_target->sas_address, 
+                        sas_device_priv_data->sas_target->noresp_simu);*/
+
+    if(sas_device_priv_data->sas_target->noresp_simu == 1) {
+        printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");
+        scsi_dma_unmap(scmd);
+        spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
+        return 1;
+    }
+
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
+
+    out:
+    spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
+    return 0;
+}
+
+
 /**
  * _scsih_io_done - scsi request callback
  * @ioc: per adapter object
@@ -4452,7 +4486,16 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		scmd->result = DID_NO_CONNECT << 16;
 		goto out;
 	}
-    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
+
+    
+    /*printk(KERN_ERR "sas devide:%llx noresp_simu :%d\n", sas_device_priv_data->sas_target->sas_address, sas_device_priv_data->sas_target->noresp_simu);
+    if(sas_device_priv_data->sas_target->noresp_simu == 1) {
+        printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");
+        scsi_dma_unmap(scmd);
+        return 1;
+    }
+
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);*/
 	ioc_status = le16_to_cpu(mpi_reply->IOCStatus);
 
 	/*
