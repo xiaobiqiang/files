@@ -13,8 +13,8 @@
 #define CMD_lmod			"/usr/sbin/lsmod"
 #define CMD_emod(mod)		CMD_lmod" | cut -d ' ' -f 1 | grep -w %s | wc -l",	\
 							(mod)
-#define OS_RELEASE			"/etc/redhat-release"
-#define CMD_os_release		"cat "OS_RELEASE
+#define OS_RELEASE			"/etc/os-release"
+#define CMD_os_release		"cat "OS_RELEASE" | grep PRETTY_NAME | cut -d '\"' -f 2"
 
 #define FC_DRV_SW			"qlf_hengwei"
 #define FC_DRV_X86			"qlf"
@@ -53,8 +53,9 @@ typedef struct os_fc_map {
 
 static char *fc_drv = NULL;
 static os_fc_map_t os_fc_map[] = {
-	{"NeoKylin Server release 5.0 (Sunway)", FC_DRV_SW},
-	{"CentOS Linux release 7.3.1611 (Core)", FC_DRV_X86},
+	{"NeoKylin", 				FC_DRV_SW},
+	{"CentOS Linux", 			FC_DRV_X86},
+	{"deepin GNU/Linux 15.0", 	FC_DRV_SW},
 	{NULL, NULL}
 };
 
@@ -122,6 +123,7 @@ static int drv_exist(char *drv)
 int main(int argc, char **argv)
 {
 	init_drv(&fc_drv);
+	fprintf(stdout, "fcboot load fc driver(%s)...", fc_drv);
 	loop_load_drv(fc_drv);
 	return (0);
 }
