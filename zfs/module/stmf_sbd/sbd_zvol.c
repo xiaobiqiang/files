@@ -516,9 +516,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		abuf = abp[i];
 		size = arc_buf_size(abuf);
 		/* TODO: */
-		ret = dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync, write_meta);
-		if (ret != 0)
-			break;
+		dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync, write_meta);
 		/*dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx, sync);*/
 		toffset += size;
 		resid -= size;
@@ -526,6 +524,9 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 //	ASSERT(resid == 0);
 	txg = tx->tx_txg;
 	write_direct = dmu_tx_sync_log(tx);
+	if (sync && write_direct)
+		zvol_log_write(sl->sl_zvol_minor_hdl, 
+			tx, offset, len, sync);
 	dmu_tx_commit(tx);
 	zfs_range_unlock(rl);
 	kmem_free(zvio->zvio_abp,
@@ -672,9 +673,9 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	}
 
 	sync = !zvol_get_volume_wce(sl->sl_zvol_minor_hdl);
-    	if (sync) {
+    if (sync) {
 		write_flag |= WRITE_FLAG_APP_SYNC;
-    	}
+    }
 
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)uio->uio_resid);
@@ -684,6 +685,9 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags,char *initiator_wwn)
 	} else {
 		error = dmu_write_uio(sl->sl_zvol_objset_hdl, ZVOL_OBJ, uio, len, tx, write_flag);
 		write_direct = dmu_tx_sync_log(tx);
+		if (sync && write_direct)
+			zvol_log_write(sl->sl_zvol_minor_hdl, tx, 
+				offset, len, sync);
 		dmu_tx_commit(tx);
 	}
 
