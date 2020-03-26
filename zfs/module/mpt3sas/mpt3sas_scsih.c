@@ -4427,15 +4427,15 @@ int mpt3sas_check_noresp_simu(struct MPT3SAS_ADAPTER *ioc, u16 smid)
                         sas_device_priv_data->sas_target->noresp_simu);*/
 
     if(sas_device_priv_data->sas_target->noresp_simu == 1) {
-        printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");
-        scsi_dma_unmap(scmd);
+        //printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");       
         spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
+        scsi_dma_unmap(scmd);
         return 1;
     }
 
     atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
 
-    out:
+out:
     spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
     return 0;
 }
@@ -4488,14 +4488,14 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 	}
 
     
-    /*printk(KERN_ERR "sas devide:%llx noresp_simu :%d\n", sas_device_priv_data->sas_target->sas_address, sas_device_priv_data->sas_target->noresp_simu);
+    printk(KERN_ERR "sas devide:%llx noresp_simu :%d\n", sas_device_priv_data->sas_target->sas_address, sas_device_priv_data->sas_target->noresp_simu);
     if(sas_device_priv_data->sas_target->noresp_simu == 1) {
-        printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");
+        printk(KERN_ERR "sas target:%llx io dropped as noresp_simu been 1\n", sas_device_priv_data->sas_target->sas_address);
         scsi_dma_unmap(scmd);
         return 1;
     }
 
-    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);*/
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
 	ioc_status = le16_to_cpu(mpi_reply->IOCStatus);
 
 	/*
