@@ -26,7 +26,7 @@ libdisk_transport_la_LIBADD = 					\
         $(top_builddir)/lib/libzpool/libzpool.la \
         $(top_builddir)/lib/libzfs/libzfs.la 
 
-libdisk_transport_la_LIBADD +=  -lxml2 -lcmopensrc 
+libdisk_transport_la_LIBADD +=  -lxml2 -L$(top_srcdir)/cmd/cm/opensrc -lcmopensrc 
 
 dist_libdisk_transport_la_SOURCES = \
 	$(USER_C) \
