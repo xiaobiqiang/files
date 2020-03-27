@@ -95,7 +95,7 @@ MODULE_PARM_DESC(mpt3sas_fwfault_debug,
 static int
 _base_get_ioc_facts(struct MPT3SAS_ADAPTER *ioc, int sleep_flag);
 
-int mpt3sas_check_noresp_simu(struct MPT3SAS_ADAPTER *ioc, u16 smid);
+extern int mpt3sas_check_noresp_simu(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 
 /**
  * _scsih_set_fwfault_debug - global setting of ioc->fwfault_debug.
@@ -962,10 +962,10 @@ _base_interrupt(int irq, void *bus_id)
 			goto out;
 		reply = 0;
 		smid = le16_to_cpu(rpf->Default.DescriptorTypeDependent1);
-        if(mpt3sas_check_noresp_simu(ioc, smid) == 1) {
+        /*if(mpt3sas_check_noresp_simu(ioc, smid) == 1) {
             continue;
-        }
-        
+        }*/
+
 		if (request_desript_type ==
 		    MPI25_RPY_DESCRIPT_FLAGS_FAST_PATH_SCSI_IO_SUCCESS ||
 		    request_desript_type ==
