@@ -7625,6 +7625,7 @@ void mpt3sas_process_remove_target(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
         if(sas_addr_match(sas_address, sas_device->sas_address)) {
             list_del_init(&sas_device->list);
             found = 1;
+            break;
         }
     }
     spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
@@ -8938,7 +8939,7 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
     struct _sas_device *sas_device = NULL;
     struct scsi_target *starget = scmd->device->sdev_target;
     struct MPT3SAS_TARGET *target_priv_data = starget->hostdata;
-    
+
     sas_device_priv_data = scmd->device->hostdata;
     if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
         sas_device_priv_data->sas_target->deleted) {
