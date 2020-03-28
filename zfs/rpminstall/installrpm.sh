@@ -12,17 +12,26 @@ function install_gui()
         echo "no GUI"
         return
     fi
+
+    rm -rf $GUI_DIR
     
     if [ ! -d $GUI_DIR ]; then
         mkdir -p $GUI_DIR
     fi
     
-    rm -rf $GUI_DIR"/*"
     cp $gui_tar $GUI_DIR
     cd $GUI_DIR
     tar -xvf $gui_tar
     ./prepare.sh
     cd -
+
+    if [ ! -f /usr/local/lib/libcmjni.so ]; then
+        if [ `uname -m` = "sw_64" ]; then
+            ln -s /lib/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so 
+        else
+            ln -s /usr/lib64/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so
+        fi
+    fi
 }
 
 function install()
@@ -59,6 +68,7 @@ function unload()
     systemctl stop ceres_cm 2>/dev/null
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
+    rm -rf /usr/lib/systemd/system/ceres_cm.service
 }
 
 
