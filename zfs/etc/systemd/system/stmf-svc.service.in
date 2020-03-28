@@ -8,7 +8,7 @@ After=configd.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=/usr/bin/sleep 5
+ExecStartPre=/bin/sleep 5
 ExecStart=@sbindir@/stmfsvc start
 ExecStop=@sbindir@/stmfsvc stop
 
