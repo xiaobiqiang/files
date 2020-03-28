@@ -17,10 +17,11 @@ CM_SYS_VER_DEFAULT=0
 CM_SYS_VER_SOLARIS_V7R16=1
 CM_SYS_VER_SOLARIS_NOMASTER=2
 CM_SYS_VER_LINUX=3
+CM_OS_TYPE_DEEPIN=6
 
 CM_OS_TYPE_SOLARIS=0
 CM_OS_TYPE_ILLUMOS=1
-CM_OS_TYPE_DEEPIN=2
+
 
 CM_NODE_DB_FILE="/var/cm/data/cm_node.db"
 
@@ -203,6 +204,7 @@ function cm_get_localmanageip()
         local port_inet=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
         port_name=${port_inet[0]}
         ip_line=`cat -n /etc/network/interfaces|grep 'iface'|grep -w $port_name|awk '{print $1}'`
+        ((ip_line=$ip_line+1))
         ipaddr=`sed -n "$ip_line"p /etc/network/interfaces|grep address|awk '{print $2}'`
         echo $ipaddr
         return 0
