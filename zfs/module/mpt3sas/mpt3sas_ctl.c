@@ -2038,7 +2038,7 @@ _ctl_get_sas_devinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 
 typedef int (*mpt3_simu_handler)(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 action, void *priv_data);
 
-static int __sas_device_noresp_handler(struct _sas_device *sas_device, u32 action)
+static int __sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_device *sas_device, u32 action)
 {
     struct MPT3SAS_TARGET *sas_target_priv_data;
 
@@ -2048,15 +2048,39 @@ static int __sas_device_noresp_handler(struct _sas_device *sas_device, u32 actio
         if (sas_device->starget && sas_device->starget->hostdata) {
     		sas_target_priv_data = sas_device->starget->hostdata;
     		sas_target_priv_data->noresp_simu = !action;
-            printk(KERN_ERR "sas devide:%llx noresp_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->noresp_simu);
+            printk(KERN_ERR "sas device:%llx noresp_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->noresp_simu);
 	    }
         break;
-    case noresp_repair: /* noresponse repaired */
+    default :
+        printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_target_priv_data->sas_address);
         break;
     }
 
     return 0;
 }
+
+static int __sas_device_noresp_repair(struct MPT3SAS_ADAPTER *ioc, u64 *sas_addr, u32 action)
+{
+    int retval = 0;
+
+    if(action != noresp_repair) {
+        printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_addr);
+        return -1;
+    }
+
+    mpt3sas_clear_sdev_in_removed_list(ioc, sas_addr);
+
+    if (ioc->shost_recovery || ioc->pci_error_recovery || ioc->is_driver_loading)
+		return -EAGAIN;
+
+    retval = mpt3sas_base_hard_reset_handler(ioc, CAN_SLEEP,
+        FORCE_BIG_HAMMER);
+    pr_info(MPT3SAS_FMT "__sas_device_noresp_repair host reset: %s\n",
+        ioc->name, ((!retval) ? "SUCCESS" : "FAILED"));
+
+    return retval;
+}
+
 
 static int wwn_match(u64 mgt_wwn, u64 tgt_wwn)
 {
@@ -2069,10 +2093,15 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
     struct _sas_device *sas_device;
     unsigned long flags;
 
+    if(action == noresp_repair) {
+        return __sas_device_noresp_repair(ioc, wwn, action);
+    }
+
+    /* noresponse simulate code. */
     spin_lock_irqsave(&ioc->sas_device_lock, flags);
 	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
         if(wwn_match(wwn, sas_device->sas_address)) {
-            __sas_device_noresp_handler(sas_device, action);
+            __sas_device_noresp_handler(ioc, sas_device, action);
         }
     }
     spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
@@ -2081,7 +2110,7 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
 }
 
 mpt3_simu_handler mpt3_simu_handler_arr[] = {
-    &sas_device_noresp_handler,  /*sucmd = 0, noresponse handler*/
+    &sas_device_noresp_handler,  /*subcmd = 0, noresponse handler*/
 };
 
 static long _ctl_mpt3_simu(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
