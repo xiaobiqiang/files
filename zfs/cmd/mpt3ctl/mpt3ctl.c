@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 {
     char *subcmd;
     int  i = 0;
-    int ret;
+    int ret = -1;
     mpt3_simu_cmd_t *cmd = NULL;
     
 	(void) setlocale(LC_ALL, "");
@@ -304,7 +304,6 @@ static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, noresp_action_e action, un
 	for (idx = 0; idx < ids_nr; idx++) 
     {
     	struct mpt3_fault_simu_info *cmd;
-    	int i;
     	int ret;
 
         cmd = malloc(sizeof(struct mpt3_fault_simu_info));
