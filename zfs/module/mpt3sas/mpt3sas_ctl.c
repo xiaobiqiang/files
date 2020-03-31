@@ -2081,7 +2081,7 @@ static int __sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_de
 }
 
 
-static int __sas_device_noresp_repair(struct MPT3SAS_ADAPTER *ioc, u64 *sas_addr, u32 action)
+static int __removed_sas_device_repair(struct MPT3SAS_ADAPTER *ioc, u64 *sas_addr, u32 action)
 {
     int retval = 0;
 
@@ -2116,7 +2116,7 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
     unsigned long flags;
 
     if(action == mpt3simu_repair) {
-        return __sas_device_noresp_repair(ioc, wwn, action);
+        return __removed_sas_device_repair(ioc, wwn, action);
     }
 
     /* noresponse simulate code. */
@@ -2135,6 +2135,10 @@ static int sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 act
 {
     struct _sas_device *sas_device;
     unsigned long flags;
+
+    if(action == mpt3simu_repair) {
+        return __removed_sas_device_repair(ioc, wwn, action);
+    }
 
     /* merr simulate code. */
     spin_lock_irqsave(&ioc->sas_device_lock, flags);

@@ -107,10 +107,10 @@ static int get_subcmd_idx(char *subcmd, int *idx)
 static const char *usage_info(mpt3_simu_subcmd_e subcode) {
     switch (subcode) {
     case MPT3_NORESP:
-    	return (gettext("\tnoresponse <on|off|repair> <disk-path>\n"));
+    	return (gettext("\tnoresponse <on| off | repair> <disk-path>\n"));
 
     case MPT3_MERR:
-    	return (gettext("\tmerr <on|off> <disk-path>\n"));
+    	return (gettext("\tmerr <on| off | repair> <disk-path>\n"));
     }
 
     abort();
@@ -331,7 +331,7 @@ static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, mpt3simu_action_e action, 
 
     	ret = ioctl(fd, MPT3FAULTSIMU, cmd);
     	if (ret == 0) {
-            syslog(LOG_ERR, "simulate noresponse disk:%llx on mpt ioc:%d", wwn, cmd->hdr.ioc_number);
+            syslog(LOG_ERR, "simulate for disk:%llx on mpt ioc:%d", wwn, cmd->hdr.ioc_number);
             break;
         } else {
             syslog(LOG_ERR, "disk:%llx NOT found on mpt ioc:%d", wwn, cmd->hdr.ioc_number); // NOT reached here.
@@ -362,6 +362,8 @@ static int mpt3ctl_merr(int argc, char **argv)
         action = mpt3simu_on;
     } else if(strcmp(argv[1], "off") == 0) {
         action = mpt3simu_off;
+    } else if(strcmp(argv[1], "repair") == 0) {
+        action = mpt3simu_repair;
     } else {
         goto help_and_exit;
     }
