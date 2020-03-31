@@ -44,6 +44,8 @@
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_text.h>
 #include <sys/in.h>
+#include <sys/cmn_err.h>
+
 
 #define	ISCSIT_LOGIN_SM_STRINGS
 #include "iscsit.h"

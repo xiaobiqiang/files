@@ -2,6 +2,7 @@
 
 threshold_cfg_xml_file="/var/cm/static/comm/alarm_threshold_cfg.xml"
 alarm_cfg_xml_file="/var/cm/static/comm/alarm_cfg.xml"
+alarm_cfg_period_file="/var/cm/static/comm/alarm_period_cfg.xml"
 alarm_cfg_db_file="/var/cm/data/cm_alarm.db"
 
 SQLITE=sqlite3
@@ -21,10 +22,14 @@ function alarm_init_db()
     local table_record="CREATE TABLE IF NOT EXISTS record_t (id BIGINT,alarm_id INT,report_time INT,recovery_time INT,param VARCHAR(255))"
     local table_cache="CREATE TABLE IF NOT EXISTS cache_t (id BIGINT,alarm_id INT,report_time INT,recovery_time INT,param VARCHAR(255))"
     local table_threshold="CREATE TABLE IF NOT EXISTS threshold_t (alarm_id INT, threshold INT, recoverval INT)"
+    local period_cfg_t="CREATE TABLE IF NOT EXISTS period_cfg_t (alarm_id INT,cnt INT,tmout INT)"
+    local period_t="CREATE TABLE IF NOT EXISTS period_t (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,alarm_id INT,cnt INT,tmout INT,param VARCHAR(255))"
     $SQLITE $alarm_cfg_db_file "$table_config"
     $SQLITE $alarm_cfg_db_file "$table_record"
     $SQLITE $alarm_cfg_db_file "$table_cache"
     $SQLITE $alarm_cfg_db_file "$table_threshold"
+    $SQLITE $alarm_cfg_db_file "$period_cfg_t"
+    $SQLITE $alarm_cfg_db_file "$period_t"
     if [ $? != 0 ]; then
         echo "create table fail"
         exit 1
@@ -92,7 +97,7 @@ function alarm_config_to_db()
             alarm_match=0
         fi
         local reccnt=`$SQLITE ${alarm_cfg_db_file} "SELECT COUNT(alarm_id) FROM config_t WHERE alarm_id=$alarm_id"`
-        if [ $reccnt -ne 0 ]; then
+        if [ "X$reccnt" == "X" ] || [ $reccnt -ne 0 ]; then
             continue
         fi
         sql="INSERT INTO config_t (alarm_id,match_bits,param_num,type,lvl,is_disable)"
@@ -119,7 +124,7 @@ function threshold_config_to_db()
         local recoverval=`echo "$val" |sed 's/.*recoverval="\(.*\)/\1/g' |awk -F'"' '{printf $1}'`
         
         local reccnt=`$SQLITE ${alarm_cfg_db_file} "SELECT COUNT(alarm_id) FROM threshold_t WHERE alarm_id=$alarm_id"`
-        if [ $reccnt -ne 0 ]; then
+        if [ "X$reccnt" == "X" ] || [ $reccnt -ne 0 ]; then
             continue
         fi
         sql="INSERT INTO threshold_t (alarm_id,threshold,recoverval)"
@@ -127,7 +132,37 @@ function threshold_config_to_db()
         $SQLITE $alarm_cfg_db_file "$sql"
         if [ $? != 0 ]; then
             echo "insert [$sql] fail"
-            exit 1
+            continue
+        fi
+    done
+}
+
+function alarm_period_config_to_db()
+{
+    grep -w alarm_id ${alarm_cfg_period_file} |while read line
+    do
+        val=$line
+        if [ "X$val" = "X" ]; then
+            echo "period config null"
+            continue
+        fi
+        #<alarm_id="10000014" report_count="1" recovery_time="180" />
+        local alarm_id=`echo "$val" |sed 's/.*alarm_id="\(.*\)/\1/g' |awk -F'"' '{printf $1}'`
+        local report_count=`echo "$val" |sed 's/.*report_count="\(.*\)/\1/g' |awk -F'"' '{printf $1}'`
+        local recovery_time=`echo "$val" |sed 's/.*recovery_time="\(.*\)/\1/g' |awk -F'"' '{printf $1}'`
+        
+        local reccnt=`$SQLITE ${alarm_cfg_db_file} "SELECT COUNT(alarm_id) FROM period_cfg_t WHERE alarm_id=$alarm_id"`
+        if [ "X$reccnt" == "X" ] || [ "X$reccnt" != "X0" ]; then
+            $SQLITE $alarm_cfg_db_file "UPDATE period_cfg_t SET cnt=$report_count, tmout=$recovery_time WHERE alarm_id=$alarm_id"
+            continue
+        fi
+        
+        sql="INSERT INTO period_cfg_t (alarm_id,cnt,tmout)"
+        sql=$sql" VALUES ($alarm_id,$report_count,$recovery_time)"
+        $SQLITE $alarm_cfg_db_file "$sql"
+        if [ $? != 0 ]; then
+            echo "insert [$sql] fail"
+            continue
         fi
     done
 }
@@ -138,5 +173,6 @@ fi
 alarm_init_db
 alarm_config_to_db
 threshold_config_to_db
+alarm_period_config_to_db
 exit 0
 

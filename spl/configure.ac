@@ -42,7 +42,8 @@ AC_CONFIG_HEADERS([spl_config.h], [
 AC_ARG_ENABLE(hengwei, 
 		AS_HELP_STRING([--enable-hengwei],
 			[use hengwei platform]))
-if test "$enable_hengwei" = yes; then
+enable_hengwei=`uname -m`
+if test "$enable_hengwei" = "sw_64"; then
 	echo "use hengwei platform"
 	AC_DEFINE([USE_HENGWEI], [], [Use hengwei platform])
 fi

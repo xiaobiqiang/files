@@ -125,9 +125,15 @@ typedef enum
     CM_RAID6 = 6,
     CM_RAID7 = 7,
     CM_RAID10 = 10,
+    CM_RAIDZ5 = 15,
+    CM_RAIDZ6 = 16,
+    CM_RAIDZ7 = 17,
     CM_RAID50 = 50,
+    CM_RAIDZ50 = 51,
     CM_RAID60 = 60,
+    CM_RAIDZ60 = 61,
     CM_RAID70 = 70,
+    CM_RAIDZ70 = 71,
     CM_RAID_BUTT,
 }cm_raid_type_e;
 

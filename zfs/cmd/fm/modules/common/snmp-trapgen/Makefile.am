@@ -17,6 +17,10 @@ DEFAULT_INCLUDES += \
 	-I$(top_srcdir)/lib/fm/topo/modules/common/disk \
 	-I/usr/include/libxml2
 
+dist_libsnmp_trapgen_la_DATA = \
+	copy_snmp_headers.sh \
+	net-snmp.tar
+
 libsnmp_trapgen_la_LTLIBRARIES = libsnmp_trapgen.la
 
 USER_C = \
@@ -28,4 +32,7 @@ libsnmp_trapgen_la_LIBADD = 					\
 libsnmp_trapgen_la_LIBADD +=  -lxml2 -lnetsnmp -lnetsnmpagent
 
 dist_libsnmp_trapgen_la_SOURCES = \
-	$(USER_C)
+	$(USER_C) \
+	snmp-trangen.h \
+	snmp-trapgen.h
+

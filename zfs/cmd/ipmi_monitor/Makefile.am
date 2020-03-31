@@ -19,7 +19,8 @@ EXTRA_DIST = \
 	ipmi_checker.ini
 
 ipmisvc_LDADD =	\
-	$(top_builddir)/lib/libzfs_core/libzfs_core.la
+	$(top_builddir)/lib/libzfs_core/libzfs_core.la \
+	$(top_builddir)/lib/libspl/libspl.la
 ipmisvc_LDADD += $(ZLIB) -lxml2 -lrt
 ipmisvc_LDFLAGS = -pthread
 

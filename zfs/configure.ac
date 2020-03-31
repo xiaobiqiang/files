@@ -48,7 +48,8 @@ AC_CONFIG_HEADERS([zfs_config.h], [
 AC_ARG_ENABLE(hengwei, 
 		AS_HELP_STRING([--enable-hengwei],
 			[use hengwei platform]))
-if test "$enable_hengwei" = yes; then
+enable_hengwei=`uname -m`
+if test "$enable_hengwei" = "sw_64"; then
 	echo "use hengwei platform"
 	AC_DEFINE([USE_HENGWEI], [], [Use hengwei platform])
 fi
@@ -153,12 +154,12 @@ AC_CONFIG_FILES([
 	cmd/arc_summary/Makefile
 	cmd/zed/Makefile
 	cmd/sas3show/Makefile
+	cmd/mpt3ctl/Makefile
 	cmd/perf_stat/Makefile
 	cmd/clusterd/Makefile
 	cmd/pmm/Makefile
 	cmd/disk/Makefile
 	cmd/fcboot/Makefile
-	cmd/scsi_tools/Makefile
 	cmd/synckey/Makefile
 	cmd/fm/Makefile
 	cmd/fm/fmd/Makefile
@@ -179,6 +180,7 @@ AC_CONFIG_FILES([
 	cmd/fm/modules/common/pool-transport/Makefile
 	cmd/fm/modules/common/eversholt/Makefile
 	cmd/fm/modules/common/eversholt/files/Makefile
+	cmd/fm/modules/common/snmp-trapgen/Makefile
 	cmd/fm/fmd/schemes/Makefile
 	cmd/fm/fmd/schemes/zfs/Makefile
 	cmd/fm/dicts/Makefile
@@ -210,6 +212,8 @@ AC_CONFIG_FILES([
 	cmd/cm/static/res_en/Makefile
 	cmd/cm/static/task/Makefile
 	cmd/cm/build/Makefile
+	cmd/cm/tools/Makefile
+	cmd/cm/tools/alarm_tool/Makefile
 	contrib/Makefile
 	contrib/bash_completion.d/Makefile
 	contrib/dracut/Makefile

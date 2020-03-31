@@ -10,7 +10,8 @@ drbdmonsvc_SOURCES = 	\
 	drbdmon.c
 
 drbdmonsvc_LDADD = \
-	$(top_builddir)/lib/libzfs_core/libzfs_core.la
+	$(top_builddir)/lib/libzfs_core/libzfs_core.la \
+	$(top_builddir)/lib/libspl/libspl.la
 drbdmonsvc_LDADD += $(ZLIB) -lxml2 -lrt
 drbdmonsvc_LDFLAGS = -pthread
 

@@ -94,7 +94,7 @@ pppt_global_t pppt_global;
 pppt_conn_t	pppt_conn;
 
 int pppt_logging = 0;
-volatile int pppt_session_clear_time = 120;
+volatile int pppt_session_clear_time = 60*60*20;
 
 static int pppt_enable_svc(void);
 
@@ -1570,7 +1570,7 @@ pppt_sess_close_locked(pppt_sess_t *ps)
 		else if (ps->ps_refcnt == 0)
 			break;
 		
-		delay(100);
+		delay(1000);
     }
 
 	if (num != 0)

@@ -45,6 +45,8 @@
 #include <sys/iscsit/iscsit_common.h>
 #include <sys/iscsi_protocol.h>
 #include <sys/iscsit/isns_protocol.h>
+#include <sys/cmn_err.h>
+
 
 void *
 iscsit_zalloc(size_t size)

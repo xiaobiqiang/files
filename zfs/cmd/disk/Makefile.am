@@ -11,12 +11,12 @@ sbin_PROGRAMS = disk
 disk_SOURCES = 	\
 	disk.c
 
-EXTRA_DIST = \
-	sas2ircu \
-	sas3ircu \
+diskdir = /usr/local/sbin
+
+dist_disk_SCRIPTS = \
+	initdisk \
 	get_en_slot.sh \
-	sg_led_disk.sh \
-	lsiraid-2018-03-05.tar.bz2
+	sg_led_disk.sh 
 
 disk_LDADD = \
 	$(top_builddir)/lib/libnvpair/libnvpair.la \
@@ -31,24 +31,10 @@ disk_LDADD += $(ZLIB) -lxml2 -lrt
 disk_LDFLAGS = -pthread
 
 install-exec-hook:
-	cp $(top_srcdir)/cmd/disk/sas2ircu /usr/local/sbin
-	chmod a+x /usr/local/sbin/sas2ircu
-	cp $(top_srcdir)/cmd/disk/sas3ircu /usr/local/sbin
-	chmod a+x /usr/local/sbin/sas3ircu
 	cp $(top_srcdir)/cmd/disk/get_en_slot.sh /usr/local/bin
 	chmod a+x /usr/local/bin/get_en_slot.sh
-	rm -rf /tmp/megacli/
-	mkdir /tmp/megacli/
-	tar jxvf $(top_srcdir)/cmd/disk/lsiraid-2018-03-05.tar.bz2 -C /tmp/megacli/ 
-	cp -rf /tmp/megacli/lsiraid-2018-03-05/megacli/qemu-x86_64 /usr/local/bin/qemu-x86_64
-	chmod u+x  /usr/local/bin/qemu-x86_64
-	rm -rf /usr/gnemul
-	mkdir /usr/gnemul
-	tar zxvf /tmp/megacli/lsiraid-2018-03-05/megacli/qemu-x86_64.tar.gz -C /usr/gnemul
-	mkdir /usr/gnemul/qemu-x86_64/bin/
-	cp -rf /tmp/megacli/lsiraid-2018-03-05/megacli/MegaCli64 /usr/gnemul/qemu-x86_64/bin/MegaCli64
-	chmod u+x  /usr/gnemul/qemu-x86_64/bin/MegaCli64
 	mkdir -p /var/fm
 	cp $(top_srcdir)/cmd/disk/sg_led_disk.sh /var/fm/
 	chmod a+x /var/fm/sg_led_disk.sh
-
+	cp $(top_srcdir)/cmd/disk/initdisk /usr/local/bin
+	chmod a+x /usr/local/bin/initdisk

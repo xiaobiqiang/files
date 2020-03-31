@@ -9,6 +9,9 @@ CM_RAID1='mirror'
 CM_RAID5='raidz1'
 CM_RAID6='raidz2'
 CM_RAID7='raidz3'
+CM_RAIDZ5='raidz_s1'
+CM_RAIDZ6='raidz_s2'
+CM_RAIDZ7='raidz_s3'
 CM_DISK_DB_CACHE='/tmp/cm_db_disk.db'
 
 function cm_pool_destroy_xml()
@@ -112,19 +115,19 @@ function cm_pool_check_param()
             fi
         ;;
         
-        5)
+        *5)
             if [ $data -lt 3 ]; then
                 iret=$CM_PARAM_ERR
             fi
         ;;
         
-        6)
+        *6)
             if [ $data -lt 4 ]; then
                 iret=$CM_PARAM_ERR
             fi
         ;;
         
-        7)
+        *7)
             if [ $data -lt 5 ]; then
                 iret=$CM_PARAM_ERR
             fi
@@ -151,6 +154,15 @@ function cm_pool_get_raid_str()
         ;;
         7)
             echo $CM_RAID7
+        ;;
+        15)
+            echo $CM_RAIDZ5
+        ;;
+        16)
+            echo $CM_RAIDZ6
+        ;;
+        17)
+            echo $CM_RAIDZ7
         ;;
         *)
         ;;

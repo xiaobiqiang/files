@@ -981,6 +981,7 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 
 	switch(val) {
     case SAS_EVT_DEV_REMOVE:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEV_REMOVED, vd->vdev_spa, vd, NULL, 0, 0);
         zfs_post_remove(vd->vdev_spa, vd);
         break;
 
@@ -988,6 +989,10 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
         zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_MERR, vd->vdev_spa, vd, NULL, 0, 0);
         break;
 
+    case SAS_EVT_DEV_NORESP:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEV_NORESP, vd->vdev_spa, vd, NULL, 0, 0);
+        break;
+    
     default :
         break;
     }

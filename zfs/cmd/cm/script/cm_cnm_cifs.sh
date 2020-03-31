@@ -40,6 +40,7 @@ function cm_cnm_cifs_getbatch()
     local total=$3
     local index=0
     local domain=$CM_DOMAIN_LOCAL
+    local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
     
     ((index=$offset))
     #脚本里下标从1开始计算,并跳过第一行
@@ -90,7 +91,12 @@ function cm_cnm_cifs_getbatch()
             permission=$CM_NAS_PERISSION_RO
             ;;
         esac
-        name=`/var/cm/script/cm_cnm_user.sh getnamebyid "$nametype" "$name"`
+        if [ "X$dname" == "X" ]; then
+            name="$CM_DOMAIN_LOCAL $nametype $name"
+        else
+            name=`/var/cm/script/cm_cnm_user.sh getnamebyid "$nametype" "$name"`
+        fi
+        
         echo "$index $permission $name"
         ((index=$index+1))
     done
@@ -339,7 +345,8 @@ function cm_cnm_cifs_get()
     local domain=$2
     local nametype=$3
     local name=$4
-    if [ $domain -eq $CM_DOMAIN_AD ]; then
+    local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
+    if [ $domain -eq $CM_DOMAIN_AD ] && [ "X$dname" != "X" ]; then
         #AD域用户场景，需要将用户名转换为UID
         name=`/var/cm/script/cm_cnm_user.sh ad_getidbyname "$nametype" "$name"`
         if [ "X$name" == "X" ]; then
@@ -366,7 +373,11 @@ function cm_cnm_cifs_get()
         permission=$CM_NAS_PERISSION_RO
         ;;
     esac
-    name=`/var/cm/script/cm_cnm_user.sh ad_getnamebyid "$nametype" "$name"`
+    if [ "X$dname" == "X" ]; then
+        name="$CM_DOMAIN_LOCAL $nametype $name"
+    else
+        name=`/var/cm/script/cm_cnm_user.sh getnamebyid "$nametype" "$name"`
+    fi
     echo "0 $permission $name"
     return $CM_OK
 }

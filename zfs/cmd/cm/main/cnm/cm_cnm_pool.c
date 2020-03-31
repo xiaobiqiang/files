@@ -44,6 +44,9 @@ const cm_omi_map_cfg_t g_cm_raid_map[] =
     {"raidz1",CM_RAID5},
     {"raidz2",CM_RAID6},
     {"raidz3",CM_RAID7},
+    {"raidz_s1",CM_RAIDZ5},
+    {"raidz_s2",CM_RAIDZ6},
+    {"raidz_s3",CM_RAIDZ7},
 };
 
 const sint8 * g_cm_cnm_pool_get_scrub_status = "echo `zpool %s %s`|"
@@ -677,18 +680,21 @@ static uint32 cm_cnm_pool_raid_judge(const cm_cnm_pool_list_param_t *info)
             }
             break;
         case CM_RAID5:
+        case CM_RAIDZ5:
             if(cut<3)
             {
                 return CM_FALSE;    
             }
             break;
         case CM_RAID6:
+        case CM_RAIDZ6:
             if(cut<4)
             {
                 return CM_FALSE;    
             }
             break;
         case CM_RAID7:
+        case CM_RAIDZ7:
             if(cut<5)
             {
                 return CM_FALSE;    
@@ -701,18 +707,21 @@ static uint32 cm_cnm_pool_raid_judge(const cm_cnm_pool_list_param_t *info)
             }
             break;
         case CM_RAID50:
+        case CM_RAIDZ50:
             if(0 != cut%(info->group) || (cut/(info->group)<3))
             {
                 return CM_FALSE;    
             }
             break;
         case CM_RAID60:
+        case CM_RAIDZ60:
             if(0 != cut%(info->group) || (cut/(info->group)<4))
             {
                 return CM_FALSE;    
             }
             break;
         case CM_RAID70:
+        case CM_RAIDZ70:
             if(0 != cut%(info->group) || (cut/(info->group)<5))
             {
                 return CM_FALSE;    
@@ -768,6 +777,18 @@ sint32 cm_cnm_pool_local_create(
             break;
         case CM_RAID70:
             raid_num = CM_RAID7;
+            raid_x = CM_TRUE;
+            break;
+        case CM_RAIDZ50:
+            raid_num = CM_RAIDZ5;
+            raid_x = CM_TRUE;
+            break;
+        case CM_RAIDZ60:
+            raid_num = CM_RAIDZ6;
+            raid_x = CM_TRUE;
+            break;
+        case CM_RAIDZ70:
+            raid_num = CM_RAIDZ7;
             raid_x = CM_TRUE;
             break;
         default:
@@ -1248,37 +1269,38 @@ static uint32 cm_cnm_pooldisk_get_raid(cm_xml_node_ptr curnode)
     {
         raid = cm_cnm_get_enum(&CmOmiMapEnumPoolRaidType,valstr,CM_RAID0);
     }
-
-    switch(raid)
+    cm_xml_find_node(cm_xml_get_parent(parent),"vdev","name",\
+                    valstr,cm_cnm_pooldisk_get_raid_count,&count);
+    if(count > 1)
     {
-        case CM_RAID1:            
-        case CM_RAID5:
-            cm_xml_find_node(cm_xml_get_parent(parent),"vdev","name",\
-                    valstr,cm_cnm_pooldisk_get_raid_count,&count);
-            if(count > 1)
-            {
-                raid = (raid==CM_RAID1)? CM_RAID10 : CM_RAID50;
-            }
-            break;
-        case CM_RAID6:
-            cm_xml_find_node(cm_xml_get_parent(parent),"vdev","name",\
-                    valstr,cm_cnm_pooldisk_get_raid_count,&count);
-            if(count > 1)
-            {
-                raid = (raid==CM_RAID1)? CM_RAID10 : CM_RAID60;
-            }
-            break;
-        case CM_RAID7:
-            cm_xml_find_node(cm_xml_get_parent(parent),"vdev","name",\
-                    valstr,cm_cnm_pooldisk_get_raid_count,&count);
-            if(count > 1)
-            {
-                raid = (raid==CM_RAID1)? CM_RAID10 : CM_RAID70;
-            }
-            break;
-        default:
-            break;
+        switch(raid)
+        {
+            case CM_RAID1:
+                raid=CM_RAID10;
+                break;
+            case CM_RAID5:
+                raid=CM_RAID50;
+                break;
+            case CM_RAID6:
+                raid=CM_RAID60;
+                break;
+            case CM_RAID7:
+                raid=CM_RAID70;
+                break;
+            case CM_RAIDZ5:
+                raid=CM_RAIDZ50;
+                break;
+            case CM_RAIDZ6:
+                raid=CM_RAIDZ60;
+                break;
+            case CM_RAIDZ7:
+                raid=CM_RAIDZ70;
+                break;
+            default:
+                break;
+        }
     }
+    
     return raid;
 }
 

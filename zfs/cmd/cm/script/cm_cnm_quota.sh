@@ -16,8 +16,18 @@ function cm_cnm_quota_getbatch()
 {
     local usertype=$1
     local filesystem=$2
+    local offset=$3
+    local total=$4
+    if [ "X$offset" == "X" ]; then
+        offset=0
+    fi
+    if [ "X$total" == "X" ]; then
+        total=100
+    fi
+    ((total=$offset+$total))
+    ((offset=$offset+1))
     if [ $usertype -eq 0 ]; then
-        array_name=($(cat /etc/passwd|awk -F':' '$3>99&&$3<50000{print $1}'))
+        array_name=($(cat /etc/passwd|awk -F':' '$3>99&&$3<50000{print $1}' |sed -n ${offset},${total}p))
         len=${#array_name[@]}
         for (( i=0; i<$len; i=i+1 ))
         do
@@ -29,7 +39,7 @@ function cm_cnm_quota_getbatch()
     fi
 
     if [ $usertype -eq 1 ]; then
-        array_name=($(cat /etc/group|awk -F':' '$3==1||($3>99&&$3<1000){print $1}'))
+        array_name=($(cat /etc/group|awk -F':' '$3==1||($3>99&&$3<1000){print $1}' |sed -n ${offset},${total}p))
         len=${#array_name[@]}
         for (( i=0; i<$len; i=i+1 ))
         do

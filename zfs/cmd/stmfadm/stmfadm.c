@@ -4692,7 +4692,8 @@ main(int argc, char *argv[])
 				}						
 			}
 		}	
-		sprintf(cmdfullName,"%s %s",cmdfullName,tmp_argv);		
+		//sprintf(cmdfullName,"%s %s",cmdfullName,tmp_argv);
+		snprintf((cmdfullName)+strlen(cmdfullName),sizeof(cmdfullName)-strlen(cmdfullName)," %s",tmp_argv);
 	}
 	
 	/* set global command name */

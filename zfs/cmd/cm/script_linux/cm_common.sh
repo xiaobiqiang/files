@@ -16,9 +16,12 @@ CM_LOG_LEVEL=$CM_LOG_LEVEL_ERR
 CM_SYS_VER_DEFAULT=0
 CM_SYS_VER_SOLARIS_V7R16=1
 CM_SYS_VER_SOLARIS_NOMASTER=2
+CM_SYS_VER_LINUX=3
+CM_OS_TYPE_DEEPIN=6
 
 CM_OS_TYPE_SOLARIS=0
 CM_OS_TYPE_ILLUMOS=1
+
 
 CM_NODE_DB_FILE="/var/cm/data/cm_node.db"
 
@@ -84,19 +87,24 @@ function CM_EXEC_CMD()
 
 function cm_systerm_version_get()
 {
-    local issolaris=`uname -a |grep -w Prodigy |wc -l`
-    if [ $issolaris -ne 0 ]; then
-        #Solaris V1110crypt.20.v7.r16.p11
-        local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
-        if [ "X$versions" == "Xv7.r16" ]; then
-            echo $CM_SYS_VER_SOLARIS_V7R16
-            return 0
-        elif [[ "$versions" == *"CDCFS"* ]]; then
-            echo $CM_SYS_VER_SOLARIS_NOMASTER
-            return 0
-        fi
+    #local issolaris=`uname -a |grep -w Prodigy |wc -l`
+    #if [ $issolaris -ne 0 ]; then
+    #    #Solaris V1110crypt.20.v7.r16.p11
+    #    local versions=`cat /lib/release |sed -n 1p |awk '{print $5}' |awk -F'.' '{print $3"."$4}'`
+    #    if [ "X$versions" == "Xv7.r16" ]; then
+    #        echo $CM_SYS_VER_SOLARIS_V7R16
+    #        return 0
+    #    elif [[ "$versions" == *"CDCFS"* ]]; then
+    #        echo $CM_SYS_VER_SOLARIS_NOMASTER
+    #        return 0
+    #    fi
+    #fi
+    local type=`uname -r|grep 'deepin'|wc -l`
+    if [ $type -eq 1 ];then
+        echo $CM_OS_TYPE_DEEPIN
+    else
+        echo $CM_SYS_VER_LINUX
     fi
-    echo $CM_SYS_VER_DEFAULT
     return 0
 }
 
@@ -160,7 +168,14 @@ function cm_software_version()
 function cm_get_localmanageport()
 {
     local cfgfile='/var/cm/data/node_config.ini'
-    if [ ! -f ${cfgfile} ]; then
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        local port=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
+        echo "${port[0]}"
+        return 0
+    fi
+    
+    if [ ! -f ${cfgfile} ]; then    
         portlist=`ls /etc/sysconfig/network-scripts| grep ifcfg |grep -v lo|sort`
         for portfile in $portlist
         do
@@ -184,9 +199,19 @@ function cm_get_localmanageport()
 function cm_get_localmanageip()
 {
     local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        local port_inet=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
+        port_name=${port_inet[0]}
+        ip_line=`cat -n /etc/network/interfaces|grep 'iface'|grep -w $port_name|awk '{print $1}'`
+        ((ip_line=$ip_line+1))
+        ipaddr=`sed -n "$ip_line"p /etc/network/interfaces|grep address|awk '{print $2}'`
+        echo $ipaddr
+        return 0
+    fi
     local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
     
-    if [ ! -f ${cfgfile} ] || [`cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
+    if [ ! -f ${cfgfile} ] || [ `cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
         ifconfig eth0|grep 'inet '|awk '{print $2}'
         return 0
     fi

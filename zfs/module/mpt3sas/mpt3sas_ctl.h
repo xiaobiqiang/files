@@ -98,6 +98,10 @@
 #define MPT3GETSASDEVINFO   _IOWR(MPT3_MAGIC_NUMBER, 32, \
 	struct mpt3_sas_devinfo_buffer)
 
+#define MPT3FAULTSIMU   _IOWR(MPT3_MAGIC_NUMBER, 33, \
+	struct mpt3_fault_simu_info)
+
+
 /**
  * struct mpt3_ioctl_header - main header structure
  * @ioc_number -  IOC unit number
@@ -446,6 +450,24 @@ struct mpt3_sas_devinfo_buffer {
     uint32_t sas_dev_cnt;
     struct mpt3sas_dev_info  buffer[0];
 };
+
+struct mpt3_fault_simu_info {
+    struct mpt3_ioctl_header hdr;
+    uint32_t subcmd;
+    uint32_t action;
+    uint64_t wwn;
+    void *    priv_data;
+};
+
+typedef enum {
+	MPT3_NORESP,
+} mpt3_simu_subcmd_e;
+
+typedef enum {
+	noresp_on = 0,
+    noresp_off,
+    noresp_repair
+} noresp_action_e;
 
 
 #endif /* MPT3SAS_CTL_H_INCLUDED */

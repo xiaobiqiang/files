@@ -1,6 +1,7 @@
 [Unit]
 Description=Start ceres_cm service
 DefaultDependencies=no
+After=zfs.target zfs-boot.service stmf-svc.service
 
 [Service]
 ExecStart=/usr/local/bin/ceres_cm -d 2>/dev/null

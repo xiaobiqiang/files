@@ -198,12 +198,31 @@ function cm_disk_update_cache()
     return 0
 }
 
+function cm_check_node_offine()
+{
+    local alarmdb="/var/cm/data/cm_alarm.db"
+    sqlite3 ${alarmdb} "SELECT id,param FROM record_t WHERE alarm_id=10000000 AND recovery_time=0" |sed 's/[|]/ /g' |while read line
+    do
+        local info=($line)
+        local aid=${info[0]}
+        local nodename=${info[1]}
+        local chek=`ceres_cmd node |grep -w "$nodename" |grep -w normal`
+        if [ "X$chek" != "X" ]; then
+            local utctime=`/var/cm/script/cm_cnm.sh utctime`
+            sqlite3 ${alarmdb} "UPDATE record_t SET recovery_time=$utctime WHERE id=$aid"
+        fi
+    done
+    return 0
+}
+
 function cm_period_5min()
 {
     /var/cm/script/cm_topo.sh cache_update &
     /var/cm/script/cm_topo.sh savesnmap 1>/dev/null 2>/dev/null &
     
     /var/cm/script/cm_cnm_node_servce.sh iscsi_check
+    
+    cm_check_node_offine
     return 0
 }
 
@@ -423,22 +442,49 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'collisions|ierrors|norcvbuf|obytes|obytes64|oerrors|rbytes|rbytes64|link_duplex|ifspeed|noxmtbuf' \
-    |awk '{printf $2" "}'
+    local ib_num=`echo $name|grep ib|wc -l`
+    if [ $ib_num -eq 1 ];then
+        local ib_data=(`kstat -m hermon -n port*|egrep 'recv_data|xmit_data'|awk '{printf $2" "}'`)
+        if [ "X${ib_data[0]}" == "X" ];then
+            ib_data[0]=0
+        fi
+        if [ "X${ib_data[1]}" == "X" ];then
+            ib_data[1]=0
+        fi
+        
+        ((ib_data[0]=${ib_data[0]}*4))
+        ((ib_data[1]=${ib_data[1]}*4))
+        
+        echo "0 0 0 0 0 0 ${ib_data[1]} ${ib_data[1]} 0 ${ib_data[0]} ${ib_data[0]}"    
+    else
+        kstat -m link -n $name|egrep 'collisions|ierrors|norcvbuf|obytes|obytes64|oerrors|rbytes|rbytes64|link_duplex|ifspeed|noxmtbuf' \
+        |awk '{printf $2" "}'
+    fi
     return $?
 }
 
 function cm_pmm_dup_ifspeed()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    local ib_name=`echo $name|grep ib|wc -l`
+    if [ $ib_name -eq 1 ];then
+        echo "0 0"
+    else
+        kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    fi
     return $?
 }
 
 function cm_pmm_nic_check()
 {
     local name=$1
-    nicstat | grep -w $name | wc -l
+    local ib_name=`echo $name|grep ib|wc -l`
+    if [ $ib_name -eq 1 ];then
+        echo 1
+    else
+        nicstat | grep -w $name | wc -l
+    fi
+    return $?
 }
 
 function cm_pmm_disk_instance()

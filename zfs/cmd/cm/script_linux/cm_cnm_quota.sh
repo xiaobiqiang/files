@@ -16,8 +16,18 @@ function cm_cnm_quota_getbatch()
 {
     local usertype=$1
     local filesystem=$2
+    local offset=$4
+    local total=$5
+    if [ "X$offset" == "X" ]; then
+        offset=0
+    fi
+    if [ "X$total" == "X" ]; then
+        total=100
+    fi
+    ((total=$offset+$total))
+    ((offset=$offset+1))
     if [ $usertype -eq 0 ]; then
-        array_name=($(cat /etc/passwd|awk -F':' '$3>99&&$3<50000{print $1}'))
+        array_name=($(cat /etc/passwd|awk -F':' '$3>99&&$3<60000{print $1}' |sed -n ${offset},${total}p))
         len=${#array_name[@]}
         for (( i=0; i<$len; i=i+1 ))
         do
@@ -29,7 +39,7 @@ function cm_cnm_quota_getbatch()
     fi
 
     if [ $usertype -eq 1 ]; then
-        array_name=($(cat /etc/group|awk -F':' '$3==1||($3>99&&$3<1000){print $1}'))
+        array_name=($(cat /etc/group|awk -F':' '$3==1||($3>99&&$3<60000){print $1}' |sed -n ${offset},${total}p))
         len=${#array_name[@]}
         for (( i=0; i<$len; i=i+1 ))
         do
@@ -153,14 +163,53 @@ function cm_cnm_quota_count()
     local usertype=$1
     local filesystem=$2
     if [ $usertype -eq 0 ]; then
-        cut=`cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3}'| wc -l`
+        cut=`cat /etc/passwd | awk -F':' '($3>99&&$3<60000) {print $3}'| wc -l`
         echo "$cut"
     fi
 
     if [ $usertype -eq 1 ]; then
-        cut=`cat /etc/group |awk -F':' '$3==1||($3>99&&$3<1000)' |wc -l`
+        cut=`cat /etc/group |awk -F':' '$3==1||($3>99&&$3<60000)' |wc -l`
         echo "$cut"
     fi	
+    return $CM_OK
+}
+
+function cm_cnm_quota_count_x()
+{
+    local usertype=$1
+    local filesystem=$2
+    
+    if [ $usertype -eq 0 ]; then
+        usertype="user"
+    else
+        usertype="group"
+    fi
+    zfs userspace $filesystem |sed 1d |awk '$2=="'$usertype'"{print $3}' |sort -u |wc -l
+    return $CM_OK
+}
+
+function cm_cnm_quota_getbatch_x()
+{
+    local usertype=$1
+    local filesystem=$2
+    local offset=$4
+    local total=$5
+    if [ "X$offset" == "X" ]; then
+        offset=0
+    fi
+    if [ "X$total" == "X" ]; then
+        total=100
+    fi
+    ((total=$offset+$total))
+    ((offset=$offset+1))
+    if [ $usertype -eq 0 ]; then
+        usertype="user"
+    else
+        usertype="group"
+    fi
+    zfs userspace $filesystem |sed 1d |awk '$2=="'$usertype'"{print $3" "$1" "$4}' |sort -k 1  \
+        |awk 'BEGIN{d="0M";a="";u=d;q=d;sq=d}($1!=a&&a!=""){print "nas "a" "q" "sq" "u}$1!=a{a=$1;u=d;q=d;sq=d}$2=="used"{u=$3}$2=="quota"{q=$3}$2=="softquota"{sq=$3}END{print "nas "a" "q" "sq" "u}' \
+        |sed -n ${offset},${total}p
     return $CM_OK
 }
 

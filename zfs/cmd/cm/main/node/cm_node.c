@@ -876,13 +876,6 @@ static sint32 cm_node_delete_from_list(cm_tree_node_t *pRoot, cm_node_info_t *pN
         return CM_FAIL;
     }
     
-    if((pNode->subdomain_id == cm_node_get_subdomain_id())
-        && pNode->id != cm_node_get_id())
-    {
-        /* 断开连接*/
-        CM_LOG_WARNING(CM_MOD_NODE,"disconn nid[%u]",pNode->id);
-        (void)cm_cmt_node_delete(pNode->id);
-    }
     /*删除节点内存*/    
     pTreeNode->pdata = NULL;
     CM_LOG_WARNING(CM_MOD_NODE,"delete nid[%u]",pNode->id);
@@ -906,6 +899,13 @@ static sint32 cm_node_delete_from_list(cm_tree_node_t *pRoot, cm_node_info_t *pN
         CM_FREE(pSubInfo);
     }
     
+    if((pNode->subdomain_id == cm_node_get_subdomain_id())
+        && pNode->id != cm_node_get_id())
+    {
+        /* 断开连接*/
+        CM_LOG_WARNING(CM_MOD_NODE,"disconn nid[%u]",pNode->id);
+        (void)cm_cmt_node_delete(pNode->id);
+    }
     return CM_OK;
 }
 
@@ -1306,7 +1306,7 @@ sint32 cm_node_add(const sint8* ipaddr, uint32 sbbid)
     if(0 == strcmp(ipaddr,g_CmNodeInfoLocal.ip_addr))
     {
         CM_LOG_ERR(CM_MOD_NODE,"ip %s self",ipaddr);
-        return CM_PARAM_ERR;
+        return CM_OK;
     }
     CM_MEM_ZERO(&NodeInfo,sizeof(NodeInfo));
     NodeInfo.id = cm_ipaddr_to_nid(ipaddr);

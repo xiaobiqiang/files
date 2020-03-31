@@ -142,7 +142,7 @@
 #define CM_NAME_LEN_SNAPSHOT 64
 #define CM_NAME_LEN_SNAPSHOT_BACKUP 64 
 #define CM_LEN_CMD_DESC 256
-#define CM_NAME_LEN_DIR 256
+#define CM_NAME_LEN_DIR 512
 #define CM_NAME_LEN_HOSTGROUP 64
 #define CM_NAME_LEN_TARGET 64
 
@@ -150,6 +150,8 @@ typedef enum
 {
     CM_SYS_VER_DEFAULT = 0,
     CM_SYS_VER_SOLARIS_V7R16,
+    CM_SYS_VER_SOLARIS_NOMASTER,
+    CM_SYS_VER_LINUX,
 }cm_system_version_e;
 
 

@@ -175,6 +175,7 @@ const cm_omi_map_object_field_t CmOmiMapFieldsExplorer[]=
 const cm_omi_map_object_field_t* CmOmiMapExplorerCmdParamsGetBatch_ext[]=
 {
     &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_FIND],
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_TYPE],
     &CmOmiMapCommFields[1], /*offset*/
     &CmOmiMapCommFields[2], /*total*/
 };
@@ -190,6 +191,7 @@ const cm_omi_map_object_field_t* CmOmiMapExplorerCmdParamsCount[]=
 {
     &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_FIND],
     &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_FLAG],
+    &CmOmiMapFieldsExplorer[CM_OMI_FIELD_EXPLORER_TYPE],
 };
 
 const cm_omi_map_object_field_t* CmOmiMapExplorerCmdParamsAddOpt[]=
@@ -208,7 +210,7 @@ const cm_omi_map_object_cmd_t CmOmiMapExplorerCmds[] =
         &CmOmiMapCmds[CM_OMI_CMD_GET_BATCH],
         2,
         CmOmiMapExplorerCmdParamsGetBatch,
-        3,
+        4,
         CmOmiMapExplorerCmdParamsGetBatch_ext,
     },
     /* count */
@@ -216,7 +218,7 @@ const cm_omi_map_object_cmd_t CmOmiMapExplorerCmds[] =
         &CmOmiMapCmds[CM_OMI_CMD_COUNT],
         2,
         CmOmiMapExplorerCmdParamsGetBatch,
-        2,
+        3,
         CmOmiMapExplorerCmdParamsCount,
     },
     /* insert */

@@ -700,15 +700,14 @@ function cm_cnm_clumgt_status()
     local stat="online"
     local ip="127.0.0.1"
     local mport=`cm_get_localmanageport`
-    if [ -f /etc/hostname.${mport} ]; then
-        ip=`sed -n 1p /etc/hostname.${mport}`
-    fi
-    local version=`head -n 1 /lib/release | sed 's/^[ t]*//'|cut -d' ' -f5`
+    ip=`ifconfig $mport|grep 'inet '|awk '{print $2}'`
+   
+    local version="zfsonlinux"
     local hostid=`hostid`
     local uptime=`uptime |sed 's/.*up //g'|awk -F',' '{for(i=1;i<NF-3;i++){printf $i}}'`
-    local clusterstat=`clusterinfo|awk '{print $3 }'|sed -n '$p'`
+    #local clusterstat=`clusterinfo|awk '{print $3 }'|sed -n '$p'`
     local systime=`date '+%Y-%m-%d %H:%M'`
-    local mem=`prtconf | grep 'Memory'| cut -d: -f2|sed 's/^ *//'`
+    local mem=`echo $( expr $(head /proc/meminfo | grep MemTotal | grep -o '[0-9]*' ) / 1000 / 1000 ) GB`
     local gui_ver="2.0.0"
     
     echo "------------------------"
@@ -717,7 +716,7 @@ function cm_cnm_clumgt_status()
     echo "ip:$ip"
     echo "version:$version"
     echo "uptime:$uptime"
-    echo "stat:$clusterstat"
+    #echo "stat:$clusterstat"
     echo "hostid:$hostid"
     echo "systime:$systime"
     echo "mem:$mem"
@@ -729,10 +728,10 @@ function cm_cnm_get_lun_stmfid()
     local ver=`cm_systerm_version_get`
     local lun=$1
     if [ $ver -eq $CM_SYS_VER_SOLARIS_V7R16 ]; then
-        /var/cm/script/cm_shell_exec.sh stmfadm_list_all_luns |egrep $"$lun"^ |awk '{print $1}'
+        /var/cm/script/cm_shell_exec.sh stmfadm_list_all_luns |grep -w "$lun" |awk '{print $1}'
         return 0
     fi
-    stmfadm list-all-luns |egrep $"$lun"^ |awk '{print $1}'
+    stmfadm list-all-luns |grep -w "$lun" |awk '{print $1}'
     return 0
 }
 
@@ -744,7 +743,7 @@ function cm_cnm_snapshot_rollback()
     local ftype=`zfs get type $dir |sed 1d |awk '{print $3}'`
     
     if [ "X$ftype" != "Xvolume" ]; then
-        CM_EXEC_CMD "zfs rollback -rf ${dir}@${snap}"
+        CM_EXEC_CMD "zfs rollback -rRf ${dir}@${snap}"
         return $?
     fi
     
@@ -895,6 +894,38 @@ function cm_cnm_filedir_delete()
     rm -rf "${parentdir}"/"${fname}" >>${CM_LOG_DIR}${CM_LOG_FILE} 2>&1
     iRet=$?
     return $iRet
+}
+
+function cm_cnm_filedir_getbatch()
+{
+    local dir=$1
+    local type=$2
+    local offset=$3
+    local total=$4
+    ((total=$offset+$total))
+    ((offset=$offset+1))
+    if [ "X$type" == "X" ] || [ "X$type" == "X-" ]; then
+        ls -1F "$dir" |sed -n ${offset},${total}p |sed 's/[*@/]$//g'
+    elif [ $type -eq 1 ]; then
+        ls -1F "$dir" |grep '/$' |sed -n ${offset},${total}p |sed 's/[/]//g'
+    else
+        ls -1F "$dir" |grep -v '/$' |sed -n ${offset},${total}p  |sed 's/[*@]$//g'
+    fi
+    return 0
+}
+
+function cm_cnm_filedir_count()
+{
+    local dir=$1
+    local type=$2
+    if [ "X$type" == "X" ] || [ "X$type" == "X-" ]; then
+        ls -1F "$dir" |wc -l
+    elif [ $type -eq 1 ]; then
+        ls -1F "$dir" |grep '/$' |wc -l
+    else
+        ls -1F "$dir" |grep -v '/$' |wc -l
+    fi
+    return 0
 }
 
 function cm_cnm_localtask_sql()
@@ -1170,7 +1201,7 @@ function cm_cnm_lun_update_exec()
     #lunname|lunsize|is_single|blocksize|is_compress|is_hot|write_policy|dedup|is_double|thold|qos|qos_val
     local params="$1"
     local paramnull="-"
-    params=`echo "$params" |sed 's/\|/ /g'`
+    params=`echo "$params" |sed 's/|/ /g'`
     params=($params)
     local lunname=${params[0]}
     local lunsize=${params[1]}
@@ -1193,7 +1224,7 @@ function cm_cnm_lun_update_exec()
             CM_LOG "[${FUNCNAME}:${LINENO}]$lunname stmfid null"
             return $CM_FAIL
         fi
-        CM_EXEC_CMD "stmfadm modify-lu -c -s $lunsize $stmfid"
+        CM_EXEC_CMD "stmfadm modify-lu -s $lunsize $stmfid"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             return $iRet
@@ -1429,25 +1460,25 @@ function cm_cnm_nas_set()
         return $failnum
     fi
     
-    if [ "X${qos}" != "X" ] && [ "X${qos}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set bandwidth=${qos} ${nasname}"
-        iRet=$?
-        if [ $iRet -ne $CM_OK ]; then
-            ((failnum=$failnum+1))
-        fi
-    fi
+    #if [ "X${qos}" != "X" ] && [ "X${qos}" != "X${paramnull}" ]; then
+    #    CM_EXEC_CMD "zfs set bandwidth=${qos} ${nasname}"
+    #    iRet=$?
+    #    if [ $iRet -ne $CM_OK ]; then
+    #        ((failnum=$failnum+1))
+    #    fi
+    #fi
     
-    if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
-        return $failnum
-    fi
+    #if [ $sfver -eq ${CM_SYS_VER_SOLARIS_NOMASTER} ]; then
+    #    return $failnum
+    #fi
     
-    if [ "X${qos_avs}" != "X" ] && [ "X${qos_avs}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set nasavsbw=${qos_avs} ${nasname}"
-        iRet=$?
-        if [ $iRet -ne $CM_OK ]; then
-            ((failnum=$failnum+1))
-        fi
-    fi
+    #if [ "X${qos_avs}" != "X" ] && [ "X${qos_avs}" != "X${paramnull}" ]; then
+    #    CM_EXEC_CMD "zfs set nasavsbw=${qos_avs} ${nasname}"
+    #    iRet=$?
+    #    if [ $iRet -ne $CM_OK ]; then
+    #        ((failnum=$failnum+1))
+    #    fi
+    #fi
     return $failnum
 }
 
