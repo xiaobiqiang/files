@@ -476,6 +476,9 @@ function setipaddress
 	if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ]; then
 		echo "/etc/network/interfaces" > /tmp/nicpath
 		ifconfig -a|grep Link|awk '{print $1}' >/tmp/inittmp
+	else if [ "deepin" == ${osversion:0:6} ]
+		echo "/etc/network/interfaces" > /tmp/nicpath
+		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
 	else
 		echo "/etc/sysconfig/network-scripts/ifcfg-" > /tmp/nicpath	
 		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
@@ -529,7 +532,7 @@ function setipaddress
 		MASK=`cat /tmp/inittmp1`
 		nicpath=`cat /tmp/nicpath`
 
-		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ];then
+		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ] || [ "deepin" == ${osversion:0:6} ];then
 			echo "CREATING $dst config file."
 			cat >> $nicpath << _HSTNAME_
 auto $dst
