@@ -1003,6 +1003,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.dev.merr")) {
 			fault_device = B_TRUE;
+		} else if (fmd_nvl_class_match(hdl, fault,
+		    "fault.fs.zfs.dev.smart_fail")) {
+			fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault, "fault.io.*")) {
 			is_disk = B_TRUE;
 			degrade_device = B_TRUE;

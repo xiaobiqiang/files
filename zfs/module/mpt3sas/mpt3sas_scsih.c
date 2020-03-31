@@ -4403,6 +4403,7 @@ _scsih_smart_predicted_fault(struct MPT3SAS_ADAPTER *ioc, u16 handle)
 	event_data->SASAddress = cpu_to_le64(sas_target_priv_data->sas_address);
 	mpt3sas_ctl_add_to_event_log(ioc, event_reply);
 	kfree(event_reply);
+    atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_SMART_FAIL, &sas_target_priv_data->sas_address);
 out:
 	if (sas_device)
 		sas_device_put(sas_device);
