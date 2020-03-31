@@ -78,7 +78,7 @@ int disk_db_close(disk_db_handle_t handle)
         return CM_FAIL;
     }
     ret =  sqlite3_close((sqlite3*)handle);
-	system("/usr/bin/mv /var/cm/data/db_disk_tmp.db /var/cm/data/db_disk.db");
+	system("mv /var/cm/data/db_disk_tmp.db /var/cm/data/db_disk.db");
 	return ret;
 }
 
