@@ -2043,8 +2043,8 @@ static int __sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_
     struct MPT3SAS_TARGET *sas_target_priv_data;
 
     switch(action) {
-    case noresp_on: /* noresponse on */
-    case noresp_off: /* noresponse off */
+    case mpt3simu_on: /* noresponse on */
+    case mpt3simu_off: /* noresponse off */
         if (sas_device->starget && sas_device->starget->hostdata) {
     		sas_target_priv_data = sas_device->starget->hostdata;
     		sas_target_priv_data->noresp_simu = !action;
@@ -2059,11 +2059,33 @@ static int __sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_
     return 0;
 }
 
+static int __sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_device *sas_device, u32 action)
+{
+    struct MPT3SAS_TARGET *sas_target_priv_data;
+
+    switch(action) {
+    case mpt3simu_on: /* noresponse on */
+    case mpt3simu_off: /* noresponse off */
+        if (sas_device->starget && sas_device->starget->hostdata) {
+    		sas_target_priv_data = sas_device->starget->hostdata;
+    		sas_target_priv_data->merr_simu = !action;
+            printk(KERN_ERR "sas device:%llx merr_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->merr_simu);
+	    }
+        break;
+    default :
+        printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_target_priv_data->sas_address);
+        break;
+    }
+
+    return 0;
+}
+
+
 static int __sas_device_noresp_repair(struct MPT3SAS_ADAPTER *ioc, u64 *sas_addr, u32 action)
 {
     int retval = 0;
 
-    if(action != noresp_repair) {
+    if(action != mpt3simu_repair) {
         printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_addr);
         return -1;
     }
@@ -2093,7 +2115,7 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
     struct _sas_device *sas_device;
     unsigned long flags;
 
-    if(action == noresp_repair) {
+    if(action == mpt3simu_repair) {
         return __sas_device_noresp_repair(ioc, wwn, action);
     }
 
@@ -2109,8 +2131,27 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
     return 0;
 }
 
+static int sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 action, void *priv_data)
+{
+    struct _sas_device *sas_device;
+    unsigned long flags;
+
+    /* merr simulate code. */
+    spin_lock_irqsave(&ioc->sas_device_lock, flags);
+	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+        if(wwn_match(wwn, sas_device->sas_address)) {
+            __sas_device_merr_handler(ioc, sas_device, action);
+        }
+    }
+    spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+
+    return 0;
+}
+
+
 mpt3_simu_handler mpt3_simu_handler_arr[] = {
     &sas_device_noresp_handler,  /*subcmd = 0, noresponse handler*/
+    &sas_device_merr_handler,    /*subcmd = 1, merr handler*/
 };
 
 static long _ctl_mpt3_simu(struct MPT3SAS_ADAPTER *ioc, void __user *arg)

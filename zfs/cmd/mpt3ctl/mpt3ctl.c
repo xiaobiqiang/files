@@ -59,7 +59,8 @@ struct mpt3_fault_simu_info {
 };
 
 typedef enum {
-	MPT3_NORESP,
+    MPT3_NORESP,
+    MPT3_MERR,     
 } mpt3_simu_subcmd_e;
 
 typedef struct mpt3_simu_cmd {
@@ -69,15 +70,18 @@ typedef struct mpt3_simu_cmd {
 } mpt3_simu_cmd_t;
 
 typedef enum {
-	noresp_on = 0,
-    noresp_off,
-    noresp_repair
-} noresp_action_e;
+    mpt3simu_on = 0,
+    mpt3simu_off,
+    mpt3simu_repair
+} mpt3simu_action_e;
 
 static int mpt3ctl_noresponse(int argc, char **argv);
+static int mpt3ctl_merr(int argc, char **argv);
+
 
 static mpt3_simu_cmd_t subcmd_table[] = {
 	{ "noresponse",	mpt3ctl_noresponse,	MPT3_NORESP		},
+	{ "merr",	mpt3ctl_merr,	MPT3_MERR		},
     {NULL},
 };
 
@@ -101,12 +105,15 @@ static int get_subcmd_idx(char *subcmd, int *idx)
 }
 
 static const char *usage_info(mpt3_simu_subcmd_e subcode) {
-	switch (subcode) {
-	case MPT3_NORESP:
-		return (gettext("\tnoresponse <on|off|repair> <disk-path>\n"));
-	}
+    switch (subcode) {
+    case MPT3_NORESP:
+    	return (gettext("\tnoresponse <on|off|repair> <disk-path>\n"));
 
-	abort();
+    case MPT3_MERR:
+    	return (gettext("\tmerr <on|off> <disk-path>\n"));
+    }
+
+    abort();
 }
 
 static void usage(mpt3_simu_cmd_t *subcmd)
@@ -150,6 +157,7 @@ int main(int argc, char **argv)
     if (argc < 2) {
         (void) fprintf(stderr, gettext("missing command\n"));
         usage(NULL);
+        return ret;
     }
 
     subcmd = argv[1];
@@ -276,7 +284,7 @@ static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
     return 0;
 }
 
-static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, noresp_action_e action, unsigned long long wwn, void *data) 
+static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, mpt3simu_action_e action, unsigned long long wwn, void *data) 
 {
     int ret;
     mpt_ioc_t *ids = NULL;
@@ -337,9 +345,52 @@ static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, noresp_action_e action, un
     return ret;
 }
 
+static int mpt3ctl_merr(int argc, char **argv)
+{
+    mpt3simu_action_e action;
+    
+    char *wwn_key = "scsi-3";
+    char *wwn_pos = NULL;
+    char *dev_path;
+    unsigned long long wwn;
+
+    if (argc < 3) {
+        usage(&subcmd_table[current_subcmd_idx]);
+    }
+
+    if(strcmp(argv[1], "on") == 0) {
+        action = mpt3simu_on;
+    } else if(strcmp(argv[1], "off") == 0) {
+        action = mpt3simu_off;
+    } else {
+        goto help_and_exit;
+    }
+
+    dev_path = argv[2];
+
+    wwn_pos = strstr(dev_path, wwn_key);
+    if(wwn_pos == NULL) {
+        (void) fprintf(stderr, gettext("dev path invalid:%s\n"), dev_path);
+        goto help_and_exit;
+    }
+
+    wwn_pos += strlen(wwn_key);
+    if(sscanf(wwn_pos, "%llx", &wwn) == 0) {        
+        (void) fprintf(stderr, gettext("disk wwn invalid:%s\n"), wwn_pos);
+        goto help_and_exit;
+    }
+
+    return do_mpt3ctl_simu(subcmd_table[current_subcmd_idx].sub_code, action, wwn, NULL);
+
+help_and_exit:
+    usage(&subcmd_table[current_subcmd_idx]);
+    return -1;
+}
+
+
 static int mpt3ctl_noresponse(int argc, char **argv)
 {
-    noresp_action_e action;
+    mpt3simu_action_e action;
     
     char *wwn_key = "scsi-3";
     char *wwn_pos = NULL;
@@ -351,11 +402,11 @@ static int mpt3ctl_noresponse(int argc, char **argv)
 	}
 
     if(strcmp(argv[1], "on") == 0) {
-        action = noresp_on;
+        action = mpt3simu_on;
     } else if(strcmp(argv[1], "off") == 0) {
-        action = noresp_off;
+        action = mpt3simu_off;
     } else if(strcmp(argv[1], "repair") == 0) {
-        action = noresp_repair;
+        action = mpt3simu_repair;
     } else {
         goto help_and_exit;
     }

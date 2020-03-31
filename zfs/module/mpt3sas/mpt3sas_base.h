@@ -376,6 +376,7 @@ struct MPT3SAS_TARGET {
 	struct _sas_device *sdev;
     atomic64_t   noresp_cnt;
     u8          noresp_simu;
+    u8          merr_simu;
 };
 
 
