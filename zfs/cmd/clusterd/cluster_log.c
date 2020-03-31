@@ -33,11 +33,14 @@ static pid_t log_pid;
 #define	CLUSTER_LOG_SYSLOG	0x4
 
 #define	CLUSTER_DEFAULT_LOG	"cluster.log"
+#define	CLUSTER_DBGMSG_LOG	"dbgmsgs.log"
+#define	DBGMSG_PATH	"/proc/spl/kstat/zfs/dbgmsg"
 
 static int cluster_log_level_min = LOG_INFO;
 static uint_t cluster_log_flags = CLUSTER_LOG_FILE|CLUSTER_LOG_SYSLOG;
 
 static char cluster_log_prefix[] = "/var/cluster/log/";
+static char trace_script[MAXPATHLEN] = "trace_dbgmsgs.py";
 
 static void
 vlog_prefix(int severity, const char *prefix, const char *format, va_list args)
@@ -166,5 +169,41 @@ cluster_log_init(const char *execname, const char *logpath,
 
 	log_name = strdup(execname);
 	log_pid = getpid();
+}
+
+static void
+trace_dbgmsgs(void)
+{
+	char buf[512];
+	sprintf(buf, "%s -p %s/%s",
+		trace_script, cluster_log_prefix, CLUSTER_DBGMSG_LOG);
+	system(buf);
+}
+
+static void *
+trace_dbgmsgs_thread(void *arg)
+{
+	pthread_detach(pthread_self());
+	while (1) {
+		trace_dbgmsgs();
+	}
+	return (NULL);
+}
+
+void
+trace_dbgmsgs_init(const char *script_path)
+{
+	pthread_t tid;
+	int error;
+
+	if (script_path)
+		strcpy(trace_script, script_path);
+
+	error = pthread_create(&tid, NULL, trace_dbgmsgs_thread, NULL);
+	if (error) {
+		cluster_log_error(LOG_WARNING,
+			"couldn't create thread: %s\n",
+			strerror(error));
+	}
 }
 

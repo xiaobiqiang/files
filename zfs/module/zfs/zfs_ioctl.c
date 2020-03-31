@@ -1528,6 +1528,7 @@ zfs_ioc_pool_destroy(zfs_cmd_t *zc)
 	int error;
 	zfs_log_history(zc);
 	error = spa_destroy(zc->zc_name);
+	zfs_dbgmsg("spa_destroy return %d", error);
 
 	return (error);
 }
@@ -1555,6 +1556,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 		error = SET_ERROR(EINVAL);
 	else
 		error = spa_import(zc->zc_name, config, props, zc->zc_cookie);
+	zfs_dbgmsg("spa_import return %d", error);
 
 	if (zc->zc_nvlist_dst != 0) {
 		int err;
@@ -1580,6 +1582,7 @@ zfs_ioc_pool_export(zfs_cmd_t *zc)
 
 	zfs_log_history(zc);
 	error = spa_export(zc->zc_name, NULL, force, hardforce);
+	zfs_dbgmsg("spa export %s return %d", zc->zc_name, error);
 
 	return (error);
 }
@@ -7315,7 +7318,7 @@ _fini(void)
 	lun_migrate_fini();
 	zvol_fini();
 	cluster_proto_unregister();
-    
+
     zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier);
 
