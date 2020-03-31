@@ -324,8 +324,7 @@ exit 0
 %{_libdir}/*.so
 %{_libdir}/*.so.*
 /usr/local/lib/fmd/*
-/usr/local/lib/fmd/schemes/*
-/usr/local/lib/topo/plugins/*
+/usr/local/lib/topo/*
 /usr/local/sbin/*.sh
 /usr/local/sbin/initdisk
 %{_includedir}/*
