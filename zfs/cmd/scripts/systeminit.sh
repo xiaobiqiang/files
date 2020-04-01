@@ -478,7 +478,7 @@ function setipaddress
 		ifconfig -a|grep Link|awk '{print $1}' >/tmp/inittmp
 	else if [ "deepin" == ${osversion:0:6} ]
 		echo "/etc/network/interfaces" > /tmp/nicpath
-		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
+		ip a | grep mtu | cut -d ' ' -f 2 | sed s/:// >/tmp/inittmp
 	else
 		echo "/etc/sysconfig/network-scripts/ifcfg-" > /tmp/nicpath	
 		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
