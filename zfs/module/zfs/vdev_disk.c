@@ -180,14 +180,14 @@ static vdev_t* find_vdev_by_sas_addr(u64 sas_addr)
     /*char sas_wwn_str[WWN_STRLEN] = {0};
 
     sprintf(sas_wwn_str, "%016llx", sas_addr);
-    printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);*/
-    printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);
+    printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);
+    printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);*/
 
     spin_lock(&vdev_ev_mgt_lock);
     list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
         /*printk(KERN_ERR "iterate sas wwn:%s\n", vdev_ev->wwn_str);
-        if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {*/
-        printk(KERN_ERR "iterate sas wwn:%llx\n", vdev_ev->wwn);
+        if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {
+        printk(KERN_ERR "iterate sas wwn:%llx\n", vdev_ev->wwn);*/
         if(wwn_match(vdev_ev->wwn, sas_addr)) {
             ret = vdev_ev->vd;
             break;
