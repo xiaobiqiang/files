@@ -439,6 +439,7 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 	dmu_object_info_t *doi;
 	uint64_t readonly;
 	boolean_t owned = B_FALSE;
+	uint64_t start, end;
 
 	error = dsl_prop_get_integer(name,
 	    zfs_prop_to_name(ZFS_PROP_READONLY), &readonly, NULL);
@@ -447,6 +448,8 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 	if (readonly)
 		return (SET_ERROR(EROFS));
 
+	start = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s start", __func__, name);
 	mutex_enter(&zvol_state_lock);
 	zv = zvol_find_by_name(name);
 
@@ -454,6 +457,9 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 		if ((error = dmu_objset_own(name, DMU_OST_ZVOL, B_FALSE,
 		    FTAG, &os)) != 0) {
 			mutex_exit(&zvol_state_lock);
+			end = gethrtime();
+			cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms",
+				__func__, name, error, (end - start) / 1000000);
 			return (SET_ERROR(error));
 		}
 		owned = B_TRUE;
@@ -481,6 +487,9 @@ out:
 			zv->zv_objset = NULL;
 	}
 	mutex_exit(&zvol_state_lock);
+	end = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms",
+		__func__, name, error, (end - start) / 1000000);
 	return (error);
 }
 
@@ -1839,6 +1848,10 @@ zvol_create_minor_impl(const char *name)
 	kthread_t *replay_th;
 	zvol_replay_arg_t *replay_arg;
 	boolean_t bmdata = zfs_mirror_mdata_enable();
+	uint64_t start, end;
+
+	start = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s start", __func__, name);
 
 	mutex_enter(&zvol_state_lock);
 
@@ -1963,6 +1976,9 @@ out:
 		mutex_exit(&zvol_state_lock);
 	}
 
+	end = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms", 
+		__func__, name, error, (end - start) / 1000000);
 	return (SET_ERROR(error));
 }
 
