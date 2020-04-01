@@ -347,6 +347,9 @@ int spa_asize_inflation = 24;
  */
 int spa_slop_shift = 5;
 
+uint64_t spa_vdev_config_tryenter(spa_t *spa);
+
+
 /*
  * ==========================================================================
  * SPA config locking
@@ -445,6 +448,52 @@ spa_config_enter(spa_t *spa, int locks, void *tag, krw_t rw)
 		mutex_exit(&scl->scl_lock);
 	}
 	ASSERT(wlocks_held <= locks);
+}
+
+static int
+spa_config_tryenter2(spa_t *spa, int locks, void *tag, krw_t rw)
+{
+	int i;
+
+	for (i = 0; i < SCL_LOCKS; i++) {
+		spa_config_lock_t *scl = &spa->spa_config_lock[i];
+		if (!(locks & (1 << i)))
+			continue;
+		mutex_enter(&scl->scl_lock);
+		if (rw == RW_READER) {
+			if (scl->scl_writer || scl->scl_write_wanted) {
+				mutex_exit(&scl->scl_lock);
+				break;
+			}
+		} else {
+			ASSERT(scl->scl_writer != curthread);
+			if (!refcount_is_zero(&scl->scl_count)) {
+				scl->scl_write_wanted++;
+				(void) cv_timedwait(&scl->scl_cv, &scl->scl_lock,
+					(ddi_get_lbolt() + (zfs_txg_timeout * hz)));
+				scl->scl_write_wanted--;
+				if (!refcount_is_zero(&scl->scl_count)) {
+					mutex_exit(&scl->scl_lock);
+					break;
+				}
+			}
+			scl->scl_writer = curthread;
+		}
+		(void) refcount_add(&scl->scl_count, tag);
+		mutex_exit(&scl->scl_lock);
+	}
+	if (i < SCL_LOCKS) {
+		int unlocks = locks;
+		for (; i < SCL_LOCKS; i++) {
+			if (!(locks & (1 << i)))
+				continue;
+			unlocks ^= (1 << i);
+		}
+		if (unlocks > 0)
+			spa_config_exit(spa, unlocks, tag);
+		return (0);
+	}
+	return (1);
 }
 
 void
@@ -1251,6 +1300,27 @@ spa_vdev_enter(spa_t *spa)
 	return (spa_vdev_config_enter(spa));
 }
 
+uint64_t
+spa_vdev_tryenter(spa_t *spa)
+{
+	uint64_t ret;
+
+	mutex_enter(&spa->spa_vdev_top_lock);
+	mutex_enter(&spa_namespace_lock);
+	if (spa_suspended(spa)) {
+		mutex_exit(&spa_namespace_lock);
+		mutex_exit(&spa->spa_vdev_top_lock);
+		return (-1);
+	}
+	ret = spa_vdev_config_tryenter(spa);
+	if (ret == 0) {
+		mutex_exit(&spa_namespace_lock);
+		mutex_exit(&spa->spa_vdev_top_lock);
+		return (0);
+	}
+	return (ret);
+}
+
 /*
  * Internal implementation for spa_vdev_enter().  Used when a vdev
  * operation requires multiple syncs (i.e. removing a device) while
@@ -1262,6 +1332,17 @@ spa_vdev_config_enter(spa_t *spa)
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
 	spa_config_enter(spa, SCL_ALL, spa, RW_WRITER);
+
+	return (spa_last_synced_txg(spa) + 1);
+}
+
+uint64_t
+spa_vdev_config_tryenter(spa_t *spa)
+{
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	if (spa_config_tryenter2(spa, SCL_ALL, spa, RW_WRITER) == 0)
+		return (0);
 
 	return (spa_last_synced_txg(spa) + 1);
 }
@@ -1311,8 +1392,11 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	 * that there won't be more than one config change per txg.
 	 * This allows us to use the txg as the generation number.
 	 */
-	if (error == 0)
+	if (error == 0) {
+		mutex_exit(&spa_namespace_lock);
 		txg_wait_synced(spa->spa_dsl_pool, txg);
+		mutex_enter(&spa_namespace_lock);
+	}
 
 	if (vd != NULL) {
 		ASSERT(!vd->vdev_detached || vd->vdev_dtl_sm == NULL);
