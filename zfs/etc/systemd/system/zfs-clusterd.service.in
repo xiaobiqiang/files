@@ -1,7 +1,7 @@
 [Unit]
 Description=Start clusterd service
 DefaultDependencies=no
-Requires=NetworkManager.service zfs-boot.service stmf-svc.service
+Requires=zfs-boot.service stmf-svc.service
 After=zfs.target zfs-boot.service stmf-svc.service
 
 [Service]
