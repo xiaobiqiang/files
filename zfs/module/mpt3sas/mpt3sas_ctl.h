@@ -460,14 +460,15 @@ struct mpt3_fault_simu_info {
 };
 
 typedef enum {
-	MPT3_NORESP,
+    MPT3_NORESP,
+    MPT3_MERR,
 } mpt3_simu_subcmd_e;
 
 typedef enum {
-	noresp_on = 0,
-    noresp_off,
-    noresp_repair
-} noresp_action_e;
+    mpt3simu_on = 0,
+    mpt3simu_off,
+    mpt3simu_repair
+} mpt3simu_action_e;
 
 
 #endif /* MPT3SAS_CTL_H_INCLUDED */
