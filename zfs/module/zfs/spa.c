@@ -5375,7 +5375,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	uint64_t is_metaspare = 0;
 	uint64_t is_lowspare = 0;
 	uint64_t is_mirrorspare = 0;
-	uint64_t ret;
+	int64_t ret;
 	
 	ASSERTV(vdev_t *rvd = spa->spa_root_vdev);
 

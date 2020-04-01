@@ -1300,7 +1300,7 @@ spa_vdev_enter(spa_t *spa)
 	return (spa_vdev_config_enter(spa));
 }
 
-uint64_t
+int64_t
 spa_vdev_tryenter(spa_t *spa)
 {
 	uint64_t ret;
@@ -1318,7 +1318,7 @@ spa_vdev_tryenter(spa_t *spa)
 		mutex_exit(&spa->spa_vdev_top_lock);
 		return (0);
 	}
-	return (ret);
+	return ((int64_t) ret);
 }
 
 /*
