@@ -476,7 +476,7 @@ function setipaddress
 	if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ]; then
 		echo "/etc/network/interfaces" > /tmp/nicpath
 		ifconfig -a|grep Link|awk '{print $1}' >/tmp/inittmp
-	else if [ "deepin" == ${osversion:0:6} ]
+	elif [ "deepin" == ${osversion:0:6} ]; then
 		echo "/etc/network/interfaces" > /tmp/nicpath
 		ip a | grep mtu | cut -d ' ' -f 2 | sed s/:// >/tmp/inittmp
 	else
