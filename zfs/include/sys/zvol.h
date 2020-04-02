@@ -71,6 +71,9 @@ extern int zvol_dkio_free(const char *name, void *arg);
 extern int zvol_obj_rewrite(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t len, struct dbuf_segs_data *seg_node);
 extern int zvol_write_lun_copy(lun_copy_t *lct, char *buf, offset_t off, size_t size);
+extern void 
+zvol_log_write(void *zv_minor, dmu_tx_t *tx, uint64_t offset,
+		uint64_t size, int sync);
 
 extern int zvol_init(void);
 extern void zvol_fini(void);

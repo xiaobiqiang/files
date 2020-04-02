@@ -747,7 +747,7 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 	}
 	if (check_map & ZFSTHINLUN_CHECK_FLAG)
 		zfs_thinlun_check(hdl, lmp);
-	node_state_check(hdl, lmp);
+	//node_state_check(hdl, lmp);
 	fmd_hdl_topo_rele(hdl, thp);
 
 	lmp->lm_timer = fmd_timer_install(hdl, NULL, NULL, lmp->lm_interval);

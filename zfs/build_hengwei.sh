@@ -1,4 +1,6 @@
 #!/bin/bash
+OS_TYPE=`uname -r`
+DEEPIN_CHECK=`echo $OS_TYPE|grep 'deepin'|wc -l`
 topdir=`pwd`
 cd cmd/cm/
 chmod 755 ./cpcmfile.sh
@@ -19,13 +21,17 @@ if [ ! -d $SNMP_HEADERS ];then
     rm -rf ./net-snmp/
 fi
 
-
-location_check=`ls -l /usr/lib|grep libnetsnmp|wc -l`
-if [ $location_check -eq 0 ];then
-    location="/usr/lib64"
+if [ $DEEPIN_CHECK -ne 0 ];then
+    location="/usr/lib/sw_64-linux-gnu"
 else
-    location="/usr/lib"
+    location_check=`ls -l /usr/lib|grep libnetsnmp|wc -l`
+    if [ $location_check -eq 0 ];then
+        location="/usr/lib64"
+    else
+        location="/usr/lib"
+    fi
 fi
+
 
 if [ ! -f "$location/libnetsnmp.so" ];then
     libnetsnmp_ver=`ls -l $location|grep -w "libnetsnmp.so"|grep -v ">"|awk '{print $9}'`
