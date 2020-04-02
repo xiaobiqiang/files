@@ -105,6 +105,7 @@ This package contains the CM command line utilities.
 
 %post -n libcm
 /usr/cm/script/cm_rpm.sh
+/usr/local/sbin/rpm_install.sh
 
 %description
 This package contains the ZFS command line utilities.
@@ -177,8 +178,6 @@ Obsoletes:      zfs-devel
 This package contains the header files needed for building additional
 applications against the ZFS libraries.
 
-%post -n libzfs2-devel
-/usr/local/sbin/rpm_install.sh
 
 %package test
 Summary:        Test infrastructure
