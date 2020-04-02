@@ -521,6 +521,9 @@ extern sint32 cm_cnm_lowdata_volume_get(
 extern sint32 cm_cnm_lowdata_volume_sync_request(
     uint64 data_id, void *pdata, uint32 len);
 
+extern sint32 cm_cnm_lowdata_volume_sync_get(uint64 data_id, void **pdata, uint32 
+*plen);
+
 extern void cm_cnm_lowdata_volume_thread(void);
 
 extern void cm_cnm_lowdata_volume_stop_thread(void);

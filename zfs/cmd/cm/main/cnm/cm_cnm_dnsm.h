@@ -97,6 +97,9 @@ extern sint32 cm_cnm_dns_delete(
 extern sint32 cm_cnm_dns_insert(
     void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
 extern sint32 cm_cnm_dns_sync_request(uint64 enid, void *pdata, uint32 len);
+extern sint32 cm_cnm_dns_sync_get(uint64 enid, void **pdata, uint32 *plen);
+extern sint32 cm_cnm_dns_sync_delete(uint64 enid);
+
 typedef struct
 {
     sint8 domain[CM_NAME_LEN];

@@ -77,6 +77,9 @@ static void _scsih_remove_device(struct MPT3SAS_ADAPTER *ioc,
 static int _scsih_add_device(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 	u8 retry_count, u8 is_pd);
 
+static int mpt3sas_check_sdev_in_removed_list(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
+void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
+
 static u8 _scsih_check_for_pending_tm(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 
 ATOMIC_NOTIFIER_HEAD(mpt3sas_notifier_list);
@@ -177,11 +180,15 @@ struct sense_info {
 	u8 ascq;
 };
 
+#define MPT3SAS_REMOVE_TARGET                    (0xEE00)
+
 #define MPT3SAS_PROCESS_TRIGGER_DIAG (0xFFFB)
 #define MPT3SAS_TURN_ON_PFA_LED (0xFFFC)
 #define MPT3SAS_PORT_ENABLE_COMPLETE (0xFFFD)
 #define MPT3SAS_ABRT_TASK_SET (0xFFFE)
 #define MPT3SAS_REMOVE_UNRESPONDING_DEVICES (0xFFFF)
+
+
 /**
  * struct fw_event_work - firmware event struct
  * @list: link list framework
@@ -4397,6 +4404,8 @@ _scsih_smart_predicted_fault(struct MPT3SAS_ADAPTER *ioc, u16 handle)
 	event_data->SASAddress = cpu_to_le64(sas_target_priv_data->sas_address);
 	mpt3sas_ctl_add_to_event_log(ioc, event_reply);
 	kfree(event_reply);
+    atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_SMART_FAIL, &sas_target_priv_data->sas_address);
+    mpt3sas_trigger_remove_target_event(ioc, sas_target_priv_data->sas_address);
 out:
 	if (sas_device)
 		sas_device_put(sas_device);
@@ -4406,6 +4415,40 @@ out_unlock:
 	spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
 	goto out;
 }
+
+int mpt3sas_check_noresp_simu(struct MPT3SAS_ADAPTER *ioc, u16 smid)
+{
+    struct scsi_cmnd *scmd;
+    struct MPT3SAS_DEVICE *sas_device_priv_data;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioc->scsi_lookup_lock, flags);
+    scmd = _scsih_scsi_lookup_get(ioc, smid);
+    if (scmd == NULL)
+        goto out;
+
+    sas_device_priv_data = scmd->device->hostdata;
+    if (!sas_device_priv_data || !sas_device_priv_data->sas_target || sas_device_priv_data->sas_target->deleted)
+        goto out;
+
+    /*printk(KERN_ERR "sas devide:%llx noresp_simu :%d\n", 
+                        sas_device_priv_data->sas_target->sas_address, 
+                        sas_device_priv_data->sas_target->noresp_simu);*/
+
+    if(sas_device_priv_data->sas_target->noresp_simu == 1) {
+        //printk(KERN_ERR "io dropped for noresp_simu be set to 1\n");       
+        spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
+        scsi_dma_unmap(scmd);
+        return 1;
+    }
+
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
+
+out:
+    spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
+    return 0;
+}
+
 
 /**
  * _scsih_io_done - scsi request callback
@@ -4439,6 +4482,21 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 	if (scmd == NULL)
 		return 1;
 
+    sas_device_priv_data = scmd->device->hostdata;
+    if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
+         sas_device_priv_data->sas_target->deleted) {
+        scmd->result = DID_NO_CONNECT << 16;
+        goto out;
+    }
+
+    if(sas_device_priv_data->sas_target->noresp_simu == 1) {
+        printk(KERN_ERR "sas target:%llx io dropped as noresp_simu been 1\n", sas_device_priv_data->sas_target->sas_address);
+        scsi_dma_unmap(scmd);
+        return 1;
+    }
+
+    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
+
 	mpi_request = mpt3sas_base_get_msg_frame(ioc, smid);
 
 	if (mpi_reply == NULL) {
@@ -4446,13 +4504,6 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		goto out;
 	}
 
-	sas_device_priv_data = scmd->device->hostdata;
-	if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-	     sas_device_priv_data->sas_target->deleted) {
-		scmd->result = DID_NO_CONNECT << 16;
-		goto out;
-	}
-    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
 	ioc_status = le16_to_cpu(mpi_reply->IOCStatus);
 
 	/*
@@ -4505,6 +4556,11 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		ioc_status = MPI2_IOCSTATUS_SUCCESS;
 	}
 
+    if(sas_device_priv_data->sas_target->merr_simu == 1) {
+       printk(KERN_ERR "simulate merr\n");
+       scsi_state |= MPI2_SCSI_STATE_AUTOSENSE_VALID;
+    }
+
 	if (scsi_state & MPI2_SCSI_STATE_AUTOSENSE_VALID) {
 		struct sense_info data;
 		const void *sense_data = mpt3sas_base_get_sense_buffer(ioc,
@@ -4519,6 +4575,10 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 			    le16_to_cpu(mpi_reply->DevHandle));
 		mpt3sas_trigger_scsi(ioc, data.skey, data.asc, data.ascq);
 
+        if(sas_device_priv_data->sas_target->merr_simu == 1) {
+            scmd->sense_buffer[2] = MEDIUM_ERROR;
+        }
+
 		if (!(ioc->logging_level & MPT_DEBUG_REPLY) &&
 		     ((scmd->sense_buffer[2] == UNIT_ATTENTION) ||
 		     (scmd->sense_buffer[2] == MEDIUM_ERROR) ||
@@ -4531,6 +4591,7 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 
             atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, &sas_device_priv_data->sas_target->sas_address);
             _scsih_scsi_ioc_info(ioc, scmd, mpi_reply, smid);
+            mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
         }
 	}
 	switch (ioc_status) {
@@ -7474,6 +7535,10 @@ _scsih_scan_for_devices_after_reset(struct MPT3SAS_ADAPTER *ioc)
 		if (!(_scsih_is_end_device(
 		    le32_to_cpu(sas_device_pg0.DeviceInfo))))
 			continue;
+        
+        if(mpt3sas_check_sdev_in_removed_list(ioc, le64_to_cpu(sas_device_pg0.SASAddress)))
+            continue;
+        
 		sas_device = mpt3sas_get_sdev_by_addr(ioc,
 		    le64_to_cpu(sas_device_pg0.SASAddress));
 		if (sas_device) {
@@ -7560,6 +7625,85 @@ mpt3sas_scsih_reset_handler(struct MPT3SAS_ADAPTER *ioc, int reset_phase)
 	}
 }
 
+static int sas_addr_match(u64 mgt_wwn, u64 tgt_wwn)
+{
+    return (mgt_wwn > tgt_wwn) ? (mgt_wwn - tgt_wwn) < 4 : (tgt_wwn - mgt_wwn) < 4 ;
+}
+
+static int mpt3sas_check_sdev_in_removed_list(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
+{
+    struct _sas_device *sas_device;
+    unsigned long flags;
+    int found = 0;
+
+    //printk(KERN_WARNING "mpt3sas_check_sdev_in_removed_list for target(%llx)\n", sas_address);
+    spin_lock_irqsave(&ioc->removed_device_lock, flags);
+    list_for_each_entry(sas_device, &ioc->removed_sas_device_list, list) {
+        if(sas_addr_match(sas_address, sas_device->sas_address)) {
+            found = 1;
+            break;
+        }
+    }
+    spin_unlock_irqrestore(&ioc->removed_device_lock, flags);
+
+    return found;
+}
+
+int mpt3sas_clear_sdev_in_removed_list(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
+{
+    struct _sas_device *sas_device;
+    unsigned long flags;
+    int found = 0;
+
+    //printk(KERN_WARNING "mpt3sas_check_sdev_in_removed_list for target(%llx)\n", sas_address);
+    spin_lock_irqsave(&ioc->removed_device_lock, flags);
+    list_for_each_entry(sas_device, &ioc->removed_sas_device_list, list) {
+        if(sas_addr_match(sas_address, sas_device->sas_address)) {
+            list_del_init(&sas_device->list);
+            found = 1;
+            break;
+        }
+    }
+    spin_unlock_irqrestore(&ioc->removed_device_lock, flags);
+
+    if(found) {
+        sas_device_put(sas_device);
+    }
+
+    return found;
+}
+
+
+
+void mpt3sas_process_remove_target(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
+{
+    struct _sas_device *sas_device;
+    unsigned long flags;
+    int found = 0;
+
+    printk(KERN_WARNING "receive remove event for target(%llx)\n", sas_address);
+    
+    spin_lock_irqsave(&ioc->sas_device_lock, flags);
+	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+        if(sas_addr_match(sas_address, sas_device->sas_address)) {
+            list_del_init(&sas_device->list);
+            found = 1;
+            break;
+        }
+    }
+    spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+
+    if(found == 1 ) {
+        spin_lock_irqsave(&ioc->removed_device_lock, flags);
+        list_add_tail(&sas_device->list, &ioc->removed_sas_device_list);
+        spin_unlock_irqrestore(&ioc->removed_device_lock, flags);
+        _scsih_remove_device(ioc, sas_device);
+        
+        //sas_device_put(sas_device);
+    }
+}
+
+
 /**
  * _mpt3sas_fw_work - delayed task for processing firmware events
  * @ioc: per adapter object
@@ -7580,6 +7724,10 @@ _mpt3sas_fw_work(struct MPT3SAS_ADAPTER *ioc, struct fw_event_work *fw_event)
 	}
 
 	switch (fw_event->event) {
+    case MPT3SAS_REMOVE_TARGET:
+        mpt3sas_process_remove_target(ioc, *(u64 *)fw_event->event_data);
+        break;
+    
 	case MPT3SAS_PROCESS_TRIGGER_DIAG:
 		mpt3sas_process_trigger_data(ioc,
 			(struct SL_WH_TRIGGERS_EVENT_DATA_T *)
@@ -8550,9 +8698,11 @@ _scsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&ioc->fw_event_lock);
 	spin_lock_init(&ioc->raid_device_lock);
 	spin_lock_init(&ioc->diag_trigger_lock);
+    spin_lock_init(&ioc->removed_device_lock);
 
 	INIT_LIST_HEAD(&ioc->sas_device_list);
-	INIT_LIST_HEAD(&ioc->sas_device_init_list);
+	INIT_LIST_HEAD(&ioc->sas_device_init_list);    
+    INIT_LIST_HEAD(&ioc->removed_sas_device_list);
 	INIT_LIST_HEAD(&ioc->sas_expander_list);
 	INIT_LIST_HEAD(&ioc->fw_event_list);
 	INIT_LIST_HEAD(&ioc->raid_device_list);
@@ -8832,6 +8982,25 @@ scsih_pci_mmio_enabled(struct pci_dev *pdev)
 	return PCI_ERS_RESULT_NEED_RESET;
 }
 
+void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_address)
+{
+	struct fw_event_work *fw_event;
+	u16 sz;
+
+	if (ioc->is_driver_loading)
+		return;
+	sz = sizeof(sas_address);
+	fw_event = alloc_fw_event_work(sz);
+	if (!fw_event)
+		return;
+	fw_event->event = MPT3SAS_REMOVE_TARGET;
+	fw_event->ioc = ioc;
+	memcpy(fw_event->event_data, &sas_address, sizeof(sas_address));
+	_scsih_fw_event_add(ioc, fw_event);
+	fw_event_work_put(fw_event);
+}
+
+
 static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 {
     struct MPT3SAS_ADAPTER *ioc = shost_priv(scmd->device->host);
@@ -8839,8 +9008,7 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
     struct _sas_device *sas_device = NULL;
     struct scsi_target *starget = scmd->device->sdev_target;
     struct MPT3SAS_TARGET *target_priv_data = starget->hostdata;
-    unsigned long flags;
-    
+
     sas_device_priv_data = scmd->device->hostdata;
     if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
         sas_device_priv_data->sas_target->deleted) {
@@ -8857,15 +9025,8 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
         atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) + 1);
 
     atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
-    if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 10) {
-        spin_lock_irqsave(&ioc->sas_device_lock, flags);
-        list_del_init(&sas_device->list);		
-        spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
-        
-        _scsih_remove_device(ioc, sas_device);
-        sas_device_put(sas_device);   /* in order to implement fmadm repaired, 
-                                       * sas_device should be placed in another list. 
-                                       */
+    if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 6) {
+        mpt3sas_trigger_remove_target_event(ioc, target_priv_data->sas_address);
     }
 
     return BLK_EH_NOT_HANDLED;   /* for scsi_times_out to abort this command. */

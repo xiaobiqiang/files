@@ -37,6 +37,7 @@ extern void cm_cnm_cluster_nas_thread(void);
 extern void cm_cnm_lunmap_update_period(void);
 extern void cm_cnm_ntp_sync_thread(void);
 extern void cm_cnm_alarm_common_thread(void);
+extern void cm_alarm_period_check(void);;
 
 static void cm_period_20s(uint32 sec);
 static void cm_period_5min(uint32 minute);
@@ -70,6 +71,7 @@ const cm_main_period_func_t g_cm_period_list_munite[]=
     cm_cnm_storage_alarm_thread,
     cm_cnm_alarm_common_thread,
     cm_cnm_lowdata_volume_stop_thread,
+    cm_alarm_period_check,
     NULL
 };
 

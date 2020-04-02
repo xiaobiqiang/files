@@ -48,7 +48,8 @@ AC_CONFIG_HEADERS([zfs_config.h], [
 AC_ARG_ENABLE(hengwei, 
 		AS_HELP_STRING([--enable-hengwei],
 			[use hengwei platform]))
-if test "$enable_hengwei" = yes; then
+enable_hengwei=`uname -m`
+if test "$enable_hengwei" = "sw_64"; then
 	echo "use hengwei platform"
 	AC_DEFINE([USE_HENGWEI], [], [Use hengwei platform])
 fi
@@ -153,6 +154,7 @@ AC_CONFIG_FILES([
 	cmd/arc_summary/Makefile
 	cmd/zed/Makefile
 	cmd/sas3show/Makefile
+	cmd/mpt3ctl/Makefile
 	cmd/perf_stat/Makefile
 	cmd/clusterd/Makefile
 	cmd/pmm/Makefile

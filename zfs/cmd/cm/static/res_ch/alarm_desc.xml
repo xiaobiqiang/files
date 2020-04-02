@@ -64,21 +64,21 @@
     <alarm id="40000003" name="故障切池成功" title="故障切换存储池(#1)成功" desc="存储池(#1)由故障节点向节点(#0)切换成功,耗时(#2)秒." suggest="无"/>
     <alarm id="40000004" name="存储容量使用较高" title="(#0) ((#1))使用较高" desc="(#0) ((#1))使用较多，占比(#2)%" suggest="删除一些数据"/>
     
-    <!-- 0:user 1:ip 2:node 3:pool 4:nas 5:blocksize 6:access 7:w_policy 8:is_comp 9:qos 10:quota 11:dedup 12:avsbw 13:smb -->
-    <alarm id="80000000" name="创建NAS成功" title="创建NAS((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建NAS((#3)/(#4))成功，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QOS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
-    <alarm id="80000001" name="创建NAS失败" title="创建NAS((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建NAS((#3)/(#4))失败，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QOS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
-    <alarm id="80000002" name="修改NAS成功" title="修改NAS((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)修改NAS((#3)/(#4))成功，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QOS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
-    <alarm id="80000003" name="修改NAS失败" title="修改NAS((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)修改NAS((#3)/(#4))失败，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QOS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:pool 4:nas -->
+    <!-- 0:用户 1:ip 2:node 3:pool 4:nas 5:blocksize 6:access 7:w_policy 8:is_comp 9:QoS 10:配额 11:dedup 12:avsbw 13:smb -->
+    <alarm id="80000000" name="创建NAS成功" title="创建NAS((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建NAS((#3)/(#4))成功，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QoS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
+    <alarm id="80000001" name="创建NAS失败" title="创建NAS((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建NAS((#3)/(#4))失败，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QoS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
+    <alarm id="80000002" name="修改NAS成功" title="修改NAS((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)修改NAS((#3)/(#4))成功，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QoS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
+    <alarm id="80000003" name="修改NAS失败" title="修改NAS((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)修改NAS((#3)/(#4))失败，其中块大小为(#5)(K)，权限为(#6)，压缩状态为(#8)(0:关闭 1:开启)，QoS为(#9)，配额为(#10)，重删状态为(#11)(0:关闭 1:开启)，NASAVS带宽(#12)，SMB状态为(#13)(0:关闭 1:开启)，ABE状态为(#14)(0:关闭 1:开启)，ACL继承(#15)(0:discard 1:noallow 2:restricted 3:passthrough 4:passthrough-x)。" suggest="无"/>
+    <!-- 0:用户 1:ip 2:node 3:pool 4:nas -->
     <alarm id="80000004" name="删除NAS成功" title="删除NAS((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)删除NAS((#3)/(#4))成功。" suggest="无"/>
     <alarm id="80000005" name="删除NAS失败" title="删除NAS((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)删除NAS((#3)/(#4))失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:pool 4:lun 5:space 6:w_policy 7:is_double 8:is_comp 9:is_hot 10:alarm_threshold 11:qos 12:qos_val 13:dedup 14:blocksize 15:is_single -->
-    <alarm id="80000006" name="创建LUN成功" title="创建LUN((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建LUN((#3)/(#4))成功，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QOS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QOS值为(#12)，重删状态为(#13)(0:关闭 1:开启)，块大小(#14)，是否精简(#15)(0:否 1:是)。" suggest="无"/>
-    <alarm id="80000007" name="创建LUN失败" title="创建LUN((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建LUN((#3)/(#4))失败，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QOS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QOS值为(#12)，重删状态为(#13)(0:关闭 1:开启)，块大小(#14)，是否精简(#15)(0:否 1:是)。" suggest="无"/>
-    <alarm id="80000008" name="修改LUN成功" title="修改LUN((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)修改LUN((#3)/(#4))成功，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QOS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QOS值为(#12)，重删状态为(#13)(0:关闭 1:开启)。" suggest="无"/>
-    <alarm id="80000009" name="修改LUN失败" title="修改LUN((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)修改LUN((#3)/(#4))失败，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QOS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QOS值为(#12)，重删状态为(#13)(0:关闭 1:开启)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:pool 4:lun -->
+    <!-- 0:用户 1:ip 2:node 3:pool 4:LUN 5:space 6:w_policy 7:is_double 8:is_comp 9:is_hot 10:alarm_threshold 11:QoS 12:QoS_val 13:dedup 14:blocksize 15:is_single -->
+    <alarm id="80000006" name="创建LUN成功" title="创建LUN((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建LUN((#3)/(#4))成功，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QoS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QoS值为(#12)，重删状态为(#13)(0:关闭 1:开启)，块大小(#14)，是否精简(#15)(0:否 1:是)。" suggest="无"/>
+    <alarm id="80000007" name="创建LUN失败" title="创建LUN((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建LUN((#3)/(#4))失败，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QoS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QoS值为(#12)，重删状态为(#13)(0:关闭 1:开启)，块大小(#14)，是否精简(#15)(0:否 1:是)。" suggest="无"/>
+    <alarm id="80000008" name="修改LUN成功" title="修改LUN((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)修改LUN((#3)/(#4))成功，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QoS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QoS值为(#12)，重删状态为(#13)(0:关闭 1:开启)。" suggest="无"/>
+    <alarm id="80000009" name="修改LUN失败" title="修改LUN((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)修改LUN((#3)/(#4))失败，其中容量为(#5)，是否双份(#7)(0:否 1:是)，压缩状态为(#8)(0:关闭 1:开启)，是否开启热点(#9)(0:关闭 1:开启)，告警阈值为(#10)，QoS类型为(#11)(0:关闭 1:IOPS 2:Bandwidth)，QoS值为(#12)，重删状态为(#13)(0:关闭 1:开启)。" suggest="无"/>
+    <!-- 0:用户 1:ip 2:node 3:pool 4:LUN -->
     <alarm id="80000010" name="删除LUN成功" title="删除LUN((#3)/(#4))成功" desc="用户(#0)(IP:(#1))在节点(#2)删除LUN((#3)/(#4))成功。" suggest="无"/>
     <alarm id="80000011" name="删除LUN失败" title="删除LUN((#3)/(#4))失败" desc="用户(#0)(IP:(#1))在节点(#2)删除LUN((#3)/(#4))失败。" suggest="无"/>
     
@@ -140,62 +140,62 @@
     <alarm id="80000056" name="磁盘初始化成功" title="磁盘初始化成功" desc="用户(#0)(IP:(#1))将节点(#2)的磁盘(#3)初始化成功。" suggest="无"/>
     <alarm id="80000057" name="磁盘初始化失败" title="磁盘初始化失败" desc="用户(#0)(IP:(#1))将节点(#2)的磁盘(#3)初始化失败。" suggest="确保磁盘不在指定节点的池内"/>
     
-    <!-- 0:user 1:ip 2:id 3:gid 4:name 5:path -->
-    <alarm id="80000100" name="创建USER成功" title="创建用户(#4)成功" desc="用户(#0)(IP:(#1))创建用户(#4)成功,路径为(#5)" suggest="无"/>
-    <alarm id="80000101" name="创建USER失败" title="创建用户(#4)失败" desc="用户(#0)(IP:(#1))创建用户(#4)失败,路径为(#5)" suggest="无"/>
-    <alarm id="80000102" name="修改USER成功" title="修改用户(#4)成功" desc="用户(#0)(IP:(#1))修改用户(#4)成功,路径为(#5)" suggest="无"/>
-    <alarm id="80000103" name="修改USER失败" title="修改用户(#4)失败" desc="用户(#0)(IP:(#1))修改用户(#4)失败,路径为(#5)" suggest="无"/>
-    <!-- 0:user 1:ip 2:name -->
-    <alarm id="80000104" name="删除USER成功" title="删除用户(#2)成功" desc="用户(#0)(IP:(#1))删除用户(#2)成功" suggest="无"/>
-    <alarm id="80000105" name="删除USER失败" title="删除用户(#2)失败" desc="用户(#0)(IP:(#1))删除用户(#2)失败" suggest="无"/>
+    <!-- 0:用户 1:ip 2:id 3:gid 4:name 5:path -->
+    <alarm id="80000100" name="创建用户成功" title="创建用户(#4)成功" desc="用户(#0)(IP:(#1))创建用户(#4)成功,路径为(#5)" suggest="无"/>
+    <alarm id="80000101" name="创建用户失败" title="创建用户(#4)失败" desc="用户(#0)(IP:(#1))创建用户(#4)失败,路径为(#5)" suggest="无"/>
+    <alarm id="80000102" name="修改用户成功" title="修改用户(#4)成功" desc="用户(#0)(IP:(#1))修改用户(#4)成功,路径为(#5)" suggest="无"/>
+    <alarm id="80000103" name="修改用户失败" title="修改用户(#4)失败" desc="用户(#0)(IP:(#1))修改用户(#4)失败,路径为(#5)" suggest="无"/>
+    <!-- 0:用户 1:ip 2:name -->
+    <alarm id="80000104" name="删除用户成功" title="删除用户(#2)成功" desc="用户(#0)(IP:(#1))删除用户(#2)成功" suggest="无"/>
+    <alarm id="80000105" name="删除用户失败" title="删除用户(#2)失败" desc="用户(#0)(IP:(#1))删除用户(#2)失败" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:usertype 3:node 4:name 5:filename 6:hardspace 7:softspace -->
-    <alarm id="80000106" name="修改QUOTA成功" title="修改QUOTA(#4)成功" desc="用户(#0)(IP:(#1))修改用户配额(#4)成功,其中类型为(#2),节点为(#3),文件为(#5),硬配额为(#6),软配额为(#7)" suggest="无"/>
-    <alarm id="80000107" name="修改QUOTA失败" title="修改QUOTA(#4)失败" desc="用户(#0)(IP:(#1))修改用户配额(#4)成功,其中类型为(#2),节点为(#3),文件为(#5),硬配额为(#6),软配额为(#7)" suggest="无"/>
-    <!-- 0:user 1:ip 2:usertype 3:node 4:name 5:filename -->
-    <alarm id="80000108" name="删除QUOTA成功" title="删除QUOTA(#4)成功" desc="用户(#0)(IP:(#1))删除用户(#4)在文件(#5)在节点(#3)成功" suggest="无"/>
-    <alarm id="80000109" name="删除QUOTA失败" title="删除QUOTA(#4)失败" desc="用户(#0)(IP:(#1))删除用户(#4)在文件(#5)在节点(#3)失败" suggest="无"/>
+    <!-- 0:用户 1:ip 2:用户type 3:node 4:name 5:filename 6:hardspace 7:softspace -->
+    <alarm id="80000106" name="修改配额成功" title="修改配额(#4)成功" desc="用户(#0)(IP:(#1))修改用户配额(#4)成功,其中类型为(#2),节点为(#3),文件为(#5),硬配额为(#6),软配额为(#7)" suggest="无"/>
+    <alarm id="80000107" name="修改配额失败" title="修改配额(#4)失败" desc="用户(#0)(IP:(#1))修改用户配额(#4)失败,其中类型为(#2),节点为(#3),文件为(#5),硬配额为(#6),软配额为(#7)" suggest="无"/>
+    <!-- 0:用户 1:ip 2:用户type 3:node 4:name 5:filename -->
+    <alarm id="80000108" name="删除配额成功" title="删除配额(#4)成功" desc="用户(#0)(IP:(#1))删除用户(#4)在文件(#5)在节点(#3)成功" suggest="无"/>
+    <alarm id="80000109" name="删除配额失败" title="删除配额(#4)失败" desc="用户(#0)(IP:(#1))删除用户(#4)在文件(#5)在节点(#3)失败" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:filename 3:node 4:adapter 5:ip 6:netmask -->
+    <!-- 0:用户 1:ip 2:filename 3:node 4:adapter 5:ip 6:netmask -->
     <alarm id="80000110" name="创建漂移IP成功" title="创建漂移IP(#5)成功" desc="用户(#0)(IP:(#1))创建文件IP漂移成功,其中文件名为(#2),节点为(#3),网口为(#4),IP为(#5),子网掩码为(#6)" suggest="无"/>
     <alarm id="80000111" name="创建漂移IP失败" title="创建漂移IP(#5)失败" desc="用户(#0)(IP:(#1))创建文件IP漂移失败,其中文件名为(#2),节点为(#3),网口为(#4),IP为(#5),子网掩码为(#6)" suggest="无"/>
-    <!-- 0:user 1:ip 2:filename 3:node 4:ip -->
+    <!-- 0:用户 1:ip 2:filename 3:node 4:ip -->
     <alarm id="80000112" name="删除漂移IP成功" title="删除漂移IP(#4)成功" desc="用户(#0)(IP:(#1))删除IP(#4)在文件(#2)在节点(#3)成功" suggest="无"/>
     <alarm id="80000113" name="删除漂移IP失败" title="删除漂移IP(#4)成功" desc="用户(#0)(IP:(#1))删除IP(#4)在文件(#2)在节点(#3)失败" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:destination 3:node 4:netmask 5:geteway -->
-    <alarm id="80000114" name="创建ROUTE成功" title="创建ROUTE成功" desc="用户(#0)(IP:(#1))创建路由成功,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
-    <alarm id="80000115" name="创建ROUTE失败" title="创建ROUTE失败" desc="用户(#0)(IP:(#1))创建路由失败,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
-    <alarm id="80000116" name="删除ROUTE成功" title="删除ROUTE成功" desc="用户(#0)(IP:(#1))删除路由成功,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
-    <alarm id="80000117" name="删除ROUTE失败" title="删除ROUTE失败" desc="用户(#0)(IP:(#1))删除路由失败,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
+    <!-- 0:用户 1:ip 2:destination 3:node 4:netmask 5:geteway -->
+    <alarm id="80000114" name="创建路由成功" title="创建路由成功" desc="用户(#0)(IP:(#1))创建路由成功,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
+    <alarm id="80000115" name="创建路由失败" title="创建路由失败" desc="用户(#0)(IP:(#1))创建路由失败,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
+    <alarm id="80000116" name="删除路由成功" title="删除路由成功" desc="用户(#0)(IP:(#1))删除路由成功,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
+    <alarm id="80000117" name="删除路由失败" title="删除路由失败" desc="用户(#0)(IP:(#1))删除路由失败,其中目的网段为(#2),节点为(#3),子网掩码为(#4),网关为(#5)" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:adapter 3:node 4:ip 5:netmask -->
+    <!-- 0:用户 1:ip 2:adapter 3:node 4:ip 5:netmask -->
     <alarm id="80000118" name="绑定IP成功" title="绑定IP(#4)成功" desc="用户(#0)(IP:(#1))绑定IP成功,其中网卡为(#2),节点为(#3),ip为(#4),子网掩码为(#5)" suggest="无"/>
     <alarm id="80000119" name="绑定IP失败" title="绑定IP(#4)失败" desc="用户(#0)(IP:(#1))绑定IP失败,其中网卡为(#2),节点为(#3),ip为(#4),子网掩码为(#5)" suggest="无"/>
     <alarm id="80000120" name="删除IP成功" title="删除网口(#4)成功" desc="用户(#0)(IP:(#1))删除IP成功,其中网卡为(#2),节点为(#3),ip为(#4),子网掩码为(#5)" suggest="无"/>
     <alarm id="80000121" name="删除IP失败" title="删除网口(#4)成功" desc="用户(#0)(IP:(#1))删除IP失败,其中网卡为(#2),节点为(#3),ip为(#4),子网掩码为(#5)" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:type 3:node 4:opreation 5:path 6:pool 7:lunid 8:progress -->
-    <alarm id="80000122" name="创建lun迁移成功" title="创建lun迁移成功" desc="用户(#0)(IP:(#1))创建迁移成功,其中类型为(#2)(0:disk 1:lun),节点为(#3),路径为(#4),存储池为(#6),lunid为(#7)" suggest="无"/>
-    <alarm id="80000123" name="创建lun迁移失败" title="创建lun迁移失败" desc="用户(#0)(IP:(#1))创建迁移失败,其中类型为(#2)(0:disk 1:lun),节点为(#3),路径为(#4),存储池为(#6),lunid为(#7)" suggest="无"/>
-    <alarm id="80000124" name="修改lun迁移成功" title="修改lun迁移成功" desc="用户(#0)(IP:(#1))修改迁移成功,其中类型为(#2)(0:disk 1:lun),节点为(#3),目标为(#5),操作为(#8)" suggest="无"/>
-    <alarm id="80000125" name="修改lun迁移失败" title="修改lun迁移失败" desc="用户(#0)(IP:(#1))修改迁移失败,其中类型为(#2)(0:disk 1:lun),节点为(#3),目标为(#5),操作为(#8),子网掩码为(#3)" suggest="无"/>
+    <!-- 0:用户 1:ip 2:type 3:node 4:opreation 5:path 6:pool 7:LUNid 8:progress -->
+    <alarm id="80000122" name="创建LUN迁移成功" title="创建LUN迁移成功" desc="用户(#0)(IP:(#1))创建迁移成功,其中类型为(#2)(0:disk 1:LUN),节点为(#3),路径为(#4),存储池为(#6),LUNid为(#7)" suggest="无"/>
+    <alarm id="80000123" name="创建LUN迁移失败" title="创建LUN迁移失败" desc="用户(#0)(IP:(#1))创建迁移失败,其中类型为(#2)(0:disk 1:LUN),节点为(#3),路径为(#4),存储池为(#6),LUNid为(#7)" suggest="无"/>
+    <alarm id="80000124" name="修改LUN迁移成功" title="修改LUN迁移成功" desc="用户(#0)(IP:(#1))修改迁移成功,其中类型为(#2)(0:disk 1:LUN),节点为(#3),目标为(#5),操作为(#8)" suggest="无"/>
+    <alarm id="80000125" name="修改LUN迁移失败" title="修改LUN迁移失败" desc="用户(#0)(IP:(#1))修改迁移失败,其中类型为(#2)(0:disk 1:LUN),节点为(#3),目标为(#5),操作为(#8),子网掩码为(#3)" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:name 3:node 4:state 5:ip 6:netmask 7:adapter 8:policy 9:lacpactivity 10:lacptimer -->
+    <!-- 0:用户 1:ip 2:name 3:node 4:state 5:ip 6:netmask 7:adapter 8:policy 9:lacpactivity 10:lacptimer -->
     <alarm id="80000126" name="创建链路聚合成功" title="创建链路聚合(#5)成功" desc="用户(#0)(IP:(#1))创建链路聚合成功,其中ip为(#5),节点为(#3),子网掩码为(#6),网卡为(#7),policy为(#8),lacpactivity(#9),lacptimer为(#10)" suggest="无"/>
     <alarm id="80000127" name="创建链路聚合失败" title="创建链路聚合(#5)失败" desc="用户(#0)(IP:(#1))创建链路聚合失败,其中ip为(#5),节点为(#3),子网掩码为(#6),网卡为(#7),policy为(#8),lacpactivity(#9),lacptimer为(#10)" suggest="无"/>
     <alarm id="80000128" name="修改链路聚合成功" title="修改链路聚合(#5)成功" desc="用户(#0)(IP:(#1))修改链路聚合成功,其中ip为(#5),节点为(#3),子网掩码为(#6),网卡为(#7),policy为(#8),lacpactivity(#9),lacptimer为(#10)" suggest="无"/>
     <alarm id="80000129" name="修改链路聚合失败" title="修改链路聚合(#5)失败" desc="用户(#0)(IP:(#1))修改链路聚合失败,其中ip为(#5),节点为(#3),子网掩码为(#6),网卡为(#7),policy为(#8),lacpactivity(#9),lacptimer为(#10)" suggest="无"/>
-    <!-- 0:user 1:ip 2:name 3:node 4:state 5:ip 6:netmask  -->
+    <!-- 0:用户 1:ip 2:name 3:node 4:state 5:ip 6:netmask  -->
     <alarm id="80000130" name="删除链路聚合成功" title="删除链路聚合(#2)成功" desc="用户(#0)(IP:(#1))删除链路聚合成功,名字为(#2),节点为(#3)" suggest="无"/>
     <alarm id="80000131" name="删除链路聚合失败" title="删除链路聚合(#3)失败" desc="用户(#0)(IP:(#1))删除链路聚合失败,名字为(#2),节点为(#3)" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:node 3:dst 4:src 5:mount 6：state -->
+    <!-- 0:用户 1:ip 2:node 3:dst 4:src 5:mount 6：state -->
     <alarm id="80000132" name="创建影子迁移成功" title="创建影子迁移成功" desc="用户(#0)(IP:(#1))创建影子迁移成功,其中节点为(#2),dst为(#3),src为(#4),mount为(#5)" suggest="无"/>
     <alarm id="80000133" name="创建影子迁移失败" title="创建影子迁移失败" desc="用户(#0)(IP:(#1))创建影子迁移失败,其中节点为(#2),dst为(#3),src为(#4),mount为(#5)" suggest="无"/>
     <alarm id="80000134" name="修改影子迁移成功" title="修改影子迁移成功" desc="用户(#0)(IP:(#1))修改影子迁移成功,其中节点为(#2)" suggest="无"/>
     <alarm id="80000135" name="修改影子迁移失败" title="修改影子迁移失败" desc="用户(#0)(IP:(#1))修改影子迁移失败,其中节点为(#2)" suggest="无"/>
-    <!-- 0:user 1:ip 2:name -->
+    <!-- 0:用户 1:ip 2:name -->
     <alarm id="80000136" name="删除影子迁移成功" title="删除影子迁移成功" desc="用户(#0)(IP:(#1))删除影子迁移节点(#2)成功" suggest="无"/>
     <alarm id="80000137" name="删除影子迁移失败" title="删除影子迁移失败" desc="用户(#0)(IP:(#1))删除影子迁移节点(#2)失败" suggest="无"/>
 	
@@ -233,76 +233,76 @@
     <!-- 0:protocol -->
     <alarm id="80000216" name="为LUN映射添加端口成功" title="为LUN映射添加端口成功" desc="用户(#0)(IP:(#1))为LUN映射添加端口成功，协议为(#2)(0:unkown 1:iscsi 2:fc 3:ib)。" suggest="无"/>
     <alarm id="80000217" name="为LUN映射添加端口失败" title="为LUN映射添加端口失败" desc="用户(#0)(IP:(#1))为LUN映射添加端口失败，协议为(#2)(0:unkown 1:iscsi 2:fc 3:ib)。" suggest="无"/>
-    <!-- 0:lun 1:hostgroup 2:targetgroup-->
+    <!-- 0:LUN 1:hostgroup 2:targetgroup-->
 	
     <alarm id="80000218" name="添加LUN映射成功" title="为LUN(#2)添加LUN映射成功" desc="用户(#0)(IP:(#1))为LUN(#2)添加映射成功，其中主机组为(#3),目标组为(#4)。" suggest="无"/>
     <alarm id="80000219" name="添加LUN映射失败" title="为LUN(#2)添加LUN映射失败" desc="用户(#0)(IP:(#1))为LUN(#2)添加映射失败，其中主机组为(#3),目标组为(#4)。" suggest="无"/>
     <!-- -->
     <alarm id="80000220" name="修改LUN映射成功" title="修改LUN映射成功" desc="用户(#0)(IP:(#1))修改LUN映射成功" suggest="无"/>
     <alarm id="80000221" name="修改LUN映射失败" title="修改LUN映射成功" desc="用户(#0)(IP:(#1))修改LUN映射成功" suggest="无"/>
-    <!-- 0:lun 1:hostgroup -->
+    <!-- 0:LUN 1:hostgroup -->
     <alarm id="80000222" name="删除LUN映射成功" title="为LUN(#2)删除LUN映射成功" desc="用户(#0)(IP:(#1))为LUN(#2)删除映射成功，其中主机组为(#3)。" suggest="无"/>
     <alarm id="80000223" name="删除LUN映射失败" title="为LUN(#2)删除LUN映射失败" desc="用户(#0)(IP:(#1))为LUN(#2)删除映射失败，其中主机组为(#3)。" suggest="无"/>
     <!-- 0:nid 1:nas 2:nametype 3:name 4:permission -->
-    <alarm id="80000226" name="CIFS添加成功" title="为用户(#5)添加CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)添加CIFS共享成功，用户类型为(#4)(0:user 1:ugroup),用户权限为(#6)(0:RW 1:RO 2:RD),路径为(#3)" suggest="无"/>
-    <alarm id="80000227" name="CIFS添加失败" title="为用户(#5)添加CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)添加CIFS共享失败，用户类型为(#4)(0:user 1:ugroup),用户权限为(#6)(0:RW 1:RO 2:RD),路径为(#3)" suggest="无"/>
+    <alarm id="80000226" name="CIFS添加成功" title="为用户(#5)添加CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)添加CIFS共享成功，用户类型为(#4)(0:用户 1:ugroup),用户权限为(#6)(0:RW 1:RO),路径为(#3)" suggest="无"/>
+    <alarm id="80000227" name="CIFS添加失败" title="为用户(#5)添加CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)添加CIFS共享失败，用户类型为(#4)(0:用户 1:ugroup),用户权限为(#6)(0:RW 1:RO),路径为(#3)" suggest="无"/>
     <!-- 0:nid 1:nas 2:nametype 3:name 4:permission -->
-    <alarm id="80000228" name="CIFS修改成功" title="为用户(#5)修改CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)修改CIFS共享成功，用户类型为(#4)(0:user 1:ugroup),用户权限为(#6)(0:RW 1:RO 2:RD),路径为(#3)" suggest="无"/>
-    <alarm id="80000229" name="CIFS修改失败" title="为用户(#5)修改CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)修改CIFS共享失败，用户类型为(#4)(0:user 1:ugroup),用户权限为(#6)(0:RW 1:RO 2:RD),路径为(#3)" suggest="无"/>
+    <alarm id="80000228" name="CIFS修改成功" title="为用户(#5)修改CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)修改CIFS共享成功，用户类型为(#4)(0:用户 1:ugroup),用户权限为(#6)(0:RW 1:RO),路径为(#3)" suggest="无"/>
+    <alarm id="80000229" name="CIFS修改失败" title="为用户(#5)修改CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)修改CIFS共享失败，用户类型为(#4)(0:用户 1:ugroup),用户权限为(#6)(0:RW 1:RO),路径为(#3)" suggest="无"/>
     <!-- 0:nid 1:nas 2:nametype 3:name -->
-    <alarm id="80000230" name="CIFS删除成功" title="为用户(#5)删除CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)删除CIFS共享成功，用户类型为(#4)(0:user 1:ugroup),路径为(#3)" suggest="无"/>
-    <alarm id="80000231" name="CIFS删除失败" title="为用户(#5)删除CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)删除CIFS共享失败，用户类型为(#4)(0:user 1:ugroup),路径为(#3)" suggest="无"/>
+    <alarm id="80000230" name="CIFS删除成功" title="为用户(#5)删除CIFS共享成功" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)删除CIFS共享成功，用户类型为(#4)(0:用户 1:ugroup),路径为(#3)" suggest="无"/>
+    <alarm id="80000231" name="CIFS删除失败" title="为用户(#5)删除CIFS共享失败" desc="用户(#0)(IP:(#1))在节点(#2)为用户(#5)删除CIFS共享失败，用户类型为(#4)(0:用户 1:ugroup),路径为(#3)" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:nas 4:ipaddress 5:permission -->
+    <!-- 0:用户 1:ip 2:node 3:nas 4:ipaddress 5:permission -->
     <alarm id="80000300" name="NAS添加IP成功" title="NAS:(#3)添加IP:(#4)成功" desc="用户(#0)(IP:(#1))在节点(#2)NAS:(#3)添加IP:(#4)成功，设置权限为(#5)(0:rw 1:ro)。" suggest="无"/>
     <alarm id="80000301" name="NAS添加IP失败" title="NAS:(#3)添加IP:(#4)失败" desc="用户(#0)(IP:(#1))在节点(#2)NAS:(#3)添加IP:(#4)失败，设置权限为(#5)(0:rw 1:ro)。" suggest="查看nas属性是否正常"/>
-    <!-- 0:user 1:ip 2:node 3:nas 4:ipaddress -->
+    <!-- 0:用户 1:ip 2:node 3:nas 4:ipaddress -->
     <alarm id="80000302" name="NAS删除IP成功" title="NAS:(#3)删除IP:(#4)成功" desc="用户(#0)(IP:(#1))在节点(#2)NAS:(#3)删除IP:(#4)成功。" suggest="无"/>
     <alarm id="80000303" name="NAS删除IP失败" title="NAS:(#3)删除IP:(#4)失败" desc="用户(#0)(IP:(#1))在节点(#2)NAS:(#3)删除IP:(#4)失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype 7:workload_if 8:workload_ip 9:netmask -->
+    <!-- 0:用户 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype 7:workload_if 8:workload_ip 9:netmask -->
     <alarm id="80000304" name="创建双活成功" title="创建双活((#2):(#3)连接(#4):(#5))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建双活((#2):(#3)连接(#4):(#5))成功，同步模式为(#6)(0:off 1:async 2:sync) 业务网卡:(#7) 业务IP:(#8) 子网掩码(#9)。" suggest="无"/>
     <alarm id="80000305" name="创建双活失败" title="创建双活((#2):(#3)连接(#4):(#5))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建双活((#2):(#3)连接(#4):(#5))失败，同步模式为(#6)(0:off 1:async 2:sync) 业务网卡:(#7) 业务IP:(#8) 子网掩码(#9)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:master_node 3:master_nas -->
+    <!-- 0:用户 1:ip 2:master_node 3:master_nas -->
     <alarm id="80000306" name="删除双活成功" title="删除以((#2):(#3))为主的双活成功" desc="用户(#0)(IP:(#1))在节点(#2)删除以((#2):(#3))为主的双活成功。" suggest="无"/>
     <alarm id="80000307" name="删除双活失败" title="删除以((#2):(#3))为主的双活失败" desc="用户(#0)(IP:(#1))在节点(#2)删除以((#2):(#3))为主的双活失败。" suggest="无"/>
     
-    <!-- 0:user 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype -->
+    <!-- 0:用户 1:ip 2:master_node 3:master_nas 4:slave_node 5:slave_nas 6:synctype -->
     <alarm id="80000308" name="创建备份成功" title="创建备份((#2):(#3)连接(#4):(#5))成功" desc="用户(#0)(IP:(#1))在节点(#2)创建备份((#2):(#3)连接(#4):(#5))成功，同步模式为(#6)(0:off 1:async 2:sync)。" suggest="无"/>
     <alarm id="80000309" name="创建备份失败" title="创建备份((#2):(#3)连接(#4):(#5))失败" desc="用户(#0)(IP:(#1))在节点(#2)创建备份((#2):(#3)连接(#4):(#5))失败，同步模式为(#6)(0:off 1:async 2:sync)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:master_node 3:master_nas -->
+    <!-- 0:用户 1:ip 2:master_node 3:master_nas -->
     <alarm id="80000310" name="删除备份成功" title="删除以((#2):(#3))为主的备份成功" desc="用户(#0)(IP:(#1))在节点(#2)删除以((#2):(#3))为主的备份成功。" suggest="无"/>
     <alarm id="80000311" name="删除备份失败" title="删除以((#2):(#3))为主的备份失败" desc="用户(#0)(IP:(#1))在节点(#2)删除以((#2):(#3))为主的备份失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:nfs 4:stmf 5:ssh 6:ftp 7:smb 8:guiview 9:fmd 10:iscsi -->
-    <alarm id="80000312" name="改变服务状态成功" title="改变服务状态成功" desc="用户(#0)(IP:(#1))在节点(#2)改变服务状态成功，更改nfs为(#3)，更改stmf为(#4)，更改ssh为(#5)，更改ftp为(#6)，更改smb为(#7)，更改guiview为(#8)，更改fmd为(#9)，更改iscsi为(#10)。" suggest="无"/>
-    <alarm id="80000313" name="改变服务状态失败" title="改变服务状态失败" desc="用户(#0)(IP:(#1))在节点(#2)改变服务状态失败，更改nfs为(#3)，更改stmf为(#4)，更改ssh为(#5)，更改ftp为(#6)，更改smb为(#7)，更改guiview为(#8)，更改fmd为(#9)，更改iscsi为(#10)。" suggest="无"/>
+    <!-- 0:用户 1:ip 2:node 3:nfs 4:stmf 5:ssh 6:ftp 7:smb 8:guiview 9:fmd 10:iscsi -->
+    <alarm id="80000312" name="改变服务状态成功" title="改变服务状态成功" desc="用户(#0)(IP:(#1))在节点(#2)改变服务状态成功，更改nfs为(#3)，更改stmf为(#4)，更改ssh为(#5)，更改ftp为(#6)，更改smb为(#7)，更改guiview为(#8)，更改fmd为(#9)，更改iscsi为(#10)，状态说明(-:未操作，0:关闭，1:开启)。" suggest="无"/>
+    <alarm id="80000313" name="改变服务状态失败" title="改变服务状态失败" desc="用户(#0)(IP:(#1))在节点(#2)改变服务状态失败，更改nfs为(#3)，更改stmf为(#4)，更改ssh为(#5)，更改ftp为(#6)，更改smb为(#7)，更改guiview为(#8)，更改fmd为(#9)，更改iscsi为(#10)，状态说明(-:未操作，0:关闭，1:开启)。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:nas 4:quota -->
+    <!-- 0:用户 1:ip 2:node 3:nas 4:配额 -->
     <alarm id="80000314" name="目录配额成功" title="为((#3))配额成功" desc="用户(#0)(IP:(#1))在节点(#2)上为(#3)配额成功，配额为:(#4)。" suggest="无"/>
     <alarm id="80000315" name="目录配额失败" title="为((#3))配额失败" desc="用户(#0)(IP:(#1))在节点(#2)上为(#3)配额失败，配额为:(#4)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:nas -->
+    <!-- 0:用户 1:ip 2:node 3:nas -->
     <alarm id="80000316" name="取消目录配额成功" title="取消(#3)配额成功" desc="用户(#0)(IP:(#1))在节点(#2)取消(#3)配额成功。" suggest="无"/>
     <alarm id="80000317" name="取消目录配额失败" title="取消(#3)配额失败" desc="用户(#0)(IP:(#1))在节点(#2)取消(#3)配额失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:raid 4:name 5:param 6:group -->
+    <!-- 0:用户 1:ip 2:node 3:raid 4:name 5:param 6:group -->
     <alarm id="80000318" name="创建池成功" title="创建池(#4)成功" desc="用户(#0)(IP:(#1))在节点(#2)创建池(#4)成功，其中写raid为(#3)(0:raid0 1:raid1 5:raid5 6:raid6 10:raid10 50:raid50)，盘ID: (#5)。" suggest="无"/>
     <alarm id="80000319" name="创建池失败" title="创建池(#4)失败" desc="用户(#0)(IP:(#1))在节点(#2)创建池(#4)失败，其中写raid为(#3)(0:raid0 1:raid1 5:raid5 6:raid6 10:raid10 50:raid50)，盘ID: (#5)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:name 4:operation 5:var -->
+    <!-- 0:用户 1:ip 2:node 3:name 4:operation 5:var -->
     <alarm id="80000320" name="操作池成功" title="操作池(#3)成功" desc="用户(#0)(IP:(#1))在节点(#2)操作池(#3)下发命令成功，其中操作为(#4)(2:scrub 3:clear 4:release 5:destory)。" suggest="无"/>
     <alarm id="80000321" name="操作池失败" title="操作池(#3)失败" desc="用户(#0)(IP:(#1))在节点(#2)操作池(#3)下发命令失败，其中操作为(#4)(2:scrub 3:clear 4:release 5:destory)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:pool-->
+    <!-- 0:用户 1:ip 2:node 3:pool-->
     <alarm id="80000322" name="删除池成功" title="删除池(#3)成功" desc="用户(#0)(IP:(#1))在节点(#2)删除池(#3)成功。" suggest="无"/>
     <alarm id="80000323" name="删除池失败" title="删除池(#3)失败" desc="用户(#0)(IP:(#1))在节点(#2)删除池(#3)失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:pool 4:param 5:type 6:raid 7:group -->
+    <!-- 0:用户 1:ip 2:node 3:pool 4:param 5:type 6:raid 7:group -->
     <alarm id="80000324" name="向池中添加盘成功" title="向(#3)池中添加盘成功" desc="用户(#0)(IP:(#1))在节点(#2)向(#3)池中添加盘(#4)成功，其中类型为(#5)，raid为raid(#6)。" suggest="无"/>
     <alarm id="80000325" name="向池中添加盘失败" title="向(#3)池中添加盘失败" desc="用户(#0)(IP:(#1))在节点(#2)向(#3)池中添加盘(#4)失败，其中类型为(#5)，raid为raid(#6)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:node 3:pool 4:param -->
+    <!-- 0:用户 1:ip 2:node 3:pool 4:param -->
     <alarm id="80000326" name="从池中删除盘成功" title="从(#3)池中删除盘成功" desc="用户(#0)(IP:(#1))在节点(#2)从(#3)池中删除盘(#4)成功。" suggest="无"/>
     <alarm id="80000327" name="从池中删除盘失败" title="从(#3)池中删除盘失败" desc="用户(#0)(IP:(#1))在节点(#2)从(#3)池中删除盘(#4)失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:node 3:dir 4:name -->
+    <!-- 0:用户 1:ip 2:node 3:dir 4:name -->
     <alarm id="80000328" name="创建快照成功" title="创建(#3)快照成功" desc="用户(#0)(IP:(#1))在节点(#2)创建(#3)快照成功，其名为(#4)。" suggest="无"/>
     <alarm id="80000329" name="创建快照失败" title="创建(#3)快照失败" desc="用户(#0)(IP:(#1))在节点(#2)创建(#3)快照失败，其名为(#4)。" suggest="无"/>
     <alarm id="80000330" name="修改快照成功" title="修改(#3)快照成功" desc="用户(#0)(IP:(#1))在节点(#2)修改(#3)快照成功，其名为(#4)。" suggest="无"/>
@@ -310,27 +310,27 @@
     <alarm id="80000332" name="删除快照成功" title="删除(#3)快照成功" desc="用户(#0)(IP:(#1))在节点(#2)删除(#3)快照成功，其名为(#4)。" suggest="无"/>
     <alarm id="80000333" name="删除快照失败" title="删除(#3)快照失败" desc="用户(#0)(IP:(#1))在节点(#2)删除(#3)快照失败，其名为(#4)。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:dir 3:name 4:expired 5:type 6:daytype 7:minute 8:hours 9:days -->
+    <!-- 0:用户 1:ip 2:dir 3:name 4:expired 5:type 6:daytype 7:minute 8:hours 9:days -->
     <alarm id="80000334" name="创建定时快照成功" title="创建定时快照(#3)成功" desc="用户(#0)(IP:(#1))为(#2)创建定时快照(#3)成功，其名为(#3)，快照过时时间为(#4)，快照定时类型为:(#5)(0:定时生成一次快照 1:循环生成)，生成周期为:(#6)(0:everyday 1:monthday 2:weekday)，分钟(#7)，小时(#8)，天(#9)。" suggest="无"/>
     <alarm id="80000335" name="创建定时快照失败" title="创建定时快照(#3)失败" desc="用户(#0)(IP:(#1))为(#2)创建定时快照(#3)失败，其名为(#3)，快照过时时间为(#4)，快照定时类型为:(#5)(0:定时生成一次快照 1:循环生成)，生成周期为:(#6)(0:everyday 1:monthday 2:weekday)，分钟(#7)，小时(#8)，天(#9)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:id 3:type 4:daytype 5:minute 6:hours 7:days 8:expired-->
+    <!-- 0:用户 1:ip 2:id 3:type 4:daytype 5:minute 6:hours 7:days 8:expired-->
     <alarm id="80000336" name="修改定时快照成功" title="修改定时快照(ID(#2))成功" desc="用户(#0)(IP:(#1))修改定时快照(ID(#2))成功，定时快照类型更改为:(#3)(0:定时生成一次快照 1:循环生成)，生成周期为:(#4)(0:everyday 1:monthday 2:weekday)，分钟(#5)，小时(#6)，天(#7)，快照过期时间更改为(#8)。" suggest="无"/>
     <alarm id="80000337" name="修改定时快照失败" title="修改定时快照(ID(#2))失败" desc="用户(#0)(IP:(#1))修改定时快照(ID(#2))失败，定时快照类型更改为:(#3)(0:定时生成一次快照 1:循环生成)，生成周期为:(#4)(0:everyday 1:monthday 2:weekday)，分钟(#5)，小时(#6)，天(#7)，快照过期时间更改为(#8)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:id -->
+    <!-- 0:用户 1:ip 2:id -->
     <alarm id="80000338" name="删除定时快照成功" title="删除定时快照(ID(#2))成功" desc="用户(#0)(IP:(#1))删除定时快照(ID(#2))成功。" suggest="无"/>
     <alarm id="80000339" name="删除定时快照失败" title="删除定时快照(ID(#2))失败" desc="用户(#0)(IP:(#1)))删除定时快照(ID(#2))失败。" suggest="无"/>
 
-    <!-- 0:user 1:ip 2:type 3:name -->
+    <!-- 0:用户 1:ip 2:type 3:name -->
     <alarm id="80000340" name="创建主机组成功" title="创建主机组(#3)((#2))成功" desc="用户(#0)(IP:(#1))创建(#2)成功，名称为(#3)。" suggest="无"/>
     <alarm id="80000341" name="创建主机组失败" title="创建主机组(#3)((#2))失败" desc="用户(#0)(IP:(#1))创建(#2)失败，名称为(#3)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:type 3:name 4:action 5:members -->
+    <!-- 0:用户 1:ip 2:type 3:name 4:action 5:members -->
     <alarm id="80000342" name="修改主机组成功" title="修改主机组(#3)((#2))成功" desc="用户(#0)(IP:(#1))修改(#2)成功，名称为(#3)，操作为(#4)(0:add 1:remove)，成员为(#5)。" suggest="无"/>
     <alarm id="80000343" name="修改主机组失败" title="修改主机组(#3)((#2))失败" desc="用户(#0)(IP:(#1))修改(#2)失败，名称为(#3)，操作为(#4)(0:add 1:remove)，成员为(#5)。" suggest="无"/>
-    <!-- 0:user 1:ip 2:type 3:name -->
+    <!-- 0:用户 1:ip 2:type 3:name -->
     <alarm id="80000344" name="删除主机组成功" title="删除主机组(#3)((#2))成功" desc="用户(#0)(IP:(#1))删除(#2)成功，名称为(#3)。" suggest="无"/>
     <alarm id="80000345" name="删除主机组失败" title="删除主机组(#3)((#2))失败" desc="用户(#0)(IP:(#1))删除(#2)失败，名称为(#3)。" suggest="无"/>
 	
-    <!-- 0:user 1:ip 2:domian_user 3:local_user -->
+    <!-- 0:用户 1:ip 2:domian_用户 3:local_用户 -->
     <alarm id="80000346" name="创建域控用户成功" title="创建域控用户成功" desc="用户(#0)(IP:(#1))创建成功，域控用户为(#2),映射用户为(#3)。" suggest="无"/>
     <alarm id="80000347" name="创建域控用户失败" title="创建域控用户失败" desc="用户(#0)(IP:(#1))创建失败，域控用户为(#2),映射用户为(#3)。" suggest="无"/>
     <alarm id="80000348" name="删除域控用户成功" title="删除域控用户成功" desc="用户(#0)(IP:(#1))删除成功，域控用户为(#2),映射用户为(#3)。" suggest="无"/>

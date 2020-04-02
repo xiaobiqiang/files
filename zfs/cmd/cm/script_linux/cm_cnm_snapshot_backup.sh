@@ -15,7 +15,7 @@ function cm_cnm_snapshot_backup_init_sshd()
     cp ${CM_SSHD_CFG_FILE} "${CM_SSHD_CFG_FILE}.backup"
     rm $tmpfile 2>/dev/null
     cat ${CM_SSHD_CFG_FILE} | awk '{if($1=="PermitEmptyPasswords" || $1=="PermitRootLogin"){$2="yes";print;} else{print;};}' > $tmpfile
-	mv $tmpfile ${CM_SSHD_CFG_FILE}
+    mv $tmpfile ${CM_SSHD_CFG_FILE}
     return $CM_OK
 }
 
@@ -43,19 +43,40 @@ function cm_cnm_snapshot_backup_init_mtu()
 
 function cm_cnm_snapshot_backup_init_user_attr()
 {
-	local tmpfile=${CM_USER_ATTR_FILE}.tmp
-	rm $tmpfile 2>/dev/null
+    local tmpfile=${CM_USER_ATTR_FILE}.tmp
+    local bkupfile=${CM_USER_ATTR_FILE}.backup
+    
+    if [ ! -f $bkupfile ]; then
+        cp ${CM_USER_ATTR_FILE} ${bkupfile}
+    fi
+    rm $tmpfile 2>/dev/null
         cat ${CM_USER_ATTR_FILE} | awk 'BEGIN{FS=OFS=";"} {if($1~/root/){$6="type=normal";} print}' > $tmpfile
-	mv ${tmpfile} ${CM_USER_ATTR_FILE}
+    mv ${tmpfile} ${CM_USER_ATTR_FILE}
     return $CM_OK
 }
 
 function cm_cnm_snapshot_backup_term_user_attr()
 {
-	local tmpfile=${CM_USER_ATTR_FILE}.tmp
-	rm $tmpfile
-	cat ${CM_USER_ATTR_FILE} | awk 'BEGIN{FS=OFS=";"} {if($1~/root/){$6="type=role";} print}' > $tmpfile
-	mv ${tmpfile} ${CM_USER_ATTR_FILE}
+    local tmpfile=${CM_USER_ATTR_FILE}.tmp
+    
+    local bkupfile=${CM_USER_ATTR_FILE}.backup
+    
+    if [ -f ${bkupfile} ]; then
+        mv ${bkupfile} ${CM_USER_ATTR_FILE}
+        return $CM_OK
+    fi
+
+    rm $tmpfile
+
+    #illumos²»Ö§³Ö
+    local ostype=`cm_os_type_get`
+    if [ $ostype -eq ${CM_OS_TYPE_SOLARIS} ];then
+        cat ${CM_USER_ATTR_FILE} | awk 'BEGIN{FS=OFS=";"} {if($1~/root/){$6="type=role";} print}' > $tmpfile
+    elif [ $ostype -eq ${CM_OS_TYPE_ILLUMOS} ];then
+        cat ${CM_USER_ATTR_FILE} | awk 'BEGIN{FS=OFS=";"} {if($1~/root/){$6="";} print}' > $tmpfile
+    fi
+    
+    mv ${tmpfile} ${CM_USER_ATTR_FILE}
     return $CM_OK
 }
 

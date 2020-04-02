@@ -3,4 +3,5 @@
 <period>
     <!--  report_count: times, default: 1 recovery_time: seconds, default:180s -->
     <alarm_id="10000014" report_count="1" recovery_time="180" /> <!-- storage alarm -->
+    <alarm_id="10000012" report_count="3" recovery_time="300" /> <!-- ntp -->
 </period>

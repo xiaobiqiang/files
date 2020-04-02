@@ -321,7 +321,14 @@ function sethostname
 		fi
 	fi
 
-	hostnamectl set-hostname $HOSTNAME
+# for deepin
+	local os=`cat /etc/os-release | grep -w ID | cut -d '=' -f 2`
+	if [ $os == deepin ]; then
+		chmod -R 755 /usr/lib
+		echo $HOSTNAME >/etc/hostname
+		sed "s/sw6a/$HOSTNAME/g" -i /etc/hosts
+	fi
+	hostnamectl set-hostname --static $HOSTNAME
 }
 
 #hostid
@@ -455,7 +462,7 @@ cat > /usr/sbin/cluster_init.sh <<_CLUSTERINIT_
 #
 # Cluster system, to initialize zfs mirror port
 #
-#[ -f /var/cm/script/cm_cluster_init.sh ]&&/var/cm/script/cm_cluster_init.sh
+[ -f /var/cm/script/cm_cluster_init.sh ]&&/var/cm/script/cm_cluster_init.sh
 _CLUSTERINIT_
 
 

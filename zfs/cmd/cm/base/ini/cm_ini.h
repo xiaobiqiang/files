@@ -228,4 +228,7 @@ extern sint32 cm_ini_get_ext_uint32(const sint8 *filename,
     const sint8 *section, const sint8 *key, uint32 *val);    
 
 
+extern sint32 cm_ini_delete_key_ext(const sint8 *filename, 
+    const sint8 *section, const sint8 *key);
+
 #endif /* BASE_INI_CM_INI_H_ */
