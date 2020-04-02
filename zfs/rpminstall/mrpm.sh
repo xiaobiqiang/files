@@ -4,11 +4,13 @@
 SPL_DIR="../../spl"
 ZFS_DIR=".."
 RPM_DIR="rpm"
+SCSI_DIR="../cmd/scsi_tools"
 
 
 if [ ! -d $RPM_DIR ]; then
 	mkdir  -p $RPM_DIR/zfs
 	mkdir  -p $RPM_DIR/spl
+	mkdir  -p scsi/lib     
 fi
 
 
@@ -33,6 +35,18 @@ else
     cp $ZFS_DIR/*.deb $RPM_DIR/zfs    
 fi
 
+cd $SCSI_DIR
+chmod 755 Makecurrent.sh
+./Makecurrent.sh make 
+./Makecurrent.sh install
+cd -
+
+cp /usr/local/bin/sg_* scsi
+cp /usr/local/bin/lsscsi scsi
+cp /usr/local/lib/libsgutils2* scsi/lib
+
 tar -zcvf zfsonlinuxrpm.tar.gz $RPM_DIR
+tar -zcvf scsi_tool.tar.gz scsi
 
 rm -rf $RPM_DIR
+rm -rf scsi

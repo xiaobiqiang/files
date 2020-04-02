@@ -56,6 +56,12 @@ function install_type_deb()
     cd -
 }
 
+function install_scsi()
+{
+    tar -xzvf scsi_tool.tar.gz
+    cp scsi/sg_* /usr/local/bin
+    cp scsi/lib/* /usr/local/lib
+}
 
 function install()
 {
@@ -76,6 +82,7 @@ function install()
         cp  /lib/modules/$(uname -r)/extra/zfs/mpt3sas/mpt3sas.ko  /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
     fi
     install_gui
+    install_scsi
 }
 
 
@@ -94,7 +101,7 @@ function unload()
     systemctl stop ceres_cm 2>/dev/null
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
-    rm -rf /usr/lib/systemd/system/ceres_cm.service
+    rm -rf /lib/systemd/system/ceres_cm.service
 }
 
 
