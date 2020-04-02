@@ -23,7 +23,7 @@ netsnmp_so_loc=
 [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "NeoKylin 5 (Five)" ] && netsnmp_so_loc=/usr/lib
 netsnmp_so="libnetsnmp.so libnetsnmpagent.so"
 for so in ${netsnmp_so}; do
-	[ ! -f ${netsnmp_so_loc}/${so} ] && ln -s `ls ${netsnmp_so_loc}/ | grep ${so}.[0-9][0-9].[0-9].` ${netsnmp_so_loc}/${so}
+	[ ! -f ${netsnmp_so_loc}/${so} ] && ln -s ${netsnmp_so_loc}/`ls ${netsnmp_so_loc}/ | grep ${so}.[0-9][0-9].[0-9].` ${netsnmp_so_loc}/${so}
 done
 
 if [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "deepin GNU/Linux 15.0 (kui)" ]; then 
