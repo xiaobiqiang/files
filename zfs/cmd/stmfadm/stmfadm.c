@@ -243,7 +243,7 @@ subCommandProps_t subcommands[] = {
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-tg-member", removeTargetGroupMemberFunc, "gc", "g", NULL,
 		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
-	{"remove-view", removeViewFunc, "lac", "l", NULL,
+	{"remove-view", removeViewFunc, "lacht", "l", NULL,
 		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
 	{"set-drbd", bindDrbdFunc, "d", "d", NULL, 
 		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
