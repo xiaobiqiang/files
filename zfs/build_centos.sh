@@ -23,7 +23,7 @@ fi
 netsnmp_so_loc=/usr/lib64
 netsnmp_so="libnetsnmp.so libnetsnmpagent.so"
 for so in ${netsnmp_so}; do
-	[ ! -f ${netsnmp_so_loc}/${so} ] && ln -s `ls ${netsnmp_so_loc}/ | grep ${so}.[0-9][0-9].[0-9].` ${netsnmp_so_loc}/${so}
+	[ ! -f ${netsnmp_so_loc}/${so} ] && ln -s ${netsnmp_so_loc}/`ls ${netsnmp_so_loc}/ | grep ${so}.[0-9][0-9].[0-9].` ${netsnmp_so_loc}/${so}
 done
 
 cp module/Makefile_centos.in module/Makefile.in
