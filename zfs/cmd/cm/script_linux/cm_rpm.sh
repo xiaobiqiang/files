@@ -46,8 +46,8 @@ if [ ! -f /usr/sbin/clumgt ]; then
 fi
 
 if [ ! -f /usr/lib/systemd/system/ceres_cm.service ]; then
-    cp -rf "$CM_DIR"build/ceres_cm.service /usr/lib/systemd/system/
-    cp -rf "$CM_DIR"build/cm_multi_server.service /usr/lib/systemd/system/
+    cp -rf "$CM_DIR"build/ceres_cm.service /lib/systemd/system/
+    cp -rf "$CM_DIR"build/cm_multi_server.service /lib/systemd/system/
     systemctl daemon-reload
     systemctl enable ceres_cm
     systemctl enable cm_multi_server

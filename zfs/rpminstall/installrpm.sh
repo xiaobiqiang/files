@@ -34,6 +34,35 @@ function install_gui()
     fi
 }
 
+function install_type_rpm()
+{
+    cd $SPL_RPM
+    rpm -ivh ./*
+    cd -
+    
+    cd $ZFS_RPM
+    rpm -ivh ./* --nodeps --force
+    cd -
+}
+
+function install_type_deb()
+{
+    cd $SPL_RPM
+    dpkg -i ./*
+    cd -
+    
+    cd $ZFS_RPM
+    dpkg --force-overwrite -i ./*
+    cd -
+}
+
+function install_scsi()
+{
+    tar -xzvf scsi_tool.tar.gz
+    cp scsi/sg_* /usr/local/bin
+    cp scsi/lib/* /usr/local/lib
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
@@ -42,25 +71,29 @@ function install()
     fi
     
     tar -xzvf zfsonlinuxrpm.tar.gz
-    
-    cd $SPL_RPM
-    rpm -ivh ./*
-    cd -
-    
-    cd $ZFS_RPM
-    rpm -ivh ./* --nodeps --force
-    cd -
+        
+    if [ `uname -a|grep deepin|wc -l` -eq 0 ]; then
+        install_type_rpm
+    else
+        install_type_deb
+    fi
     
     if [ `uname -m` = "sw_64" ]; then
         cp  /lib/modules/$(uname -r)/extra/zfs/mpt3sas/mpt3sas.ko  /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
     fi
     install_gui
+    install_scsi
 }
 
 
 function unload()
 {
-    rpm -qa | grep 0.6.5.9 |xargs rpm -e
+
+    if [ `uname -a|grep deepin|wc -l` -eq 0 ]; then
+        rpm -qa | grep 0.6.5.9 |xargs rpm -e
+    else
+        dpkg -l |grep 0.6.5.9|awk '{print $2}'|xargs dpkg -r
+    fi
     
     rm -rf /usr/local/sbin/*
     rm -rf /usr/local/lib/*
@@ -68,7 +101,7 @@ function unload()
     systemctl stop ceres_cm 2>/dev/null
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
-    rm -rf /usr/lib/systemd/system/ceres_cm.service
+    rm -rf /lib/systemd/system/ceres_cm.service
 }
 
 

@@ -464,8 +464,8 @@ drive_get_descriptor_by_name(char *name, int *errp)
 	 * want.  Once drive is set, we don't need to compare any more.
 	 */
 	for (i = 0; drives[i]; i++) {
-	    if (drive == NULL && drives[i]->p.disk->devid != NULL &&
-		devid_compare(devid, drives[i]->p.disk->devid) == 0) {
+	    if (drive == NULL && drives[i]->p.disk->devid != NULL /*&&
+		devid_compare(devid, drives[i]->p.disk->devid) == 0*/) {
 		drive = drives[i];
 
 	    } else {

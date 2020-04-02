@@ -191,8 +191,8 @@ add_path_state(descriptor_t *dp, nvlist_t *attrs)
 	/* find the index of the correct drive assoc. */
 	pp = dp->p.path;
 	for (i = 0; pp->disks[i] && pp->states[i] != -1; i++) {
-	    if (pp->disks[i]->devid != NULL &&
-		devid_compare(pp->disks[i]->devid, devid) == 0) {
+	    if (pp->disks[i]->devid != NULL /*&&
+		devid_compare(pp->disks[i]->devid, devid) == 0*/) {
 
 		/* add the corresponding state */
 		if (nvlist_add_string(attrs, DM_PATH_STATE,
@@ -229,8 +229,8 @@ add_wwn(descriptor_t *dp, nvlist_t *attrs)
 	/* find the index of the correct drive assoc. */
 	pp = dp->p.path;
 	for (i = 0; pp->disks[i] && pp->states[i] != -1; i++) {
-	    if (pp->disks[i]->devid != NULL &&
-		devid_compare(pp->disks[i]->devid, devid) == 0) {
+	    if (pp->disks[i]->devid != NULL /*&&
+		devid_compare(pp->disks[i]->devid, devid) == 0*/) {
 
 		/* add the corresponding state */
 		if (nvlist_add_string(attrs, DM_WWN, pp->wwns[i]) != 0) {
