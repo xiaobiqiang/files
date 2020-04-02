@@ -3221,7 +3221,7 @@ dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx)
 				continue;
 			}
 
-            if (zio->io_bp_override){
+            if (dr->dr_zio->io_bp_override){
                 zio_nowait(dr->dr_zio);
 				continue;
             }
