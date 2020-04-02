@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
+#include <locale.h>
 
 #include <libintl.h>
 
