@@ -14,5 +14,23 @@ function install_python()
     fi
 }
 
+function install_service()
+{
+    systemctl enable zfs-boot.service
+    systemctl enable stmf-boot.service
+    systemctl enable configd.service
+    systemctl enable pppt-boot.service
+    systemctl enable stmf-svc.service
+
+    systemctl enable fc-boot.service
+    systemctl enable fmd.service
+    systemctl enable ceres_cm.service
+    systemctl enable cm_multi_server.service
+    #systemctl enable zfs-clusterd.service
+    systemctl enable iscsitsvc.service
+    
+}
+
 install_disk
 install_python
+install_service
