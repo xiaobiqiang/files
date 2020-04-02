@@ -176,14 +176,6 @@ sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf, char *initiator_ww
 	if (error == ECKSUM)
 		error = EIO;
 
-	if (error == 0)
-		zvio->zvio_dbp = dbpp;
-
-	if (dbuf->db_sglist_length != numbufs) {
-		cmn_err(CE_PANIC, "wrong size sglist: dbuf %d != %d\n",
-			dbuf->db_sglist_length, numbufs);
-	}
-
 	if (error == 0) {
 		int		i;
 		stmf_sglist_ent_t *sgl;
@@ -191,6 +183,12 @@ sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf, char *initiator_ww
 
 		zvio->zvio_crypt_data = kmem_zalloc(sizeof(void *) * numbufs, KM_SLEEP);
 
+		zvio->zvio_dbp = dbpp;
+		if (dbuf->db_sglist_length != numbufs) {
+			cmn_err(CE_PANIC, "wrong size sglist: dbuf %d != %d\n",
+				dbuf->db_sglist_length, numbufs);
+		}
+		
 		sgl = &dbuf->db_sglist[0];
 		for (i = 0; i < numbufs; i++) {
 			void *data;
