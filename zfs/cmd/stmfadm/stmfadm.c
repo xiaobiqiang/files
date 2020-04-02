@@ -3776,6 +3776,50 @@ removeTargetGroupMemberFunc(int operandLen, char *operands[],
 	return (ret);
 }
 
+static bool_t 
+checkViewEntryByHostOrTarget(
+    bool_t isHost, stmfGroupName Host,
+    bool_t isTarget, stmfGroupName Target,
+    stmfViewEntry *pEntry)
+{
+    if(true == isHost)
+    {
+        if(true == pEntry->allHosts)
+        {
+            if(0 != strcmp(Host,"All"))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if(0 != strcmp(Host,pEntry->hostGroup))
+            {
+                return false;
+            }
+        }
+    }
+    
+    if(true == isTarget)
+    {
+        if(true == pEntry->allTargets)
+        {
+            if(0 != strcmp(Target,"All"))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if(0 != strcmp(Target,pEntry->targetGroup))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /*
  * removeViewFunc
  *
@@ -3802,7 +3846,11 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	stmf_remove_proxy_view_t *proxy_remove_view_entry;
 	
 	bool_t isCluster = false;
-
+	bool_t isHost = false;
+	bool_t isTarget = false;
+	stmfGroupName Host = {0};
+	stmfGroupName Target = {0};
+	
 	/* Note: 'l' is required */
 	for (; options->optval; options++) {
 		switch (options->optval) {
@@ -3825,6 +3873,28 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			case 'c':
 				isCluster = true;
 				break;
+		    case 'h':
+		    case 't':
+		        if(strlen(options->optarg) > sizeof(stmfGroupName))
+		        {
+		            (void) fprintf(stderr,
+					    "%s: %s: %s %d %s\n",
+					    cmdName, options->optarg,
+					    gettext("must <= "), sizeof(stmfGroupName),
+					    gettext("hexadecimal digits long"));
+					return (1);
+		        }
+		        if(options->optval == 'h')
+		        {
+		            bcopy(options->optarg, Host, strlen(options->optarg));
+		            isHost = true;
+		        }
+		        else
+		        {
+		            bcopy(options->optarg, Target, strlen(options->optarg));
+		            isTarget = true;
+		        }
+		        break;
 			default:
 				(void) fprintf(stderr, "%s: %c: %s\n",
 				    cmdName, options->optval,
@@ -3833,7 +3903,7 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		}
 	}
 
-	if (!all && operandLen == 0) {
+	if (!all && operandLen == 0 && !isHost && !isTarget) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("no view entries specified"));
 		return (1);
@@ -3890,7 +3960,7 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		return (1);
 	}
 
-	if (all) {
+	if (all || isHost || isTarget) {
 		count = viewEntryList->cnt;
 	} else {
 		count = operandLen;
@@ -3899,7 +3969,17 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	for (i = 0; i < count; i++) {
 		if (all) {
 			veNbr = viewEntryList->ve[i].veIndex;
-		} else {
+		} 
+        else if((true == isHost) || (true == isTarget))
+        {
+            if(false == checkViewEntryByHostOrTarget(
+                isHost,Host, isTarget, Target, &(viewEntryList->ve[i])))
+            {
+                continue;
+            }
+            veNbr = viewEntryList->ve[i].veIndex;
+        }
+		else {
 			endPtr = NULL;
 			veNbr = strtol(operands[i], &endPtr, 10);
 			if (endPtr && *endPtr != 0) {
@@ -3919,9 +3999,10 @@ removeViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			proxy_remove_view_entry->view_index = veNbr;
 			free(proxy_remove_view_entry);
 			
-			if (true == isCluster)
+			if (true == isCluster) {
 				stmfadm_send_cmd(cmdfullName);
-				break;
+			}
+			break;
 			case STMF_ERROR_NOT_FOUND:
 				(void) fprintf(stderr, "%s: %s: %d: %s\n",
 				    cmdName, sGuid, veNbr,
