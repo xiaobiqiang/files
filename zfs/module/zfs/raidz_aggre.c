@@ -818,16 +818,9 @@ raidz_aggre_map_open(spa_t *spa)
 		map->free_txg = 0;
 		mutex_init(&map->aggre_lock, NULL, MUTEX_DEFAULT, NULL);
 		
-		cmn_err(CE_NOTE, "%s %s map[%d].state=%d  tot=%ld process_index=%ld",
-			__func__, spa->spa_name, loop, map->hdr->state, 
-			(long)map->hdr->total_count, (long)map->hdr->process_index);
-        if (map->hdr->state == AGGRE_MAP_OBJ_RECLAIMING){
-            /*map->hdr->state = AGGRE_MAP_OBJ_RECLAIMED;*/
-            map->hdr->process_index = map->hdr->total_count ; 
-			cmn_err(CE_NOTE, "%s %s Clear reclaiming [%d]", 
-                __func__, spa->spa_name, loop);
-        }
-        
+		cmn_err(CE_NOTE, "%s %s map[%d].state=%d",
+			__func__, spa->spa_name, loop, map->hdr->state);
+
 		if (map->hdr->state == AGGRE_MAP_OBJ_FILLING) {
 			int blk_rec_count;
 			if (found_filling) {
@@ -1298,19 +1291,7 @@ raidz_check_and_reclaim_space(spa_t *spa)
 
 		ASSERT(data != NULL);
 		elem = (aggre_map_elem_t *)data;
-
-       	cmn_err(CE_WARN, "%s %s first_txg:[%lx] elem_txg:[%lx]",
-			__func__, spa->spa_name, spa->spa_first_txg, elem->txg);
-        if(elem->txg> spa->spa_first_txg && elem->txg< spa->spa_first_txg+5) 
-        {
-            err = 0;
-            cmn_err(CE_WARN, "%s %s pos=%"PRIu64" first_txg:[%lx] elem_txg:[%lx] ", 
-				__func__, spa->spa_name, pos, spa->spa_first_txg, elem->txg); 
-        }
-        else
-        {
-		    err = raidz_aggre_process_elem(spa, pos , elem, &state);
-        }
+		err = raidz_aggre_process_elem(spa, pos , elem, &state);
 		#if 0
 		DTRACE_PROBE3(process__result, spa_t *, spa, 
 			uint64_t, pos,
