@@ -1908,8 +1908,10 @@ zfs_domount(struct super_block *sb, zfs_mntopts_t *zmo, int silent)
 	int error;
 	int retry = 0;
 
+	zfs_dbgmsg("osname %s", osname);
 	while ((error = zfs_sb_create(osname, zmo, &zsb)) == EBUSY) {
 		cmn_err(CE_WARN,"[DS_BUSY] zfs_sb_create(%s)", osname);
+		zfs_dbgmsg("[DS_BUSY] osname %s", osname);
 		if (retry >= 3)
 			break;
 		retry++;
@@ -2016,7 +2018,8 @@ out:
 			start_zfs_group_dtl_thread(zsb->z_os);
 		}
 	}
-	
+
+	zfs_dbgmsg("osname %s error %d", osname, error);
 	return (error);
 }
 EXPORT_SYMBOL(zfs_domount);
@@ -2051,6 +2054,7 @@ zfs_umount(struct super_block *sb)
 	char fsname[MAX_FSNAME_LEN] = {0};
 	os = zsb->z_os;
 
+	zfs_dbgmsg("zsb %p", zsb);
 	stop_wrc_thread(zsb->z_os);
 
 	if (ZFS_GROUP_DTL_ENABLE)
@@ -2092,6 +2096,7 @@ zfs_umount(struct super_block *sb)
 		dmu_objset_disown(os, zsb);
 	}
 	zfs_sb_free(zsb);
+	zfs_dbgmsg("fini zsb %p", zsb);
 	return (0);
 }
 EXPORT_SYMBOL(zfs_umount);

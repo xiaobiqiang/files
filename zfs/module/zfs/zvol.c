@@ -1787,6 +1787,7 @@ zvol_alloc(dev_t dev, const char *name)
 	    ZVOL_DEV_NAME, (dev & MINORMASK));
 	
 	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
+	zfs_dbgmsg("zvol %s alloc %p", name, zv);
 	return (zv);
 
 out_queue:
@@ -1805,6 +1806,7 @@ zvol_free(zvol_state_t *zv)
 {
 
 	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
+	zfs_dbgmsg("zvol free %p", zv);
 	/*dump_stack();*/
 
 	ASSERT(MUTEX_HELD(&zvol_state_lock));
@@ -1852,6 +1854,8 @@ zvol_create_minor_impl(const char *name)
 
 	start = gethrtime();
 	cmn_err(CE_NOTE, "zjn %s name=%s start", __func__, name);
+
+	zfs_dbgmsg("zvol %s", name);
 
 	mutex_enter(&zvol_state_lock);
 
@@ -1975,6 +1979,8 @@ out:
 	} else {
 		mutex_exit(&zvol_state_lock);
 	}
+
+	zfs_dbgmsg("fini zvol %s error %d", name, error);
 
 	end = gethrtime();
 	cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms", 
@@ -2158,6 +2164,7 @@ zvol_remove_minors_impl(const char *name)
 
 	
 	printk(KERN_WARNING "%s %s begin", __func__, name);
+	zfs_dbgmsg("zvol %s", name);
 	mutex_enter(&zvol_state_lock);
 
 	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
@@ -2184,6 +2191,8 @@ zvol_remove_minors_impl(const char *name)
 #endif
 			printk(KERN_WARNING "%s %s zv_open_count %lu", __func__,
 				zv->zv_name, (ulong_t)zv->zv_open_count);
+			zfs_dbgmsg("zvol %s zv_open_count %lu",
+				zv->zv_name, (ulong_t)zv->zv_open_count);
 			while (zv->zv_open_count && count > 0) {
 				cv_timedwait(&zv->zv_rele_cv, &zvol_state_lock, 
 					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 10));
@@ -2209,6 +2218,8 @@ zvol_remove_minors_impl(const char *name)
 				zvol_free(zv);
 			} else {
 				printk(KERN_WARNING "%s zv_open_count %lu",
+					zv->zv_name, (ulong_t)zv->zv_open_count);
+				zfs_dbgmsg("zvol %s zv_open_count %lu",
 					zv->zv_name, (ulong_t)zv->zv_open_count);
 				zv->zv_flags &= ~ZVOL_WANT_REMOVE;
 			}
