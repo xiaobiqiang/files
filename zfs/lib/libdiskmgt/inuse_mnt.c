@@ -136,9 +136,9 @@ diff_mnttab(int send_event, struct mntpnt_list *firstp,
 	while (listp != NULL) {
 	    if (! in_list(listp, secondp)) {
 		/* not in new list, so was mounted and now unmounted */
-		if (send_event) {
+		/*if (send_event) {
 		    events_new_slice_event(listp->special, DM_EV_TCHANGE);
-		}
+		}*/
 		different = B_TRUE;
 	    }
 	    listp = listp->next;
@@ -148,9 +148,9 @@ diff_mnttab(int send_event, struct mntpnt_list *firstp,
 	while (listp != NULL) {
 	    if (! in_list(listp, firstp)) {
 		/* not in orig list, so this is a new mount */
-		if (send_event) {
+		/*if (send_event) {
 		    events_new_slice_event(listp->special, DM_EV_TCHANGE);
-		}
+		}*/
 		different = B_TRUE;
 	    }
 	    listp = listp->next;

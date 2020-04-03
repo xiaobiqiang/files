@@ -170,6 +170,7 @@ __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
 	size_t size;
 	char *buf;
 	char *nl;
+	char *xbuf;
 
 	if (!zfs_dbgmsg_enable && !(zfs_flags & ZFS_DEBUG_DPRINTF))
 		return;
@@ -223,8 +224,12 @@ __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
 	 * # Dump the log buffer.
 	 * $ cat /proc/spl/kstat/zfs/dbgmsg
 	 */
-	if (zfs_dbgmsg_enable)
-		__zfs_dbgmsg(buf);
+	if (zfs_dbgmsg_enable) {
+		xbuf = kmem_alloc(size, KM_SLEEP);
+		snprintf(xbuf, size, "%s [%d]: %s", func, line, buf);
+		__zfs_dbgmsg(xbuf);
+		kmem_free(xbuf, size);
+	}
 
 	kmem_free(buf, size);
 }
