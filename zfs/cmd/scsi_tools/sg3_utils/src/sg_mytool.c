@@ -14,6 +14,8 @@
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <stdarg.h>
+
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -3457,17 +3459,6 @@ decode_dev_slot_ids(const char * leadin, unsigned char * buff, int len)
         pr2serr("%s VPD page error: around offset=%d\n", leadin, off);
 }
 
-static void
-decode_id_slot_vpd(unsigned char * buff, int len, int do_hex)
-{
-    if (len < 4) {
-        pr2serr("Device identification VPD page length too "
-                "short=%d\n", len);
-        return;
-    }
-    decode_dev_slot_ids("Device identification", buff + 4, len - 4, do_hex);
-}
-
 static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
 
 static int
@@ -3612,30 +3603,58 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     }
 }
 
-
-/* Returns 0 if successful */
-static int
-vpd_decode_slot(int sg_fd)
+static void
+show_disk_slot(const unsigned char * ucp, int len, const struct opts_t * op)
 {
-    int len, pdt,  mxlen;
-    int res = 0;
-    unsigned char * rp;
-    rp = rsp_buff;
-    if (sg_fd >= 0)
-        mxlen = 0;
-    else
-        mxlen = -1;
+    int desc_type, eip_offset ,pcie_pt;
 
-    res = vpd_fetch_page_from_dev(sg_fd, rp, 0x83, mxlen, 0, &len);
-    if (res == 0)
-        decode_id_slot_vpd(rp, len, 0);
- 
-    return res;
+    if (op->inner_hex) {
+        return;
+    }
+    eip_offset = (0x10 & ucp[0]) ? 2 : 0;
+    switch (0xf & ucp[0]) {
+    case TPROTO_FCP:
+        if (len < (12 + eip_offset))
+            break;
+        if (eip_offset)
+            printf("device slot number: %d", ucp[5 + eip_offset]);
+        printf("\n");
+        break;
+    case TPROTO_SAS:
+        if (len < (4 + eip_offset))
+            break;
+        desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
+        if (0 == desc_type) {
+            if (eip_offset)
+                printf("device slot number: %d", ucp[5 + eip_offset]);
+            printf("\n");
+        } 
+        break;
+    case TPROTO_PCIE: /* added in ses3r08 */
+        if (0 == eip_offset) {
+            break;
+        }
+        if (len < 6)
+            break;
+        pcie_pt = (ucp[5] >> 5) & 0x7;
+        if (1 != pcie_pt){
+            if (op->verbose)
+                dStrHex((const char *)ucp, len, 0);
+            break;
+        }
+        printf("device slot number: %d\n", ucp[7]);
+    default:
+        break;
+    }
 }
 
 
+/* Fetch Configuration, Enclosure Status, Element Descriptor, Additional
+ * Element Status and optionally Threshold In pages, place in static arrays.
+ * Collate (join) overall and individual elements into the static join_arr[].
+ * Returns 0 for success, any other return value is an error. */
 static int
-show_disk_slot(int sg_fd, struct opts_t * op, int display)
+join_work_zjd(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, desc_len, dn_len;
     int et4aes, broken_ei, ei2, got1, jr_max_ind, mlen;
@@ -3663,12 +3682,7 @@ show_disk_slot(int sg_fd, struct opts_t * op, int display)
                                             op);
     if (num_t_hdrs < 0)
         return num_t_hdrs;
-    if (display && primary_info.have_info) {
-        printf("  Primary enclosure logical identifier (hex): ");
-        for (j = 0; j < 8; ++j)
-            printf("%02x", primary_info.enc_log_id[j]);
-        printf("\n");
-    }
+
     mlen = sizeof(enc_stat_rsp);
     if (mlen > op->maxlen)
         mlen = op->maxlen;
@@ -3943,26 +3957,6 @@ try_again:
         }
     }
 
-    if (op->verbose > 3) {
-        jrp = join_arr;
-        for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            pr2serr("el_ind_th=%d el_ind_indiv=%d etype=%d se_id=%d ei=%d "
-                    "ei2=%d dsn=%d sa=0x", jrp->el_ind_th, jrp->el_ind_indiv,
-                    jrp->etype, jrp->se_id, jrp->ei_asc, jrp->ei_asc2,
-                    jrp->dev_slot_num);
-            if (saddr_non_zero(jrp->sas_addr)) {
-                for (j = 0; j < 8; ++j)
-                    pr2serr("%02x", jrp->sas_addr[j]);
-            } else
-                pr2serr("0");
-            pr2serr(" %s %s %s %s\n", (jrp->enc_statp ? "ES" : ""),
-                    (jrp->elem_descp ? "ED" : ""),
-                    (jrp->add_elem_statp ? "AES" : ""),
-                    (jrp->thresh_inp ? "TI" : ""));
-        }
-        pr2serr(">> elements in join_arr: %d, broken_ei=%d\n", k, broken_ei);
-    }
-
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
@@ -4004,10 +3998,11 @@ try_again:
         ++got1;
         if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
             continue;   /* when '-ff' and status!=OK, skip */
+
         if (jrp->add_elem_statp) {
             ae_ucp = jrp->add_elem_statp;
             desc_len = ae_ucp[1] + 2;
-			get_myslot("INFO ", ae_ucp, desc_len,op);
+            show_disk_slot(ae_ucp, desc_len, op);
         }
     }
     return res;
@@ -4937,21 +4932,170 @@ enumerate_work(const struct opts_t * op)
     }
 }
 
-int 
-main(int argc,char *argv[]){
+static void
+trimTrailingSpaces(char * b)
+{
+    int k;
 
-	int sg_fd = 0;
-
-	if ((sg_fd = sg_cmds_open_device(argv[1],1,0)) < 0) {
-	    return SG_LIB_FILE_ERROR;
-	}
-
-	vpd_decode_slot(sg_fd);
-
+    for (k = ((int)strlen(b) - 1); k >= 0; --k) {
+        if (' ' != b[k])
+            break;
+    }
+    if ('\0' != b[k + 1])
+        b[k + 1] = '\0';
 }
 
+
+static int
+my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    if (cp_max_len < 2)
+        return 0;
+    va_start(args, fmt);
+    n = vsnprintf(cp, cp_max_len, fmt, args);
+    va_end(args);
+    return (n < cp_max_len) ? n : (cp_max_len - 1);
+}
+
+void myStr(const char* str, int len, int no_ascii,FILE * fp){
+	const char * p = str;
+    const char * formatstr;
+    unsigned char c;
+    char buff[82];
+    int bpstart = 5;
+    const int cpstart = 60;
+    int cpos = cpstart;
+    int bpos = bpstart;
+    int k, blen;
+
+    if (len > 16)
+		len = 16
+	else if(len <=0)
+        return;
+    blen = (int)sizeof(buff);
+    formatstr = "%s\n";     /* was: "%.48s\n"; */
+
+	memset(buff, ' ', 80);
+    buff[80] = '\0';
+    bpstart = 0;
+    bpos = bpstart;
+    for (k = 0; k < len; k++) {
+        c = *p++;
+        if (bpos == (bpstart + (8 * 3)))
+            bpos++;
+        my_snprintf(&buff[bpos], blen - bpos, "%.2x",
+                    (int)(unsigned char)c);
+		bpos += 2;
+    }
+	
+    if (bpos > bpstart) {
+        buff[bpos + 2] = '\0';
+        fprintf(fp, "%s\n", buff);
+    }
+    return;
+}
+
+/* These are target port, device server (i.e. target) and LU identifiers */
+static void
+disk_decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
+{
+    int u, j, id_len, c_set, piv, assoc, desig_type, i_len;
+    int off;
+    const unsigned char * ucp;
+    const unsigned char * ip;
+	
+    for (j = 1, off = -1;
+         (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
+         ++j) {
+		if(j != 2)
+			continue;
+        ucp = buff + off;
+        i_len = ucp[3];
+        id_len = i_len + 4;
+
+        if ((off + id_len) > len){
+            return;
+        }
+        ip = ucp + 4;
+
+		myStr((const char *)ip, i_len, -1,stdout);
+	}
+}
+
+static void
+disk_decode_id_vpd(unsigned char * buff, int len, int do_hex)
+{
+    if (len < 4) {
+        pr2serr("Device identification VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    disk_decode_dev_ids("Device identification", buff + 4, len - 4, do_hex);
+}
+
+#define VPD_DEVICE_ID  0x83
+
+/* Returns 0 if successful */
+static int
+disk_vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
+{
+    int len, pdt, pn, vb, mxlen;
+    int res = 0;
+    unsigned char * rp;
+
+    rp = rsp_buff;
+    vb = op->verbose;
+	
+    res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_DEVICE_ID, 0, vb, &len);
+    if (res)
+        return res;
+    
+    disk_decode_id_vpd(rp, len, op->do_hex);
+
+    return res;
+}
+
+int
+main(int argc, char * argv[])
+{
+    int sg_fd, res, n;
+    int ret = 0;
+    int inhex_len = 0;
+    const struct svpd_values_name_t * vnp;
+    struct opts_t opts;
+    struct opts_t * op;
+
+    op = &opts;
+       /* use default for OS */
+    res = cl_process(op, argc, argv);
+    if (res)
+        return SG_LIB_SYNTAX_ERROR;
+
+    if ((sg_fd = sg_cmds_open_device(argv[2], 1 /* ro */,
+                                     op->verbose)) < 0) {
+        return SG_LIB_FILE_ERROR;
+    }
+
+    ret = disk_vpd_decode(sg_fd, op, -1);
+
+
+err_out:
+    res = sg_cmds_close_device(sg_fd);
+    if (res < 0) {
+        pr2serr("close error: %s\n", safe_strerror(-res));
+        if (0 == ret)
+            return SG_LIB_FILE_ERROR;
+    }
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+}
+
+
 #if 0
-/*int
+
+int
 main(int argc, char * argv[])
 {
     int sg_fd, res;
@@ -4975,60 +5119,6 @@ main(int argc, char * argv[])
         pr2serr("version: %s\n", version_str);
         return 0;
     }
-    if (op->do_help) {
-        usage(op->do_help);
-        return 0;
-    }
-    if (op->enumerate || op->do_list) {
-        enumerate_work(op);
-        return 0;
-    }
-    if (op->num_cgs) {
-        have_cgs = 1;
-        cp = op->clear_str ? op->clear_str :
-             (op->get_str ? op->get_str : op->set_str);
-        strncpy(buff, cp, sizeof(buff) - 1);
-        buff[sizeof(buff) - 1] = '\0';
-        if (parse_cgs_str(buff, &tav)) {
-            pr2serr("unable to decode STR argument to --clear, --get or "
-                    "--set\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (op->get_str && tav.val_str)
-            pr2serr("--get option ignoring =<val> at the end of STR "
-                    "argument\n");
-        if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
-               saddr_non_zero(op->sas_addr))) {
-            pr2serr("with --clear, --get or --set option need either\n   "
-                    "--index, --descriptor, --dev-slot-num or --sas-addr\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (NULL == tav.val_str) {
-            if (op->clear_str)
-                tav.val = 0;
-            if (op->set_str)
-                tav.val = 1;
-        }
-        if (op->page_code_given && (DPC_ENC_STATUS != op->page_code) &&
-            (DPC_THRESHOLD != op->page_code) &&
-            (DPC_ADD_ELEM_STATUS != op->page_code)) {
-            pr2serr("--clear, --get or --set options only supported for the "
-                    "Enclosure\nControl/Status, Threshold In/Out and "
-                    "Additional Element Status pages\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-    }
-
-#ifdef SG_LIB_WIN32
-#ifdef SG_LIB_WIN32_DIRECT
-    if (op->verbose > 4)
-        pr2serr("Initial win32 SPT interface state: %s\n",
-                scsi_pt_win32_spt_state() ? "direct" : "indirect");
-    if (op->maxlen >= 16384)
-        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
-#endif
-//#endif
-#if 0
     sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
@@ -5052,110 +5142,11 @@ main(int argc, char * argv[])
                 printf("    %s device (not an enclosure)\n", cp);
         }
     }
-
-    if (op->nickname_str)
-        ret = ses_set_nickname(sg_fd, op);
-    else if (have_cgs)
-        ret = ses_cgs(sg_fd, &tav, op);
-    else if (op->do_join)
-        ret = show_disk_slot(sg_fd, op, 1);
-    else if (op->do_status)
-        ret = ses_process_status_page(sg_fd, op);
-    else { /* control page requested */
-        op->data_arr[0] = op->page_code;
-        op->data_arr[1] = op->byte1;
-        sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
-        switch (op->page_code) {
-        case DPC_ENC_CONTROL:  /* Enclosure Control diagnostic page [0x2] */
-            printf("Sending Enclosure Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Enclosure Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_STRING:       /* String Out diagnostic page [0x4] */
-            printf("Sending String Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send String Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_THRESHOLD:       /* Threshold Out diagnostic page [0x5] */
-            printf("Sending Threshold Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Threshold Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_ARRAY_CONTROL:   /* Array control diagnostic page [0x6] */
-            printf("Sending Array Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Array Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_SUBENC_STRING: /* Subenclosure String Out page [0xc] */
-            printf("Sending Subenclosure String Out [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Subenclosure String Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_DOWNLOAD_MICROCODE: /* Download Microcode Control [0xe] */
-            printf("Sending Download Microcode Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
-            printf("  Perhaps it would be better to use the sg_ses_microcode "
-                   "utility\n");
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Download Microcode Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_SUBENC_NICKNAME: /* Subenclosure Nickname Control [0xf] */
-            printf("Sending Subenclosure Nickname Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Subenclosure Nickname Control page\n");
-                goto err_out;
-            }
-            break;
-        default:
-            pr2serr("Setting SES control page 0x%x not supported by this "
-                    "utility\n", op->page_code);
-            pr2serr("That can be done with the sg_senddiag utility with its "
-                    "'--raw=' option\n");
-            ret = SG_LIB_SYNTAX_ERROR;
-            break;
-        }
-    }
+	ret = join_work_zjd(sg_fd, op, 1);
+    
 
 err_out:
-    if (0 == op->do_status) {
-        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
-        pr2serr("    %s\n", b);
-    }
-    if (ret && (0 == op->verbose))
-        pr2serr("Problem detected, try again with --verbose option for more "
-                "information\n");
+
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
@@ -5163,6 +5154,6 @@ err_out:
             return SG_LIB_FILE_ERROR;
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
-}*/
+}
 #endif
 
