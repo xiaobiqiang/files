@@ -6195,6 +6195,26 @@ unshielding_failover_poollist(struct link_list *list)
 	return (success);
 }
 
+static void
+get_share_status(int *active)
+{
+	char buf[128];
+	FILE *fp;
+
+	snprintf(buf, 128, "systemctl is-active nfs-server");
+	if ((fp = popen(buf, "r")) == NULL) {
+		*active = -1;
+		return ;
+	}
+
+	while (fgets(buf, 128, fp) != NULL) {
+		if (strncmp(buf, "active", 6) == 0)
+			*active = 1;
+		break;
+	}
+	pclose(fp);
+}
+
 static int
 check_share_service(void)
 {
@@ -6202,26 +6222,19 @@ check_share_service(void)
 	FILE *fp;
 	int active = -1;
 
-top:
-	snprintf(buf, 128, "/usr/bin/systemctl is-active nfs-server");
-	if ((fp = popen(buf, "r")) == NULL)
-		return (-1);
-	while (fgets(buf, 128, fp) != NULL) {
-		if (strncmp(buf, "active", 6) == 0)
-			active = 1;
-		break;
-	}
-	pclose(fp);
-
+	get_share_status(&active);
 	if (active != -1)
 		return (active);
 
-	snprintf(buf, 128, "/usr/bin/systemctl start nfs-server");
+	snprintf(buf, 128, "systemctl start nfs-server");
 	if ((fp = popen(buf, "r")) == NULL)
 		return (0);
+	else {
+		get_share_status(&active);
+		if (active != -1)
+			return (active);
+	}
 	pclose(fp);
-	active = 0;
-	goto top;
 
 	return (0);
 }
