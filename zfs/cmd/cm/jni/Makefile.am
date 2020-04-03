@@ -26,6 +26,8 @@ AM_CPPFLAGS += \
 	-I$(top)/config \
 	-I/usr/lib/jvm/java-1.8.0-swjdk-H318P.sw_64/include/linux/ \
 	-I/usr/lib/jvm/java-1.8.0-swjdk-H318P.sw_64/include/ \
+	-I/usr/lib/jvm/java-1.8.0-openjdk-sw_64/include/ \
+	-I/usr/lib/jvm/java-1.8.0-openjdk-sw_64/include/linux/ \
 	-I$(top)/jni \
 	-I$(top)/jni/config
 libcmjni_la_SOURCES = \

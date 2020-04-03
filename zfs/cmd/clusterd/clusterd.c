@@ -70,6 +70,7 @@ char zpool_cmd[MAXPATHLEN] = "/usr/local/sbin/zpool";
 char zpool_import_cmd[MAXPATHLEN] = "/usr/local/sbin/zpool import -bfi";
 char zpool_export_cmd[MAXPATHLEN] = "/usr/local/sbin/zpool export -f";
 char clusterd_cmd[MAXPATHLEN] = "/usr/local/sbin/clusterd";
+char dbgmsg_cmd[MAXPATHLEN] = "/usr/local/bin/trace_dbgmsgs.py";
 
 char ip_cmd[MAXPATHLEN] = "/usr/sbin/ip";
 
@@ -6695,6 +6696,21 @@ fix_command_path(void)
 		if (result)
 			free(result);
 	}
+
+	if (stat(dbgmsg_cmd, &sb) == -1) {
+		strcpy(dbgmsg_cmd, "/usr/bin/trace_dbgmsgs.py");
+		if (stat(dbgmsg_cmd, &sb) == -1) {
+			sprintf(cmd, "%s trace_dbgmsgs.py", which);
+			if (excute_cmd_result(cmd, &result) == 0 && result != NULL) {
+				if (stat(result, &sb) == 0) {
+					strcpy(dbgmsg_cmd, result);
+					c_log(LOG_WARNING, "dbgmsg_cmd=%s", dbgmsg_cmd);
+				}
+			}
+			if (result)
+				free(result);
+		}
+	}
 }
 
 int
@@ -6706,6 +6722,7 @@ main(int argc, char *argv[])
 	char *log_path = NULL;
 	int log_level = 0;
 	int log_flags = 0;
+	int trace_dbgmsgs_enable = 1;
 
 	/*
 	 * There is no check for non-global zone and Trusted Extensions.
@@ -6781,6 +6798,12 @@ main(int argc, char *argv[])
 			else
 				log_flags = val;
 		}
+		if ((defval = defread("TRACE_DBGMSG=")) != NULL) {
+			if (strncasecmp("TRUE", defval, 4) == 0)
+				trace_dbgmsgs_enable = 1;
+			else
+				trace_dbgmsgs_enable = 0;
+		}
 
 		defopen(NULL);
 	}
@@ -6817,6 +6840,9 @@ main(int argc, char *argv[])
 	cluster_log_init(MyName, log_path, log_level, log_flags);
 	c_log(LOG_WARNING, "clusterd enabled.");
 	(void) signal(SIGHUP, warn_hup);
+
+	if (trace_dbgmsgs_enable)
+		trace_dbgmsgs_init(dbgmsg_cmd);
 
 	g_zfs_init();
 	init_cluster_failover_conf();

@@ -476,6 +476,9 @@ function setipaddress
 	if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ]; then
 		echo "/etc/network/interfaces" > /tmp/nicpath
 		ifconfig -a|grep Link|awk '{print $1}' >/tmp/inittmp
+	elif [ "deepin" == ${osversion:0:6} ]; then
+		echo "/etc/network/interfaces" > /tmp/nicpath
+		ip a | grep mtu | cut -d ' ' -f 2 | sed s/:// >/tmp/inittmp
 	else
 		echo "/etc/sysconfig/network-scripts/ifcfg-" > /tmp/nicpath	
 		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
@@ -529,7 +532,7 @@ function setipaddress
 		MASK=`cat /tmp/inittmp1`
 		nicpath=`cat /tmp/nicpath`
 
-		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ];then
+		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ] || [ "deepin" == ${osversion:0:6} ];then
 			echo "CREATING $dst config file."
 			cat >> $nicpath << _HSTNAME_
 auto $dst
@@ -654,6 +657,25 @@ function add_prepare_gui
 	fi
 }
 
+function deepin_unmanage_netdevice
+{
+	if [ "deepin" == ${osversion:0:6} ]; then
+		for nd in `ip a | grep mtu | awk '{print $2}' | sed 's/://'`; do
+			if [ X10000Mb/s == X`ethtool $nd | grep Speed | cut -d ' ' -f 2` ]; then 
+				local ether=`ifconfig $nd | grep ether | awk '{print $2}'`
+				if [ `cat /etc/NetworkManager/NetworkManager.conf | grep "\[keyfile\]" | wc -l` -lt 1 ]; then
+					echo "" >> /etc/NetworkManager/NetworkManager.conf
+					echo '[keyfile]' >> /etc/NetworkManager/NetworkManager.conf
+					echo "unmanaged-devices=mac:${ether};" >> /etc/NetworkManager/NetworkManager.conf
+				else
+					local origin=`cat NetworkManager.conf | grep unmanaged-devices`
+					sed "s/${origin}/${origin}${ether};/" -i /etc/NetworkManager/NetworkManager.conf
+				fi
+			fi
+		done
+	fi
+}
+
 #main
 
 get_osversion
@@ -768,6 +790,8 @@ else
 	echo "Init cluster failed and exit!"
 	exit 
 fi
+
+deepin_unmanage_netdevice
 
 echo ""
 echo ""

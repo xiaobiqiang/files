@@ -1705,6 +1705,8 @@ zio_suspend(spa_t *spa, zio_t *zio)
 
 	cmn_err(CE_WARN, "Pool '%s' has encountered an uncorrectable I/O "
 	    "failure and has been suspended.\n", spa_name(spa));
+	zfs_dbgmsg("Pool '%s' has encountered an uncorrectable I/O "
+	    "failure and has been suspended.\n", spa_name(spa));
 
 	zfs_ereport_post(FM_EREPORT_ZFS_IO_FAILURE, spa, NULL, NULL, 0, 0);
 
@@ -1726,6 +1728,8 @@ zio_suspend(spa_t *spa, zio_t *zio)
 		ASSERT(zio_unique_parent(zio) == NULL);
 		ASSERT(zio->io_stage == ZIO_STAGE_DONE);
 		zio_add_child(spa->spa_suspend_zio_root, zio);
+		zfs_dbgmsg("zio %p error %d flags %x",
+			zio, zio->io_error, zio->io_flags);
 	}
 
 	mutex_exit(&spa->spa_suspend_lock);
@@ -1745,6 +1749,7 @@ zio_resume(spa_t *spa)
 	pio = spa->spa_suspend_zio_root;
 	spa->spa_suspend_zio_root = NULL;
 	mutex_exit(&spa->spa_suspend_lock);
+	zfs_dbgmsg("spa %s", spa_name(spa));
 
 	if (pio == NULL)
 		return (0);
@@ -3398,6 +3403,12 @@ zio_done(zio_t *zio)
 	}
 
 	if (zio->io_error) {
+		zfs_dbgmsg("zio %p error %d flags %x reexcute %d",
+			zio, zio->io_error, zio->io_flags, zio->io_reexecute);
+		if (zio->io_vd != NULL) {
+			zfs_dbgmsg("zio %p vd_guid %llx",
+				zio, (u_longlong_t)zio->io_vd->vdev_guid);
+		}
 		/*
 		 * If this I/O is attached to a particular vdev,
 		 * generate an error message describing the I/O failure

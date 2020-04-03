@@ -623,7 +623,6 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	disk_info_t *current = NULL;
 	char * scsid = NULL;
 	int len = 0;
-	syslog(LOG_ERR, "dt_update_disk_info in 1");
 
 	dcb.dcb_list = &listp;
 	dcb.hdl = hdl;
