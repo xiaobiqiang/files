@@ -152,6 +152,7 @@ typedef enum
     CM_SYS_VER_SOLARIS_V7R16,
     CM_SYS_VER_SOLARIS_NOMASTER,
     CM_SYS_VER_LINUX,
+    CM_OS_TYPE_DEEPIN,
 }cm_system_version_e;
 
 
