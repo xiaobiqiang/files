@@ -9,11 +9,7 @@ function cm_cnm_dirquota_getbatch()
     local names=$(zfs list|awk '{print $5}'|sed -n '/\/.*\//'p|awk -F'/' '{print $2 "/" $3}')
     for name in ${names[@]}
     do
-        if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
-                zfs dirspace $name 2>/dev/null|sed 's/%//g'
-        else
-                zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'
-        fi      
+        zfs dirspace $name 2>/dev/null|sed 's/%//g' 
     done
     return $CM_OK
 }
@@ -23,18 +19,10 @@ function cm_cnm_dirquota_get()
     local name=$1
     local path=$2
     if [ $path == "all" ];then
-        if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
-                zfs dirspace $name 2>/dev/null|sed 's/%//g'
-        else
-                zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'
-        fi    
-       return $?
+        zfs dirspace $name 2>/dev/null|sed 's/%//g'  
+        return $?
     fi
-    if [ $VERSION -eq $CM_SYS_VER_SOLARIS_V7R16 ];then
-            zfs dirspace $name 2>/dev/null|sed 's/%//g'|grep -w $path
-    else
-            zfs dirspace $name 2>/dev/null|sed '1d'|sed 's/%//g'|grep -w $path
-    fi
+    zfs dirspace $name 2>/dev/null|sed 's/%//g'|grep -w $path
     return $?
 }
 
