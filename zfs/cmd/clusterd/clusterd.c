@@ -6312,6 +6312,8 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		}
 	}
 
+	c_log(LOG_ERR, FUNC_LINE"release pools finished.", func_line);
+
 	unshielding_failover_poollist(pool_list);
 exit_func:
 	for (p = pool_list; p != NULL; p = p->next)
