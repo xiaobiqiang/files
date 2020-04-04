@@ -319,6 +319,9 @@ struct shielding_failover_pools {
 	struct link_list *head;	/* point a struct release_pool_param list */
 };
 
+#define FUNC_LINE       "[%s %d]"
+#define func_line       __func__, __LINE__
+
 /*
  * These pools are ready to import/export by release message handler or
  * mac offline event handler, do_ip_failover()/do_ip_restore() shuold
@@ -6224,16 +6227,20 @@ check_share_service(void)
 	int active = -1;
 
 	get_share_status(&active);
-	if (active != -1)
+	if (active != -1) {
+		c_log(LOG_WARN, FUNC_LINE"nfs-server is active", func_line);
 		return (active);
+	}
 
 	snprintf(buf, 128, "systemctl start nfs-server");
 	if ((fp = popen(buf, "r")) == NULL)
 		return (0);
 	else {
 		get_share_status(&active);
-		if (active != -1)
+		if (active != -1) {
+			c_log(LOG_ERR, FUNC_LINE"open nfs-server failed.", func_line);
 			return (active);
+		}
 	}
 	pclose(fp);
 
@@ -6259,9 +6266,9 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		return (-1);
 	}
 
+	c_log(LOG_WARN, FUNC_LINE"step 1: open nfs-server.", func_line);
 	if (check_share_service() != 1) {
-		c_log(LOG_ERR, "%s: share service inactive", __func__);
-		return (-1);
+		c_log(LOG_ERR, FUNC_LINE"nfs-server inactive.", func_line);
 	}
 
 	/*
@@ -6276,6 +6283,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	}
 
 	/* step 2: import the pools */
+	c_log(LOG_WARN, FUNC_LINE"step 2: import the pools.", func_line);
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < 10; i++) {
@@ -6290,6 +6298,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		}
 	}
 
+	c_log(LOG_WARN, FUNC_LINE"step 3: failover the ips.", func_line);
 	for (p = pool_list; (p != NULL) && (p->ptr != NULL); p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < param->failover_num; i++) {
@@ -6332,6 +6341,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 			break;
 		}
 		/* get pool failover props */
+		c_log(LOG_WARN, FUNC_LINE"step 1: get pool failover props.", func_line);
 		strlcpy(param->pool_name, r_msg->pools_list[i], ZPOOL_MAXNAMELEN);
 		param->failover_num = 0;
 		if (get_release_pool_param(param) != 0) {
@@ -6377,6 +6387,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 
 		/* step 2: export the pools */
+		c_log(LOG_WARN, FUNC_LINE"step 2: export the pools.", func_line);
 		if (err == 0) {
 			uint32_t	hostid = 0;
 
@@ -6400,6 +6411,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 
 		/* step 3: send the todo release pools to remote */
+		c_log(LOG_WARN, FUNC_LINE"step 2: send the todo release pools to remote.", func_line);
 		if (err == 0) {
 			buffer = malloc(MAX_RELEASE_POOLS_MSGSIZE);
 			if (!buffer)
