@@ -6228,7 +6228,7 @@ check_share_service(void)
 
 	get_share_status(&active);
 	if (active != -1) {
-		c_log(LOG_WARN, FUNC_LINE"nfs-server is active", func_line);
+		c_log(LOG_ERR, FUNC_LINE"nfs-server is active", func_line);
 		return (active);
 	}
 
@@ -6283,7 +6283,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	}
 
 	/* step 2: import the pools */
-	c_log(LOG_WARN, FUNC_LINE"step 2: import the pools.", func_line);
+	c_log(LOG_ERR, FUNC_LINE"step 2: import the pools.", func_line);
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < 10; i++) {
@@ -6298,7 +6298,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		}
 	}
 
-	c_log(LOG_WARN, FUNC_LINE"step 3: failover the ips.", func_line);
+	c_log(LOG_ERR, FUNC_LINE"step 3: failover the ips.", func_line);
 	for (p = pool_list; (p != NULL) && (p->ptr != NULL); p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < param->failover_num; i++) {
@@ -6341,7 +6341,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 			break;
 		}
 		/* get pool failover props */
-		c_log(LOG_WARN, FUNC_LINE"step 1: get pool failover props.", func_line);
+		c_log(LOG_ERR, FUNC_LINE"step 1: get pool failover props.", func_line);
 		strlcpy(param->pool_name, r_msg->pools_list[i], ZPOOL_MAXNAMELEN);
 		param->failover_num = 0;
 		if (get_release_pool_param(param) != 0) {
@@ -6387,7 +6387,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 
 		/* step 2: export the pools */
-		c_log(LOG_WARN, FUNC_LINE"step 2: export the pools.", func_line);
+		c_log(LOG_ERR, FUNC_LINE"step 2: export the pools.", func_line);
 		if (err == 0) {
 			uint32_t	hostid = 0;
 
@@ -6411,7 +6411,7 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 
 		/* step 3: send the todo release pools to remote */
-		c_log(LOG_WARN, FUNC_LINE"step 2: send the todo release pools to remote.", func_line);
+		c_log(LOG_ERR, FUNC_LINE"step 2: send the todo release pools to remote.", func_line);
 		if (err == 0) {
 			buffer = malloc(MAX_RELEASE_POOLS_MSGSIZE);
 			if (!buffer)
