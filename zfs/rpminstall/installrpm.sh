@@ -60,7 +60,12 @@ function install_scsi()
 {
     tar -xzvf scsi_tool.tar.gz
     cp scsi/sg_* /usr/local/bin
-    cp scsi/lib/* /usr/local/lib
+    cp scsi/lsscsi /usr/local/bin
+    if [ `uname -m` = "sw_64" ]; then
+        cp scsi/lib/* /lib
+    else
+        cp scsi/lib/* /lib64
+    fi
 }
 
 function install()
