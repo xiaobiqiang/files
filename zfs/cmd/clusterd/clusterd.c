@@ -6266,7 +6266,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		return (-1);
 	}
 
-	c_log(LOG_WARN, FUNC_LINE"step 1: open nfs-server.", func_line);
+	c_log(LOG_ERR, FUNC_LINE"step 1: open nfs-server.", func_line);
 	if (check_share_service() != 1) {
 		c_log(LOG_ERR, FUNC_LINE"nfs-server inactive.", func_line);
 	}
