@@ -4,10 +4,13 @@ RPM_DIR="./rpm"
 SPL_RPM=$RPM_DIR"/spl"
 ZFS_RPM=$RPM_DIR"/zfs"
 GUI_DIR="/gui"
+SYSTEM_DIR="../etc/systemd/system"
+RELY_DEB="deepinrely.tar.gz"
+IS_DEEP=`uname -r|grep deepin|wc -l`
 
 function install_gui()
 {
-    gui_tar=`ls ./ |grep G1`
+    local gui_tar=`ls ./ |grep G1`
     if [  "X"$gui_tar = "X" ]; then
         echo "no GUI"
         return
@@ -68,6 +71,30 @@ function install_scsi()
     fi
 }
 
+function install_deepin_rely()
+{
+    local rely_nmae=`echo $RELY_DEB|sed 's/.tar.gz//g'`
+    tar -xzvf $RELY_DEB
+    
+    cd $rely_nmae/deb-pkg
+    dpkg -i ./*
+    cd -
+    
+    if [ `ls /usr/lib/jvm/|grep jdk8|wc -l` -ne 0 ]; then
+        cp $rely_nmae/jdk8.tar /usr/lib/jvm/
+        cd /usr/lib/jvm/
+        tar -xvf jdk8.tar
+        rm jdk8.tar
+        cd - 
+    fi
+    
+    if [ `cat /etc/profile|grep JAVA_HOME|wc -l` -eq 0 ]; then
+        echo 'export JAVA_HOME=/usr/lib/jvm/jdk8' >> /etc/profile
+        echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /etc/profile
+        echo 'export CLASSPATH=.:$JAVA_HONE/lib/dt.jar:$JAVA_HOME/lib/tools.jar' >> /etc/profile
+    fi
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
@@ -77,15 +104,27 @@ function install()
     
     tar -xzvf zfsonlinuxrpm.tar.gz
         
-    if [ `uname -a|grep deepin|wc -l` -eq 0 ]; then
+    if [ $IS_DEEP -eq 0 ]; then
         install_type_rpm
     else
         install_type_deb
+        
+        mkdir -p /lib/systemd/system-preset/
+        cp system/*service /lib/systemd/system
+        cp system/50-zfs.preset /lib/systemd/system-preset/
+
+        if [ -f $RELY_DEB ]; then
+            install_deepin_rely
+        fi
+        
+        /usr/cm/script/cm_rpm.sh
+        /usr/local/sbin/rpm_install.sh
     fi
     
     if [ `uname -m` = "sw_64" ]; then
         cp  /lib/modules/$(uname -r)/extra/zfs/mpt3sas/mpt3sas.ko  /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
     fi
+        
     install_gui
     install_scsi
 }
@@ -94,7 +133,7 @@ function install()
 function unload()
 {
 
-    if [ `uname -a|grep deepin|wc -l` -eq 0 ]; then
+    if [ $IS_DEEP -eq 0 ]; then
         rpm -qa | grep 0.6.5.9 |xargs rpm -e
     else
         dpkg -l |grep 0.6.5.9|awk '{print $2}'|xargs dpkg -r
