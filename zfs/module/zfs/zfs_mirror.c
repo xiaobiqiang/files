@@ -1025,7 +1025,7 @@ failed:
             data = (void *)blkptr_list->blkptr_array;
             len =  blkptr_list->blkptr_num * sizeof(os_mirror_blkptr_node_t);
         }
-        kmem_free(data, len);
+        vfree(data);
         kmem_free(blkptr_list, sizeof(os_mirror_blkptr_list_t));
     }
     kmem_free(para, sizeof(log_clear_para_t));

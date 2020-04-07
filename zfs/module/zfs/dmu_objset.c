@@ -2796,7 +2796,7 @@ dmu_objset_clear_mirror_io(objset_t *os, uint64_t txg)
         goto FINISH;
     }
 
-    blkptr_array->blkptr_array  = kmem_zalloc(
+    blkptr_array->blkptr_array  = vmalloc(
         sizeof(os_mirror_blkptr_node_t) * os->os_mirror_io_num[txg_id], KM_SLEEP);
     if (blkptr_array->blkptr_array == NULL) {
         cmn_err(CE_WARN, "mem alloc mirror blkptr array failed");
