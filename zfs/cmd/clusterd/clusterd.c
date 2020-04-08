@@ -6413,8 +6413,8 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 
 		/* step 3: send the todo release pools to remote */
-		c_log(LOG_ERR, FUNC_LINE"step 2: send the todo release pools to remote.", func_line);
 		if (err == 0) {
+			c_log(LOG_ERR, FUNC_LINE"step 3: send the todo release pools to remote.", func_line);
 			buffer = malloc(MAX_RELEASE_POOLS_MSGSIZE);
 			if (!buffer)
 				err = -1;
