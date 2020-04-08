@@ -161,7 +161,12 @@ function cm_software_version()
     if [ $issolaris -ne 0 ]; then
         sed -n 1p /lib/release |awk -F'.' '{print $3$4$5}' |sed 's/PRO//g'
     else
-        echo "zfsonlinux_sw" 
+        local version=`cat /etc/release`
+        if [ "X"$version = "X" ]; then
+            echo "zfsonlinux_sw"
+        else
+            echo $version
+        fi
     fi
 }
 

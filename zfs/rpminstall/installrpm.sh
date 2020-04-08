@@ -6,6 +6,7 @@ ZFS_RPM=$RPM_DIR"/zfs"
 GUI_DIR="/gui"
 SYSTEM_DIR="../etc/systemd/system"
 RELY_DEB="deepinrely.tar.gz"
+VERSION_FILE="release"
 IS_DEEP=`uname -r|grep deepin|wc -l`
 
 function install_gui()
@@ -95,6 +96,11 @@ function install_deepin_rely()
     fi
 }
 
+function install_version()
+{
+    cp $VERSION_FILE /etc
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
@@ -127,6 +133,7 @@ function install()
         
     install_gui
     install_scsi
+    install_version
 }
 
 

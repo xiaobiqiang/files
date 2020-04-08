@@ -54,6 +54,7 @@ cp /usr/local/lib/libsgutils2* scsi/lib
 
 tar -zcvf zfsonlinuxrpm.tar.gz $RPM_DIR
 tar -zcvf scsi_tool.tar.gz scsi
+git branch|grep '*'|awk '{print $2}' > release
 
 rm -rf $RPM_DIR
 rm -rf scsi
