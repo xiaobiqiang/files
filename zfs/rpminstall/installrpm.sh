@@ -81,7 +81,7 @@ function install_deepin_rely()
     dpkg -i ./*
     cd -
     
-    if [ `ls /usr/lib/jvm/|grep jdk8|wc -l` -ne 0 ]; then
+    if [ `ls /usr/lib/jvm/|grep jdk8|wc -l` -eq 0 ]; then
         cp $rely_nmae/jdk8.tar /usr/lib/jvm/
         cd /usr/lib/jvm/
         tar -xvf jdk8.tar
