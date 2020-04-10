@@ -4584,14 +4584,18 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		     (scmd->sense_buffer[2] == MEDIUM_ERROR) ||
 		     (scmd->sense_buffer[2] == HARDWARE_ERROR))) {
 
-            printk(KERN_ERR "report sense:%d, [host's target adderess:%llx], [target's host address:%llx]\n",
-                scmd->sense_buffer[2],
-                sas_device_priv_data->sas_target->sas_address,
-               ((struct MPT3SAS_TARGET *)(scmd->device->sdev_target->hostdata))->sas_address);
-
-            atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, &sas_device_priv_data->sas_target->sas_address);
             _scsih_scsi_ioc_info(ioc, scmd, mpi_reply, smid);
-            mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
+
+            if(scmd->sense_buffer[2] == MEDIUM_ERROR) {
+                printk(KERN_ERR "report sense:%d, [host's target adderess:%llx], [target's host address:%llx]\n",
+                    scmd->sense_buffer[2],
+                    sas_device_priv_data->sas_target->sas_address,
+                   ((struct MPT3SAS_TARGET *)(scmd->device->sdev_target->hostdata))->sas_address);
+
+                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, &sas_device_priv_data->sas_target->sas_address);
+
+                mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
+            }
         }
 	}
 	switch (ioc_status) {
