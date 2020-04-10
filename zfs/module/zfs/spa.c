@@ -6955,12 +6955,7 @@ static int
 spa_free_sync_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 {
 	zio_t *zio = arg;
-
-	if (BP_IS_TOGTHER(bp)) {
-		cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
-		return (0);
-	}
-
+	
 	zio_nowait(zio_free_sync(zio, zio->io_spa, dmu_tx_get_txg(tx), bp,
 	    zio->io_flags));
 	return (0);
