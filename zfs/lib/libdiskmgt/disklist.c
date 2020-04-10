@@ -1284,18 +1284,28 @@ void disk_get_slot_map(slot_map_t *sm)
 void slot_map_find_value(slot_map_t *sm, disk_info_t *di)
 {
 	slot_record_t *search = NULL;
-
+	di->dk_enclosure = 0;
+	di->dk_slot = 0;
+	char tmp_name[16] = {0};
 	for (search = sm->sm_head; search != NULL; search = search->sr_next) {
-		if (strcasestr(di->dk_serial, search->sr_serial) != NULL ||
-				strcasestr(search->sr_serial, di->dk_serial) != NULL ||
-				strcasestr(search->sr_addr, di->dk_scsid) != NULL ||
-				strcasestr(di->dk_scsid, search->sr_addr) != NULL) {	
-		    /*printf("di->dk_serial:%s, di->dk_scsid:%s, search->sr_serial:%s,search->sr_addr:%s\n",
-                    di->dk_serial, di->dk_scsid, search->sr_serial, 
-                    search->sr_addr);*/
+		if (strcasestr(di->dk_scsid, search->sr_addr) != NULL) {	
+		    //printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,search->sr_addr);
 			di->dk_enclosure = search->sr_enclosure;
 			di->dk_slot = search->sr_slot;
 			break;
+		}
+	}
+	
+	if(di->dk_enclosure == 0 && di->dk_slot == 0){
+		for (search = sm->sm_head; search != NULL; search = search->sr_next) {
+			snprintf(tmp_name,sizeof(tmp_name),"%s",search->sr_addr);
+			tmp_name[15] = 0;
+			if (strcasestr(di->dk_scsid, tmp_name) != NULL) {	
+				//printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,tmp_name);
+				di->dk_enclosure = search->sr_enclosure;
+				di->dk_slot = search->sr_slot;
+				break;
+			}
 		}
 	}
 
@@ -1332,17 +1342,31 @@ void slot_map_find_value(slot_map_t *sm, disk_info_t *di)
 void slot_map_find_value_guid(slot_map_t *sm, disk_info_t *di)
 {
 	slot_record_t *search = NULL;
-
-	for (search = sm->sm_head; search != NULL; search = search->sr_next) {
-		if (strcasestr(search->sr_addr, di->dk_scsid) != NULL ||
-				strcasestr(di->dk_scsid, search->sr_addr) != NULL) {
-			di->dk_enclosure = search->sr_enclosure;
-			di->dk_slot = search->sr_slot;
-			return;
-		}
-	}
 	di->dk_enclosure = 0;
 	di->dk_slot = 0;
+	char tmp_name[16] = {0};
+	for (search = sm->sm_head; search != NULL; search = search->sr_next) {
+		if (strcasestr(di->dk_scsid, search->sr_addr) != NULL) {	
+		    //printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,search->sr_addr);
+			di->dk_enclosure = search->sr_enclosure;
+			di->dk_slot = search->sr_slot;
+			break;
+		}
+	}
+	
+	if(di->dk_enclosure == 0 && di->dk_slot == 0){
+		for (search = sm->sm_head; search != NULL; search = search->sr_next) {
+			snprintf(tmp_name,sizeof(tmp_name),"%s",search->sr_addr);
+			tmp_name[15] = 0;
+			if (strcasestr(di->dk_scsid, tmp_name) != NULL) {	
+				//printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,tmp_name);
+				di->dk_enclosure = search->sr_enclosure;
+				di->dk_slot = search->sr_slot;
+				break;
+			}
+		}
+	}
+
 	return;
 }
 
