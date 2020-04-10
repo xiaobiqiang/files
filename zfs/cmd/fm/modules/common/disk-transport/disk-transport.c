@@ -543,7 +543,19 @@ dt_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 static void
 dt_topo_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
 {
+	static hrtime_t time = 0;
+	hrtime_t time1;
+	uint64_t deleta;
 	disk_monitor_t *dmp = fmd_hdl_getspecific(hdl);
+
+	time1 = gethrtime();
+	deleta = time1 - time;
+
+	/*4s*/
+	if (deleta > 4000000000ull) {
+		time = time1;
+		dt_update_disk_info(hdl, thp);
+	}
 
 	if (dmp->dm_timer_istopo)
 		return;
@@ -666,6 +678,14 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 
     return (0);
 }
+
+static void
+dt_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
+{
+	return;
+}
+
+
 static const fmd_prop_t fmd_props[] = {
 	{ "interval", FMD_TYPE_TIME, "10min" },
 	{ "min-interval", FMD_TYPE_TIME, "1min" },
@@ -674,7 +694,7 @@ static const fmd_prop_t fmd_props[] = {
 };
 
 static const fmd_hdl_ops_t fmd_ops = {
-	NULL,			/* fmdo_recv */
+	dt_recv,			/* fmdo_recv */
 	dt_timeout,		/* fmdo_timeout */
 	NULL, 			/* fmdo_close */
 	NULL,			/* fmdo_stats */

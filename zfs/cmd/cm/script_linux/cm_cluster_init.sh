@@ -109,6 +109,7 @@ function cm_cluster_san_init()
             if [ "X${nics[$index]}" != "Xrdma_rpc" ] && [ $ostype -eq ${CM_OS_TYPE_ILLUMOS} ]; then
                 dladm set-linkprop -p mtu=9000 ${nics[$index]}
             fi
+            ifconfig ${nics[$index]} mtu 9000
             zfs clustersan enable -l ${nics[$index]}
             
             iRet=$?

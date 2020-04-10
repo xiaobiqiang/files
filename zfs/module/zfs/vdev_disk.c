@@ -983,6 +983,8 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
     case SAS_EVT_DEV_REMOVE:
         zfs_ereport_post(FM_EREPORT_ZFS_DEV_REMOVED, vd->vdev_spa, vd, NULL, 0, 0);
         zfs_post_remove(vd->vdev_spa, vd);
+        vd->vdev_remove_wanted = B_TRUE;
+        spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);
         break;
 
     case SAS_EVT_DEV_MERR:

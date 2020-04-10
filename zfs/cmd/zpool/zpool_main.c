@@ -1312,11 +1312,13 @@ errout:
 	nvlist_free(nvroot);
 	nvlist_free(fsprops);
 	nvlist_free(props);
+	system("fmadm genxml -u &");
 	return (ret);
 badusage:
 	nvlist_free(fsprops);
 	nvlist_free(props);
 	usage(B_FALSE);
+	system("fmadm genxml -u &");
 	return (2);
 }
 
@@ -1600,6 +1602,7 @@ zpool_do_destroy(int argc, char **argv)
 out:
 	if (sharenfs || sharesmb)
 		enable_share_services(sharenfs, sharesmb);
+	system("fmadm genxml -u &");
 	return (ret);
 }
 
@@ -2050,7 +2053,7 @@ find_spare(zpool_handle_t *zhp, void *data)
 
 xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *state,
     char *read_err, char *write_err,
-    char *sum_err, char *en_id, char *slot_id, char *type)
+    char *sum_err, char *en_id, char *slot_id, char *type, char *total_buf)
 {
 	xmlNodePtr node;
 
@@ -2081,6 +2084,8 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 		xmlSetProp(node, (xmlChar *)"en_id", (xmlChar *) en_id);
 	if (strcmp(slot_id, "--") != 0)
 		xmlSetProp(node, (xmlChar *)"slot_id", (xmlChar *) slot_id);
+    if ((strcmp(total_buf, "--") != 0) && total_buf != NULL)
+		xmlSetProp(node, (xmlChar *)"total", (xmlChar *) total_buf);
 	return (node);
 
 }
@@ -2209,7 +2214,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	}
 
 	if (parent_node != NULL )
-		node = create_item_node(parent_node, buf, state, rbuf, wbuf, cbuf, en_buf, slot_buf, type);
+		node = create_item_node(parent_node, buf, state, rbuf, wbuf, cbuf, en_buf, slot_buf, type, total_buf);
 
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
 	    &notpresent) == 0) {
