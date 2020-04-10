@@ -71,6 +71,8 @@ static vdev_ops_t *vdev_ops_table[] = {
 
 int vdev_alloc_ratio_thresh1 = 80;
 int vdev_alloc_ratio_thresh2 = 90;
+int vdev_open_children_seq = 0;
+
 /*
  * Given a vdev type, return the appropriate ops vector.
  */
@@ -1201,8 +1203,9 @@ vdev_open_children(vdev_t *vd)
 	 * in a single thread so that the same thread holds the
 	 * spa_namespace_lock
 	 */
-	if (vdev_uses_zvols(vd)) {
+	if (vdev_uses_zvols(vd) || vdev_open_children_seq) {
 		for (c = 0; c < children; c++) {
+			zfs_dbgmsg("open children seq %d", children);
 			vd->vdev_child[c]->vdev_open_error =
 			    vdev_open(vd->vdev_child[c]);
 			vd->vdev_nonrot &= vd->vdev_child[c]->vdev_nonrot;
@@ -3565,5 +3568,8 @@ MODULE_PARM_DESC(vdev_alloc_ratio_thresh1, "vdev_alloc_ratio_thresh1");
 
 module_param(vdev_alloc_ratio_thresh2, int, 0644);
 MODULE_PARM_DESC(vdev_alloc_ratio_thresh2, "vdev_alloc_ratio_thresh2");
+
+module_param(vdev_open_children_seq, int, 0644);
+MODULE_PARM_DESC(vdev_open_children_seq, "vdev_open_children_seq");
 
 #endif
