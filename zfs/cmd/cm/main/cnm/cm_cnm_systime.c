@@ -402,10 +402,10 @@ void cm_cnm_ntp_sync_thread(void)
         {
             return;
         }
-        if(CM_OK == cm_node_get_info(CM_MASTER_SUBDOMAIN_ID,masterid,&ninfo))
+        /*if(CM_OK == cm_node_get_info(CM_MASTER_SUBDOMAIN_ID,masterid,&ninfo))
         {
             (void)cm_system("ntpdate -u %s",ninfo.ip_addr);
-        }
+        }*/
         return;
     }
 

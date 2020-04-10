@@ -646,14 +646,34 @@ function get_osversion
 
 function add_prepare_gui
 {
-	RCLOCALPATH=/etc/rc.d/rc.local
-	if [ -f  $RCLOCALPATH ];then
-		cat $RCLOCALPATH | grep "/gui/prepare.sh" > /dev/null
-		if [ $? != 0 ];then
-			echo "/gui/prepare.sh &" >> $RCLOCALPATH
-		fi
-	else
-		echo "add_prepare_gui, $RCLOCALPATH is not exist."
+    local RCLOCALPATH=""
+    local gui_script="/gui/prepare.sh"
+    local check=0
+    if [ ! -f  $gui_script ];then
+        return -1
+    fi
+    local os_type=`grep PRETTY_NAME /etc/os-release|cut -d '"' -f 2|grep deepin|wc -l`
+    if [ $os_type -eq 0 ];then
+        RCLOCALPATH="/etc/rc.d/rc.local"
+        if [ -f  $RCLOCALPATH ];then
+            check=`grep $gui_script $RCLOCALPATH|wc -l`
+            if [ $check -eq 0 ];then
+                echo "/gui/prepare.sh &" >> $RCLOCALPATH
+            fi
+        else
+            echo "add_prepare_gui, $RCLOCALPATH is not exist."
+        fi
+    else
+        RCLOCALPATH="/etc/rc.local"
+        check=`grep $gui_script $RCLOCALPATH|wc -l`
+        if [ $check -eq 0 ];then
+            echo "#!/bin/sh" >> $RCLOCALPATH
+            echo "$gui_script" >> $RCLOCALPATH
+            echo "exit 0" >> $RCLOCALPATH
+            chmod 755  $RCLOCALPATH
+            systemctl  start rc-local
+        fi
+        return $?
 	fi
 }
 

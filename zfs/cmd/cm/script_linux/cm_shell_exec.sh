@@ -199,11 +199,12 @@ function cm_get_nodeinfo()
     local ramsize=`cat /proc/meminfo | grep MemTotal| awk '{print $2}'`
     ((ramsize=$ramsize/1024))
     local interid=`cm_get_localid`
-    local ostype=`cm_os_type_get`
+    local ostype=`cm_systerm_version_get`
     local version=`cm_software_version`
     local devtype='AIC'
-    devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
-    
+    if [ $ostype -ne $CM_OS_TYPE_DEEPIN ];then
+        devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
+    fi
     local myip="127.0.0.1"
     local mport=`cm_get_localmanageport`
     if [ "X"$mport = "X" ]; then
