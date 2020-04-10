@@ -671,7 +671,8 @@ function deepin_unmanage_netdevice
 {
 	if [ "deepin" == ${osversion:0:6} ]; then
 		for nd in `ip a | grep mtu | awk '{print $2}' | sed 's/://'`; do
-			if [ X10000baseT/Full == X`ethtool $nd | grep 'Supported link modes:' | cut -d ' ' -f 6` ]; then 
+			local mode=`ethtool $nd | grep 'Supported link modes:' | cut -d ' ' -f 6`
+			if [ X10000baseT/Full == X$mode ] || [ X10baseT/Half == X$mode ]; then 
 				local ether=`ifconfig $nd | grep ether | awk '{print $2}'`
 				if [ `cat /etc/NetworkManager/NetworkManager.conf | grep "\[keyfile\]" | wc -l` -lt 1 ]; then
 					echo "" >> /etc/NetworkManager/NetworkManager.conf
@@ -679,7 +680,9 @@ function deepin_unmanage_netdevice
 					echo "unmanaged-devices=mac:${ether};" >> /etc/NetworkManager/NetworkManager.conf
 				else
 					local origin=`cat /etc/NetworkManager/NetworkManager.conf | grep unmanaged-devices`
-					sed "s/${origin}/${origin}${ether};/" -i /etc/NetworkManager/NetworkManager.conf
+					if [ `echo "$origin" | sed "s/$ether//"` == "$origin" ]; then
+						sed "s/${origin}/${origin}${ether};/" -i /etc/NetworkManager/NetworkManager.conf
+					fi
 				fi
 			fi
 		done
