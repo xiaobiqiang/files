@@ -996,9 +996,8 @@ pt_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	pt_close_fsxml_file();
 	pt_close_luxml_file();
 
-	pt_pool_check(hdl);
-	
-//	system("/usr/local/sbin/zpool status -x");
+	pt_pool_check(hdl);	
+	system("zpool status  -x > /dev/null  2> /dev/null");
 }
 
 static const fmd_prop_t fmd_props[] = {

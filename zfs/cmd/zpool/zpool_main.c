@@ -1312,11 +1312,13 @@ errout:
 	nvlist_free(nvroot);
 	nvlist_free(fsprops);
 	nvlist_free(props);
+	system(fmadm genxml -u &);
 	return (ret);
 badusage:
 	nvlist_free(fsprops);
 	nvlist_free(props);
 	usage(B_FALSE);
+	system(fmadm genxml -u &);
 	return (2);
 }
 
@@ -1600,6 +1602,7 @@ zpool_do_destroy(int argc, char **argv)
 out:
 	if (sharenfs || sharesmb)
 		enable_share_services(sharenfs, sharesmb);
+	system(fmadm genxml -u &);
 	return (ret);
 }
 

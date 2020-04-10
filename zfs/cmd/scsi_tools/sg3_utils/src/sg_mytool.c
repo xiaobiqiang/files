@@ -14,6 +14,8 @@
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <stdarg.h>
+
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -686,6 +688,7 @@ static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
 static int saddr_non_zero(const unsigned char * ucp);
 
+static int g_maxlen = 65532;
 
 static void
 usage(int help_num)
@@ -1454,7 +1457,7 @@ active_et_aesp(int el_type)
  * failures */
 static int
 do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
-            int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
+            int rsp_buff_size, int * rsp_lenp)
 {
     int rsp_len, res;
     const char * cp;
@@ -1464,15 +1467,9 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
     if (rsp_lenp)
         *rsp_lenp = 0;
     cp = find_in_diag_page_desc(page_code);
-    if (op->verbose > 1) {
-        if (cp)
-            pr2serr("    Receive diagnostic results cmd for %s page\n", cp);
-        else
-            pr2serr("    Receive diagnostic results cmd for page 0x%x\n",
-                    page_code);
-    }
+
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
-                             rsp_buff_size, 1, op->verbose);
+                             rsp_buff_size, 1, 0);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
@@ -1486,8 +1483,6 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
         if (page_code != rsp_buff[0]) {
             if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
                 pr2serr("Enclosure busy, try again later\n");
-                if (op->do_hex)
-                    dStrHexErr((const char *)rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 pr2serr("Enclosure only supports Short Enclosure Status: "
                         "0x%x\n", rsp_buff[1]);
@@ -1499,14 +1494,6 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             return -2;
         }
         return 0;
-    } else if (op->verbose) {
-        if (cp)
-            pr2serr("Attempt to fetch %s diagnostic page failed\n", cp);
-        else
-            pr2serr("Attempt to fetch status diagnostic page [0x%x] failed\n",
-                    page_code);
-        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
-        pr2serr("    %s\n", b);
     }
     return res;
 }
@@ -1603,8 +1590,7 @@ truncated:
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
                            uint32_t * generationp,
-                           struct enclosure_info * primary_ip,
-                           struct opts_t * op)
+                           struct enclosure_info * primary_ip)
 {
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
     int ret = 0;
@@ -1613,14 +1599,12 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
-    resp = (unsigned char *)calloc(op->maxlen, 1);
+    resp = (unsigned char *)calloc(g_maxlen, 1);
     if (NULL == resp) {
-        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                op->maxlen);
         ret = -1;
         goto the_end;
     }
-    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, op->maxlen, op, &resp_len);
+    res = do_rec_diag(fd, DPC_CONFIGURATION, resp, g_maxlen, &resp_len);
     if (res) {
         pr2serr("%s: couldn't read config page, res=%d\n", __func__, res);
         ret = -1;
@@ -1668,29 +1652,6 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         tdhp[k].num_elements = ucp[1];
         tdhp[k].se_id = ucp[2];
         tdhp[k].txt_len = ucp[3];
-    }
-    if (op->ind_given && op->ind_etp) {
-        n = op->ind_et_inst;
-        for (k = 0; k < sum_type_dheaders; ++k) {
-            if (op->ind_etp->elem_type_code == tdhp[k].etype) {
-                if (0 == n)
-                    break;
-                else
-                    --n;
-            }
-        }
-        if (k < sum_type_dheaders)
-            op->ind_th = k;
-        else {
-            if (op->ind_et_inst)
-                pr2serr("%s: unable to find element type '%s%d'\n", __func__,
-                        op->ind_etp->abbrev, op->ind_et_inst);
-            else
-                pr2serr("%s: unable to find element type '%s'\n", __func__,
-                        op->ind_etp->abbrev);
-            ret = -1;
-            goto the_end;
-        }
     }
     ret = sum_type_dheaders;
     goto the_end;
@@ -3165,180 +3126,6 @@ err_with_fp:
     return 1;
 }
 
-/* Display "status" page (op->page_code). Return 0 for success. */
-static int
-ses_process_status_page(int sg_fd, struct opts_t * op)
-{
-    int j, resp_len, res;
-    int ret = 0;
-    uint32_t ref_gen_code;
-    unsigned char *  resp;
-    const char * cp;
-    struct enclosure_info primary_info;
-
-    resp = (unsigned char *)calloc(op->maxlen, 1);
-    if (NULL == resp) {
-        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                op->maxlen);
-        ret = -1;
-        goto fini;
-    }
-    cp = find_in_diag_page_desc(op->page_code);
-    ret = do_rec_diag(sg_fd, op->page_code, resp, op->maxlen, op, &resp_len);
-    if (ret)
-        goto fini;
-    if (op->do_raw) {
-        if (1 == op->do_raw)
-            dStrHex((const char *)resp + 4, resp_len - 4, -1);
-        else {
-            if (sg_set_binary_mode(STDOUT_FILENO) < 0)
-                perror("sg_set_binary_mode");
-            dStrRaw((const char *)resp, resp_len);
-        }
-    } else if (op->do_hex) {
-        if (op->do_hex > 2)
-            dStrHex((const char *)resp, resp_len, -1);
-         else {
-            if (cp)
-                printf("Response in hex from diagnostic page: %s\n", cp);
-            else
-                printf("Response in hex from unknown diagnostic page "
-                       "[0x%x]\n", op->page_code);
-            dStrHex((const char *)resp, resp_len, (2 == op->do_hex));
-        }
-    } else {
-        memset(&primary_info, 0, sizeof(primary_info));
-        switch (op->page_code) {
-        case DPC_SUPPORTED:
-            ses_supported_pages_sdg("Supported diagnostic pages",
-                                    resp, resp_len);
-            break;
-        case DPC_CONFIGURATION:
-            ses_configuration_sdg(resp, resp_len);
-            break;
-        case DPC_ENC_STATUS:
-            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, &primary_info,
-                                             op);
-            if (res < 0) {
-                ret = res;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            ses_enc_status_dp(type_desc_hdr_arr, res, ref_gen_code,
-                              resp, resp_len, op);
-            break;
-        case DPC_HELP_TEXT:
-            printf("Help text diagnostic page (for primary "
-                   "subenclosure):\n");
-            if (resp_len > 4)
-                printf("  %.*s\n", resp_len - 4, resp + 4);
-            else
-                printf("  <empty>\n");
-            break;
-        case DPC_STRING:
-            printf("String In diagnostic page (for primary "
-                   "subenclosure):\n");
-            if (resp_len > 4)
-                dStrHex((const char *)(resp + 4), resp_len - 4, 0);
-            else
-                printf("  <empty>\n");
-            break;
-        case DPC_THRESHOLD:
-            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, &primary_info,
-                                             op);
-            if (res < 0) {
-                ret = res;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            ses_threshold_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                              resp, resp_len, op);
-            break;
-        case DPC_ELEM_DESC:
-            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, &primary_info,
-                                             op);
-            if (res < 0) {
-                ret = res;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            ses_element_desc_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                 resp, resp_len, op);
-            break;
-        case DPC_SHORT_ENC_STATUS:
-            printf("Short enclosure status diagnostic page, "
-                   "status=0x%x\n", resp[1]);
-            break;
-        case DPC_ENC_BUSY:
-            printf("Enclosure Busy diagnostic page, "
-                   "busy=%d [vendor specific=0x%x]\n",
-                   resp[1] & 1, (resp[1] >> 1) & 0xff);
-            break;
-        case DPC_ADD_ELEM_STATUS:
-            res = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                             &ref_gen_code, &primary_info,
-                                             op);
-            if (res < 0) {
-                ret = res;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            ses_additional_elem_sdg(type_desc_hdr_arr, res, ref_gen_code,
-                                    resp, resp_len, op);
-            break;
-        case DPC_SUBENC_HELP_TEXT:
-            ses_subenc_help_sdg(resp, resp_len);
-            break;
-        case DPC_SUBENC_STRING:
-            ses_subenc_string_sdg(resp, resp_len);
-            break;
-        case DPC_SUPPORTED_SES:
-            ses_supported_pages_sdg("Supported SES diagnostic pages",
-                                    resp, resp_len);
-            break;
-        case DPC_DOWNLOAD_MICROCODE:
-            ses_download_code_sdg(resp, resp_len);
-            break;
-        case DPC_SUBENC_NICKNAME:
-            ses_subenc_nickname_sdg(resp, resp_len);
-            break;
-        default:
-            printf("Cannot decode response from diagnostic "
-                   "page: %s\n", (cp ? cp : "<unknown>"));
-            dStrHex((const char *)resp, resp_len, 0);
-        }
-    }
-    ret = 0;
-
-fini:
-    if (resp)
-        free(resp);
-    return ret;
-}
-
 static void
 devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
 {
@@ -3455,17 +3242,6 @@ decode_dev_slot_ids(const char * leadin, unsigned char * buff, int len)
     }
     if (-2 == u)
         pr2serr("%s VPD page error: around offset=%d\n", leadin, off);
-}
-
-static void
-decode_id_slot_vpd(unsigned char * buff, int len, int do_hex)
-{
-    if (len < 4) {
-        pr2serr("Device identification VPD page length too "
-                "short=%d\n", len);
-        return;
-    }
-    decode_dev_slot_ids("Device identification", buff + 4, len - 4, do_hex);
 }
 
 static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
@@ -3612,405 +3388,44 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     }
 }
 
-
-/* Returns 0 if successful */
-static int
-vpd_decode_slot(int sg_fd)
+static void
+show_disk_slot(const unsigned char * ucp, int len)
 {
-    int len, pdt,  mxlen;
-    int res = 0;
-    unsigned char * rp;
-    rp = rsp_buff;
-    if (sg_fd >= 0)
-        mxlen = 0;
-    else
-        mxlen = -1;
+    int desc_type, eip_offset ,pcie_pt;
 
-    res = vpd_fetch_page_from_dev(sg_fd, rp, 0x83, mxlen, 0, &len);
-    if (res == 0)
-        decode_id_slot_vpd(rp, len, 0);
- 
-    return res;
-}
-
-
-static int
-show_disk_slot(int sg_fd, struct opts_t * op, int display)
-{
-    int k, j, res, num_t_hdrs, elem_ind, ei, desc_len, dn_len;
-    int et4aes, broken_ei, ei2, got1, jr_max_ind, mlen;
-    uint32_t ref_gen_code, gen_code;
-    struct join_row_t * jrp;
-    struct join_row_t * jr2p;
-    unsigned char * es_ucp;
-    unsigned char * ed_ucp;
-    unsigned char * ae_ucp;
-    unsigned char * t_ucp;
-    /* const unsigned char * es_last_ucp; */
-    /* const unsigned char * ed_last_ucp; */
-    const unsigned char * ae_last_ucp;
-    /* const unsigned char * t_last_ucp; */
-    const char * cp;
-    const char * enc_state_changed = "  <<state of enclosure changed, "
-                                     "please try again>>\n";
-    const struct type_desc_hdr_t * tdhp;
-    struct enclosure_info primary_info;
-    char b[64];
-
-    memset(&primary_info, 0, sizeof(primary_info));
-    num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                            &ref_gen_code, &primary_info,
-                                            op);
-    if (num_t_hdrs < 0)
-        return num_t_hdrs;
-    if (display && primary_info.have_info) {
-        printf("  Primary enclosure logical identifier (hex): ");
-        for (j = 0; j < 8; ++j)
-            printf("%02x", primary_info.enc_log_id[j]);
+    eip_offset = (0x10 & ucp[0]) ? 2 : 0;
+    switch (0xf & ucp[0]) {
+    case TPROTO_FCP:
+        if (len < (12 + eip_offset))
+            break;
+        if (eip_offset)
+            printf("device slot number: %d", ucp[5 + eip_offset]);
         printf("\n");
+        break;
+    case TPROTO_SAS:
+        if (len < (4 + eip_offset))
+            break;
+        desc_type = (ucp[3 + eip_offset] >> 6) & 0x3;
+        if (0 == desc_type) {
+            if (eip_offset)
+                printf("device slot number: %d", ucp[5 + eip_offset]);
+            printf("\n");
+        } 
+        break;
+    case TPROTO_PCIE: /* added in ses3r08 */
+        if (0 == eip_offset) {
+            break;
+        }
+        if (len < 6)
+            break;
+        pcie_pt = (ucp[5] >> 5) & 0x7;
+        if (1 != pcie_pt){
+            break;
+        }
+        printf("device slot number: %d\n", ucp[7]);
+    default:
+        break;
     }
-    mlen = sizeof(enc_stat_rsp);
-    if (mlen > op->maxlen)
-        mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp, mlen, op,
-                      &enc_stat_rsp_len);
-    if (res)
-        return res;
-    if (enc_stat_rsp_len < 8) {
-        pr2serr("Enclosure Status response too short\n");
-        return -1;
-    }
-    gen_code = sg_get_unaligned_be32(enc_stat_rsp + 4);
-    if (ref_gen_code != gen_code) {
-        pr2serr("%s", enc_state_changed);
-        return -1;
-    }
-    es_ucp = enc_stat_rsp + 8;
-    /* es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1; */
-
-    mlen = sizeof(elem_desc_rsp);
-    if (mlen > op->maxlen)
-        mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp, mlen, op,
-                      &elem_desc_rsp_len);
-    if (0 == res) {
-        if (elem_desc_rsp_len < 8) {
-            pr2serr("Element Descriptor response too short\n");
-            return -1;
-        }
-        gen_code = sg_get_unaligned_be32(elem_desc_rsp + 4);
-        if (ref_gen_code != gen_code) {
-            pr2serr("%s", enc_state_changed);
-            return -1;
-        }
-        ed_ucp = elem_desc_rsp + 8;
-        /* ed_last_ucp = elem_desc_rsp + elem_desc_rsp_len - 1; */
-    } else {
-        elem_desc_rsp_len = 0;
-        ed_ucp = NULL;
-        res = 0;
-        if (op->verbose)
-            pr2serr("  Element Descriptor page not available\n");
-    }
-
-    if (display || (DPC_ADD_ELEM_STATUS == op->page_code) ||
-        (op->dev_slot_num >= 0) || saddr_non_zero(op->sas_addr)) {
-        mlen = sizeof(add_elem_rsp);
-        if (mlen > op->maxlen)
-            mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp, mlen, op,
-                          &add_elem_rsp_len);
-        if (0 == res) {
-            if (add_elem_rsp_len < 8) {
-                pr2serr("Additional Element Status response too short\n");
-                return -1;
-            }
-            gen_code = sg_get_unaligned_be32(add_elem_rsp + 4);
-            if (ref_gen_code != gen_code) {
-                pr2serr("%s", enc_state_changed);
-                return -1;
-            }
-            ae_ucp = add_elem_rsp + 8;
-            ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
-            if (op->eiioe_auto && (add_elem_rsp_len > 11)) {
-                /* heuristic: if first element index in this page is 1
-                 * then act as if the EIIOE bit is set. */
-                if ((ae_ucp[0] & 0x10) && (1 == ae_ucp[3]))
-                    op->eiioe_force = 1;
-            }
-        } else {
-            add_elem_rsp_len = 0;
-            ae_ucp = NULL;
-            ae_last_ucp = NULL;
-            res = 0;
-            if (op->verbose)
-                pr2serr("  Additional Element Status page not available\n");
-        }
-    } else {
-        ae_ucp = NULL;
-        ae_last_ucp = NULL;
-    }
-
-    if ((op->do_join > 1) ||
-        ((0 == display) && (DPC_THRESHOLD == op->page_code))) {
-        mlen = sizeof(threshold_rsp);
-        if (mlen > op->maxlen)
-            mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, DPC_THRESHOLD, threshold_rsp, mlen, op,
-                          &threshold_rsp_len);
-        if (0 == res) {
-            if (threshold_rsp_len < 8) {
-                pr2serr("Threshold In response too short\n");
-                return -1;
-            }
-            gen_code = sg_get_unaligned_be32(threshold_rsp + 4);
-            if (ref_gen_code != gen_code) {
-                pr2serr("%s", enc_state_changed);
-                return -1;
-            }
-            t_ucp = threshold_rsp + 8;
-            /* t_last_ucp = threshold_rsp + threshold_rsp_len - 1; */
-        } else {
-            threshold_rsp_len = 0;
-            t_ucp = NULL;
-            res = 0;
-            if (op->verbose)
-                pr2serr("  Threshold In page not available\n");
-        }
-    } else {
-        threshold_rsp_len = 0;
-        t_ucp = NULL;
-    }
-
-    jrp = join_arr;
-    tdhp = type_desc_hdr_arr;
-    jr_max_ind = 0;
-    for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
-        jrp->el_ind_th = k;
-        jrp->el_ind_indiv = -1;
-        jrp->etype = tdhp->etype;
-        jrp->ei_asc = -1;
-        et4aes = active_et_aesp(tdhp->etype);
-        jrp->ei_asc2 = -1;
-        jrp->se_id = tdhp->se_id;
-        /* check es_ucp < es_last_ucp still in range */
-        jrp->enc_statp = es_ucp;
-        es_ucp += 4;
-        jrp->elem_descp = ed_ucp;
-        if (ed_ucp)
-            ed_ucp += sg_get_unaligned_be16(ed_ucp + 2) + 4;
-        jrp->add_elem_statp = NULL;
-        jrp->thresh_inp = t_ucp;
-        jrp->dev_slot_num = -1;
-        /* assume sas_addr[8] zeroed since it's static file scope */
-        if (t_ucp)
-            t_ucp += 4;
-        ++jrp;
-        for (j = 0, elem_ind = 0; j < tdhp->num_elements;
-             ++j, ++jrp, ++elem_ind) {
-            if (jrp >= join_arr_lastp)
-                break;
-            jrp->el_ind_th = k;
-            jrp->el_ind_indiv = elem_ind;
-            jrp->ei_asc = ei++;
-            if (et4aes)
-                jrp->ei_asc2 = ei2++;
-            else
-                jrp->ei_asc2 = -1;
-            jrp->etype = tdhp->etype;
-            jrp->se_id = tdhp->se_id;
-            jrp->enc_statp = es_ucp;
-            es_ucp += 4;
-            jrp->elem_descp = ed_ucp;
-            if (ed_ucp)
-                ed_ucp += sg_get_unaligned_be16(ed_ucp + 2) + 4;
-            jrp->thresh_inp = t_ucp;
-            jrp->dev_slot_num = -1;
-            /* assume sas_addr[8] zeroed since it's static file scope */
-            if (t_ucp)
-                t_ucp += 4;
-            jrp->add_elem_statp = NULL;
-            ++jr_max_ind;
-        }
-        if (jrp >= join_arr_lastp) {
-            ++k;
-            break;      /* leave last row all zeros */
-        }
-    }
-
-    broken_ei = 0;
-    if (ae_ucp) {
-        int eip, eiioe;
-        int aes_i = 0;
-        int get_out = 0;
-
-        jrp = join_arr;
-        tdhp = type_desc_hdr_arr;
-        for (k = 0; k < num_t_hdrs; ++k, ++tdhp) {
-            if (active_et_aesp(tdhp->etype)) {
-                /* only consider element types that AES element are permiited
-                 * to refer to, then loop over those number of elements */
-                for (j = 0; j < tdhp->num_elements; ++j) {
-                    if ((ae_ucp + 1) > ae_last_ucp) {
-                        get_out = 1;
-                        if (op->verbose || op->warn)
-                            pr2serr("warning: %s: off end of ae page\n",
-                                    __func__);
-                        break;
-                    }
-                    eip = !!(ae_ucp[0] & 0x10); /* element index present */
-                    if (eip)
-                        eiioe = op->eiioe_force ? 1 : (ae_ucp[2] & 1);
-                    else
-                        eiioe = 0;
-                    if (eip && eiioe) {
-                        ei = ae_ucp[3];
-                        jr2p = join_arr + ei;
-                        if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
-                            get_out = 1;
-                            pr2serr("%s: oi=%d, ei=%d [max_ind=%d], eiioe=1 "
-                                    "not in join_arr\n", __func__, k, ei,
-                                    jr_max_ind);
-                            break;
-                        }
-                        devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
-                        } else
-                            jr2p->add_elem_statp = ae_ucp;
-                    } else if (eip) {     /* and EIIOE=0 */
-                        ei = ae_ucp[3];
-try_again:
-                        for (jr2p = join_arr; jr2p->enc_statp; ++jr2p) {
-                            if (broken_ei) {
-                                if (ei == jr2p->ei_asc2)
-                                    break;
-                            } else {
-                                if (ei == jr2p->ei_asc)
-                                    break;
-                            }
-                        }
-                        if (NULL == jr2p->enc_statp) {
-                            get_out = 1;
-                            pr2serr("warning: %s: oi=%d, ei=%d (broken_ei=%d) "
-                                    "not in join_arr\n", __func__, k, ei,
-                                    broken_ei);
-                            break;
-                        }
-                        if (! active_et_aesp(jr2p->etype)) {
-                            /* broken_ei must be 0 for that to be false */
-                            ++broken_ei;
-                            goto try_again;
-                        }
-                        devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
-                        } else
-                            jr2p->add_elem_statp = ae_ucp;
-                    } else {    /* EIP=0 */
-                        while (jrp->enc_statp && ((-1 == jrp->el_ind_indiv) ||
-                                                  jrp->add_elem_statp))
-                            ++jrp;
-                        if (NULL == jrp->enc_statp) {
-                            get_out = 1;
-                            pr2serr("warning: %s: join_arr has no space for "
-                                    "ae\n", __func__);
-                            break;
-                        }
-                        jrp->add_elem_statp = ae_ucp;
-                        ++jrp;
-                    }
-                    ae_ucp += ae_ucp[1] + 2;
-                    ++aes_i;
-                }
-            } else {    /* element type not relevant to ae status */
-                /* step over overall and individual elements */
-                for (j = 0; j <= tdhp->num_elements; ++j, ++jrp) {
-                    if (NULL == jrp->enc_statp) {
-                        get_out = 1;
-                        pr2serr("warning: %s: join_arr has no space\n",
-                                __func__);
-                        break;
-                    }
-                }
-            }
-            if (get_out)
-                break;
-        }
-    }
-
-    if (op->verbose > 3) {
-        jrp = join_arr;
-        for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            pr2serr("el_ind_th=%d el_ind_indiv=%d etype=%d se_id=%d ei=%d "
-                    "ei2=%d dsn=%d sa=0x", jrp->el_ind_th, jrp->el_ind_indiv,
-                    jrp->etype, jrp->se_id, jrp->ei_asc, jrp->ei_asc2,
-                    jrp->dev_slot_num);
-            if (saddr_non_zero(jrp->sas_addr)) {
-                for (j = 0; j < 8; ++j)
-                    pr2serr("%02x", jrp->sas_addr[j]);
-            } else
-                pr2serr("0");
-            pr2serr(" %s %s %s %s\n", (jrp->enc_statp ? "ES" : ""),
-                    (jrp->elem_descp ? "ED" : ""),
-                    (jrp->add_elem_statp ? "AES" : ""),
-                    (jrp->thresh_inp ? "TI" : ""));
-        }
-        pr2serr(">> elements in join_arr: %d, broken_ei=%d\n", k, broken_ei);
-    }
-
-    if (! display)      /* probably wanted join_arr[] built only */
-        return 0;
-
-    /* Display contents of join_arr */
-    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
-    for (k = 0, jrp = join_arr, got1 = 0;
-         ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-        if (op->ind_given) {
-            if (op->ind_th != jrp->el_ind_th)
-                continue;
-            if (op->ind_indiv != jrp->el_ind_indiv)
-                continue;
-        }
-        ed_ucp = jrp->elem_descp;
-        if (op->desc_name) {
-            if (NULL == ed_ucp)
-                continue;
-            desc_len = sg_get_unaligned_be16(ed_ucp + 2);
-            /* some element descriptor strings have trailing NULLs and
-             * count them in their length; adjust */
-            while (desc_len && ('\0' == ed_ucp[4 + desc_len - 1]))
-                --desc_len;
-            if (desc_len != dn_len)
-                continue;
-            if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
-                             desc_len))
-                continue;
-        } else if (op->dev_slot_num >= 0) {
-            if (op->dev_slot_num != jrp->dev_slot_num)
-                continue;
-        } else if (saddr_non_zero(op->sas_addr)) {
-            for (j = 0; j < 8; ++j) {
-                if (op->sas_addr[j] != jrp->sas_addr[j])
-                    break;
-            }
-            if (j < 8)
-                continue;
-        }
-        ++got1;
-        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
-            continue;   /* when '-ff' and status!=OK, skip */
-        if (jrp->add_elem_statp) {
-            ae_ucp = jrp->add_elem_statp;
-            desc_len = ae_ucp[1] + 2;
-			get_myslot("INFO ", ae_ucp, desc_len,op);
-        }
-    }
-    return res;
 }
 
 
@@ -4019,13 +3434,13 @@ try_again:
  * Collate (join) overall and individual elements into the static join_arr[].
  * Returns 0 for success, any other return value is an error. */
 static int
-join_work(int sg_fd, struct opts_t * op, int display)
+join_work_zjd(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, desc_len, dn_len;
     int et4aes, broken_ei, ei2, got1, jr_max_ind, mlen;
     uint32_t ref_gen_code, gen_code;
     struct join_row_t * jrp;
-    struct join_row_t * jr2p;
+    struct join_row_t * jr2p = NULL;
     unsigned char * es_ucp;
     unsigned char * ed_ucp;
     unsigned char * ae_ucp;
@@ -4043,39 +3458,31 @@ join_work(int sg_fd, struct opts_t * op, int display)
 
     memset(&primary_info, 0, sizeof(primary_info));
     num_t_hdrs = populate_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                            &ref_gen_code, &primary_info,
-                                            op);
+                                            &ref_gen_code, &primary_info);
     if (num_t_hdrs < 0)
         return num_t_hdrs;
-    if (display && primary_info.have_info) {
-        printf("  Primary enclosure logical identifier (hex): ");
-        for (j = 0; j < 8; ++j)
-            printf("%02x", primary_info.enc_log_id[j]);
-        printf("\n");
-    }
+
     mlen = sizeof(enc_stat_rsp);
-    if (mlen > op->maxlen)
-        mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp, mlen, op,
+    if (mlen > g_maxlen)
+        mlen = g_maxlen;
+    res = do_rec_diag(sg_fd, DPC_ENC_STATUS, enc_stat_rsp, mlen,
                       &enc_stat_rsp_len);
     if (res)
         return res;
     if (enc_stat_rsp_len < 8) {
-        pr2serr("Enclosure Status response too short\n");
         return -1;
     }
     gen_code = sg_get_unaligned_be32(enc_stat_rsp + 4);
     if (ref_gen_code != gen_code) {
-        pr2serr("%s", enc_state_changed);
         return -1;
     }
     es_ucp = enc_stat_rsp + 8;
     /* es_last_ucp = enc_stat_rsp + enc_stat_rsp_len - 1; */
 
     mlen = sizeof(elem_desc_rsp);
-    if (mlen > op->maxlen)
-        mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp, mlen, op,
+    if (mlen > g_maxlen)
+        mlen = g_maxlen;
+    res = do_rec_diag(sg_fd, DPC_ELEM_DESC, elem_desc_rsp, mlen,
                       &elem_desc_rsp_len);
     if (0 == res) {
         if (elem_desc_rsp_len < 8) {
@@ -4093,20 +3500,16 @@ join_work(int sg_fd, struct opts_t * op, int display)
         elem_desc_rsp_len = 0;
         ed_ucp = NULL;
         res = 0;
-        if (op->verbose)
-            pr2serr("  Element Descriptor page not available\n");
     }
 
-    if (display || (DPC_ADD_ELEM_STATUS == op->page_code) ||
-        (op->dev_slot_num >= 0) || saddr_non_zero(op->sas_addr)) {
+    if (display) {
         mlen = sizeof(add_elem_rsp);
-        if (mlen > op->maxlen)
-            mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp, mlen, op,
+        if (mlen > g_maxlen)
+            mlen = g_maxlen;
+        res = do_rec_diag(sg_fd, DPC_ADD_ELEM_STATUS, add_elem_rsp, mlen,
                           &add_elem_rsp_len);
         if (0 == res) {
             if (add_elem_rsp_len < 8) {
-                pr2serr("Additional Element Status response too short\n");
                 return -1;
             }
             gen_code = sg_get_unaligned_be32(add_elem_rsp + 4);
@@ -4116,57 +3519,18 @@ join_work(int sg_fd, struct opts_t * op, int display)
             }
             ae_ucp = add_elem_rsp + 8;
             ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
-            if (op->eiioe_auto && (add_elem_rsp_len > 11)) {
-                /* heuristic: if first element index in this page is 1
-                 * then act as if the EIIOE bit is set. */
-                if ((ae_ucp[0] & 0x10) && (1 == ae_ucp[3]))
-                    op->eiioe_force = 1;
-            }
         } else {
             add_elem_rsp_len = 0;
             ae_ucp = NULL;
             ae_last_ucp = NULL;
             res = 0;
-            if (op->verbose)
-                pr2serr("  Additional Element Status page not available\n");
         }
     } else {
         ae_ucp = NULL;
         ae_last_ucp = NULL;
     }
 
-    if ((op->do_join > 1) ||
-        ((0 == display) && (DPC_THRESHOLD == op->page_code))) {
-        mlen = sizeof(threshold_rsp);
-        if (mlen > op->maxlen)
-            mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, DPC_THRESHOLD, threshold_rsp, mlen, op,
-                          &threshold_rsp_len);
-        if (0 == res) {
-            if (threshold_rsp_len < 8) {
-                pr2serr("Threshold In response too short\n");
-                return -1;
-            }
-            gen_code = sg_get_unaligned_be32(threshold_rsp + 4);
-            if (ref_gen_code != gen_code) {
-                pr2serr("%s", enc_state_changed);
-                return -1;
-            }
-            t_ucp = threshold_rsp + 8;
-            /* t_last_ucp = threshold_rsp + threshold_rsp_len - 1; */
-        } else {
-            threshold_rsp_len = 0;
-            t_ucp = NULL;
-            res = 0;
-            if (op->verbose)
-                pr2serr("  Threshold In page not available\n");
-        }
-    } else {
-        threshold_rsp_len = 0;
-        t_ucp = NULL;
-    }
-
-    jrp = join_arr;
+	jrp = join_arr;
     tdhp = type_desc_hdr_arr;
     jr_max_ind = 0;
     for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
@@ -4221,7 +3585,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             break;      /* leave last row all zeros */
         }
     }
-
+	
     broken_ei = 0;
     if (ae_ucp) {
         int eip, eiioe;
@@ -4237,14 +3601,11 @@ join_work(int sg_fd, struct opts_t * op, int display)
                 for (j = 0; j < tdhp->num_elements; ++j) {
                     if ((ae_ucp + 1) > ae_last_ucp) {
                         get_out = 1;
-                        if (op->verbose || op->warn)
-                            pr2serr("warning: %s: off end of ae page\n",
-                                    __func__);
                         break;
                     }
                     eip = !!(ae_ucp[0] & 0x10); /* element index present */
                     if (eip)
-                        eiioe = op->eiioe_force ? 1 : (ae_ucp[2] & 1);
+                        eiioe =  (ae_ucp[2] & 1);
                     else
                         eiioe = 0;
                     if (eip && eiioe) {
@@ -4258,11 +3619,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                             break;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
-                        } else
+                        if (NULL == jr2p->add_elem_statp)
                             jr2p->add_elem_statp = ae_ucp;
                     } else if (eip) {     /* and EIIOE=0 */
                         ei = ae_ucp[3];
@@ -4289,11 +3646,7 @@ try_again:
                             goto try_again;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
-                        } else
+                        if (NULL == jr2p->add_elem_statp)
                             jr2p->add_elem_statp = ae_ucp;
                     } else {    /* EIP=0 */
                         while (jrp->enc_statp && ((-1 == jrp->el_ind_indiv) ||
@@ -4327,54 +3680,15 @@ try_again:
         }
     }
 
-    if (op->verbose > 3) {
-        jrp = join_arr;
-        for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            pr2serr("el_ind_th=%d el_ind_indiv=%d etype=%d se_id=%d ei=%d "
-                    "ei2=%d dsn=%d sa=0x", jrp->el_ind_th, jrp->el_ind_indiv,
-                    jrp->etype, jrp->se_id, jrp->ei_asc, jrp->ei_asc2,
-                    jrp->dev_slot_num);
-            if (saddr_non_zero(jrp->sas_addr)) {
-                for (j = 0; j < 8; ++j)
-                    pr2serr("%02x", jrp->sas_addr[j]);
-            } else
-                pr2serr("0");
-            pr2serr(" %s %s %s %s\n", (jrp->enc_statp ? "ES" : ""),
-                    (jrp->elem_descp ? "ED" : ""),
-                    (jrp->add_elem_statp ? "AES" : ""),
-                    (jrp->thresh_inp ? "TI" : ""));
-        }
-        pr2serr(">> elements in join_arr: %d, broken_ei=%d\n", k, broken_ei);
-    }
-
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
     /* Display contents of join_arr */
-    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
+    dn_len =  0;
     for (k = 0, jrp = join_arr, got1 = 0;
          ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-        if (op->ind_given) {
-            if (op->ind_th != jrp->el_ind_th)
-                continue;
-            if (op->ind_indiv != jrp->el_ind_indiv)
-                continue;
-        }
         ed_ucp = jrp->elem_descp;
-        if (op->desc_name) {
-            if (NULL == ed_ucp)
-                continue;
-            desc_len = sg_get_unaligned_be16(ed_ucp + 2);
-            /* some element descriptor strings have trailing NULLs and
-             * count them in their length; adjust */
-            while (desc_len && ('\0' == ed_ucp[4 + desc_len - 1]))
-                --desc_len;
-            if (desc_len != dn_len)
-                continue;
-            if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
-                             desc_len))
-                continue;
-        } else if (op->dev_slot_num >= 0) {
+        if (op->dev_slot_num >= 0) {
             if (op->dev_slot_num != jrp->dev_slot_num)
                 continue;
         } else if (saddr_non_zero(op->sas_addr)) {
@@ -4386,49 +3700,11 @@ try_again:
                 continue;
         }
         ++got1;
-        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
-            continue;   /* when '-ff' and status!=OK, skip */
-        cp = find_element_tname(jrp->etype, b, sizeof(b));
-        if (ed_ucp) {
-            desc_len = sg_get_unaligned_be16(ed_ucp + 2) + 4;
-            if (desc_len > 4)
-                printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
-                       (const char *)(ed_ucp + 4), jrp->el_ind_th,
-                       jrp->el_ind_indiv, cp);
-            else
-                printf("[%d,%d]  Element type: %s\n", jrp->el_ind_th,
-                       jrp->el_ind_indiv, cp);
-        } else
-            printf("[%d,%d]  Element type: %s\n", jrp->el_ind_th,
-                   jrp->el_ind_indiv, cp);
-        printf("  Enclosure Status:\n");
-        enc_status_helper("    ", jrp->enc_statp, jrp->etype, op);
+
         if (jrp->add_elem_statp) {
-            printf("  Additional Element Status:\n");
             ae_ucp = jrp->add_elem_statp;
             desc_len = ae_ucp[1] + 2;
-            additional_elem_helper("    ",  ae_ucp, desc_len, jrp->etype, op);
-        }
-        if (jrp->thresh_inp) {
-            printf("  Threshold In:\n");
-            t_ucp = jrp->thresh_inp;
-            ses_threshold_helper("    ", t_ucp, jrp->etype, op);
-        }
-    }
-    if (0 == got1) {
-        if (op->ind_given)
-            printf("      >>> no match on --index=%d,%d\n", op->ind_th,
-                   op->ind_indiv);
-        else if (op->desc_name)
-            printf("      >>> no match on --descriptor=%s\n", op->desc_name);
-        else if (op->dev_slot_num >= 0)
-            printf("      >>> no match on --dev-slot-name=%d\n",
-                   op->dev_slot_num);
-        else if (saddr_non_zero(op->sas_addr)) {
-            printf("      >>> no match on --sas-addr=0x");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", op->sas_addr[j]);
-            printf("\n");
+            show_disk_slot(ae_ucp, desc_len);
         }
     }
     return res;
@@ -4809,47 +4085,6 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     return 0;
 }
 
-/* Called when '--nickname=SEN' given. First calls status page to fetch
- * the generation code. Returns 0 for success, any other return value is
- * an error. */
-static int
-ses_set_nickname(int sg_fd, struct opts_t * op)
-{
-    int res, len;
-    int resp_len = 0;
-    unsigned char b[64];
-    const int control_plen = 0x24;
-
-    memset(b, 0, sizeof(b));
-    /* Only after the generation code, offset 4 for 4 bytes */
-    res = do_rec_diag(sg_fd, DPC_SUBENC_NICKNAME, b, 8, op, &resp_len);
-    if (res) {
-        pr2serr("%s: Subenclosure nickname status page, res=%d\n", __func__,
-                res);
-        return -1;
-    }
-    if (resp_len < 8) {
-        pr2serr("%s: Subenclosure nickname status page, response length too "
-                "short: %d\n", __func__, resp_len);
-        return -1;
-    }
-    if (op->verbose) {
-        uint32_t gc;
-
-        gc = sg_get_unaligned_be32(b + 4);
-        pr2serr("%s: generation code from status page: %" PRIu32 "\n",
-                __func__, gc);
-    }
-    b[0] = (unsigned char)DPC_SUBENC_NICKNAME;  /* just in case */
-    b[1] = (unsigned char)op->seid;
-    sg_put_unaligned_be16((uint16_t)control_plen, b + 2);
-    len = strlen(op->nickname_str);
-    if (len > 32)
-        len = 32;
-    memcpy(b + 8, op->nickname_str, len);
-    return do_senddiag(sg_fd, 1, b, control_plen + 4, 1, op->verbose);
-}
-
 static void
 enumerate_diag_pages(void)
 {
@@ -4937,21 +4172,186 @@ enumerate_work(const struct opts_t * op)
     }
 }
 
-int 
-main(int argc,char *argv[]){
+static void
+trimTrailingSpaces(char * b)
+{
+    int k;
 
-	int sg_fd = 0;
-
-	if ((sg_fd = sg_cmds_open_device(argv[1],1,0)) < 0) {
-	    return SG_LIB_FILE_ERROR;
-	}
-
-	vpd_decode_slot(sg_fd);
-
+    for (k = ((int)strlen(b) - 1); k >= 0; --k) {
+        if (' ' != b[k])
+            break;
+    }
+    if ('\0' != b[k + 1])
+        b[k + 1] = '\0';
 }
 
-#if 0
-/*int
+
+static int
+my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    if (cp_max_len < 2)
+        return 0;
+    va_start(args, fmt);
+    n = vsnprintf(cp, cp_max_len, fmt, args);
+    va_end(args);
+    return (n < cp_max_len) ? n : (cp_max_len - 1);
+}
+
+void myStr(const char* str, int len){
+	const char * p = str;
+    const char * formatstr;
+    unsigned char c;
+    char buff[82];
+    int bpstart = 5;
+    const int cpstart = 60;
+    int cpos = cpstart;
+    int bpos = bpstart;
+    int k, blen;
+
+    if (len > 16)
+		len = 16;
+	else if(len <=0)
+        return;
+    blen = (int)sizeof(buff);
+    formatstr = "%s\n";     /* was: "%.48s\n"; */
+
+	memset(buff, ' ', 80);
+    buff[80] = '\0';
+    bpstart = 0;
+    bpos = bpstart;
+    for (k = 0; k < len; k++) {
+        c = *p++;
+        if (bpos == (bpstart + (8 * 3)))
+            bpos++;
+        my_snprintf(&buff[bpos], blen - bpos, "%.2x",
+                    (int)(unsigned char)c);
+		bpos += 2;
+    }
+	
+    if (bpos > bpstart) {
+        buff[bpos + 2] = '\0';
+        fprintf(stdout, "%s\n", buff);
+    }
+    return;
+}
+
+/* These are target port, device server (i.e. target) and LU identifiers */
+static char *
+disk_decode_dev_ids(unsigned char * buff, int len)
+{
+    int u, j, k, id_len, i_len;
+    int off;
+    const unsigned char * ucp;
+    const unsigned char * ip;
+	
+    for (j = 1, off = -1;
+         (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
+         ++j) {
+		if(j != 2)
+			continue;
+        ucp = buff + off;
+        i_len = ucp[3];
+        id_len = i_len + 4;
+
+        if ((off + id_len) > len){
+            return NULL;
+        }
+        return (char *)(ucp + 4);
+
+		//myStr((const char *)ip, i_len);
+	}
+	return NULL;
+}
+
+static char *
+disk_decode_id_vpd(unsigned char * buff, int len)
+{
+    if (len < 4) {
+        pr2serr("Device identification VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    
+}
+
+#define VPD_DEVICE_ID  0x83
+
+/* Returns 0 if successful */
+static char *
+disk_vpd_decode(int sg_fd, int inhex_len)
+{
+    int len, pn;
+    int res = 0;
+    unsigned char * rp;
+    rp = rsp_buff;
+	
+    res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_DEVICE_ID, 0, 0, &len);
+    if (res || len < 4)
+        return NULL;
+    
+    return disk_decode_dev_ids(rp + 4, len - 4);;
+}
+
+#if 1
+int
+main(int argc, char * argv[])
+{
+    int sg_fd, dk_fd, n;
+    int ret = 0;
+    struct opts_t opts;
+    struct opts_t * op;
+	struct sg_simple_inquiry_resp inq_resp;
+	char buff[128];
+    int pd_type = 0;
+	const char * cp;
+	char * addr;
+
+    op = &opts;
+       /* use default for OS */
+
+	op->dev_slot_num = -1;
+	   
+	/*$3 = "W\v=_q\231\027\036"*/
+    if ((dk_fd = sg_cmds_open_device(argv[1], 1,0)) < 0) {
+        return SG_LIB_FILE_ERROR;
+    }
+
+	 
+	addr = disk_vpd_decode(dk_fd, -1);
+	if(addr){
+		for(n = 0; n < 8;++n)
+			op->sas_addr[n] = addr[n];
+	}else{
+		sg_cmds_close_device(dk_fd);
+        return SG_LIB_FILE_ERROR;
+	}
+	
+    if ((sg_fd = sg_cmds_open_device(argv[2], 1, 0)) < 0) {
+        sg_cmds_close_device(dk_fd);
+        return SG_LIB_FILE_ERROR;
+    }
+
+    
+
+    if (sg_simple_inquiry(sg_fd, &inq_resp, 1, 0)) {
+        ret = SG_LIB_CAT_OTHER;
+        goto err_out;
+    } else {
+        pd_type = inq_resp.peripheral_type;
+        cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
+    }
+	ret = join_work_zjd(sg_fd, op, 1);
+	
+err_out:
+	sg_cmds_close_device(dk_fd);
+	sg_cmds_close_device(sg_fd);
+	return 0;
+}
+#else
+int
 main(int argc, char * argv[])
 {
     int sg_fd, res;
@@ -4975,64 +4375,7 @@ main(int argc, char * argv[])
         pr2serr("version: %s\n", version_str);
         return 0;
     }
-    if (op->do_help) {
-        usage(op->do_help);
-        return 0;
-    }
-    if (op->enumerate || op->do_list) {
-        enumerate_work(op);
-        return 0;
-    }
-    if (op->num_cgs) {
-        have_cgs = 1;
-        cp = op->clear_str ? op->clear_str :
-             (op->get_str ? op->get_str : op->set_str);
-        strncpy(buff, cp, sizeof(buff) - 1);
-        buff[sizeof(buff) - 1] = '\0';
-        if (parse_cgs_str(buff, &tav)) {
-            pr2serr("unable to decode STR argument to --clear, --get or "
-                    "--set\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (op->get_str && tav.val_str)
-            pr2serr("--get option ignoring =<val> at the end of STR "
-                    "argument\n");
-        if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
-               saddr_non_zero(op->sas_addr))) {
-            pr2serr("with --clear, --get or --set option need either\n   "
-                    "--index, --descriptor, --dev-slot-num or --sas-addr\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (NULL == tav.val_str) {
-            if (op->clear_str)
-                tav.val = 0;
-            if (op->set_str)
-                tav.val = 1;
-        }
-        if (op->page_code_given && (DPC_ENC_STATUS != op->page_code) &&
-            (DPC_THRESHOLD != op->page_code) &&
-            (DPC_ADD_ELEM_STATUS != op->page_code)) {
-            pr2serr("--clear, --get or --set options only supported for the "
-                    "Enclosure\nControl/Status, Threshold In/Out and "
-                    "Additional Element Status pages\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-    }
-
-#ifdef SG_LIB_WIN32
-#ifdef SG_LIB_WIN32_DIRECT
-    if (op->verbose > 4)
-        pr2serr("Initial win32 SPT interface state: %s\n",
-                scsi_pt_win32_spt_state() ? "direct" : "indirect");
-    if (op->maxlen >= 16384)
-        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
-#endif
-//#endif
-#if 0
-    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
-    if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", op->dev_name,
-                safe_strerror(-sg_fd));
+    if ((sg_fd = sg_cmds_open_device(op->dev_name, 1, op->verbose)) < 0) {
         return SG_LIB_FILE_ERROR;
     }
     if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
@@ -5043,119 +4386,13 @@ main(int argc, char * argv[])
         } else {
             pd_type = inq_resp.peripheral_type;
             cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
-            if (0xd == pd_type) {
-                if (op->verbose)
-                    printf("    enclosure services device\n");
-            } else if (0x40 & inq_resp.byte_6)
-                printf("    %s device has EncServ bit set\n", cp);
-            else
-                printf("    %s device (not an enclosure)\n", cp);
         }
     }
-
-    if (op->nickname_str)
-        ret = ses_set_nickname(sg_fd, op);
-    else if (have_cgs)
-        ret = ses_cgs(sg_fd, &tav, op);
-    else if (op->do_join)
-        ret = show_disk_slot(sg_fd, op, 1);
-    else if (op->do_status)
-        ret = ses_process_status_page(sg_fd, op);
-    else { /* control page requested */
-        op->data_arr[0] = op->page_code;
-        op->data_arr[1] = op->byte1;
-        sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
-        switch (op->page_code) {
-        case DPC_ENC_CONTROL:  /* Enclosure Control diagnostic page [0x2] */
-            printf("Sending Enclosure Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Enclosure Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_STRING:       /* String Out diagnostic page [0x4] */
-            printf("Sending String Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send String Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_THRESHOLD:       /* Threshold Out diagnostic page [0x5] */
-            printf("Sending Threshold Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Threshold Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_ARRAY_CONTROL:   /* Array control diagnostic page [0x6] */
-            printf("Sending Array Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Array Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_SUBENC_STRING: /* Subenclosure String Out page [0xc] */
-            printf("Sending Subenclosure String Out [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Subenclosure String Out page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_DOWNLOAD_MICROCODE: /* Download Microcode Control [0xe] */
-            printf("Sending Download Microcode Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
-            printf("  Perhaps it would be better to use the sg_ses_microcode "
-                   "utility\n");
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Download Microcode Control page\n");
-                goto err_out;
-            }
-            break;
-        case DPC_SUBENC_NICKNAME: /* Subenclosure Nickname Control [0xf] */
-            printf("Sending Subenclosure Nickname Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
-            if (ret) {
-                pr2serr("couldn't send Subenclosure Nickname Control page\n");
-                goto err_out;
-            }
-            break;
-        default:
-            pr2serr("Setting SES control page 0x%x not supported by this "
-                    "utility\n", op->page_code);
-            pr2serr("That can be done with the sg_senddiag utility with its "
-                    "'--raw=' option\n");
-            ret = SG_LIB_SYNTAX_ERROR;
-            break;
-        }
-    }
+	ret = join_work_zjd(sg_fd, op, 1);
+    
 
 err_out:
-    if (0 == op->do_status) {
-        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
-        pr2serr("    %s\n", b);
-    }
-    if (ret && (0 == op->verbose))
-        pr2serr("Problem detected, try again with --verbose option for more "
-                "information\n");
+
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
@@ -5163,6 +4400,6 @@ err_out:
             return SG_LIB_FILE_ERROR;
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
-}*/
+}
 #endif
 
