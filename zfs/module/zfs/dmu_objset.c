@@ -2801,6 +2801,7 @@ dmu_objset_clear_mirror_io(objset_t *os, uint64_t txg)
     if (blkptr_array->blkptr_array == NULL) {
         cmn_err(CE_WARN, "mem alloc mirror blkptr array failed");
         kmem_free(blkptr_array, sizeof(os_mirror_blkptr_list_t));
+		blkptr_array = NULL;
         goto FINISH;
     }
 

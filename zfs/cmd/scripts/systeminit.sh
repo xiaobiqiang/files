@@ -532,7 +532,7 @@ function setipaddress
 		MASK=`cat /tmp/inittmp1`
 		nicpath=`cat /tmp/nicpath`
 
-		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ] || [ "deepin" == ${osversion:0:6} ];then
+		if [ "Ubuntu" == ${osversion:0:6} ] || [ "Debian" == ${osversion:0:6} ] || [ "Kylin" == ${osversion:0:5} ];then
 			echo "CREATING $dst config file."
 			cat >> $nicpath << _HSTNAME_
 auto $dst
@@ -541,6 +541,16 @@ iface $dst inet static
 address $IPADDR
 netmask $MASK
 _HSTNAME_
+		elif [ "deepin" == ${osversion:0:6} ]; then
+			echo "CREATING $dst config file."
+			if [ `cat $nicpath | grep -w $dst | wc -l` -eq 0 ]; then 
+			cat >> $nicpath << _HSTNAME_
+auto $dst
+iface $dst inet static
+address $IPADDR
+netmask $MASK
+_HSTNAME_
+			fi
 		else
 			echo "creating $dst config file."
 			cat > $nicpath$dst << _HSTNAME_
@@ -661,14 +671,14 @@ function deepin_unmanage_netdevice
 {
 	if [ "deepin" == ${osversion:0:6} ]; then
 		for nd in `ip a | grep mtu | awk '{print $2}' | sed 's/://'`; do
-			if [ X10000Mb/s == X`ethtool $nd | grep Speed | cut -d ' ' -f 2` ]; then 
+			if [ X10000baseT/Full == X`ethtool $nd | grep 'Supported link modes:' | cut -d ' ' -f 6` ]; then 
 				local ether=`ifconfig $nd | grep ether | awk '{print $2}'`
 				if [ `cat /etc/NetworkManager/NetworkManager.conf | grep "\[keyfile\]" | wc -l` -lt 1 ]; then
 					echo "" >> /etc/NetworkManager/NetworkManager.conf
 					echo '[keyfile]' >> /etc/NetworkManager/NetworkManager.conf
 					echo "unmanaged-devices=mac:${ether};" >> /etc/NetworkManager/NetworkManager.conf
 				else
-					local origin=`cat NetworkManager.conf | grep unmanaged-devices`
+					local origin=`cat /etc/NetworkManager/NetworkManager.conf | grep unmanaged-devices`
 					sed "s/${origin}/${origin}${ether};/" -i /etc/NetworkManager/NetworkManager.conf
 				fi
 			fi
