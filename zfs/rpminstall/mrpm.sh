@@ -5,6 +5,8 @@ SPL_DIR="../../spl"
 ZFS_DIR=".."
 RPM_DIR="rpm"
 SCSI_DIR="../cmd/scsi_tools"
+SYSTEM_DIR="../etc/systemd/system"
+IS_DEEP=`uname -r|grep deepin|wc -l`
 
 
 if [ ! -d $RPM_DIR ]; then
@@ -21,7 +23,7 @@ else
 	UNAME_FLAG="x86_64"
 fi
 
-if [ `uname -a|grep deepin|wc -l` -eq 0 ]; then
+if [ $IS_DEEP -eq 0 ]; then
     cp $SPL_DIR/*.$UNAME_FLAG.rpm $RPM_DIR/spl
     cp $ZFS_DIR/*.$UNAME_FLAG.rpm $RPM_DIR/zfs
 else
@@ -32,7 +34,12 @@ else
     fi
     cd -
     cp $SPL_DIR/*.deb $RPM_DIR/spl
-    cp $ZFS_DIR/*.deb $RPM_DIR/zfs    
+    cp $ZFS_DIR/*.deb $RPM_DIR/zfs
+
+    mkdir ./system
+    cp $SYSTEM_DIR/*service system
+    cp $SYSTEM_DIR/50-zfs.preset system
+    cp $SYSTEM_DIR/zfs.target system    
 fi
 
 cd $SCSI_DIR
@@ -47,6 +54,7 @@ cp /usr/local/lib/libsgutils2* scsi/lib
 
 tar -zcvf zfsonlinuxrpm.tar.gz $RPM_DIR
 tar -zcvf scsi_tool.tar.gz scsi
+git branch|grep '*'|awk '{print $2}' > release
 
 rm -rf $RPM_DIR
 rm -rf scsi

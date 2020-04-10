@@ -16,6 +16,7 @@ function install_python()
 
 function install_service()
 {
+    systemctl enable zfs.target
     systemctl enable zfs-boot.service
     systemctl enable stmf-boot.service
     systemctl enable configd.service
