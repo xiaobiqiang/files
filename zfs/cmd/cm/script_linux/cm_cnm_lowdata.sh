@@ -6,7 +6,7 @@ function cm_cnm_lowdata_getbatch()
 {
 	zfs list -H -t filesystem -o name,lowdata,lowdata_period,lowdata_delete_period,lowdata_period_unit,lowdata_criteria|grep '/'|while read line
 	do
-		echo "$line \c"
+		echo -n "$line "
 		local arr=($line)
 		zfs migrate status ${arr[0]}|grep "^total"|awk -F':' '{printf $2} END{print ""}'
 	done
