@@ -81,7 +81,8 @@ function install_deepin_rely()
     dpkg -i ./*
     cd -
     
-    if [ `ls /usr/lib/jvm/|grep jdk8|wc -l` -eq 0 ]; then
+    mkdir -p /usr/lib/jvm/
+    if [ `ls /usr/lib/jvm/|grep jdk8|wc -l 2>/dev/null` -eq 0 ]; then
         cp $rely_nmae/jdk8.tar /usr/lib/jvm/
         cd /usr/lib/jvm/
         tar -xvf jdk8.tar
@@ -94,6 +95,16 @@ function install_deepin_rely()
         echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /etc/profile
         echo 'export CLASSPATH=.:$JAVA_HONE/lib/dt.jar:$JAVA_HOME/lib/tools.jar' >> /etc/profile
     fi
+
+    ln -s /usr/lib/libxml2.so.2 /usr/lib/libxml2.so
+    ln -s /usr/lib/libreadline.so.6.3 /usr/lib/libreadline.so.6 
+    ln -s /usr/lib/libreadline.so.6 /usr/lib/libreadline.so
+    ln -s /usr/lib/sw_64-linux-gnu/libnetsnmpagent.so.30.0.3 /usr/lib/sw_64-linux-gnu/libnetsnmpagent.so    
+    ln -s /usr/lib/sw_64-linux-gnu/libnetsnmp.so.30.0.3 /usr/lib/sw_64-linux-gnu/libnetsnmp.so 
+
+    mkdir -p /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
+    cp $rely_nmae/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
+    depmod
 }
 
 function install_version()
@@ -113,18 +124,20 @@ function install()
     if [ $IS_DEEP -eq 0 ]; then
         install_type_rpm
     else
+        #if [ -f $RELY_DEB ]; then
+        #    install_deepin_rely
+        #fi
+
         install_type_deb
         
         mkdir -p /lib/systemd/system-preset/
         cp system/*service /lib/systemd/system
+        cp system/*target /lib/systemd/system
         cp system/50-zfs.preset /lib/systemd/system-preset/
 
-        if [ -f $RELY_DEB ]; then
-            install_deepin_rely
-        fi
-        
         /usr/cm/script/cm_rpm.sh
         /usr/local/sbin/rpm_install.sh
+        systemctl disable network-manager.service
     fi
     
     if [ `uname -m` = "sw_64" ]; then
