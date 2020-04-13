@@ -36,5 +36,5 @@ done > $SASDISK
 
         echo "Enclosure : ${diskinfos[0]}"
         echo "Slot : ${diskinfos[1]}"
-        echo "Addr : ${addr:1:15}"
+        echo "Addr : ${addr:1:16}"
     done < $SASDISK

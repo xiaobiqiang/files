@@ -1,5 +1,9 @@
 #!/bin/bash
 cfgfile='/etc/ntp.conf'
+source '/var/cm/script/cm_types.sh'
+source '/var/cm/script/cm_common.sh'
+
+OS_TYPE=`cm_systerm_version_get`
 
 function cm_cnm_ntp_server()
 {
@@ -8,7 +12,12 @@ function cm_cnm_ntp_server()
     else
         echo 'server 127.127.1.0' >> $cfgfile
     fi
-    systemctl restart ntpd
+    if [ $OS_TYPE -eq $CM_OS_TYPE_DEEPIN ];then
+        systemctl restart ntp
+    else
+        systemctl restart ntpd
+    fi
+    return $?
 }
 
 function cm_cnm_ntp_client()
@@ -27,7 +36,12 @@ function cm_cnm_ntp_client()
     else
         echo "server $ip" >> $cfgfile
     fi
-    systemctl restart ntpd
+    if [ $OS_TYPE -eq $CM_OS_TYPE_DEEPIN ];then
+        systemctl restart ntp
+    else
+        systemctl restart ntpd
+    fi
+    return $?
 }
 
 function cm_cnm_ntp_start()
@@ -52,7 +66,13 @@ function cm_cnm_ntp_close()
     if [ `tail -n 1 $cfgfile |grep server |wc -l` -ne 0 ]; then
         sed -i '$d' $cfgfile
     fi
-    systemctl stop ntpd
+    
+    if [ $OS_TYPE -eq $CM_OS_TYPE_DEEPIN ];then
+        systemctl stop ntp
+    else
+        systemctl stop ntpd
+    fi
+    return $?
 }
 
 case $1 in 

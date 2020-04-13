@@ -165,6 +165,7 @@ enum {
     SAS_EVT_DEV_REMOVE,
     SAS_EVT_DEV_NORESP,
     SAS_EVT_DEV_MERR,
+    SAS_EVT_DEV_SMART_FAIL,
     SAS_EVT_BUTT
 };
 
@@ -375,6 +376,7 @@ struct MPT3SAS_TARGET {
 	struct _sas_device *sdev;
     atomic64_t   noresp_cnt;
     u8          noresp_simu;
+    u8          merr_simu;
 };
 
 
@@ -1062,6 +1064,8 @@ struct MPT3SAS_ADAPTER {
 	spinlock_t	sas_device_lock;
 	struct list_head raid_device_list;
 	spinlock_t	raid_device_lock;
+    struct list_head removed_sas_device_list;
+    spinlock_t	removed_device_lock;
 	u8		io_missing_delay;
 	u16		device_missing_delay;
 	int		sas_id;
@@ -1381,6 +1385,8 @@ void mpt3sas_enable_diag_buffer(struct MPT3SAS_ADAPTER *ioc,
 	u8 bits_to_regsiter);
 int mpt3sas_send_diag_release(struct MPT3SAS_ADAPTER *ioc, u8 buffer_type,
 	u8 *issue_reset);
+int mpt3sas_clear_sdev_in_removed_list(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
+
 
 /* transport shared API */
 extern struct scsi_transport_template *mpt3sas_transport_template;

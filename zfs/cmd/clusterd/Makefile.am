@@ -57,3 +57,5 @@ clusterd_LDADD = \
 
 clusterd_LDADD += $(ZLIB) -lrt
 clusterd_LDFLAGS = -pthread
+
+dist_bin_SCRIPTS = trace_dbgmsgs.py

@@ -250,7 +250,8 @@ static int
 fmd_msg_lock_held(fmd_msg_hdl_t *h)
 {
 	extern int _rw_write_held(struct _rwlock *);
-	return (_rw_write_held((struct _rwlock *)&fmd_msg_rwlock));
+	//return (_rw_write_held((struct _rwlock *)&fmd_msg_rwlock));
+	return 0;
 }
 
 void

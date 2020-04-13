@@ -39,5 +39,14 @@ fi
 
 cp module/Makefile_hengwei.in module/Makefile.in
 ./autogen.sh
-./configure --enable-hengwei=yes --with-spl=$1
+./configure --enable-hengwei=yes --with-spl=$1 --prefix=/usr --sbindir=/sbin
 make -j 16 && make install
+
+cp -f /lib/modules/$(uname -r)/extra/mpt3sas/mpt3sas.ko /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+
+if [[ $? == 0 ]]; then
+	echo "install mpt3sas.ko success"
+else 
+	echo "install mpt3sas.ko failed"
+fi
+

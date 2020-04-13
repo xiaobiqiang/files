@@ -439,6 +439,7 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 	dmu_object_info_t *doi;
 	uint64_t readonly;
 	boolean_t owned = B_FALSE;
+	uint64_t start, end;
 
 	error = dsl_prop_get_integer(name,
 	    zfs_prop_to_name(ZFS_PROP_READONLY), &readonly, NULL);
@@ -447,6 +448,8 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 	if (readonly)
 		return (SET_ERROR(EROFS));
 
+	start = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s start", __func__, name);
 	mutex_enter(&zvol_state_lock);
 	zv = zvol_find_by_name(name);
 
@@ -454,6 +457,9 @@ zvol_set_volsize(const char *name, uint64_t volsize)
 		if ((error = dmu_objset_own(name, DMU_OST_ZVOL, B_FALSE,
 		    FTAG, &os)) != 0) {
 			mutex_exit(&zvol_state_lock);
+			end = gethrtime();
+			cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms",
+				__func__, name, error, (end - start) / 1000000);
 			return (SET_ERROR(error));
 		}
 		owned = B_TRUE;
@@ -481,6 +487,9 @@ out:
 			zv->zv_objset = NULL;
 	}
 	mutex_exit(&zvol_state_lock);
+	end = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms",
+		__func__, name, error, (end - start) / 1000000);
 	return (error);
 }
 
@@ -1778,6 +1787,7 @@ zvol_alloc(dev_t dev, const char *name)
 	    ZVOL_DEV_NAME, (dev & MINORMASK));
 	
 	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
+	zfs_dbgmsg("zvol %s alloc %p", name, zv);
 	return (zv);
 
 out_queue:
@@ -1796,6 +1806,7 @@ zvol_free(zvol_state_t *zv)
 {
 
 	printk(KERN_WARNING "%s  %s  \n", __func__, zv->zv_name);
+	zfs_dbgmsg("zvol free %p", zv);
 	/*dump_stack();*/
 
 	ASSERT(MUTEX_HELD(&zvol_state_lock));
@@ -1839,6 +1850,12 @@ zvol_create_minor_impl(const char *name)
 	kthread_t *replay_th;
 	zvol_replay_arg_t *replay_arg;
 	boolean_t bmdata = zfs_mirror_mdata_enable();
+	uint64_t start, end;
+
+	start = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s start", __func__, name);
+
+	zfs_dbgmsg("zvol %s", name);
 
 	mutex_enter(&zvol_state_lock);
 
@@ -1963,6 +1980,11 @@ out:
 		mutex_exit(&zvol_state_lock);
 	}
 
+	zfs_dbgmsg("fini zvol %s error %d", name, error);
+
+	end = gethrtime();
+	cmn_err(CE_NOTE, "zjn %s name=%s end, error=%d elapsed=%"PRIu64"ms", 
+		__func__, name, error, (end - start) / 1000000);
 	return (SET_ERROR(error));
 }
 
@@ -2142,6 +2164,7 @@ zvol_remove_minors_impl(const char *name)
 
 	
 	printk(KERN_WARNING "%s %s begin", __func__, name);
+	zfs_dbgmsg("zvol %s", name);
 	mutex_enter(&zvol_state_lock);
 
 	for (zv = list_head(&zvol_state_list); zv != NULL; zv = zv_next) {
@@ -2168,6 +2191,8 @@ zvol_remove_minors_impl(const char *name)
 #endif
 			printk(KERN_WARNING "%s %s zv_open_count %lu", __func__,
 				zv->zv_name, (ulong_t)zv->zv_open_count);
+			zfs_dbgmsg("zvol %s zv_open_count %lu",
+				zv->zv_name, (ulong_t)zv->zv_open_count);
 			while (zv->zv_open_count && count > 0) {
 				cv_timedwait(&zv->zv_rele_cv, &zvol_state_lock, 
 					ddi_get_lbolt() + msecs_to_jiffies(ZVOL_REMOVE_WAIT_GAP * 10));
@@ -2193,6 +2218,8 @@ zvol_remove_minors_impl(const char *name)
 				zvol_free(zv);
 			} else {
 				printk(KERN_WARNING "%s zv_open_count %lu",
+					zv->zv_name, (ulong_t)zv->zv_open_count);
+				zfs_dbgmsg("zvol %s zv_open_count %lu",
 					zv->zv_name, (ulong_t)zv->zv_open_count);
 				zv->zv_flags &= ~ZVOL_WANT_REMOVE;
 			}

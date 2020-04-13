@@ -2448,6 +2448,8 @@ spa_dir_prop(spa_t *spa, const char *name, uint64_t *val)
 static int
 spa_vdev_err(vdev_t *vdev, vdev_aux_t aux, int err)
 {
+	zfs_dbgmsg("vdev guid %llx aux %d err %d",
+		(u_longlong_t)vdev->vdev_guid, aux, err);
 	vdev_set_state(vdev, B_TRUE, VDEV_STATE_CANT_OPEN, aux);
 	return (err);
 }
@@ -2711,6 +2713,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	 * Find the best uberblock.
 	 */
 	vdev_uberblock_load(rvd, ub, &label);
+	zfs_dbgmsg("uberblock load ub_txg %llx spa %p",
+		(u_longlong_t)ub->ub_txg, spa);
 
 	/*
 	 * If we weren't able to find a single valid uberblock, return failure.
@@ -3174,6 +3178,7 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 	 * Load the vdev state for all toplevel vdevs.
 	 */
 	vdev_load(rvd);
+	zfs_dbgmsg("vdev load, spa %p", spa);
 
 	/*
 	 * Propagate the leaf DTLs we just loaded all the way up the tree.
@@ -3283,6 +3288,8 @@ spa_load_impl(spa_t *spa, uint64_t pool_guid, nvlist_t *config,
 		 * (invoked from spa_check_logs()) or zil_claim() above.
 		 */
 		txg_wait_synced(spa->spa_dsl_pool, spa->spa_claim_max_txg);
+		zfs_dbgmsg("wait claim, spa_claim_max_txg %llx spa %p",
+			(u_longlong_t)spa->spa_claim_max_txg, spa);
 
 		/*
 		 * If the config cache is stale, or we have uninitialized
@@ -4560,6 +4567,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 * If a pool with this name exists, return failure.
 	 */
 	cmn_err(CE_WARN,"%s %s", __func__,pool);
+	zfs_dbgmsg("import %s", pool);
 	mutex_enter(&spa_namespace_lock);
 	if (spa_lookup(pool) != NULL) {
 		mutex_exit(&spa_namespace_lock);
@@ -4598,6 +4606,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 * Don't start async tasks until we know everything is healthy.
 	 */
 	spa_async_suspend(spa);
+	zfs_dbgmsg("async suspend %p", spa);
 
 	zpool_get_rewind_policy(config, &policy);
 	if (policy.zrp_request & ZPOOL_DO_REWIND)
@@ -4613,6 +4622,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 
 	error = spa_load_best(spa, state, B_TRUE, policy.zrp_txg,
 	    policy.zrp_request);
+	zfs_dbgmsg("spa load best error %d spa %p", error, spa);
 
 	/*
 	 * Propagate anything learned while loading the pool and pass it
@@ -4780,14 +4790,17 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	 */
 	spa_async_request(spa, SPA_ASYNC_AUTOEXPAND);
 	cmn_err(CE_WARN,"%s %s do raidz_aggre_check", __func__,pool);
+	zfs_dbgmsg("raidz aggre check %p", spa);
 	raidz_aggre_check(spa);
 	
 	cmn_err(CE_WARN,"%s %s %d", __func__,pool,spa_is_raidz_aggre(spa));
+	zfs_dbgmsg("start reclaim thread %p", spa);
 	start_space_reclaim_thread(spa);
 
 	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa_is_raidz_aggre(spa));
 	mutex_exit(&spa_namespace_lock);
 	spa_history_log_version(spa, "import");
+	zfs_dbgmsg("zvol create minors %p", spa);
 	zvol_create_minors(spa, pool, B_FALSE);
 
 	return (0);
@@ -4908,6 +4921,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	spa_t *spa;
 	int wait_refcount_times = 0;
 
+	zfs_dbgmsg("export %s force %d hardforce %d", pool, force, hardforce);
 	if (oldconfig)
 		*oldconfig = NULL;
 
@@ -4931,6 +4945,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	spa_async_suspend(spa);
 	if (spa->spa_zvol_taskq) {
 		cmn_err(CE_WARN, "%s to do zvol_remove_minors %s", __func__, spa_name(spa));
+		zfs_dbgmsg("remove minors spa %p", spa);
 		zvol_remove_minors(spa, spa_name(spa), B_TRUE);
 		taskq_wait(spa->spa_zvol_taskq);
 	}
@@ -4945,6 +4960,7 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	 * so we have to force it to sync before checking spa_refcnt.
 	 */
 	if (spa->spa_sync_on) {
+		zfs_dbgmsg("wait evicting spa %p", spa);
 		txg_wait_synced(spa->spa_dsl_pool, 0);
 		spa_evicting_os_wait(spa);
 	}
@@ -4952,6 +4968,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
 	while (!spa_refcount_zero(spa) && wait_refcount_times < 3) {
 		wait_refcount_times++;
 		cmn_err(CE_WARN, "[SPA_BUSY] %p, ref=%llu",
+			spa, (u_longlong_t) refcount_count(&spa->spa_refcount));
+		zfs_dbgmsg("[SPA_BUSY] %p, ref=%llu",
 			spa, (u_longlong_t) refcount_count(&spa->spa_refcount));
 		delay(hz);
 	}
@@ -5375,12 +5393,17 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	uint64_t is_metaspare = 0;
 	uint64_t is_lowspare = 0;
 	uint64_t is_mirrorspare = 0;
+	int64_t ret;
 	
 	ASSERTV(vdev_t *rvd = spa->spa_root_vdev);
 
 	ASSERT(spa_writeable(spa));
 
-	txg = spa_vdev_enter(spa);
+	while ((ret = spa_vdev_tryenter(spa)) == 0)
+		delay(4);
+	if (ret < 0)
+		return (ENOTSUP);
+	txg = ret;
 
 	oldvd = spa_lookup_by_guid(spa, guid, B_FALSE);
 
@@ -6932,12 +6955,7 @@ static int
 spa_free_sync_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 {
 	zio_t *zio = arg;
-
-	if (BP_IS_TOGTHER(bp)) {
-		cmn_err(CE_WARN, "%s BP_IS_TOGTHER \n", __func__);
-		return (0);
-	}
-
+	
 	zio_nowait(zio_free_sync(zio, zio->io_spa, dmu_tx_get_txg(tx), bp,
 	    zio->io_flags));
 	return (0);

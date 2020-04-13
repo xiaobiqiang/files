@@ -180,14 +180,14 @@ static vdev_t* find_vdev_by_sas_addr(u64 sas_addr)
     /*char sas_wwn_str[WWN_STRLEN] = {0};
 
     sprintf(sas_wwn_str, "%016llx", sas_addr);
-    printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);*/
-    printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);
+    printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);
+    printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);*/
 
     spin_lock(&vdev_ev_mgt_lock);
     list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
         /*printk(KERN_ERR "iterate sas wwn:%s\n", vdev_ev->wwn_str);
-        if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {*/
-        printk(KERN_ERR "iterate sas wwn:%llx\n", vdev_ev->wwn);
+        if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {
+        printk(KERN_ERR "iterate sas wwn:%llx\n", vdev_ev->wwn);*/
         if(wwn_match(vdev_ev->wwn, sas_addr)) {
             ret = vdev_ev->vd;
             break;
@@ -394,6 +394,7 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	vdev_disk_t *vd;
 	int count = 0, mode, block_size;
     char bdev_name[BDEVNAME_SIZE];
+    int bdev_retry_count = 50;
 
 	/* Must have a pathname and it must be absolute. */
 	if (v->vdev_path == NULL || v->vdev_path[0] != '/') {
@@ -438,10 +439,12 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	 * practice delays have been observed to be on the order of 100ms.
 	 */
 	mode = spa_mode(v->vdev_spa);
-	if (v->vdev_wholedisk && v->vdev_expanding)
+	if (v->vdev_wholedisk && v->vdev_expanding) {
 		bdev = vdev_disk_rrpart(v->vdev_path, mode, vd);
+        bdev_retry_count = 100;
+    }
 
-	while (IS_ERR(bdev) && count < 50) {
+	while (IS_ERR(bdev) && count < bdev_retry_count) {
 		bdev = vdev_bdev_open(v->vdev_path,
 		    vdev_bdev_mode(mode), zfs_vdev_holder);
 		if (unlikely(PTR_ERR(bdev) == -ENOENT)) {
@@ -983,6 +986,8 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
     case SAS_EVT_DEV_REMOVE:
         zfs_ereport_post(FM_EREPORT_ZFS_DEV_REMOVED, vd->vdev_spa, vd, NULL, 0, 0);
         zfs_post_remove(vd->vdev_spa, vd);
+        vd->vdev_remove_wanted = B_TRUE;
+        spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);
         break;
 
     case SAS_EVT_DEV_MERR:
@@ -991,6 +996,10 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 
     case SAS_EVT_DEV_NORESP:
         zfs_ereport_post(FM_EREPORT_ZFS_DEV_NORESP, vd->vdev_spa, vd, NULL, 0, 0);
+        break;
+
+    case SAS_EVT_DEV_SMART_FAIL:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEV_SMART_FAIL, vd->vdev_spa, vd, NULL, 0, 0);
         break;
     
     default :

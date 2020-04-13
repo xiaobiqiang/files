@@ -3221,6 +3221,11 @@ dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx)
 				continue;
 			}
 
+            if (dr->dr_zio->io_bp_override){
+                zio_nowait(dr->dr_zio);
+				continue;
+            }
+
 			if (dr->dr_zio->io_data == NULL ||
 					dr->dr_zio->io_size != dn->dn_datablksz ) {
 				cmn_err(CE_WARN,"%s data=%p blkid = %lx iosize = %lx ",__func__,

@@ -533,7 +533,7 @@ void *cs_kmem_alloc(size_t size)
 	}
 
 	if (size > CLUSTERSAN_MAXBLOCKSIZE) {
-		return (kmem_alloc(size, KM_SLEEP | KM_VMEM));
+		return (kmem_alloc(size, KM_SLEEP));
 	}
 
 	ASSERT(i < (CLUSTERSAN_MAXBLOCKSIZE >> CLUSTERSAN_MINBLOCKSHIFT));

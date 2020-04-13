@@ -754,8 +754,8 @@ static int
 match_disk(disk_t *oldp, disk_t *newp)
 {
 	if (oldp->devid != NULL) {
-		if (newp->devid != NULL &&
-		    devid_compare(oldp->devid, newp->devid) == 0) {
+		if (newp->devid != NULL /*&&
+		    devid_compare(oldp->devid, newp->devid) == 0*/) {
 			return (1);
 		}
 

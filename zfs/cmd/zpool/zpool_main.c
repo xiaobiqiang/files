@@ -1312,11 +1312,13 @@ errout:
 	nvlist_free(nvroot);
 	nvlist_free(fsprops);
 	nvlist_free(props);
+	system("fmadm genxml -u &");
 	return (ret);
 badusage:
 	nvlist_free(fsprops);
 	nvlist_free(props);
 	usage(B_FALSE);
+	system("fmadm genxml -u &");
 	return (2);
 }
 
@@ -1600,6 +1602,7 @@ zpool_do_destroy(int argc, char **argv)
 out:
 	if (sharenfs || sharesmb)
 		enable_share_services(sharenfs, sharesmb);
+	system("fmadm genxml -u &");
 	return (ret);
 }
 
@@ -1675,6 +1678,36 @@ out:
 	return (ret);
 }
 
+static void
+cprint(const char *format, ...)
+{
+	va_list args;
+	FILE *fp;
+	char path[] = "/var/cluster/log/zpool.log";
+	char buf[512], *cp;
+	char timebuf[32];
+	struct timeval now;
+	struct tm ltime;
+
+	if (gettimeofday(&now, NULL) != 0)
+		return;
+
+	(void) strftime(timebuf, sizeof (timebuf), "%b %e %T",
+	    localtime_r(&now.tv_sec, &ltime));
+
+	(void) snprintf(buf, sizeof (buf), "%s: ", timebuf);
+	cp = strchr(buf, '\0');
+	va_start(args, format);
+	(void) vsnprintf(cp, sizeof (buf) - (cp - buf), format, args);
+	va_end(args);
+	(void) strcat(buf, "\n");
+
+	fp = fopen(path, "a");
+	if (fp == NULL)
+		return;
+	(void) fputs(buf, fp);
+	fclose(fp);
+}
 
 static int
 disable_share_services(int *sharenfs, int *sharesmb)
@@ -1777,8 +1810,12 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	nvlist_t *config;
 	uint64_t guid = 0;
 
-	if (zpool_disable_datasets(zhp, cb->force) != 0)
+	if (zpool_disable_datasets(zhp, cb->force) != 0) {
+		cprint("pool %s disable datasets failed", zpool_get_name(zhp));
 		return (1);
+	}
+
+	cprint("export '%s': disable datasets fini", zpool_get_name(zhp));
 
 	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
 	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
@@ -1786,9 +1823,12 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	log_history = B_FALSE;
 
 	if (cb->hardforce) {
-		if (zpool_export_force(zhp, history_str) != 0)
+		if (zpool_export_force(zhp, history_str) != 0) {
+			cprint("pool %s export foece failed", zpool_get_name(zhp));
 			return (1);
+		}
 	} else if (zpool_export(zhp, cb->force, history_str) != 0) {
+		cprint("pool %s export failed", zpool_get_name(zhp));
 		return (1);
 	}
 
@@ -1799,6 +1839,7 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	}
 	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 
+	cprint("export '%s': export fini", zpool_get_name(zhp));
 	return (0);
 }
 
@@ -1841,6 +1882,8 @@ zpool_do_export(int argc, char **argv)
 		}
 	}
 
+	cprint("%s", history_str);
+
 	cb.force = force;
 	cb.hardforce = hardforce;
 	argc -= optind;
@@ -1865,6 +1908,8 @@ zpool_do_export(int argc, char **argv)
 		if (sharenfs || sharesmb)
 			enable_share_services(sharenfs, sharesmb);
 
+		if (ret != 0)
+			cprint("return %d", ret);
 		return (ret);
 	}
 
@@ -1886,6 +1931,8 @@ zpool_do_export(int argc, char **argv)
 	if (sharenfs || sharesmb)
 		enable_share_services(sharenfs, sharesmb);
 
+	if (ret != 0)
+		cprint("return %d", ret);
 	return (ret);
 }
 
@@ -2006,7 +2053,7 @@ find_spare(zpool_handle_t *zhp, void *data)
 
 xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *state,
     char *read_err, char *write_err,
-    char *sum_err, char *en_id, char *slot_id, char *type)
+    char *sum_err, char *en_id, char *slot_id, char *type, char *total_buf)
 {
 	xmlNodePtr node;
 
@@ -2037,6 +2084,8 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 		xmlSetProp(node, (xmlChar *)"en_id", (xmlChar *) en_id);
 	if (strcmp(slot_id, "--") != 0)
 		xmlSetProp(node, (xmlChar *)"slot_id", (xmlChar *) slot_id);
+    if ((strcmp(total_buf, "--") != 0) && total_buf != NULL)
+		xmlSetProp(node, (xmlChar *)"total", (xmlChar *) total_buf);
 	return (node);
 
 }
@@ -2165,7 +2214,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	}
 
 	if (parent_node != NULL )
-		node = create_item_node(parent_node, buf, state, rbuf, wbuf, cbuf, en_buf, slot_buf, type);
+		node = create_item_node(parent_node, buf, state, rbuf, wbuf, cbuf, en_buf, slot_buf, type, total_buf);
 
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
 	    &notpresent) == 0) {
@@ -2954,6 +3003,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	if (!SPA_VERSION_IS_SUPPORTED(version)) {
 		(void) fprintf(stderr, gettext("cannot import '%s': pool "
 		    "is formatted using an unsupported ZFS version\n"), name);
+		cprint("cannot import '%s': pool "
+		    "is formatted using an unsupported ZFS version", name);
 		return (1);
 	} else if (state != POOL_STATE_EXPORTED &&
 	    !(flags & ZFS_IMPORT_ANY_HOST)) {
@@ -2979,6 +3030,9 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 			    "(hostid: 0x%lx) on %s"), name, hostname,
 			    (unsigned long)hostid,
 			    asctime(localtime(&t)));
+			cprint("cannot import "
+			    "'%s': pool may be in use from other "
+			    "system, it was last accessed by %s", name, hostname);
 			(void) fprintf(stderr, gettext("use '-f' to "
 			    "import anyway\n"));
 			return (1);
@@ -2989,22 +3043,31 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		(void) fprintf(stderr, gettext("cannot import "
 		    "'%s': pool may be in use from other "
 		    "system, the quantum index changed\n"), name);
+		cprint("cannot import "
+		    "'%s': pool may be in use from other "
+		    "system, the quantum index changed", name);
 		return (1);
 	}
 
-	if (zpool_import_props(g_zfs, config, newname, props, flags) != 0)
+	if (zpool_import_props(g_zfs, config, newname, props, flags) != 0) {
+		cprint("cannot import '%s': zpool_import_props error", name);
 		return (1);
+	}
 
 	if (newname != NULL)
 		name = (char *)newname;
 
-	if ((zhp = zpool_open_canfail(g_zfs, name)) == NULL)
+	if ((zhp = zpool_open_canfail(g_zfs, name)) == NULL) {
+		cprint("cannot import '%s': zpool_open error", name);
 		return (1);
+	}
 
+	cprint("import '%s': start enable datasets", name);
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
 	    !(flags & ZFS_IMPORT_ONLY) &&
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
+		cprint("cannot import '%s': zpool_enable_datasets error", name);
 		return (1);
 	}
 
@@ -3028,16 +3091,19 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	if (ret != 0) {
 		syslog(LOG_NOTICE, "%s: failed wait pool(%s)'s zvol create minor done",
 			__func__, name);
+		cprint("cannot import '%s': ioctl error", name);
 	}
 	free(zc);
 
 	syslog(LOG_NOTICE, "%s: all volume create minor finished, start to import lu", __func__);
+	cprint("import '%s': start import lu", name);
 	zfs_import_all_lus(g_zfs, name);
 	zfs_enable_avs(g_zfs, name, 1);
 
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) == 0);
 	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 	zpool_close(zhp);
+	cprint("import '%s': import success", name);
 	return (0);
 }
 
@@ -3235,6 +3301,8 @@ zpool_do_import(int argc, char **argv)
 		}
 	}
 
+	cprint("%s", history_str);
+
 	argc -= optind;
 	argv += optind;
 
@@ -3361,6 +3429,8 @@ zpool_do_import(int argc, char **argv)
 		(void) fprintf(stderr, gettext("cannot import '%s': "
 		    "a pool with that name already exists\n"),
 		    argv[0]);
+		cprint("cannot import '%s': "
+		    "a pool with that name already exists", argv[0]);
 		(void) fprintf(stderr, gettext("use the form '%s "
 		    "<pool | id> <newpool>' to give it a new name\n"),
 		    "zpool import");
@@ -3369,6 +3439,8 @@ zpool_do_import(int argc, char **argv)
 		(void) fprintf(stderr, gettext("cannot import '%s': "
 		    "a pool with that name is already created/imported,\n"),
 		    argv[0]);
+		cprint("cannot import '%s': "
+		    "a pool with that name is already created/imported", argv[0]);
 		(void) fprintf(stderr, gettext("and no additional pools "
 		    "with that name were found\n"));
 		err = 1;
@@ -3376,6 +3448,8 @@ zpool_do_import(int argc, char **argv)
 		if (argc != 0) {
 			(void) fprintf(stderr, gettext("cannot import '%s': "
 			    "no such pool available\n"), argv[0]);
+			cprint("cannot import '%s': "
+			    "no such pool available", argv[0]);
 		}
 		err = 1;
 	}
@@ -3438,6 +3512,8 @@ zpool_do_import(int argc, char **argv)
 					(void) fprintf(stderr, gettext(
 					    "cannot import '%s': more than "
 					    "one matching pool\n"), searchname);
+					cprint("cannot import '%s': more than "
+					    "one matching pool", searchname);
 					(void) fprintf(stderr, gettext(
 					    "import by numeric ID instead\n"));
 					err = B_TRUE;
@@ -3466,6 +3542,8 @@ zpool_do_import(int argc, char **argv)
 		if (found_config == NULL) {
 			(void) fprintf(stderr, gettext("cannot import '%s': "
 			    "no such pool available\n"), argv[0]);
+			cprint("cannot import '%s': "
+			    "no such pool available", argv[0]);
 			err = B_TRUE;
 		} else if (testquantum) {
 			test_quantum(found_config);
@@ -7507,6 +7585,7 @@ release_callback(zpool_handle_t *zhp, void *data)
 	if (partner_id == 0) {
 		fprintf(stderr, "don't known where to release, please give remote"
 			" hostid use option '-s hostid'\n");
+		cprint("release '%s': don't known where to release", pool_name);
 		return (1);
 	}
 
@@ -7527,16 +7606,20 @@ release_callback(zpool_handle_t *zhp, void *data)
 	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	if (zpool_disable_datasets(zhp, B_TRUE) != 0) {
 		syslog(LOG_ERR, "zpool disable datasets failed, errno:%d", errno);
+		cprint("release '%s': disable datasets error %d", pool_name, errno);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_export %s",zpool_get_name(zhp));
+	cprint("release '%s': start export", pool_name);
 	if (zpool_export(zhp, B_TRUE, history_str) != 0) {
 		syslog(LOG_ERR, "zpool export force failed, errno:%d", errno);
+		cprint("release '%s': export error %d", pool_name, errno);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
+	cprint("release '%s': fini", pool_name);
 	return (0);
 }
 
@@ -7661,6 +7744,8 @@ zpool_do_release(int argc, char **argv)
 		}
 	}
 
+	cprint("%s", history_str);
+
 	argc -= optind;
 	argv += optind;
 
@@ -7684,7 +7769,9 @@ zpool_do_release(int argc, char **argv)
 
 	if (sharenfs || sharesmb)
 		enable_share_services(sharenfs, sharesmb);
-	
+
+	if (ret)
+		cprint("return %d", ret);
 	return (ret ? 1 : 0);
 }
 
