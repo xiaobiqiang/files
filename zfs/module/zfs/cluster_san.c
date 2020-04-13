@@ -2730,7 +2730,7 @@ static cs_rx_data_t *cluster_san_host_rxfragment_handle(
 	if (ctsfs == NULL) {
 		ctsfs = kmem_zalloc(sizeof(cts_fragments_t), KM_SLEEP);
 		ctsfs->cs_data = cts_rx_data_alloc(total_len);
-		if (ctsfs->cs_data->data == NULL) {
+		if (total_len && ctsfs->cs_data->data == NULL) {
 			mutex_exit(&w->fragment_lock);
 			cts_rx_data_free(cs_data, B_TRUE);
 			return NULL;
