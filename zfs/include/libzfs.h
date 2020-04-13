@@ -83,6 +83,9 @@ extern char *zpool_default_import_path[DEFAULT_IMPORT_PATH_SIZE];
 #define	GROUP_NODE_NUM		32
 #define	ZFS_NAME_LEN			256
 
+#define RAIDZS_USE_AS_META	1
+#define RAIDZS_NEED_META	2
+
 typedef struct zfs_group_sync_param
 {
 	boolean_t	check_only;
@@ -1066,7 +1069,7 @@ extern uint_t num_metas(nvlist_t *nv);
 extern uint_t num_lows(nvlist_t *nv);
 extern void zpool_check_thin_luns(zfs_thinluns_t **statpp);
 extern void zfs_check_thin_luns(zfs_thin_luns_stat_t **statpp);
-extern boolean_t zfs_check_raidz_aggre_valid(nvlist_t *nv);
+extern int zfs_check_raidz_aggre_valid(nvlist_t *nv);
 
 #ifdef	__cplusplus
 }

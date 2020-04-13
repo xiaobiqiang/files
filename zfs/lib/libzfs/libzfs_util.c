@@ -4572,12 +4572,14 @@ zfs_start_lun_migrate(libzfs_handle_t *hdl, const char *dst, char *pool, char *g
 	return (zfs_lun_migrate_check(hdl, dst, pool, guid) != 0);
 }
 
-boolean_t
+int
 zfs_check_raidz_aggre_valid(nvlist_t *nv)
 {
 	nvlist_t **child;
 	uint_t c, children;
 	uint64_t is_meta;
+	int has_raidz_aggre = 0;
+	int has_meta = 0;
 	char *type;
 	
 	if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -4588,12 +4590,22 @@ zfs_check_raidz_aggre_valid(nvlist_t *nv)
 		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE, &type) == 0);
 		if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
 			/* can't use raidz_aggre configuration as metadata device */
+			has_raidz_aggre = 1;
 			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
 			if (is_meta)
-				return (B_FALSE);
+				return (RAIDZS_USE_AS_META);
+		} else {
+			/* raidz_aggre need metadata device */
+			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
+			if (is_meta)
+				has_meta = 1;
 		}
 	}
 
-	return (B_TRUE);	
+	if (has_raidz_aggre) {
+		return has_meta ? 0 : RAIDZS_NEED_META;	
+	}
+	
+	return (0);
 }
 
