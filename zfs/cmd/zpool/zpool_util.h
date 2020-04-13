@@ -66,6 +66,10 @@ void pool_list_remove(zpool_list_t *, zpool_handle_t *);
 
 libzfs_handle_t *g_zfs;
 
+void cprint(const char *format,...);
+int zpool_lock(const char *poolname, const char *cmd);
+int zpool_unlock(int fd, const char *poolname);
+
 #ifdef	__cplusplus
 }
 #endif
