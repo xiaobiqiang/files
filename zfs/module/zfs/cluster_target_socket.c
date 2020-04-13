@@ -306,6 +306,7 @@ cluster_target_socket_session_tran_fragment(void *src_port, void *dst_sess,
 	tdt = kmem_alloc(sizeof(cluster_target_socket_tran_data_t), KM_SLEEP);
 	
 	ct_head = &tdt->tdt_ct_head;
+	ct_head->magic = CLUSTER_SAN_MSG_MAGIC;
 	ct_head->ex_len = origin_data->header_len;
 	ct_head->index = origin_data->index;
 	ct_head->len = origin_data->data_len;
@@ -597,7 +598,13 @@ cluster_target_socket_session_conn_rx(cluster_target_session_socket_conn_t *tssp
 /*		cmn_err(CE_NOTE, "idx(%llu) msg_type(%02x) hlen(%04x) dlen(%x)",
 			ct_head.index, ct_head.msg_type, 
 			ct_head.ex_len, ct_head.total_len); */
-		
+
+		if (ct_head.magic != CLUSTER_SAN_MSG_MAGIC) {
+			cmn_err(CE_WARN, "zjn %s %d msg error magic=0x%x msg_type=0x%x",
+				__func__, __LINE__, ct_head.magic, ct_head.msg_type);
+			continue;
+		}
+
 		cluster_target_socket_session_rx_new_csdata(
 			tssp->tssp_tsso, &ct_head, rcv_buff, rcv_hdr, &cs_data);
 		if (((rval = cluster_target_socket_session_rx_buf(tssp->tssp_so,
