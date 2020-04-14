@@ -172,55 +172,33 @@ function cm_software_version()
 
 function cm_get_localmanageport()
 {
-    local cfgfile='/var/cm/data/node_config.ini'
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        local port=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
-        echo "${port[0]}"
-        return 0
-    fi
-    
-    if [ ! -f ${cfgfile} ]; then    
-        portlist=`ls /etc/sysconfig/network-scripts| grep ifcfg |grep -v lo|sort`
-        for portfile in $portlist
-        do
-            ipaddr=`cat /etc/sysconfig/network-scripts/$portfile| grep IPADDR|awk -F'=' '{print $2}'`
-            if [ "X$ipaddr" != "X" ]; then
-                cat /etc/sysconfig/network-scripts/$portfile| grep DEVICE|awk -F'=' '{print $2}'
-                break
-            fi
-        done
-        return 0
-    fi
-    local mport=`grep '^mport' $cfgfile |sed 's/ //g' |awk -F'=' '{print $2}'`
-    if [ "X$mport" != "X" ]; then
-        echo $mport
-        return 0
-    fi
-    echo "eth0"
+    local nic_conf="/var/cm/static/nic.conf"
+    if [ -f $nic_conf ];then
+        cat $nic_conf
+        return 0;
+    else
+        CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
+        echo "eth0"
+    fi  
     return 0
 }
 
 function cm_get_localmanageip()
 {
-    local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        local port_inet=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
-        port_name=${port_inet[0]}
-        ip_line=`cat -n /etc/network/interfaces|grep 'iface'|grep -w $port_name|awk '{print $1}'`
-        ((ip_line=$ip_line+1))
-        ipaddr=`sed -n "$ip_line"p /etc/network/interfaces|grep address|awk '{print $2}'`
-        echo $ipaddr
-        return 0
-    fi
-    local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
-    
-    if [ ! -f ${cfgfile} ] || [ `cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
-        ifconfig eth0|grep 'inet '|awk '{print $2}'
-        return 0
-    fi
-    cat $cfgfile|grep IPADDR |awk -F'=' '{print $2}'
+    local nic_conf="/var/cm/static/nic.conf"
+    if [ -f $nic_conf ];then
+        local port=`cat $nic_conf`
+        local ip=`ifconfig $port|grep 'inet '|awk '{print $2}'`
+        if [ "X" == "X$ip" ];then
+            CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
+            echo "0.0.0.0"
+        else
+            echo $ip
+        return 0;
+    else
+        CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
+        echo "0.0.0.0"
+    fi  
     return 0
 }
 

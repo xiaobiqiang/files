@@ -529,6 +529,7 @@ function setipaddress
 		fi
 
 		dst=`cat /tmp/inittmp|head -$choice|tail -1`
+        echo $dst>/var/cm/static/nic.conf
 		MASK=`cat /tmp/inittmp1`
 		nicpath=`cat /tmp/nicpath`
 
@@ -675,15 +676,21 @@ function add_prepare_gui
         fi
     else
         RCLOCALPATH="/etc/rc.local"
-        check=`grep $gui_script $RCLOCALPATH|wc -l`
-        if [ $check -eq 0 ];then
+        if [ ! -f $RCLOCALPATH ];then
             echo "#!/bin/sh" >> $RCLOCALPATH
             echo "$gui_script" >> $RCLOCALPATH
             echo "exit 0" >> $RCLOCALPATH
             chmod 755  $RCLOCALPATH
-            systemctl  start rc-local
+            systemctl start rc-local
+            return $?
+        else
+            check=`grep $gui_script $RCLOCALPATH|wc -l`
+            if [ $check -eq 0 ];then
+                sed "s:exit 0:$gui_script:g" $RCLOCALPATH > /tmp/rc.tmp
+                cat /tmp/rc.tmp > $RCLOCALPATH
+                echo "exit 0" >> $RCLOCALPATH
+                systemctl start rc-local
         fi
-        return $?
 	fi
 }
 
