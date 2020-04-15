@@ -79,7 +79,7 @@ def trace_dbgmsgs(path):
 		f.close()
 		ofile.close()
 		ts = t
-		time.sleep(10)
+		time.sleep(1)
 
 def open_dbgmsg_trace():
 	result = exec_comm("cat /sys/module/zfs/parameters/zfs_dbgmsg_enable")
