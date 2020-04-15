@@ -307,7 +307,7 @@ cluster_target_socket_session_tran_fragment(void *src_port, void *dst_sess,
 	
 	ct_head = &tdt->tdt_ct_head;
 	ct_head->magic = CLUSTER_SAN_MSG_MAGIC;
-	ct_head->ex_len = origin_data->header_len;
+	ct_head->ex_len = (uint16_t) origin_data->header_len;
 	ct_head->index = origin_data->index;
 	ct_head->len = origin_data->data_len;
 	ct_head->msg_type = origin_data->msg_type;

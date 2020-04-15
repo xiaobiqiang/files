@@ -311,7 +311,7 @@ cluster_target_init_skb(cluster_target_port_mac_t *port_mac,
 	ct_head->total_len = origin_data->data_len;
 	ct_head->offset = mblk->fragment_offset;
 	ct_head->need_reply = (uint8_t)(origin_data->need_reply == B_TRUE);
-	ct_head->ex_len = mblk->is_first ? origin_data->header_len : 0;
+	ct_head->ex_len = mblk->is_first ? (uint16_t) origin_data->header_len : 0;
 	ct_head->fc_tx_len = mblk->fc_tx_len;
 	ct_head->fc_rx_len = mblk->fc_rx_len;
 	memset(ct_head->reserved, 0x55, 8);
@@ -329,6 +329,9 @@ cluster_target_init_skb(cluster_target_port_mac_t *port_mac,
 		memcpy(eth_head->h_dest, sess_mac->sess_daddr, ETH_ALEN);
 	}
 	eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
+#if NET_IP_ALIGN_C > 0
+	eth_head->reserve = 0;
+#endif
 	
 	return (skb);
 }
