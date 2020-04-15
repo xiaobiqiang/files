@@ -9,6 +9,30 @@ logoutpath = "/tmp/result.log"
 
 filter = ["txg_sync_thread", "txg_quiesce_thread"]
 
+m_buffer = []
+m_buf_maxlen = 100
+dedup = 0
+
+def m_buf_insert(m):
+	global m_buffer
+	global dedup
+	dup = False
+	if m in m_buffer:
+		dup = True
+		dedup += 1
+		# print "dup message: " + m
+	m_buffer.append(m)
+	if len(m_buffer) > m_buf_maxlen:
+		m_buffer.pop(0)
+	return dup
+
+def m_buf_clear():
+	global m_buffer
+	global dedup
+	m_buffer = []
+	# print "dedup %d" % (dedup)
+	dedup = 0
+
 def exec_comm(comm):
 	f = os.popen(comm)
 	text = f.read()
@@ -42,18 +66,20 @@ def trace_dbgmsgs(path):
 				continue
 			if repeat > 0:
 				buf = "last message repeat %d times\n" % (repeat)
-				ofile.write(buf)
+				# ofile.write(buf)
 				# print buf,
 				repeat = 0
 			fl = [a[1], a[2]]
 			msg = s[s.find(a[1]):]
-			buf = "%s %s" % (time.ctime(t), msg)
-			ofile.write(buf)
-			# print buf,
+			if m_buf_insert(msg) is False:
+				buf = "%s %s" % (time.ctime(t), msg)
+				ofile.write(buf)
+				# print buf,
+		m_buf_clear()
 		f.close()
 		ofile.close()
 		ts = t
-		time.sleep(1)
+		time.sleep(10)
 
 def open_dbgmsg_trace():
 	result = exec_comm("cat /sys/module/zfs/parameters/zfs_dbgmsg_enable")
