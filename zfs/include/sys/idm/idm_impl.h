@@ -46,7 +46,7 @@ extern "C" {
  */
 
 #define	CF_LOGIN_READY		0x00000001	//for ini
-#define	CF_INITIAL_LOGIN	0x00000002	//for target
+#define	CF_INITIAL_LOGIN	0x00000002	//for target rcv login
 #define	CF_ERROR		0x80000000
 
 typedef enum {
