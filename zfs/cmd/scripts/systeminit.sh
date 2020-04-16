@@ -484,6 +484,10 @@ function setipaddress
 		ifconfig -a|grep mtu|cut -d ':' -f 1 >/tmp/inittmp
 	fi
 
+	if [ -f /var/cm/static/nic.conf ];then
+		rm /var/cm/static/nic.conf
+	fi
+
 	list=0
 	while true
 	do
@@ -529,7 +533,7 @@ function setipaddress
 		fi
 
 		dst=`cat /tmp/inittmp|head -$choice|tail -1`
-        echo $dst>/var/cm/static/nic.conf
+		echo $dst >> /var/cm/static/nic.conf
 		MASK=`cat /tmp/inittmp1`
 		nicpath=`cat /tmp/nicpath`
 
@@ -669,6 +673,8 @@ function add_prepare_gui
         if [ -f  $RCLOCALPATH ];then
             check=`grep $gui_script $RCLOCALPATH|wc -l`
             if [ $check -eq 0 ];then
+                sed "/exit/d" $RCLOCALPATH > /tmp/rc.tmp
+                cat /tmp/rc.tmp > $RCLOCALPATH
                 echo "/gui/prepare.sh &" >> $RCLOCALPATH
             fi
         else
@@ -682,16 +688,21 @@ function add_prepare_gui
             echo "exit 0" >> $RCLOCALPATH
             chmod 755  $RCLOCALPATH
             systemctl start rc-local
-            return $?
         else
             check=`grep $gui_script $RCLOCALPATH|wc -l`
             if [ $check -eq 0 ];then
-                sed "s:exit 0:$gui_script:g" $RCLOCALPATH > /tmp/rc.tmp
+                #sed "s:exit 0:$gui_script:g" $RCLOCALPATH > /tmp/rc.tmp
+                sed "/exit/d" $RCLOCALPATH > /tmp/rc.tmp
                 cat /tmp/rc.tmp > $RCLOCALPATH
+                echo "$gui_script" >> $RCLOCALPATH
                 echo "exit 0" >> $RCLOCALPATH
                 systemctl start rc-local
+            else
+                echo "gui setting already exist"
+            fi
         fi
-	fi
+    fi
+    return $?
 }
 
 function deepin_unmanage_netdevice

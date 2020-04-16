@@ -174,8 +174,9 @@ function cm_get_localmanageport()
 {
     local nic_conf="/var/cm/static/nic.conf"
     if [ -f $nic_conf ];then
-        cat $nic_conf
-        return 0;
+        local nic=`cat $nic_conf|sed -n 1p`
+        echo $nic
+        return 0
     else
         CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
         echo "eth0"
@@ -185,16 +186,15 @@ function cm_get_localmanageport()
 
 function cm_get_localmanageip()
 {
-    local nic_conf="/var/cm/static/nic.conf"
-    if [ -f $nic_conf ];then
-        local port=`cat $nic_conf`
+    local port=`cm_get_localmanageport`
         local ip=`ifconfig $port|grep 'inet '|awk '{print $2}'`
         if [ "X" == "X$ip" ];then
             CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
             echo "0.0.0.0"
         else
             echo $ip
-        return 0;
+        fi
+        return 0
     else
         CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
         echo "0.0.0.0"
