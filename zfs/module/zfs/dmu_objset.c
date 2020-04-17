@@ -1808,7 +1808,12 @@ void
 dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 {
 	dnode_t *dn;
-	list_t *list = &os->os_synced_dnodes;
+	list_t *list;
+
+	if (os == NULL)
+		return;
+
+	list = &os->os_synced_dnodes;
 
 	ASSERT(list_head(list) == NULL || dmu_objset_userused_enabled(os));
 
