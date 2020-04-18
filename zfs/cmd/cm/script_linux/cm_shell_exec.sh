@@ -47,7 +47,8 @@ function cm_pmm_nics()
 
 function cm_pmm_node_stat()
 {
-    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
+    # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题
+    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{printf("%.0f %.0f",ob,rb)}'`
     #*100是为了uint64取值，之后会/100取得正确结果
     local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs*100" "ws*100}'`
     local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print ($1+$3)*100" "$6*100}'`
@@ -580,6 +581,18 @@ function cm_pmm_cache()
     $1=="l2_misses"{printf $2" "}
     $1=="size"{printf $2" "}
     $1=="l2_size"{printf $2" "}'
+}
+
+function cm_create_lu()
+{
+    local lun=$1
+    local version=`uname -a|grep Linux|wc -l`
+    if [ $version -eq 0 ];then
+        stmfadm create-lu /dev/zvol/rdsk/$lun
+    else
+        stmfadm create-lu /dev/zvol/$lun
+    fi
+    return $?
 }
 #==============================================================================
 #执行函数

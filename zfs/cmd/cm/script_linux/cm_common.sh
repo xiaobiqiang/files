@@ -179,27 +179,24 @@ function cm_get_localmanageport()
         return 0
     else
         CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
-        echo "eth0"
+        return 1
     fi  
-    return 0
 }
 
 function cm_get_localmanageip()
 {
     local port=`cm_get_localmanageport`
-        local ip=`ifconfig $port|grep 'inet '|awk '{print $2}'`
-        if [ "X" == "X$ip" ];then
-            CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
-            echo "0.0.0.0"
-        else
-            echo $ip
-        fi
-        return 0
+    if [ "X" == "X$port" ];then
+        return 1
+    fi
+    local ip=`ifconfig $port|grep 'inet '|awk '{print $2}'`
+    if [ "X" == "X$ip" ];then
+        CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
+        return 1
     else
-        CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
-        echo "0.0.0.0"
-    fi  
-    return 0
+        echo $ip
+        return 0
+    fi 
 }
 
 function cm_check_isnum()
