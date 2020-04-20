@@ -395,6 +395,7 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	int count = 0, mode, block_size;
     char bdev_name[BDEVNAME_SIZE];
     int bdev_retry_count = 50;
+    int ms_shift = 0;
 
 	/* Must have a pathname and it must be absolute. */
 	if (v->vdev_path == NULL || v->vdev_path[0] != '/') {
@@ -441,14 +442,17 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	mode = spa_mode(v->vdev_spa);
 	if (v->vdev_wholedisk && v->vdev_expanding) {
 		bdev = vdev_disk_rrpart(v->vdev_path, mode, vd);
-        bdev_retry_count = 100;
+        bdev_retry_count += 6;
     }
 
 	while (IS_ERR(bdev) && count < bdev_retry_count) {
 		bdev = vdev_bdev_open(v->vdev_path,
 		    vdev_bdev_mode(mode), zfs_vdev_holder);
 		if (unlikely(PTR_ERR(bdev) == -ENOENT)) {
-			msleep(10);
+            if(count + 1 > 50) {
+                ms_shift = count + 1 - 50;
+            }
+			msleep(10 << ms_shift);
 			count++;
 		} else if (IS_ERR(bdev)) {
 			break;
