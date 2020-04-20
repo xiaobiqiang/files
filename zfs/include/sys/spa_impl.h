@@ -346,6 +346,8 @@ struct spa {
 	int			spa_space_reclaim_state;
 	kmutex_t	spa_space_reclaim_lock;
 	kcondvar_t	spa_space_reclaim_cv;	
+
+	int		spa_importing;
 };
 
 extern char *spa_config_path;

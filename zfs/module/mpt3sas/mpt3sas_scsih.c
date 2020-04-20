@@ -9004,6 +9004,13 @@ void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_ad
 	fw_event_work_put(fw_event);
 }
 
+void mpt3sas_eh_strategy(struct Scsi_Host *shost)
+{
+    /* do nothing. 
+     * all we need to do is delegated to mpt3sas_trans_timeout. 
+     */
+    return;
+}
 
 static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 {
@@ -9219,6 +9226,7 @@ _mpt3sas_init(void)
 		return -ENODEV;
 
     mpt3sas_transport_template->eh_timed_out = mpt3sas_trans_timeout;
+    mpt3sas_transport_template->eh_strategy_handler = mpt3sas_eh_strategy;
 
 	/* No need attach mpt3sas raid functions template
 	 * if hbas_to_enumarate value is one.

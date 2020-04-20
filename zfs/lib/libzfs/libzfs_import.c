@@ -55,7 +55,6 @@
 #include <sys/vtoc.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/efi_partition.h>
-#include <syslog.h>
 #include <sys/spa_impl.h>
 
 #include <sys/vdev_impl.h>
@@ -347,21 +346,21 @@ int zpool_write_dev_stamp(char *path, zpool_stamp_t *stamp)
 	fd = open(path, O_RDWR|O_NDELAY|O_SYNC);
 	if (fd > 0) {
 		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
-			syslog(LOG_ERR, "write stamp, get offset <%s> failed", path);
+			cluster_log_framework(LOG_ERR, "write stamp, get offset <%s> failed", path);
 		} else {
 			if (pread(fd, stamp_tmp, sizeof(zpool_stamp_t), stamp_offset) == sizeof(zpool_stamp_t)){
 				if(stamp_tmp->para.company_name == COMPANY_NAME)
 					stamp->para.company_name = stamp_tmp->para.company_name;
 			}
 			if (pwrite(fd, stamp, sizeof(zpool_stamp_t), stamp_offset) != sizeof(zpool_stamp_t)) {
-				syslog(LOG_ERR, "write error, <%s>", path);
+				cluster_log_framework(LOG_ERR, "write error, <%s>", path);
 			} else {
 				ret = 0;
 			}
 		}
 		close(fd);
 	} else {
-		syslog(LOG_ERR, "write stamp, open <%s> failed",path);
+		cluster_log_framework(LOG_ERR, "write stamp, open <%s> failed",path);
 	}
 	free(stamp_tmp);
 
@@ -380,7 +379,7 @@ int zpool_write_dev_stamp_mark(char *path, zpool_stamp_t *stamp)
 	fd = open(path, O_RDWR|O_NDELAY|O_SYNC);
 	if (fd > 0) {
 		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
-			syslog(LOG_ERR, "write stamp, get offset <%s> failed", path);
+			cluster_log_framework(LOG_ERR, "write stamp, get offset <%s> failed", path);
 		} else {
 			stamp_offset += stamp_offset/STAMP_OFFSET;
 			if (pread(fd, stamp_tmp, sizeof(zpool_stamp_t), stamp_offset) == sizeof(zpool_stamp_t)){
@@ -388,14 +387,14 @@ int zpool_write_dev_stamp_mark(char *path, zpool_stamp_t *stamp)
 					stamp->para.company_name = stamp_tmp->para.company_name;
 			}
 			if (pwrite(fd, stamp, sizeof(zpool_stamp_t), stamp_offset) != sizeof(zpool_stamp_t)) {
-				syslog(LOG_ERR, "write error, <%s>", path);
+				cluster_log_framework(LOG_ERR, "write error, <%s>", path);
 			} else {
 				ret = 0;
 			}
 		}
 		close(fd);
 	} else {
-		syslog(LOG_ERR, "write stamp, open <%s> failed",path);
+		cluster_log_framework(LOG_ERR, "write stamp, open <%s> failed",path);
 	}
     free(stamp_tmp);
 	return (ret);
@@ -417,7 +416,7 @@ int zpool_read_stmp_by_path(char *path, zpool_stamp_t *stamp)
 	fd = open(tmp_path, O_RDONLY|O_NDELAY);
 	if (fd > 0) {
 		if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
-			syslog(LOG_ERR, "read stamp, get stamp offset failed");
+			cluster_log_framework(LOG_ERR, "read stamp, get stamp offset failed");
 			close(fd);
 			return (ret);
 		}
@@ -427,10 +426,10 @@ int zpool_read_stmp_by_path(char *path, zpool_stamp_t *stamp)
 			if (stamp->para.company_name == COMPANY_NAME) {
 				ret = 0;
 			} else {
-				syslog(LOG_ERR, "pool company name check failed");
+				cluster_log_framework(LOG_ERR, "pool company name check failed");
 			}
 		} else {
-			syslog(LOG_ERR, "read stamp failed");
+			cluster_log_framework(LOG_ERR, "read stamp failed");
 		}
 		close(fd);
 	}
@@ -463,7 +462,7 @@ zpool_read_stamp(nvlist_t *pool_root, zpool_stamp_t *stamp)
 		} else {
 			err = nvlist_lookup_string(child[i], ZPOOL_CONFIG_PATH, &path);
 			if (err != 0) {
-				syslog(LOG_ERR, "pool get config path failed");
+				cluster_log_framework(LOG_ERR, "pool get config path failed");
 				continue;
 			}
 
@@ -482,7 +481,7 @@ zpool_read_stamp(nvlist_t *pool_root, zpool_stamp_t *stamp)
 			fd = open(path, O_RDONLY|O_NDELAY);
 			if (fd > 0) {
 				if (get_disk_stamp_offset(fd, &stamp_offset) != 0) {
-					syslog(LOG_ERR, "read stamp <%s>, get stamp offset failed", path);
+					cluster_log_framework(LOG_ERR, "read stamp <%s>, get stamp offset failed", path);
 					close(fd);
 					continue;
 				}
@@ -495,10 +494,10 @@ zpool_read_stamp(nvlist_t *pool_root, zpool_stamp_t *stamp)
 						close(fd);
 						break;
 					} else {
-						syslog(LOG_ERR, "<%s> pool magic num check failed", path);
+						cluster_log_framework(LOG_ERR, "<%s> pool magic num check failed", path);
 					}
 				} else {
-					syslog(LOG_ERR, "read stamp <%s> failed, size=%d, expected size=%d",
+					cluster_log_framework(LOG_ERR, "read stamp <%s> failed, size=%d, expected size=%d",
 						path, size, sizeof(zpool_stamp_t));
 				}
 				close(fd);
@@ -508,7 +507,7 @@ zpool_read_stamp(nvlist_t *pool_root, zpool_stamp_t *stamp)
 	}
 
 	if (ret)
-		syslog(LOG_ERR, "read stamp info failed");
+		cluster_log_framework(LOG_ERR, "read stamp info failed");
 	return (ret);
 }
 
@@ -576,7 +575,7 @@ zpool_restore_label(int fd)
 	uint64_t wsize, woffset, tmp_woffset;
 
 	if (fstat64(fd, &statbuf) != 0) {
-		syslog(LOG_ERR, "clear label fstat failed:%s", strerror(errno));
+		cluster_log_framework(LOG_ERR, "clear label fstat failed:%s", strerror(errno));
 		return (-1);
 	}
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
@@ -617,7 +616,7 @@ zpool_save_label(int fd)
 	uint64_t wsize, woffset, tmp_woffset;
 
 	if (fstat64(fd, &statbuf) != 0) {
-		syslog(LOG_ERR, "clear label fstat failed:%s", strerror(errno));
+		cluster_log_framework(LOG_ERR, "clear label fstat failed:%s", strerror(errno));
 		return (-1);
 	}
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
@@ -642,7 +641,7 @@ zpool_save_label(int fd)
 		wsize = pwrite64(fd, &label, sizeof (vdev_label_t), (tmp_woffset - sizeof (vdev_label_t)*(l + 1)));
 
 		if (wsize != sizeof (vdev_label_t)) {
-			syslog(LOG_ERR, "label:%d, woffset:0x%llx, wsize:0x%llx, size:%d\n", l,
+			cluster_log_framework(LOG_ERR, "label:%d, woffset:0x%llx, wsize:0x%llx, size:%d\n", l,
 			    (u_longlong_t)woffset, (u_longlong_t)wsize, sizeof (vdev_label_t));
 			rv = -1;
 		}
@@ -1867,14 +1866,14 @@ reopen:
 			 */
 			if (fstatat64(dfd, name, &statbuf, 0) != 0) {
 				if (scsi_disk) {
-					syslog(LOG_DEBUG, "%s: scsi-disk %s fstat error %d",
+					cluster_log_framework(LOG_DEBUG, "%s: scsi-disk %s fstat error %d",
 						__func__, name, errno);
 					if (reopen_times < 3) {
 						reopen_times++;
 						sleep(1);
 						goto reopen;
 					} else {
-						syslog(LOG_WARNING, "%s: fstat(%s) error %d",
+						cluster_log_framework(LOG_WARNING, "%s: fstat(%s) error %d",
 							__func__, name, errno);
 					}
 				}
@@ -1887,14 +1886,14 @@ reopen:
 
 			if ((fd = openat64(dfd, name, O_RDONLY)) < 0) {
 				if (scsi_disk) {
-					syslog(LOG_DEBUG, "%s: scsi-disk %s open error %d",
+					cluster_log_framework(LOG_DEBUG, "%s: scsi-disk %s open error %d",
 						__func__, name, errno);
 					if (reopen_times < 3) {
 						reopen_times++;
 						sleep(1);
 						goto reopen;
 					} else {
-						syslog(LOG_WARNING, "%s: open(%s) error %d",
+						cluster_log_framework(LOG_WARNING, "%s: open(%s) error %d",
 							__func__, name, errno);
 					}
 				}
@@ -2145,7 +2144,7 @@ zpool_find_import_switched(
 
 	raw = get_switched_config(hdl, poolname, remote_hostid);
 	if (raw == NULL ) {
-		syslog(LOG_WARNING, "get switchd config failed, poolname:%s\n", poolname);
+		cluster_log_framework(LOG_WARNING, "get switchd config failed, poolname:%s\n", poolname);
 		return (NULL);
 	}
 
@@ -2173,7 +2172,7 @@ zpool_find_import_switched(
 		if (pool_active(hdl, name, this_guid, &active) != 0) {
 			nvlist_free(raw);
 			nvlist_free(pools);
-			syslog(LOG_ERR, "pool active failed ");
+			cluster_log_framework(LOG_ERR, "pool active failed ");
 			return (NULL);
 		}
 		if (active) {
@@ -2183,7 +2182,7 @@ zpool_find_import_switched(
 		if ((dst = refresh_config(hdl, src)) == NULL) {
 			nvlist_free(raw);
 			nvlist_free(pools);
-			syslog(LOG_ERR, "refresh config failed");
+			cluster_log_framework(LOG_ERR, "refresh config failed");
 			return (NULL);
 		}
 
@@ -2192,7 +2191,7 @@ zpool_find_import_switched(
 			nvlist_free(dst);
 			nvlist_free(raw);
 			nvlist_free(pools);
-			syslog(LOG_ERR, "add pools failed");
+			cluster_log_framework(LOG_ERR, "add pools failed");
 			return (NULL);
 		}
 		nvlist_free(dst);
@@ -2616,7 +2615,7 @@ zpool_read_used(nvlist_t *pool_root, spa_quantum_index_t *index,
 				&type) == 0);
 			ret = nvlist_lookup_string(child[i], ZPOOL_CONFIG_PATH, &path);
 			if (ret != 0) {
-				syslog(LOG_ERR, "pool get config path failed");
+				cluster_log_framework(LOG_ERR, "pool get config path failed");
 				continue;
 			}
 			ret = nvlist_lookup_uint64(child[i], ZPOOL_CONFIG_QUANTUM_DEV, &quantum);
@@ -2628,12 +2627,12 @@ zpool_read_used(nvlist_t *pool_root, spa_quantum_index_t *index,
 			sprintf(tmp_path, "/dev/rdsk/%s", path);
 #else
 			strcpy(tmp_path, path);
-			syslog(LOG_WARNING, "zpool_read_used: path=%s", tmp_path);
+			cluster_log_framework(LOG_WARNING, "zpool_read_used: path=%s", tmp_path);
 #endif
 			fd = open(tmp_path, O_RDONLY|O_NDELAY);
 			if (fd > 0) {
 				if (get_disk_userd_offset(fd, &used_offset) != 0) {
-					syslog(LOG_ERR, "get index used offset failed");
+					cluster_log_framework(LOG_ERR, "get index used offset failed");
 					close(fd);
 					break;
 				}
@@ -2679,11 +2678,11 @@ zpool_used_index_changed(spa_quantum_index_t *last_index, uint64_t nquantum,
 		if (last_index[i].dev_name != NULL) {
 			/*sprintf(path, "/dev/rdsk/%s", last_index[i].dev_name);*/
 			strcpy(path, last_index[i].dev_name);
-			syslog(LOG_WARNING, "zpool_used_index_changed: path=%s", path);
+			cluster_log_framework(LOG_WARNING, "zpool_used_index_changed: path=%s", path);
 			fd = open(path, O_RDONLY|O_NDELAY);
 			if (fd > 0) {
 				if (get_disk_userd_offset(fd, &used_offset) != 0) {
-					syslog(LOG_ERR, "get index used offset failed");
+					cluster_log_framework(LOG_ERR, "get index used offset failed");
 					close(fd);
 					continue;
 				}
@@ -2735,13 +2734,13 @@ int zpool_cluster_set_disks(libzfs_handle_t *hdl, char *pool_name,
 	host_id = get_system_hostid();
 #if 0
 	if (host_id != 1 && host_id != 2) {
-		syslog(LOG_ERR, "host id is not 1 or 2, cluster set disks failed");
+		cluster_log_framework(LOG_ERR, "host id is not 1 or 2, cluster set disks failed");
 		if (progress == ZPOOL_NO_PROGRESS || progress == ZPOOL_ON_PROGRESS)
 			return (-1);
 	}
 #endif
 	if (host_id > 255) {
-		syslog(LOG_ERR, "host id(%"PRId64") is invalid, cluster set disks failed", host_id);
+		cluster_log_framework(LOG_ERR, "host id(%"PRId64") is invalid, cluster set disks failed", host_id);
 		if (progress == ZPOOL_NO_PROGRESS || progress == ZPOOL_ON_PROGRESS)
 			return (-1);
 	}
@@ -2751,7 +2750,7 @@ int zpool_cluster_set_disks(libzfs_handle_t *hdl, char *pool_name,
 		pools = get_switched_config(hdl, "", remote_hostid);
 	if (pools == NULL) {
 		if (nvlist_alloc(&pools, 0, 0) != 0) {
-			syslog(LOG_ERR, "scan  pools, alloc nvlist failed");
+			cluster_log_framework(LOG_ERR, "scan  pools, alloc nvlist failed");
 			return (-1);
 		}
 	}
@@ -2761,7 +2760,7 @@ int zpool_cluster_set_disks(libzfs_handle_t *hdl, char *pool_name,
 	/* Secondly, we write label info */
 	stamp = malloc(sizeof(zpool_stamp_t));
 	if (stamp == NULL) {
-		syslog(LOG_ERR, "cluste set disk malloc failed");
+		cluster_log_framework(LOG_ERR, "cluste set disk malloc failed");
 		nvlist_free(pools);
 		return (-1);
 	}
@@ -2812,10 +2811,10 @@ get_partner_id(libzfs_handle_t *hdl, uint64_t rid)
 	zc.zc_guid = 0;
 	ret = zfs_ioctl(hdl, ZFS_IOC_HBX, &zc);
 	if (ret != 0) {
-		syslog(LOG_WARNING, "%s: get hostid where to release failed",
+		cluster_log_framework(LOG_WARNING, "%s: get hostid where to release failed",
 			__func__);
 	} else {
-		syslog(LOG_NOTICE, "%s: hostid=%d", __func__, (uint32_t)zc.zc_guid);
+		cluster_log_framework(LOG_NOTICE, "%s: hostid=%d", __func__, (uint32_t)zc.zc_guid);
 	}
 	return (zc.zc_guid);
 }

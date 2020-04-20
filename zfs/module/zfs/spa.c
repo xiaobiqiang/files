@@ -4585,6 +4585,7 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 		mode = FREAD;
 	spa = spa_add(pool, config, altroot);
 	spa->spa_import_flags = flags;
+	spa->spa_importing = 1;
 
 	/*
 	 * Verbatim import - Take a pool and insert it into the namespace
@@ -4802,6 +4803,8 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	spa_history_log_version(spa, "import");
 	zfs_dbgmsg("zvol create minors %p", spa);
 	zvol_create_minors(spa, pool, B_FALSE);
+
+	spa->spa_importing = 0;
 
 	return (0);
 }

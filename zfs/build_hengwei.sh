@@ -35,6 +35,7 @@ if [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "deepin GNU
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-nm ]&& ln -s /usr/bin/nm /usr/bin/sw_64sw2-unknown-linux-gnu-nm
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-strip ]&& ln -s /usr/bin/strip /usr/bin/sw_64sw2-unknown-linux-gnu-strip
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-objdump ]&& ln -s /usr/bin/objdump /usr/bin/sw_64sw2-unknown-linux-gnu-objdump
+	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-objcopy ]&& ln -s /usr/bin/objcopy /usr/bin/sw_64sw2-unknown-linux-gnu-objcopy
 fi
 
 cp module/Makefile_hengwei.in module/Makefile.in
