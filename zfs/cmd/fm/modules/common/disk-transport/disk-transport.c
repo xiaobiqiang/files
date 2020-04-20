@@ -682,6 +682,24 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 static void
 dt_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
+	char vdev_type[32] = {0};
+	char vdev_path[128] = {0};
+	char buff[512] = {0};
+	char hostname[128] = {0};
+	if (gethostname(hostname, sizeof(hostname)) < 0) {
+		syslog(LOG_ERR, "get hostname failed\n");
+	}
+	
+	if(strcmp(class,"ereport.fs.zfs.vdev.removed") == 0){
+		nvlist_lookup_string(nvl,"vdev_type",&vdev_type);
+		if(strcmp(vdev_type,"disk") == 0){
+			nvlist_lookup_string(nvl,"vdev_path",&vdev_path);
+
+			cm_alarm_cmd(buff, "%s %d \"%s,%s,-,-,-\"",
+                             "report", AMARM_ID_DISK_LOST,
+                             hostname, vdev_path);
+		}
+	}
 	return;
 }
 

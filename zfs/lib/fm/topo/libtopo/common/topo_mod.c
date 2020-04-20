@@ -86,16 +86,19 @@
 #include <assert.h>
 #include <errno.h>
 #include <dirent.h>
+#include <stdarg.h>
 #include <limits.h>
 #include <alloca.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <syslog.h>
 #include <ctype.h>
 #include <sys/param.h>
 #include <sys/utsname.h>
 //#include <sys/smbios.h>
 #include <sys/fm/protocol.h>
-
+#include <sys/types.h>
+#include <fcntl.h>
 #include <topo_protocol.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
@@ -1052,3 +1055,28 @@ topo_fru_hash_destroy(void)
 		sizeof (void *) * TOPO_FRUHASH_BUCKETS);
 }
 
+void
+cm_alarm_cmd(char *buf, const char *format, ...)
+{
+	va_list arg;
+	int n = 0;
+    char* p = NULL;
+
+	memset(buf, CM_ALARM_CMD_LEN, 0);
+	n = snprintf(buf, CM_ALARM_CMD_LEN, CM_ALARM_CMD_T);
+	
+	va_start(arg, format);
+	vsnprintf(buf + n, CM_ALARM_CMD_LEN, format, arg);
+	va_end(arg);
+
+    p = buf;
+    while(*p != '\0'){
+        if(*p == '\n'){
+            *p = ' ';
+        }
+        p++;
+    }
+        
+	if (system(buf) != 0)
+		syslog(LOG_ERR, "system error: %s\n", buf);
+}

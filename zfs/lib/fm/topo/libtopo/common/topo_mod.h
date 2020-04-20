@@ -27,7 +27,9 @@
 #ifndef _TOPO_MOD_H
 #define	_TOPO_MOD_H
 
-//#include <libipmi.h>
+#include <fm/libtopo.h>
+#include <fm/topo_hc.h>
+#include <libipmi.h>
 #include <libnvpair.h>
 #include <libdevinfo.h>
 //#include <smbios.h>

@@ -2183,8 +2183,12 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		} else if (strncmp((char *)name, (const char *)"raidz3", strlen("raidz3")) == 0) {
 			raid_type = "raid7";
 			sprintf(buf, "%s%s", raid_type, (char *) (name + strlen("raidz3")));
+		}else{
+			sprintf(buf, "%s", name);
 		}
-	} else {
+	}else if(strcmp(type, "raidz_s") == 0){
+		sprintf(buf, "%s", name);
+	}else {
 		if (children > 0 && strcmp(type, "mirror") != 0) {
 			sprintf(buf, "%s", "raid0");
 		} else if (strncmp((char *)name, (const char *)"mirror", strlen("mirror")) == 0) {
