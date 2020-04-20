@@ -162,7 +162,7 @@ function cm_cnm_phys_ip_delete()
 
 function cm_cnm_phys_ip_physgetbatch()
 {
-    local list=($( ip addr|grep -w mtu|grep -v lo|awk '{print $2" "$5" "$9}'))
+    local list=($( ip addr|grep -w mtu|grep -v lo|grep -v dummy|awk '{print $2" "$5" "$9}'))
     local len=${#list[@]}
     ((cols=$len/3))
     
@@ -226,7 +226,7 @@ function cm_cnm_phys_ip_physget()
 
 function cm_cnm_phys_ip_physcount()
 {
-    ip addr|grep -w mtu|grep -v lo|wc -l
+    ip addr|grep -w mtu|grep -v lo|grep -v dummy|wc -l
 }
 
 function cm_cnm_phys_ip_physupdate()

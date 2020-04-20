@@ -115,20 +115,35 @@ function cm_cnm_user_get()
 function cm_cnm_user_getbatch()
 {
 	local gid=$1
-	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3 " " $4 " " $1 " " $6}'|sort -n
+	local begin=0
+	local ostype=`cm_systerm_version_get`
+	if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+		begin=112
 	else
-		cat /etc/passwd |awk -F':' '($3>99&&$3<50000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
+		begin=99
+    	fi
+	if [ $gid = "null" ]; then
+		cat /etc/passwd | awk -F':' '($3>'$begin'&&$3<50000) {print $3 " " $4 " " $1 " " $6}'|sort -n
+	else
+		cat /etc/passwd |awk -F':' '($3>'$begin'&&$3<50000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
 	fi
 }
 
 function cm_cnm_user_count()
 {
 	local gid=$1
-	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3}'| wc -l
+	local begin=0
+	local ostype=`cm_systerm_version_get`
+	if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+		begin=112
 	else
-		cat /etc/passwd |awk -F':' '($3>99&&$3<50000)&&($4=='$gid') {print $3}'| wc -l
+		begin=99
+	fi
+    
+	if [ $gid = "null" ]; then
+		cat /etc/passwd | awk -F':' '($3>'$begin'&&$3<50000) {print $3}'| wc -l
+	else
+		cat /etc/passwd |awk -F':' '($3>'$begin'&&$3<50000)&&($4=='$gid') {print $3}'| wc -l
 	fi
 }
 
@@ -226,15 +241,21 @@ function cm_cnm_user_cache_getbatch()
 {
     local domain=$1
     local type=$2
-    
+    local begin=0
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        begin=113
+    else
+        begin=100
+    fi
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' '($3>=100&&$3<=60000){print $3" "$1}'
+            cat /etc/passwd |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
         else
-            cat /etc/group |awk -F':' '($3>=100&&$3<=60000){print $3" "$1}'
+            cat /etc/group |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
@@ -256,15 +277,22 @@ function cm_cnm_user_cache_count()
 {
     local domain=$1
     local type=$2
+    local begin=0
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        begin=113
+    else
+        begin=100
+    fi
     
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>=100&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
         else
-            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>=100&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
@@ -399,6 +427,45 @@ function cm_cnm_user_test()
         return $CM_ERR_NOT_EXISTS
     fi
     return $CM_OK
+}
+
+function cm_cnm_user_group_getbatch()
+{
+    local begin=0
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        begin=116
+    else
+        begin=99
+    fi
+    cat /etc/group | awk -F':' '$3==1||($3>'$begin'&&$3<50000) {print $3" "$1}'
+    return $?
+}
+
+function cm_cnm_user_group_count()
+{
+    local begin=0
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        begin=116
+    else
+        begin=99
+    fi
+    cat /etc/group |awk -F':' '$3==1||($3>'$begin'&&$3<50000)' |wc -l
+    return $?
+}
+
+function cm_cnm_user_group_maxid()
+{
+    local begin=0
+    local ostype=`cm_systerm_version_get`
+    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
+        begin=116
+    else
+        begin=99
+    fi
+    cat /etc/group | awk -F':' 'BEGIN {max='$begin'}{if(($3>'$begin'&&$3<50000)&&($3>max)) max=$3} END{printf max}'
+    return $?
 }
 
 cm_cnm_user_"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$7"
