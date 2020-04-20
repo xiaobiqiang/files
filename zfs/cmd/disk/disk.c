@@ -311,12 +311,6 @@ int list_disks(int all)
 	FILE * fd = NULL;
 
 	create_xml_file();
-	fd = fopen("/var/fm/.blkid.txt","r");
-	if(fd == NULL){
-		system("blkid > /var/fm/.blkid.txt");
-	}else{
-		fclose(fd);
-	}
 	error = disk_get_info(&dt);
 	if (error != 0)
 		(void) printf("disk list failed\n");
@@ -1507,13 +1501,11 @@ disk_init(slice_req_t *req)
 	
 	if (status = get_disk_name(req, SUBC_INIT))
 		return (status);
-	
-	(void) disk_get_system(args);
-	if (strncmp(args, req->disk_name, 8) == 0) {
-		printf("sorry, this is system disk!\n");
-		return (-1); 
-	}
 
+	if (disk_get_system(req->disk_name)) {
+		printf("sorry, this is system disk!\n");
+		return (-1);
+	}
 	/*
 	 * Initialize zfs label info
 	 */

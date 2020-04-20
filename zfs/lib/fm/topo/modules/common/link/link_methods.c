@@ -179,7 +179,7 @@ static int get_fcstate_by_name(conn_handle_t *chp /* not used */, const char *li
 	FILE* fp;
 	char cmd[128];
 	char state[16];
-	sprintf(cmd, "cat /sys/class/fc_host/%s/port_state", link);
+	sprintf(cmd, "cat /sys/class/fc_host/%s/port_state 2>/dev/null", link);
 	fp = popen(cmd, "r");
 	fgets(state, CMDLEN, fp);
 	state[strlen(state)-1] = 0;
