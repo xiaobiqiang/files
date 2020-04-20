@@ -304,13 +304,14 @@ cluster_target_init_skb(cluster_target_port_mac_t *port_mac,
 	data = skb_push(skb, sizeof(cluster_target_msg_header_t));
 	ct_head = (cluster_target_msg_header_t *)data;
 	memset(ct_head, 0, sizeof (*ct_head));
+	ct_head->magic = CLUSTER_SAN_MSG_MAGIC;
 	ct_head->msg_type = origin_data->msg_type;
 	ct_head->index = origin_data->index;
 	ct_head->len = mblk->fragment_len;
 	ct_head->total_len = origin_data->data_len;
 	ct_head->offset = mblk->fragment_offset;
 	ct_head->need_reply = (uint8_t)(origin_data->need_reply == B_TRUE);
-	ct_head->ex_len = mblk->is_first ? origin_data->header_len : 0;
+	ct_head->ex_len = mblk->is_first ? (uint16_t) origin_data->header_len : 0;
 	ct_head->fc_tx_len = mblk->fc_tx_len;
 	ct_head->fc_rx_len = mblk->fc_rx_len;
 	memset(ct_head->reserved, 0x55, 8);
@@ -328,6 +329,9 @@ cluster_target_init_skb(cluster_target_port_mac_t *port_mac,
 		memcpy(eth_head->h_dest, sess_mac->sess_daddr, ETH_ALEN);
 	}
 	eth_head->h_proto = __constant_htons(ETHERTYPE_CLUSTERSAN);
+#if NET_IP_ALIGN_C > 0
+	eth_head->reserve = 0;
+#endif
 	
 	return (skb);
 }
@@ -1106,6 +1110,14 @@ static void ctp_mac_rx_worker_handle(void *arg)
 					sess_mac = cts->sess_target_private;
 					atomic_swap_32(&cts->sess_hb_timeout_cnt, 0);
 					atomic_add_32(&sess_mac->sess_fc_throttle_rx, ct_head->fc_rx_len);
+					if (ct_head->magic != CLUSTER_SAN_MSG_MAGIC) {
+						cmn_err(CE_WARN, "zjn %s %d msg error magic=0x%x msg_type=0x%x",
+							__func__, __LINE__, ct_head->magic, ct_head->msg_type);
+						cts_mac_fragment_free(fragment);
+						cluster_target_session_rele(cts, "cts_find");
+						continue;
+					}
+
 					switch (ct_head->msg_type) {
 					case CLUSTER_SAN_MSGTYPE_JOIN:
 						if (cts->sess_linkstate == CTS_LINK_DOWN) {
@@ -1142,6 +1154,13 @@ static void ctp_mac_rx_worker_handle(void *arg)
 						break;
 					}
 				} else {
+					if (ct_head->magic != CLUSTER_SAN_MSG_MAGIC) {
+						cmn_err(CE_WARN, "zjn %s %d msg error magic=0x%x msg_type=0x%x",
+							__func__, __LINE__, ct_head->magic, ct_head->msg_type);
+						cts_mac_fragment_free(fragment);
+						continue;
+					}
+				
 					switch (ct_head->msg_type) {
 					case CLUSTER_SAN_MSGTYPE_JOIN:
 						atomic_inc_64(&ctp->ref_count);

@@ -724,13 +724,20 @@ zpool_do_add(int argc, char **argv)
 		return (1);
 	}
 
-	if (!zfs_check_raidz_aggre_valid(nvroot)) {
-		(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
-			"configuration as metadata device\n"),
-			poolname);
+	ret = zfs_check_raidz_aggre_valid(nvroot); 
+	if (ret != 0) {
+		if (ret == RAIDZS_USE_AS_META) {
+			(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
+				"configuration as metadata device\n"),
+				poolname);
+		} else {
+			(void) fprintf(stderr, gettext("pool '%s' raidz_aggre need metadata device\n"),
+				poolname);
+		}
+		
 		zpool_close(zhp);
 		nvlist_free(nvroot);
-		return (1);
+		return (ret);
 	}
 
 	if (dryrun) {
