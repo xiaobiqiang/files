@@ -224,13 +224,12 @@ sint32 cm_cnm_user_count(const void * pDecodeParam,void **ppAckData,uint32 *pAck
     const cm_cnm_user_info_t *info = NULL;
     uint64 cut = 0;
 
-    cut = (uint64)cm_exec_int("cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3}'| wc -l");
+    cut = (uint64)cm_exec_int("%s count",cm_cnm_user_sh);
 
     if(decode != NULL&&CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_USER_GID))
     {
         info = (const cm_cnm_user_info_t *)decode->data;
-        cut = (uint64)cm_exec_int(
-            "cat /etc/passwd | awk -F':' '($3>99&&$3<50000)&&$4==%u'| wc -l",info->gid);
+        cut = (uint64)cm_exec_int("%s count %u",cm_cnm_user_sh,info->gid);
     }
     
     return cm_cnm_ack_uint64(cut,ppAckData,pAckLen);
@@ -684,14 +683,14 @@ sint32 cm_cnm_group_getbatch(const void *pDecodeParam,void **ppAckData,uint32 *p
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     uint32 offset = 0;
     uint32 total = CM_CNM_MAX_RECORD;
-    const sint8 *cmd= "cat /etc/group | awk -F':' '$3==1||($3>99&&$3<50000) {print $3\" \"$1}'";
+    sint8 cmd[CM_STRING_256] = {0};
     sint32 iRet = CM_OK;
     if(decode != NULL)
     {
         offset = decode->offset;
         total = decode->total;
     }
-
+    CM_VSPRINTF(cmd,CM_STRING_256,"%s group_getbatch",cm_cnm_user_sh);
     iRet = cm_cnm_exec_get_list(cmd,cm_cnm_group_get_each,
         offset,sizeof(cm_cnm_group_info_t),ppAckData,&total);
     if(CM_OK != iRet)
@@ -707,7 +706,7 @@ sint32 cm_cnm_group_count(const void *pDecodeParam,void **ppAckData,uint32 *pAck
 {
     uint64 cut = 0;
 
-    cut = (uint64)cm_exec_int("cat /etc/group |awk -F':' '$3==1||($3>99&&$3<50000)' |wc -l");
+    cut = (uint64)cm_exec_int("%s group_count",cm_cnm_user_sh);
 
     return cm_cnm_ack_uint64(cut,ppAckData,pAckLen);
 }
@@ -742,7 +741,7 @@ sint32 cm_cnm_group_create(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         maxid = info->id;
     }else
     {
-        maxid = (uint32)cm_exec_int("cat /etc/group | awk -F':' 'BEGIN {max=99}{if(($3>99&&$3<50000)&&($3>max)) max=$3} END{printf max}'");
+        maxid = (uint32)cm_exec_int("%s group_maxid",cm_cnm_user_sh);
         maxid++;
     }
     cut = (uint32)cm_exec_int("cat /etc/group | grep ':%u:' | wc -l",maxid); 

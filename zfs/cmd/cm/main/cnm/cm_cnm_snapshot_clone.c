@@ -8,10 +8,15 @@
 #include "cm_common.h"
 #include "cm_platform.h"
 #include "cm_cmt.h"
-
 /*
- *
+#define LINUX_OS CM_TRUE
+#if(CM_TRUE == LINUX_OS)
+#define STMF_CREATE_LU "stmfadm create-lu /dev/zvol/"
+#else
+#define STMF_CREATE_LU "stmfadm create-lu /dev/zvol/rdsk/"
+#endif
  */
+ 
 sint32 cm_cnm_snapshot_clone_init(void)
 {
     return CM_OK;
@@ -129,7 +134,7 @@ static sint32 cm_cnm_snapshot_clone_create_lu
     if(0 != iRet)   // is volume's snapshot
     {
         iRet = cm_exec_tmout(NULL, 0, CM_CNM_SNAPSHOT_CLONE_EXEC_TMOUT,
-                         "stmfadm create-lu /dev/zvol/rdsk/%s", dst);
+                         CM_SHELL_EXEC" cm_create_lu %s", dst);
         if(CM_OK != iRet)
         {
             CM_LOG_ERR(CM_MOD_CNM, "create-lu fail[%d]", iRet);
