@@ -2117,6 +2117,7 @@ split_mirror_vdev(zpool_handle_t *zhp, char *newname, nvlist_t *props,
 {
 	nvlist_t *newroot = NULL, **child;
 	uint_t c, children;
+	int ret = 0;
 
 	if (argc > 0) {
 		if ((newroot = construct_spec(props, argc, argv)) == NULL) {
@@ -2125,9 +2126,15 @@ split_mirror_vdev(zpool_handle_t *zhp, char *newname, nvlist_t *props,
 			return (NULL);
 		}
 
-		if (!zfs_check_raidz_aggre_valid(newroot)) {
-			(void) fprintf(stderr, gettext("can't use raidz_aggre "
-				"configuration as metadata device\n"));
+		ret = zfs_check_raidz_aggre_valid(newroot); 
+		if (ret != 0) {
+			if (ret == RAIDZS_USE_AS_META) {
+				(void) fprintf(stderr, gettext("can't use raidz_aggre "
+					"configuration as metadata device\n"));
+			} else {
+				(void) fprintf(stderr, gettext("raidz_aggre need metadata device\n"));
+			}
+			
 			nvlist_free(newroot);
 			return (NULL);
 		}
@@ -2181,6 +2188,8 @@ make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force, int check_rep,
 {
 	nvlist_t *newroot;
 	nvlist_t *poolconfig = NULL;
+	int ret = 0;
+	
 	is_force = force;
 
 	/*
@@ -2196,9 +2205,15 @@ make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force, int check_rep,
 		return (NULL);
 	}
 
-	if (!zfs_check_raidz_aggre_valid(newroot)) {
-		(void) fprintf(stderr, gettext("can't use raidz_aggre "
-			"configuration as metadata device\n"));
+	ret = zfs_check_raidz_aggre_valid(newroot);
+	if (ret != 0) {
+		if (ret == RAIDZS_USE_AS_META) {
+			(void) fprintf(stderr, gettext("can't use raidz_aggre "
+				"configuration as metadata device\n"));
+		} else {
+			(void) fprintf(stderr, gettext("raidz_aggre need metadata device\n"));
+		}
+		
 		nvlist_free(newroot);
 		return (NULL);
 	}
