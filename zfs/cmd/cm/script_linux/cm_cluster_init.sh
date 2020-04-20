@@ -110,6 +110,7 @@ function cm_cluster_san_init()
                 dladm set-linkprop -p mtu=9000 ${nics[$index]}
             fi
             ifconfig ${nics[$index]} mtu 9000
+			ifconfig ${nics[$index]} up
             zfs clustersan enable -l ${nics[$index]}
             
             iRet=$?
