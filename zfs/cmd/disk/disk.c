@@ -67,6 +67,7 @@ void print_info(disk_info_t *di, int count)
 static int
 get_scsi_rpm( disk_info_t *disk ) {
 	char *path = disk->dk_name ;
+	int u;
 	uint8_t output[ INQ_REPLY_LEN ] ;
 	uint8_t cmd[] = {0x12, 1, 0xB1, 0, INQ_REPLY_LEN, 0 } ;
 	int fd ;
@@ -98,7 +99,20 @@ get_scsi_rpm( disk_info_t *disk ) {
 	}
 
 	close(fd);
-	disk->dk_rpm = output[4] * 256 + output[5] ;
+	u= output[4] * 256 + output[5] ;
+	disk->dk_rpm = 0;
+	if (0 == u){
+        syslog(LOG_ERR,"  Medium rotation rate is not reported\n");
+	}
+    else if (1 == u){
+        syslog(LOG_ERR,"Non-rotating medium (e.g. solid state)\n");
+    }
+    else if ((u < 0x401) || (0xffff == u)){
+        syslog(LOG_ERR,"  Reserved [0x%x]\n", u);
+    }
+    else{
+		disk->dk_rpm = u;
+    }
 
 	return (0);
 }
