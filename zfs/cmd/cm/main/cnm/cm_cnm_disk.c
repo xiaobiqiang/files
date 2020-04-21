@@ -814,9 +814,9 @@ void* cm_cnm_disk_update_thread(void* arg)
         return NULL;
     }
     isrun = CM_TRUE;
-    CM_LOG_WARNING(CM_MOD_CNM,"zpool status -x");
+    CM_LOG_WARNING(CM_MOD_CNM,"fmadm genxml -w");
     (void)cm_cnm_exec_remote(CM_NODE_ID_NONE,CM_FALSE,buff,sizeof(buff),
-        "zpool status -x &",nodename);
+        "fmadm genxml -w &",nodename);
     isrun = CM_FALSE;
     return NULL;
 }
