@@ -230,6 +230,8 @@ function cm_get_nodeinfo()
 function cm_disk_update_cache()
 {
     cp /var/cm/data/db_disk.db /var/cm/data/cm_db_disk.db 2>/dev/null
+    
+    cm_check_node_offine
     return 0
 }
 
