@@ -72,18 +72,17 @@ function install_scsi()
     fi
 }
 
-function install_deepin_rely()
+function install_java()
 {
-    local rely_nmae=`echo $RELY_DEB|sed 's/.tar.gz//g'`
-    tar -xzvf $RELY_DEB
+    local jdk_file=$1
     
-    cd $rely_nmae/deb-pkg
-    dpkg -i ./*
-    cd -
+    if [ "X"$jdk_file = "X" ]; then
+        return
+    fi
     
     mkdir -p /usr/lib/jvm/
     if [ `ls /usr/lib/jvm/|grep jdk8|wc -l 2>/dev/null` -eq 0 ]; then
-        cp $rely_nmae/jdk8.tar /usr/lib/jvm/
+        cp $jdk_file /usr/lib/jvm/
         cd /usr/lib/jvm/
         tar -xvf jdk8.tar
         rm jdk8.tar
@@ -95,6 +94,18 @@ function install_deepin_rely()
         echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /etc/profile
         echo 'export CLASSPATH=.:$JAVA_HONE/lib/dt.jar:$JAVA_HOME/lib/tools.jar' >> /etc/profile
     fi
+}
+
+function install_deepin_rely()
+{
+    local rely_nmae=`echo $RELY_DEB|sed 's/.tar.gz//g'`
+    tar -xzvf $RELY_DEB
+    
+    cd $rely_nmae/deb-pkg
+    dpkg -i ./*
+    cd -
+    
+    install_java $rely_nmae/jdk8.tar
 
     ln -s /usr/lib/libxml2.so.2 /usr/lib/libxml2.so
     ln -s /usr/lib/libreadline.so.6.3 /usr/lib/libreadline.so.6 
@@ -105,6 +116,27 @@ function install_deepin_rely()
     mkdir -p /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
     cp $rely_nmae/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
     depmod
+    
+    rm -rf $rely_nmae
+}
+
+function install_centos_rely()
+{
+    local rely_rpm="centosrely.tar.gz"
+    
+    tar -xzvf $rely_rpm
+    if [ `file /lib64/libsgutils2.so.2|grep symbolic|wc -l` -eq 0 ]; then
+        rm /lib64/libsgutils2.so.2
+        ln -s /lib64/libsgutils2.so.2.0.0 /lib64/libsgutils2.so.2
+    fi
+    
+    cd centosrely
+    rpm -ivh ./* --nodeps --force
+    cd -
+    
+    install_java $rely_rpm/jdk8.tar
+    
+    rm -rf centosrely
 }
 
 function install_version()
@@ -147,6 +179,9 @@ function install()
     install_gui
     install_scsi
     install_version
+    
+    rm -rf rpm
+    rm -rf scsi
 }
 
 
