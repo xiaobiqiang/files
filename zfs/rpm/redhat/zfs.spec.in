@@ -326,6 +326,7 @@ exit 0
 /usr/local/lib/topo/*
 /usr/local/sbin/*.sh
 /usr/local/sbin/initdisk
+/var/fm/*
 %{_includedir}/*
 %doc AUTHORS COPYRIGHT DISCLAIMER
 %doc OPENSOLARIS.LICENSE README.markdown
