@@ -1203,12 +1203,12 @@ cluster_target_socket_session_new_state(cluster_target_session_socket_t *tsso,
 							tsso->tsso_cts, TQ_SLEEP);
 					} else  {
 						cluster_target_session_rele(tsso->tsso_cts, "up2down evt");
-						/*
-						 * wake up active connect fail, user process wait it.
-						 */
-						cv_signal(&tsso->tsso_sm_cv);
 					}
 				}
+				/*
+				 * wake up active connect fail, user process wait it.
+				 */
+				cv_signal(&tsso->tsso_sm_cv);
 			}	
 			mutex_exit(&tsso->tsso_mtx);
 			break;
