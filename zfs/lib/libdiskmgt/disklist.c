@@ -1529,7 +1529,6 @@ int disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	printf("disk_name = %s\n",disk_name);
 	fp = fopen("/var/fm/systemdisk", "r");
 	if(fp == NULL) {
 		return 0; 
