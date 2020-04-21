@@ -86,7 +86,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <dirent.h>
-#include <stdarg.h>
 #include <limits.h>
 #include <alloca.h>
 #include <unistd.h>
