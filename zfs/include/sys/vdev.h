@@ -165,6 +165,9 @@ extern int vdev_label_init(vdev_t *vd, uint64_t txg, vdev_labeltype_t reason);
 extern int vdev_usedblock_sync(vdev_t *vdev, uint64_t index);
 extern int vdev_space_alloc_full(vdev_t *vd, int thresh);
 
+extern boolean_t vdev_find_disk(vdev_t *vdev, char *disk_name, vdev_t **vdp);
+extern void vdev_simulate_fault(vdev_t *vdev, char *event);
+
 #ifdef	__cplusplus
 }
 #endif

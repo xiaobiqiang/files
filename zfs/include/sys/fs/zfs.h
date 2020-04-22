@@ -1080,6 +1080,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_GET_DIRLOWDATA,
 	ZFS_IOC_GET_ALL_DIRLOWDATA,
 	ZFS_IOC_GET_ALL_DIRQUOTA,
+	ZFS_IOC_FM_SIMULATE,
 	
 	/*
 	 * Linux - 3/64 numbers reserved.

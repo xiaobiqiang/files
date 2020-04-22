@@ -2597,6 +2597,54 @@ sprintf_all_spa_refcount(char *buf, size_t len)
 		strncpy(buf, "no spa", len);
 }
 
+static boolean_t
+spa_aux_find_disk(spa_aux_vdev_t *aux_vdev, char *disk_name, vdev_t **vdp)
+{
+	int i;
+	vdev_t *vdev;
+	boolean_t find = B_FALSE;
+	
+	for (i = 0; i < aux_vdev->sav_count; i++) {
+		vdev = aux_vdev->sav_vdevs[i];
+		if (strstr(vdev->vdev_path, disk_name)) {
+			*vdp = vdev;
+			find = B_TRUE;
+			break;
+		}
+	}
+
+	return (find);
+}
+
+boolean_t
+spa_find_disk(spa_t *spa, char *disk_name, vdev_t **vdp)
+{
+	boolean_t find = B_FALSE;
+
+	find = vdev_find_disk(spa->spa_root_vdev, disk_name, vdp);
+	if (find)
+		return (find);
+
+	find = spa_aux_find_disk(&spa->spa_spares, disk_name, vdp);
+	if (find)
+		return (find);
+
+	find = spa_aux_find_disk(&spa->spa_l2cache, disk_name, vdp);
+	if (find)
+		return (find);
+	
+	find = spa_aux_find_disk(&spa->spa_metaspares, disk_name, vdp);
+	if (find)
+		return (find);
+
+	find = spa_aux_find_disk(&spa->spa_lowspares, disk_name, vdp);
+	if (find)
+		return (find);
+
+	find = spa_aux_find_disk(&spa->spa_mirrorspares, disk_name, vdp);
+	return (find);
+}
+
 #if defined(_KERNEL) && defined(HAVE_SPL)
 /* Namespace manipulation */
 EXPORT_SYMBOL(spa_lookup);
