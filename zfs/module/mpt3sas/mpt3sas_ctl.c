@@ -2081,7 +2081,7 @@ static int __sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_de
 }
 
 
-static int __removed_sas_device_repair(struct MPT3SAS_ADAPTER *ioc, u64 *sas_addr, u32 action)
+static int __removed_sas_device_repair(struct MPT3SAS_ADAPTER *ioc, u64 sas_addr, u32 action)
 {
     int retval = 0;
 
