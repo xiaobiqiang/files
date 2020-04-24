@@ -2040,16 +2040,22 @@ typedef int (*mpt3_simu_handler)(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 actio
 
 static int __sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_device *sas_device, u32 action)
 {
-    struct MPT3SAS_TARGET *sas_target_priv_data;
+    struct MPT3SAS_TARGET *sas_target_priv_data = NULL;
+
+    if (sas_device->starget && sas_device->starget->hostdata) {
+        sas_target_priv_data = sas_device->starget->hostdata;
+    } 
+
+    if(NULL == sas_target_priv_data){
+        printk(KERN_ERR "invalid parameter:%s:%d\n", __func__, __LINE__);
+        return -1;
+    }
 
     switch(action) {
     case mpt3simu_on: /* noresponse on */
     case mpt3simu_off: /* noresponse off */
-        if (sas_device->starget && sas_device->starget->hostdata) {
-    		sas_target_priv_data = sas_device->starget->hostdata;
-    		sas_target_priv_data->noresp_simu = !action;
-            printk(KERN_ERR "sas device:%llx noresp_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->noresp_simu);
-	    }
+  		sas_target_priv_data->noresp_simu = !action;
+        printk(KERN_ERR "sas device:%llx noresp_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->noresp_simu);
         break;
     default :
         printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_target_priv_data->sas_address);
@@ -2059,18 +2065,25 @@ static int __sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_
     return 0;
 }
 
+
 static int __sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, struct _sas_device *sas_device, u32 action)
 {
-    struct MPT3SAS_TARGET *sas_target_priv_data;
+    struct MPT3SAS_TARGET *sas_target_priv_data = NULL;    
+
+    if (sas_device->starget && sas_device->starget->hostdata) {
+        sas_target_priv_data = sas_device->starget->hostdata;
+    } 
+
+    if(NULL == sas_target_priv_data){
+        printk(KERN_ERR "invalid parameter:%s:%d\n", __func__, __LINE__);
+        return -1;
+    }
 
     switch(action) {
-    case mpt3simu_on: /* noresponse on */
-    case mpt3simu_off: /* noresponse off */
-        if (sas_device->starget && sas_device->starget->hostdata) {
-    		sas_target_priv_data = sas_device->starget->hostdata;
-    		sas_target_priv_data->merr_simu = !action;
-            printk(KERN_ERR "sas device:%llx merr_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->merr_simu);
-	    }
+    case mpt3simu_on: /* merr on */
+    case mpt3simu_off: /* merr off */
+        sas_target_priv_data->merr_simu = !action;
+        printk(KERN_ERR "sas device:%llx merr_simu set to %d\n", sas_target_priv_data->sas_address, sas_target_priv_data->merr_simu);
         break;
     default :
         printk(KERN_ERR "action:%d for sas device:%llx invalid\n", action, sas_target_priv_data->sas_address);
@@ -2114,6 +2127,7 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
 {
     struct _sas_device *sas_device;
     unsigned long flags;
+    int found = 0;
 
     if(action == mpt3simu_repair) {
         return __removed_sas_device_repair(ioc, wwn, action);
@@ -2121,12 +2135,19 @@ static int sas_device_noresp_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 a
 
     /* noresponse simulate code. */
     spin_lock_irqsave(&ioc->sas_device_lock, flags);
-	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+    list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
         if(wwn_match(wwn, sas_device->sas_address)) {
             __sas_device_noresp_handler(ioc, sas_device, action);
+            found = 1;
+            break;
         }
     }
     spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+
+    if( found == 0) {
+        printk(KERN_ERR "device:%llx not found in sas device list\n", wwn);
+        return -1;
+    }
 
     return 0;
 }
@@ -2135,6 +2156,7 @@ static int sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 act
 {
     struct _sas_device *sas_device;
     unsigned long flags;
+    int found = 0;
 
     if(action == mpt3simu_repair) {
         return __removed_sas_device_repair(ioc, wwn, action);
@@ -2142,16 +2164,22 @@ static int sas_device_merr_handler(struct MPT3SAS_ADAPTER *ioc, u64 wwn, u32 act
 
     /* merr simulate code. */
     spin_lock_irqsave(&ioc->sas_device_lock, flags);
-	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+    list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
         if(wwn_match(wwn, sas_device->sas_address)) {
             __sas_device_merr_handler(ioc, sas_device, action);
+            found = 1;
+            break;
         }
     }
     spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
 
+    if( found == 0) {
+        printk(KERN_ERR "device:%llx not found in sas device list\n", wwn);
+        return -1;
+    }
+
     return 0;
 }
-
 
 mpt3_simu_handler mpt3_simu_handler_arr[] = {
     &sas_device_noresp_handler,  /*subcmd = 0, noresponse handler*/
