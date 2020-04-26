@@ -188,9 +188,10 @@ function cm_get_hoststrid()
 
 function cm_get_localcmid()
 {
-    local mport=`cm_get_localmanageport`
-    local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
-    echo $interid
+    local myip=`cm_get_localmanageip`
+    #local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
+    #echo $interid
+    echo $myip  |awk -F'.' '{myid=$3*512+$4;print myid}'
     return 0
 }
 
@@ -206,12 +207,7 @@ function cm_get_nodeinfo()
     if [ $ostype -ne $CM_OS_TYPE_DEEPIN ];then
         devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
     fi
-    local myip="127.0.0.1"
-    local mport=`cm_get_localmanageport`
-    if [ "X"$mport = "X" ]; then
-        mport=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
-    fi
-    myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
+    local myip=`cm_get_localmanageip`
     if [ "X"$myip = "X" ]; then
         myip='0.0.0.0'
     fi
