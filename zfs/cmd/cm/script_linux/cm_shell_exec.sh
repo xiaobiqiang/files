@@ -498,17 +498,34 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    local read=`cat /proc/net/dev|grep $name|awk '{print $2}'`
-    local write=`cat /proc/net/dev|grep $name|awk '{print $10}'`
+    local read=`cat /proc/net/dev|grep $name:|awk '{print $2}'`
+    local write=`cat /proc/net/dev|grep $name:|awk '{print $10}'`
+    local rerr=`cat /proc/net/dev|grep "$name:"|awk '{print $4}'`
+    local werr=`cat /proc/net/dev|grep "$name:"|awk '{print $12}'`
     
-    echo "0 0 100000000 2 0 0 $write $write 0 $read $read"
+    
+    echo "0 $rerr 100000000 2 0 0 $write $write $werr $read $read"
     return $?
 }
 
 function cm_pmm_dup_ifspeed()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    
+    if [ "X"$name = "X" ]; then
+        return $CM_FAIL
+    fi
+    #kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    local duplex=`ethtool $name|grep Duplex|awk '{print $2}'`
+    local speed=`ethtool $name|grep Speed|awk '{print $2}'|sed "s/Mb\/s//g"`
+    ((speed=$speed*1024*1024))
+    
+    if [ duplex='Full' ]; then
+        echo "$speed 2.0"    
+    else
+        echo "$speed 1.0"
+    fi
+    
     return $?
 }
 
