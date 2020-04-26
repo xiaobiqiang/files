@@ -102,13 +102,14 @@ get_scsi_rpm( disk_info_t *disk ) {
 	u= output[4] * 256 + output[5] ;
 	disk->dk_rpm = 0;
 	if (0 == u){
-        syslog(LOG_ERR,"  Medium rotation rate is not reported\n");
+		fprintf( stderr,"Medium rotation rate is not reported dev<%s>\n",path) ;
 	}
     else if (1 == u){
-        syslog(LOG_ERR,"Non-rotating medium (e.g. solid state)\n");
+		/*ssd*/
+        disk->dk_rpm = 0;
     }
     else if ((u < 0x401) || (0xffff == u)){
-        syslog(LOG_ERR,"  Reserved [0x%x]\n", u);
+		fprintf( stderr,"Reserved [0x%x] dev<%s>\n",u,path) ;
     }
     else{
 		disk->dk_rpm = u;
