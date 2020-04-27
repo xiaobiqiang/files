@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
 

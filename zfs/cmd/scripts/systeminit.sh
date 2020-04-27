@@ -677,6 +677,7 @@ function add_prepare_gui
                 sed "/exit/d" $RCLOCALPATH > /tmp/rc.tmp
                 cat /tmp/rc.tmp > $RCLOCALPATH
                 echo "/gui/prepare.sh &" >> $RCLOCALPATH
+                chmod 755  $RCLOCALPATH
             fi
         else
             echo "add_prepare_gui, $RCLOCALPATH is not exist,now we create."
