@@ -555,6 +555,7 @@ disk_get_enid_slotid(const char *dev ,int *en_id,int *slot_id)
 	char tmp[1024] = {0};
 	
 	system("/usr/local/sbin/get_en_slot.sh > /dev/null");
+	fflush(NULL);
 	fd = fopen("/tmp/.sasdisk","r");
 	if(NULL == fd){
 		*en_id = 0;
