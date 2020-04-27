@@ -2501,6 +2501,12 @@ zvol_set_snapdev(const char *ddname, zprop_source_t source, uint64_t snapdev)
 	    zvol_set_snapdev_sync, &zsda, 0, ZFS_SPACE_CHECK_NONE));
 }
 
+int
+zvol_create_minor(const char *name)
+{
+	return zvol_create_minor_impl(name);
+}
+
 void
 zvol_create_minors(spa_t *spa, const char *name, boolean_t async)
 {
@@ -2902,6 +2908,8 @@ zvol_fini(void)
 	mutex_destroy(&zvol_state_lock);
 	cluster_san_fini();
 }
+
+EXPORT_SYMBOL(zvol_create_minor);
 
 module_param(zvol_inhibit_dev, uint, 0644);
 MODULE_PARM_DESC(zvol_inhibit_dev, "Do not create zvol device nodes");

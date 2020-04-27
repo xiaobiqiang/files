@@ -3572,9 +3572,6 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 		mutex_exit(&spa_namespace_lock);
 	}
 
-	if (firstopen)
-		zvol_create_minors(spa, spa_name(spa), B_TRUE);
-
 	*spapp = spa;
 
 	return (0);
@@ -4801,8 +4798,6 @@ spa_import(char *pool, nvlist_t *config, nvlist_t *props, uint64_t flags)
 	cmn_err(CE_WARN,"%s %s start reclaim thread %d", __func__,pool,spa_is_raidz_aggre(spa));
 	mutex_exit(&spa_namespace_lock);
 	spa_history_log_version(spa, "import");
-	zfs_dbgmsg("zvol create minors %p", spa);
-	zvol_create_minors(spa, pool, B_FALSE);
 
 	spa->spa_importing = 0;
 
