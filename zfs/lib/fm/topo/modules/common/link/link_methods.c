@@ -297,7 +297,7 @@ int is_linkstate_changed(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers, n
     nvlist_t *nvl, *fmri;
 	char *fmristr;
     conn_handle_t *chp = topo_mod_getspecific(mod);
-	char aname[256] = {0}
+	char aname[256] = {0};
 	int alarmid = 0;
 	char * info = NULL;
 	
