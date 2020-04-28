@@ -10,19 +10,20 @@ do
                 if [ "$quota"X == "-"X ] || [ "$quota"X == ""X ];then
                         continue;
                 fi
-                softquota=`zfs get -H softuserquota@${k} $i |awk '{printf $3}'`
-                if [ "$softquota"X == "-"X ] || [ "$softquota"X == ""X ];then
-                        continue;
-                fi
+                #softquota=`zfs get -H softuserquota@${k} $i |awk '{printf $3}'`
+                #if [ "$softquota"X == "-"X ] || [ "$softquota"X == ""X ];then
+                #        continue;
+                #fi
+                softquota="0"
                 userused=`zfs get -H userused@${k} $i |awk '{print $3}'`
                 if [ "$userused"X == "-"X ] || [ "$userused"X == ""X ];then
                         continue;
                 fi
 
                                 if [ $1 ];then
-                                        echo $k"\t"$i"\t"$quota"\t"$softquota"\t"$userused"##"
+                                        echo -e $k"\t"$i"\t"$quota"\t"$softquota"\t"$userused"##"
                                 else
-                                        echo $k"\t"$i"\t"$quota"\t"$softquota"\t"$userused"##" >> /tmp/userquota.txt
+                                        echo -e $k"\t"$i"\t"$quota"\t"$softquota"\t"$userused"##" >> /tmp/userquota.txt
                                 fi
         done
 done

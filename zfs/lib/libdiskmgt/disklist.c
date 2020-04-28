@@ -555,6 +555,7 @@ disk_get_enid_slotid(const char *dev ,int *en_id,int *slot_id)
 	char tmp[1024] = {0};
 	
 	system("/usr/local/sbin/get_en_slot.sh > /dev/null");
+	fflush(NULL);
 	fd = fopen("/tmp/.sasdisk","r");
 	if(NULL == fd){
 		*en_id = 0;
@@ -1529,7 +1530,6 @@ int disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	printf("disk_name = %s\n",disk_name);
 	fp = fopen("/var/fm/systemdisk", "r");
 	if(fp == NULL) {
 		return 0; 

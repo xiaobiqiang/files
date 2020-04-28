@@ -4000,7 +4000,10 @@ void zpool_check_thin_luns(zfs_thinluns_t **statpp)
         check_pool_thinlun_data_t *cbdata;
         zfs_thinluns_t *luns_stat;
         
-        tmp_gzfs = libzfs_init();
+        if((tmp_gzfs = libzfs_init()) == NULL){
+			return;
+		}
+		
         cbdata  = calloc(1, sizeof(check_pool_thinlun_data_t));
         bzero(cbdata, sizeof(check_pool_thinlun_data_t));
         cbdata->thinluns_stat = calloc(MAX_POOl_NUM, sizeof(pool_thinluns_stat_t));

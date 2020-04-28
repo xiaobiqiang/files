@@ -309,6 +309,22 @@ typedef enum topo_xml_statusno{
 } topo_xml_statusno_t;
 
 
+/*alarm*/
+typedef enum{
+	TOPO_XML_UINT32,
+	TOPO_XML_INT32,
+	TOPO_XML_UINT64,
+	TOPO_XML_INT64,
+	TOPO_XML_STRING,
+	TOPO_XML_DOUBLE,
+	TOPO_XML_LONG,
+	TOPO_XML_DONE
+}topo_xml_type_t;
+
+extern void topo_fru_clear_fault_xml(const char*);
+extern int topo_fru_set_fault_xml(const int,const char*,const int,...);
+extern void topo_fru_alarm_xml_init();
+
 #ifdef	__cplusplus
 }
 #endif
