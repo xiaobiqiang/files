@@ -795,14 +795,21 @@ sint32 cm_cnm_pool_local_create(
             raid_num = req->raid;
             break;
     }
+    if(raid_num == CM_RAIDZ5 || raid_num == CM_RAIDZ6 || raid_num == CM_RAIDZ7)
+    {
+        cur_len = CM_VSPRINTF(cmd,buf_len,"zpool create -f -b %s",req->name);
+    }
+    else
+    {
+        cur_len = CM_VSPRINTF(cmd,buf_len,"zpool create -f %s",req->name); 
+    }
+    
     raid = cm_cnm_get_enum_str(&raidcfg, raid_num);
     if(NULL == raid)
     {
         CM_LOG_ERR(CM_MOD_CNM,"raid[%u]",raid_num);
         return CM_PARAM_ERR;
     }   
-    
-    cur_len = CM_VSPRINTF(cmd,buf_len,"zpool create -f %s",req->name);
     cut = cm_cnm_pool_raid_judge(req);
     if(CM_FALSE == cut)
     {
