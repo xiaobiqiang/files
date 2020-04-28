@@ -565,59 +565,6 @@ add_prop_list_default(const char *propname, char *propval, nvlist_t **props,
 	return (add_prop_list(propname, propval, props, B_TRUE));
 }
 
-int
-zpool_do_add_check_aggre(nvlist_t *config, nvlist_t *nvroot)
-{
-	char *type;
-	nvlist_t **child, **child1;
-	uint_t c, children, newchildren, raidz_children;
-	nvlist_t *pool_nvroot;
-	uint64_t parity1, parity2;
-	uint64_t is_meta;
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		&pool_nvroot) == 0);
-	verify(nvlist_lookup_nvlist_array(pool_nvroot, ZPOOL_CONFIG_CHILDREN,
-		&child, &children) == 0);
-	for (c = 0; c < children; c++) {
-		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE,
-			&type) == 0);
-		if (strncmp(type, "raidz", 5) == 0)
-			break;
-	}
-	verify(c != children);
-
-	verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-		&child1, &raidz_children) == 0);
-	verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-		&parity1) == 0);
-	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-		&child, &children) == 0);
-	for (c = 0; c < children; c++) {
-		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE,
-			&type) == 0);
-		verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META,
-			&is_meta) == 0);
-		if (is_meta)
-			continue;
-		if (strncmp(type, "raidz", 5) != 0) {
-			printf("invalid vdev specification: "
-				"raidz needed.\n");
-			return (0);
-		}
-		verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-			&child1, &newchildren) == 0);
-		verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-			&parity2) == 0);
-		if (raidz_children != newchildren || parity1 != parity2) {
-			printf("invalid vdev specification: "
-				"aggre raidz requires %d devices\n", raidz_children);
-			return (0);
-		}
-	}
-	return (1);
-}
-
 
 /*
  * zpool add [-fgLnP] [-o property=value] <pool> <vdev> ...
@@ -722,22 +669,6 @@ zpool_do_add(int argc, char **argv)
 	if (nvroot == NULL) {
 		zpool_close(zhp);
 		return (1);
-	}
-
-	ret = zfs_check_raidz_aggre_valid(nvroot); 
-	if (ret != 0) {
-		if (ret == RAIDZS_USE_AS_META) {
-			(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
-				"configuration as metadata device\n"),
-				poolname);
-		} else {
-			(void) fprintf(stderr, gettext("pool '%s' raidz_aggre need metadata device\n"),
-				poolname);
-		}
-		
-		zpool_close(zhp);
-		nvlist_free(nvroot);
-		return (ret);
 	}
 
 	if (dryrun) {

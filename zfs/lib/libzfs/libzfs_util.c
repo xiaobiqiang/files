@@ -4572,10 +4572,33 @@ zfs_start_lun_migrate(libzfs_handle_t *hdl, const char *dst, char *pool, char *g
 	return (zfs_lun_migrate_check(hdl, dst, pool, guid) != 0);
 }
 
-int
-zfs_check_raidz_aggre_valid(nvlist_t *nv)
+static boolean_t
+zfs_has_meta_device(nvlist_t *nv)
 {
-	nvlist_t **child;
+        nvlist_t **child;
+        uint_t c, children;
+	uint64_t meta_avail = 0;
+
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_META, &meta_avail) == 0) {
+		if (meta_avail)
+			return (B_TRUE);
+	}
+	
+        if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+            &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if (zfs_has_meta_device(child[c]))
+				return (B_TRUE);
+		}
+	}
+	
+	return (B_FALSE);
+}
+
+int
+zfs_check_raidz_aggre_valid(nvlist_t *nv, nvlist_t *old)
+{
+	nvlist_t **child, *vdev_tree = NULL;
 	uint_t c, children;
 	uint64_t is_meta;
 	int has_raidz_aggre = 0;
@@ -4603,6 +4626,14 @@ zfs_check_raidz_aggre_valid(nvlist_t *nv)
 	}
 
 	if (has_raidz_aggre) {
+		if (!has_meta) {
+			if (old) {
+				verify(nvlist_lookup_nvlist(old,
+			    		ZPOOL_CONFIG_VDEV_TREE, &vdev_tree) == 0);
+				has_meta = zfs_has_meta_device(vdev_tree);
+			}
+		}
+
 		return has_meta ? 0 : RAIDZS_NEED_META;	
 	}
 	

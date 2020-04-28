@@ -2126,7 +2126,7 @@ split_mirror_vdev(zpool_handle_t *zhp, char *newname, nvlist_t *props,
 			return (NULL);
 		}
 
-		ret = zfs_check_raidz_aggre_valid(newroot); 
+		ret = zfs_check_raidz_aggre_valid(newroot, NULL); 
 		if (ret != 0) {
 			if (ret == RAIDZS_USE_AS_META) {
 				(void) fprintf(stderr, gettext("can't use raidz_aggre "
@@ -2205,7 +2205,7 @@ make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force, int check_rep,
 		return (NULL);
 	}
 
-	ret = zfs_check_raidz_aggre_valid(newroot);
+	ret = zfs_check_raidz_aggre_valid(newroot, poolconfig);
 	if (ret != 0) {
 		if (ret == RAIDZS_USE_AS_META) {
 			(void) fprintf(stderr, gettext("can't use raidz_aggre "

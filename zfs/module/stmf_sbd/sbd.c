@@ -3818,7 +3818,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	
 	if (sbd_is_zvol(sl->sl_meta_filename)) {
 		char *zvol_name = sbd_get_zvol_name(sl);
-		cmn_err(CE_WARN, "zjn %s %s create minor", __func__, zvol_name);
+		cmn_err(CE_WARN, "%s %s create minor", __func__, zvol_name);
 		ret = zvol_create_minor(zvol_name);
 		if (ret) {
 			cmn_err(CE_WARN, "%s %s create minor failed", __func__, zvol_name);
