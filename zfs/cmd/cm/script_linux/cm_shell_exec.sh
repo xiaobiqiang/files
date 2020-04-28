@@ -188,9 +188,10 @@ function cm_get_hoststrid()
 
 function cm_get_localcmid()
 {
-    local mport=`cm_get_localmanageport`
-    local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
-    echo $interid
+    local myip=`cm_get_localmanageip`
+    #local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
+    #echo $interid
+    echo $myip  |awk -F'.' '{myid=$3*512+$4;print myid}'
     return 0
 }
 
@@ -206,12 +207,7 @@ function cm_get_nodeinfo()
     if [ $ostype -ne $CM_OS_TYPE_DEEPIN ];then
         devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
     fi
-    local myip="127.0.0.1"
-    local mport=`cm_get_localmanageport`
-    if [ "X"$mport = "X" ]; then
-        mport=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
-    fi
-    myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
+    local myip=`cm_get_localmanageip`
     if [ "X"$myip = "X" ]; then
         myip='0.0.0.0'
     fi
@@ -502,17 +498,34 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    local read=`cat /proc/net/dev|grep $name|awk '{print $2}'`
-    local write=`cat /proc/net/dev|grep $name|awk '{print $10}'`
+    local read=`cat /proc/net/dev|grep $name:|awk '{print $2}'`
+    local write=`cat /proc/net/dev|grep $name:|awk '{print $10}'`
+    local rerr=`cat /proc/net/dev|grep "$name:"|awk '{print $4}'`
+    local werr=`cat /proc/net/dev|grep "$name:"|awk '{print $12}'`
     
-    echo "0 0 100000000 2 0 0 $write $write 0 $read $read"
+    
+    echo "0 $rerr 100000000 2 0 0 $write $write $werr $read $read"
     return $?
 }
 
 function cm_pmm_dup_ifspeed()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    
+    if [ "X"$name = "X" ]; then
+        return $CM_FAIL
+    fi
+    #kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    local duplex=`ethtool $name|grep Duplex|awk '{print $2}'`
+    local speed=`ethtool $name|grep Speed|awk '{print $2}'|sed "s/Mb\/s//g"`
+    ((speed=$speed*1024*1024))
+    
+    if [ duplex='Full' ]; then
+        echo "$speed 2.0"    
+    else
+        echo "$speed 1.0"
+    fi
+    
     return $?
 }
 

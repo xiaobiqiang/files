@@ -173,6 +173,7 @@ function cm_software_version()
 function cm_get_localmanageport()
 {
     local nic_conf="/var/cm/static/nic.conf"
+    
     if [ -f $nic_conf ];then
         local nic=`cat $nic_conf|sed -n 1p`
         echo $nic
@@ -180,7 +181,7 @@ function cm_get_localmanageport()
     else
         CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
         return 1
-    fi  
+    fi
 }
 
 function cm_get_localmanageip()
@@ -189,14 +190,21 @@ function cm_get_localmanageip()
     if [ "X" == "X$port" ];then
         return 1
     fi
-    local ip=`ifconfig $port|grep 'inet '|awk '{print $2}'`
+    local ip
+    if [ `uname -r|grep deepin|wc -l` -eq 0 ]; then
+        ip=`cat /etc/sysconfig/network-scripts/ifcfg-$port|grep IPADDR|awk -F'=' '{print $2}'`
+    else
+        cnt=`cat /etc/network/interfaces|grep -n "iface $port"|awk -F':' '{print $1}'`
+        ((cnt=$cnt+1))
+        ip=`cat  /etc/network/interfaces|sed -n "$cnt p"|awk '{print $2}'`
+    fi
     if [ "X" == "X$ip" ];then
         CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
         return 1
     else
         echo $ip
         return 0
-    fi 
+    fi
 }
 
 function cm_check_isnum()
