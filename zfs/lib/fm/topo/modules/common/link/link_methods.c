@@ -297,6 +297,9 @@ int is_linkstate_changed(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers, n
     nvlist_t *nvl, *fmri;
 	char *fmristr;
     conn_handle_t *chp = topo_mod_getspecific(mod);
+	char aname[256] = {0}
+	int alarmid = 0;
+	char * info = NULL;
 	
     if(vers != TOPO_METH_LINK_VERSION)
         return (topo_mod_seterrno(mod, EMOD_VER_NEW));
@@ -342,34 +345,58 @@ int is_linkstate_changed(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers, n
 			ret = -1;
 			goto done;
 		}
-		if (state == FC_STATE_ONLINE)
+		if (state == FC_STATE_ONLINE){
 			status = SXML_ONLINE;
-		else
+			info = "online";
+		}
+		else{
 			status = SXML_OFFLINE;
+			info = "offline";
+		}
+
+		alarmid = AMARM_ID_FC_LINK;
 	}else if(!strcmp(type, ETHERNET_LINK)){
 		if(get_ethstate_by_name(chp, name, &state)){
 			LOG("failed get_ethstate_by_name type :%s name :%s.\n", type, name);
 			ret = -1;
 			goto done;
 		}
-		if (state == ETH_STATE_UP)
+		if (state == ETH_STATE_UP){
 			status = SXML_UP;
-		else if (state == ETH_STATE_DOWN)
+			info = "up";
+		}
+		else if (state == ETH_STATE_DOWN){
 			status = SXML_DOWN;
-		else
+			info = "down";
+		}
+		else{
 			status = SXML_UNKNOWN;
+			info = "unkown";
+		}
+
+		alarmid = AMARM_ID_ETH_LINK;
 	}else if(!strcmp(type, SAS_LINK)){      /* not use now */
 		LOG("SAS_LINK pass\n");
 		ret = -1;
+
+		alarmid = AMARM_ID_SAS_LINK;
 		goto done;
 	}else if(!strcmp(type, HEART_LINK)){
 		state = heartbert_status_ok(mod);
-		if (state == HT_STATE_UP)
+		if (state == HT_STATE_UP){
 			status = SXML_UP;
-		else if (state == HT_STATE_DOWN)
+			info = "up";
+		}
+		else if (state == HT_STATE_DOWN){
 			status = SXML_DOWN;
-		else
+			info = "down";
+		}
+		else{
 			status = SXML_UNKNOWN;
+			info = "unknown";
+		}
+
+		alarmid = AMARM_ID_HEART_LINK;
 	}else{
 		LOG("is_linkstate_changed error type.\n");
 		ret = -1;
@@ -381,11 +408,17 @@ int is_linkstate_changed(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers, n
 		ret = -1;
 		goto done;
 	}
-
-	if (status == SXML_OK || status == SXML_ONLINE || status == SXML_UP)
-		topo_fru_cleartime(fmristr, 0xffffffff);
-	else
+	if(status == SXML_UNSUPPORTED || NULL == info){
+		goto done;	
+	}
+	
+	if (status == SXML_OK || status == SXML_ONLINE || status == SXML_UP){
+		topo_fru_cleartime(fmristr, 0xffffffff);	
+	}else{
 		(void) topo_fru_setime(fmristr, status, NULL, NULL, NULL, NULL);
+		snprintf(aname,sizeof(aname),"Resource/link/%s",name);
+		topo_fru_set_fault_xml(alarmid,aname,1,TOPO_XML_STRING,info,TOPO_XML_DONE);
+	}
 	nvlist_free(fmri);
 	topo_mod_strfree(mod, fmristr);
 	

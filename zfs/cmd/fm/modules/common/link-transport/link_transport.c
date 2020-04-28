@@ -27,6 +27,9 @@
 #define QUOTA_CHECK_FLAG	2
 #define AVS_CHECK_FLAG		4
 #define ZFSTHINLUN_CHECK_FLAG	8
+#define DIRQUOTA_CHECK_FLAG		16
+
+
 
 typedef enum avs_state {
 	logging = 0,
@@ -325,6 +328,7 @@ void zfs_thinlun_check(fmd_hdl_t *hdl, link_monitor_t *lmp)
 	uint64_t ena = 0;
 	nvlist_t *fmri, *nvl;
 	FILE *fp;
+	char name[512];
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
 		nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0) != 0 )
@@ -351,13 +355,21 @@ void zfs_thinlun_check(fmd_hdl_t *hdl, link_monitor_t *lmp)
 					nvlist_free(fmri);
 					return;
 			}
+			memset(name, 0, 512);
+			sprintf(name, "Resource/Thinlun/%s", thinlun_stat->lu_name);
+			topo_fru_set_fault_xml(AMARM_ID_ZFS_THINLUN,name,0,
+				TOPO_XML_STRING,thinlun_stat->total,
+				TOPO_XML_STRING,thinlun_stat->used,
+				TOPO_XML_UINT64,thinlun_stat->thinlun_threshold,
+				TOPO_XML_DONE);
 			lt_post_ereport(lmp->lm_hdl, lmp->lm_xprt, "ceresdata", "trapinfo", ena, fmri, nvl);
 
 	   }
 	   free(statp->thinluns);
 	   free(statp);
 	} 
-				
+
+	topo_fru_clear_fault_xml("Resource/Thinlun");
 	fclose(fp);
 	(void) rename("/tmp/zfsthinlun.tmp", "/tmp/zfsthinlun.txt");
 	nvlist_free(nvl);
@@ -365,7 +377,7 @@ void zfs_thinlun_check(fmd_hdl_t *hdl, link_monitor_t *lmp)
 }
 
 
-#if 0
+#if 1
 double get_number(char *q)
 {
 
@@ -379,21 +391,25 @@ double get_number(char *q)
     p = q;
     while (*p != '\0') {
             if(*p == 'K'){
-                    t = 1000;
+                    t = 0x400;
                     *p = '\0';
             }
             else if(*p == 'M') {
-                    t = 1000000;
+                    t = 0x100000;
                     *p = '\0';
             }
             else if(*p == 'G') {
-                    t = 1000000000;
+                    t = 0x40000000;
                     *p = '\0';
             }
 			else if(*p == 'T') {
-			        t = 1000000000000;
+			        t = 0x10000000000;
                     *p = '\0';
             }
+			else if(*p == 'P'){
+					t = 0x4000000000000;
+					*p = '\0';
+			}
             p++;
     }
 
@@ -402,15 +418,157 @@ double get_number(char *q)
 
     return fq;
 }
-void softquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp, char *buf)
+
+void quota_alarm_post(fmd_hdl_t *hdl,link_monitor_t *lmp,char* buf,char *
+buffer, 
+	char *name, char *q_buf, char *sq_buf, char *u_buf)
 {
-	uint64_t ena;
 	nvlist_t *fmri, *nvl;
-	int f1 = 1,f2 = 1, f3 = 1;
-	char *q, *sq, *u, *p;
+	char cmd_buf[CM_ALARM_CMD_LEN];
+	uint64_t ena;
+	char hostname[64];
+	if (gethostname(hostname, sizeof(hostname)) < 0) {
+		syslog(LOG_ERR, "get hostname failed\n");
+		return ;
+	}
+	
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
+		nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0) != 0 )
+		return ;
+	
+	if (nvlist_add_string(fmri, "detector", "link transport") != 0 ||
+	    nvlist_add_string(nvl, TOPO_LINK_TYPE, "userquota_warning") != 0 ||
+	    nvlist_add_string(nvl, TOPO_LINK_NAME, buf) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_LINK_STATE, 2) != 0 ||
+	    nvlist_add_string(nvl, TOPO_LINK_STATE_DESC, buffer) != 0) {
+			nvlist_free(nvl);
+			nvlist_free(fmri);
+			return ;
+	}
+	ena = fmd_event_ena_create(hdl);
+	lt_post_ereport(lmp->lm_hdl, lmp->lm_xprt, "ceresdata", "trapinfo", ena, fmri, nvl);
+	
+
+	nvlist_free(nvl);
+	nvlist_free(fmri);
+	return;
+}
+
+void dirquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp,
+	char *buf, char *hostname)
+{
+	int f0 = 1,f1 = 1;
+	char *q, *u, *p;
+	int t = 0;
+	double dq, du;
+	char buffer[512] = {0};
+	char name[512];
+	char q_buf[32];
+	char u_buf[32];
+	char cmd_buf[CM_ALARM_CMD_LEN];
+
+	/*syslog(LOG_ERR, "TEST buf:%s\n", buf);*/
+	memcpy(buffer, buf, 512);
+	for(p=buffer;*p!='\0';p++) {
+		if(*p=='\t')
+			*p='_';
+	}
+
+	p=buf;
+    while(*p != '#') {
+            if(*p == '\t'){
+                    t++;
+                    *p = '\0';
+            }
+            if(t == 1 && f0){
+                    f0 = 0;
+                    q = p+1;
+            }
+            if(t == 2 && f1) {
+                    u = p+1;
+                    f1 = 0;
+            }
+            p++;
+    }
+    *p = '\0';
+
+	memset(q_buf, 0, 32);
+	memset(u_buf, 0, 32);
+	memcpy(q_buf, q, 32);
+	memcpy(u_buf, u, 32);
+	
+	if(strcmp(q, "none") == 0)
+		dq = 1000000000000000;
+	else
+		dq = get_number(q);
+	du = get_number(u);
+	
+	memset(name, 0, 512);
+	if(du >= dq){
+		sprintf(name, "Resource/Dirquota/%s", (buf+1));
+
+		topo_fru_set_fault_xml(AMARM_ID_DIR_QUOTA,name,0,
+				TOPO_XML_STRING,q_buf,
+				TOPO_XML_STRING,u_buf,
+				TOPO_XML_DONE);
+	}
+}
+
+int dirquota_check(fmd_hdl_t *hdl, link_monitor_t *lmp)
+{
+#if 0
+	FILE *fp;
+	char buff[512];
+	char hostname[64];
+	int is_popen = 0;
+	static int count = 0;
+	
+	system("/var/cm/script/cm_cnm_dirquota.sh getbatch -a");
+	fflush(NULL);
+	if (gethostname(hostname, sizeof(hostname)) < 0) {
+		syslog(LOG_ERR, "get hostname failed\n");
+		return -1;
+	}
+	
+	if((fp = fopen("/tmp/dirquota.txt", "r")) == NULL) {
+		is_popen = 1;
+		syslog(LOG_ERR, "open /tmp/dirquota.txt error\n");
+		
+		if((fp = popen("/var/cm/script/cm_cnm_dirquota.sh getbatch -c","r")) == NULL
+){
+			syslog(LOG_ERR, "popen /var/cm/script/cm_cnm_dirquota.sh getbatch -c error\
+n");
+			return -1;
+		}
+	}
+	
+	while(NULL != fgets(buff, 512, fp)) {
+		dirquota_item_check(hdl, lmp, buff, hostname);
+		memset(buff, 0, 512);
+	}
+	
+	if(is_popen)
+		pclose(fp);
+	else
+		fclose(fp);
+
+	topo_fru_clear_fault_xml("Resource/Dirquota");	
+	return 0;
+#endif
+}
+
+void softquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp,
+	char *buf, char *hostname)
+{
+	int f0 = 1,f1 = 1,f2 = 1, f3 = 1;
+	char *q, *sq, *u, *p, *fs;
 	int t = 0;
 	double dq, dsq, du;
 	char buffer[512] = {0};
+	char name[512];
+	char q_buf[32];
+	char sq_buf[32];
+	char u_buf[32];
 
 	memcpy(buffer, buf, 512);
 	for(p=buffer;*p!='\0';p++) {
@@ -424,6 +582,10 @@ void softquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp, char *buf)
                     t++;
                     *p = '\0';
             }
+			if(t == 1 && f0) {
+					f0 = 0;
+					fs = p+1;
+			}
             if(t == 2 && f1){
                     f1 = 0;
                     q = p+1;
@@ -439,6 +601,14 @@ void softquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp, char *buf)
             p++;
     }
     *p = '\0';
+
+	memset(q_buf, 0, 32);
+	memset(sq_buf, 0, 32);
+	memset(u_buf, 0, 32);
+	memcpy(q_buf, q, 32);
+	memcpy(sq_buf, sq, 32);
+	memcpy(u_buf, u, 32);
+	
 	if(strcmp(q, "none") == 0)
 		dq = 1000000000000000;
 	else
@@ -448,121 +618,68 @@ void softquota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp, char *buf)
 	else
 		dsq = get_number(sq);
 	du = get_number(u);
-
-	if(du >= dq || du >= dsq) {
-		/*syslog(LOG_ERR, "softquota exceed:%s\n", buffer);*/
-		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
-			nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0) != 0 )
-			return ;
-
-		if (nvlist_add_string(fmri, "detector", "link transport") != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_TYPE, "userquota_warning") != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_NAME, buf) != 0 ||
-		    nvlist_add_uint32(nvl, TOPO_LINK_STATE, 0) != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_STATE_DESC, buffer) != 0) {
-				nvlist_free(nvl);
-				nvlist_free(fmri);
-				return ;
-		}
-		lt_post_ereport(lmp->lm_hdl, lmp->lm_xprt, "ceresdata", "trapinfo", ena, fmri, nvl);
+	
+	memset(name, 0, 512);
+	if(du >= dq){
+		strcat(buffer,":quota");
+		sprintf(name, "Resource/Userquota/%s@%s:quota", buf, fs);
 		
-		nvlist_free(nvl);
-		nvlist_free(fmri);	
+		topo_fru_set_fault_xml(AMARM_ID_USER_QUOTA,name,0,
+			TOPO_XML_STRING,q_buf,TOPO_XML_STRING,sq_buf,
+			TOPO_XML_STRING,u_buf,TOPO_XML_DONE);
+		
+		quota_alarm_post(hdl,lmp,buf,buffer,name,q_buf,sq_buf,u_buf);
 	}
-
-}
-
-void quota_item_check(fmd_hdl_t *hdl, link_monitor_t *lmp, char *buf)
-{
-	uint64_t ena;
-	nvlist_t *fmri, *nvl;
-	int f1 = 1,f2 = 1;
-	char *q,*u, *p;
-	int t = 0;
-	double dq, dsq, du;
-	char buffer[512] = {0};
-
-	memcpy(buffer, buf, 512);
-
-	for(p=buffer;*p!='\0';p++) {
-		if(*p=='\t')
-			*p='_';
+	if(du >= dsq){
+		strcat(buffer,":softquota");
+		sprintf(name, "Resource/Userquota/%s@%s:softquota", buf, fs);
+		topo_fru_set_fault_xml(AMARM_ID_USER_QUOTA,name,0,
+			TOPO_XML_STRING,q_buf,TOPO_XML_STRING,sq_buf,
+			TOPO_XML_STRING,u_buf,TOPO_XML_DONE);
+		quota_alarm_post(hdl,lmp,buf,buffer,name,q_buf,sq_buf,u_buf);
 	}	
-
-	p=buf;
-    while(*p != '#') {
-            if(*p == '\t'){
-                    t++;
-                    *p = '\0';
-            }
-            if(t == 1 && f1){
-                    f1 = 0;
-                    q = p+1;
-            }
-            if(t == 2 && f2) {
-                    u = p + 1;
-                    f2 = 0;
-            }
-            p++;
-    }
-    *p = '\0';
-	if(strcmp(q, "none") == 0)
-		dq = 1000000000000000;
-	else
-		dq = get_number(q);
-	du = get_number(u);
-
-	if(du >= dq) {
-		/*syslog(LOG_ERR, "quota exceed:%s\n", buffer);*/
-		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
-			nvlist_alloc(&fmri, NV_UNIQUE_NAME, 0) != 0 )
-			return;
-
-		if (nvlist_add_string(fmri, "detector", "link transport") != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_TYPE, "quota_warning") != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_NAME, buf) != 0 ||
-		    nvlist_add_uint32(nvl, TOPO_LINK_STATE, 0) != 0 ||
-		    nvlist_add_string(nvl, TOPO_LINK_STATE_DESC, buffer) != 0) {
-				nvlist_free(nvl);
-				nvlist_free(fmri);
-				return;
-		}
-		lt_post_ereport(lmp->lm_hdl, lmp->lm_xprt, "ceresdata", "trapinfo", ena, fmri, nvl);
-		
-		nvlist_free(nvl);
-		nvlist_free(fmri);	
-	}
 
 }
 
 int quota_check(fmd_hdl_t *hdl, link_monitor_t *lmp)
 {
 	FILE *fp;
-	char buff[512];
+	char buff[512] = {0};
+	char hostname[64] = {0};
+	int is_popen = 0;
 	
-	system("/gui/Java_Shell/userquota.sh");
-	system("/gui/Java_Shell/quota.sh");
+	system("/var/cm/script/userquota.sh");	
 	fflush(NULL);
+	if (gethostname(hostname, sizeof(hostname)) < 0) {
+		syslog(LOG_ERR, "get hostname failed\n");
+		return -1;
+	}
+	
 	if((fp = fopen("/tmp/userquota.txt", "r")) == NULL) {
-			syslog(LOG_ERR, "open /tmp/userquota.txt error\n");
+		is_popen = 1;
+		syslog(LOG_ERR, "open /tmp/userquota.txt error\n");
+		
+		if((fp = popen("/var/cm/script/userquota.sh -c","r")) == NULL){
+			syslog(LOG_ERR, "popen /var/cm/script/userquota.sh -c error\n");
 			return -1;
+		}
 	}
+	else{
+		syslog(LOG_ERR, "userquota open file ok\n");
+	}
+	syslog(LOG_ERR, "userquota fp = %d\n",(int)fp);
+	
 	while(NULL != fgets(buff, 512, fp)) {
-		softquota_item_check(hdl, lmp, buff);
+		softquota_item_check(hdl, lmp, buff, hostname);
 		memset(buff, 0, 512);
 	}
-	fclose(fp);
-
-	if((fp = fopen("/tmp/quota.txt", "r")) == NULL) {
-			syslog(LOG_ERR, "open /tmp/quota.txt error\n");
-			return -1;
-	}
-	memset(buff, 0, 512);
-	while(NULL != fgets(buff, 512, fp)) {
-		quota_item_check(hdl, lmp, buff);
-		memset(buff, 0, 512);
-	}
-	fclose(fp);
+	
+	if(is_popen)
+		pclose(fp);
+	else
+		fclose(fp);
+	
+	topo_fru_clear_fault_xml("Resource/Userquota");	
 	return 0;
 
 }
@@ -596,6 +713,9 @@ static void get_check_conf(void)
 					check_interval = 60;
 				else
 					check_interval = check_interval*6;
+			}else if ((strcmp(s1, "dirquota_check")) == 0) {
+				if ((strcmp(s2, "yes")) == 0)
+						check_map |= DIRQUOTA_CHECK_FLAG;
 			}
 			memset(s1, 0, 32);
 			memset(s2, 0, 32);
@@ -726,6 +846,8 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 		return;
 	}
 
+	topo_fru_clear_fault_xml("Resource/link");
+
 	if(topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR){
 		topo_walk_fini(twp);
 		fmd_hdl_topo_rele(hdl, thp);
@@ -738,9 +860,13 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 	if (thinlunandquanta_check_time % check_interval == 0) {
 		if (check_map & THINLUN_CHECK_FLAG)
 			zpool_thinlun_check(hdl, lmp);
-#if 0
+
 		if (check_map & QUOTA_CHECK_FLAG)
 			quota_check(hdl, lmp);
+
+		if(check_map & DIRQUOTA_CHECK_FLAG)
+			dirquota_check(hdl, lmp);
+#if 0
 		if (check_map & AVS_CHECK_FLAG)
 			avs_check(hdl, lmp);
 #endif

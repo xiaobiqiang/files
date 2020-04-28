@@ -43,7 +43,7 @@ topo_fru_t *topo_fru_hash_lookup(const char *name);
 topo_fru_t *topo_fru_cleartime(const char *name, int status);
 void topo_fru_hash_create(void);
 void topo_fru_hash_destroy(void);
-void cm_alarm_cmd(char *buf, const char *format, ...);
+void cm_alarm_cmd(char *buf,int size,const char *format, ...);
 
 typedef enum cm_alarm_id {
 	
@@ -116,7 +116,7 @@ typedef enum cm_alarm_id {
     AMARM_ID_FPOOL_RELEASE_SUCCESS = 40000003
 } cm_alarm_id_t;
 
-#define	CM_ALARM_CMD_T "/usr/sbin/ceres_cmd alarm "
+#define	CM_ALARM_CMD_T "ceres_cmd alarm "
 #define CM_ALARM_CMD_LEN 1024
 
 

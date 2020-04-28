@@ -848,6 +848,7 @@ fmd_run(fmd_t *dp, int pfd)
 
 	topo_fru_hash_create();
 	fmd_topo_init();
+	topo_fru_alarm_xml_init();
 
 	dp->d_xprt_ids = fmd_idspace_create("xprt_ids", 1, INT_MAX);
 	fmd_xprt_suspend_all();
