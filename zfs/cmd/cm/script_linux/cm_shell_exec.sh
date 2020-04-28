@@ -5,6 +5,8 @@ source '/var/cm/script/cm_common.sh'
 ZVOL_DIR='/dev/zvol'
 PROC_DISKSTATS='/proc/diskstats'
 FC_DIR='/sys/class/fc_host/'
+PROC_STMF_DIR="/proc/spl/kstat/stmf"
+
 #==============================================================================
 #调用说明
 #./cm_shell_exec.sh <functionname> <arg1> <arg2> <...>
@@ -455,7 +457,7 @@ function cm_pmm_get_lu()
     return $?    
 }
 
-function cm_pmm_lun()
+function cm_pmm_lun_back()
 {
     local full_name=$1
     local pool_name=`echo $full_name|awk -F'/' '{print $1}'`
@@ -487,6 +489,23 @@ function cm_pmm_lun()
     ((nread=$reads*$blocksize))
     echo "$nread $nwritten $reads $writes"
     return $?
+}
+
+function cm_pmm_lun()
+{
+#   echo "name      nread    nwritten reads    writes   wtime    wlentime wupdate  rtime    rlentime rupdate  wcnt     rcnt"
+    local name=$1
+    local luns=`ls $PROC_STMF_DIR |grep "stmf_lu_f"`
+    for lu in $luns
+    do
+        local lu_id=`echo "$lu" |awk -F'_' '{print $3}'`
+        local lu_name=`grep 'lun-alias' $PROC_STMF_DIR/$lu |awk '{print $3}'|sed 's:/dev/zvol/::g'`
+        if [ "X$lu_name" == "X$name" ];then
+            local lu_data=`sed -n 3p $PROC_STMF_DIR/stmf_lu_io_${lu_id}|awk '{printf $1" "$2" "$3" "$4}'`
+            echo "${lu_data}"
+        fi
+    done
+    return $CM_OK
 }
 
 function cm_pmm_lun_check()
