@@ -664,7 +664,7 @@ zpool_do_add(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for processing */
-	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, B_FALSE, dryrun,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
@@ -921,6 +921,7 @@ int
 zpool_do_create(int argc, char **argv)
 {
 	boolean_t force = B_FALSE;
+	boolean_t ignore_check = B_FALSE;
 	boolean_t dryrun = B_FALSE;
 	boolean_t enable_all_pool_feat = B_TRUE;
 	int c;
@@ -940,11 +941,14 @@ zpool_do_create(int argc, char **argv)
 	int pool_success = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":fndR:m:o:O:t:")) != -1) {
+	while ((c = getopt(argc, argv, ":fbndR:m:o:O:t:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
 			break;
+		case 'b':
+			ignore_check = B_TRUE;
+			break;	
 		case 'n':
 			dryrun = B_TRUE;
 			break;
@@ -1073,7 +1077,7 @@ zpool_do_create(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for bulk processing */
-	nvroot = make_root_vdev(NULL, props, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(NULL, props, force, !force, ignore_check, B_FALSE, dryrun,
 	    argc - 1, argv + 1);
 	if (nvroot == NULL)
 		goto errout;
@@ -4544,7 +4548,7 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 		return (1);
 	}
 
-	nvroot = make_root_vdev(zhp, props, force, B_FALSE, replacing, B_FALSE,
+	nvroot = make_root_vdev(zhp, props, force, B_FALSE, B_FALSE, replacing, B_FALSE,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
