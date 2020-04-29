@@ -47,7 +47,7 @@ function cm_cnm_cifs_getbatch()
     #获取结束行号
     ((total=$offset+$total-1))
     
-    local rows=`getfacl -cp "$dir" 2>/dev/null |sed -n "${offset},${total}p"`
+    local rows=`getfacl -cp "$dir"|egrep -v '::' 2>/dev/null |sed -n "${offset},${total}p"`
     for row in $rows
     do
         #使用:分割
