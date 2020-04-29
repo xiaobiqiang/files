@@ -899,6 +899,7 @@ struct qla_tgt_sess {
 
 	uint8_t port_name[WWN_SIZE];
 	struct work_struct free_work;
+	int in_unreg_process;
 };
 
 struct qla_dbuf_para {

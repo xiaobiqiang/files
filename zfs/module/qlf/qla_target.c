@@ -450,7 +450,9 @@ void qlt_unreg_sess(struct qla_tgt_sess *sess)
 {
 	struct scsi_qla_host *vha = sess->vha;
 
+	/*
 	vha->hw->tgt.tgt_ops->clear_nacl_from_fcport_map(sess);
+	*/
 
 	list_del(&sess->sess_list_entry);
 	if (sess->deleted)
@@ -839,6 +841,7 @@ static struct qla_tgt_sess *qlt_create_sess(
 	sess->s_id = fcport->d_id;
 	sess->loop_id = fcport->loop_id;
 	sess->local = local;
+	sess->in_unreg_process = 0;
 
 	ql_dbg(ql_dbg_tgt_mgt, vha, 0xf006,
 	    "Adding sess %p to tgt %p via ->check_initiator_node_acl()\n",
@@ -5333,6 +5336,46 @@ qlt_free_atio(void *fca_cmd)
 	}
 }
 
+void
+qlt_logout_session(struct fct_local_port *port, uint8_t *irp_port_name, int size)
+{
+	struct scsi_qla_host *vha = (struct scsi_qla_host *)port->port_fca_private;
+	struct qla_hw_data *ha = vha->hw;
+	struct qla_tgt_sess *sess;
+	unsigned long flags = 0;
+	fc_port_t *fcport, *tfcport;
+	
+	printk("%s port %8phC\n", __func__, irp_port_name);
+	
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	list_for_each_entry(sess, &ha->tgt.qla_tgt->sess_list,
+		sess_list_entry) {
+		if (!memcmp(sess->port_name, irp_port_name, size)) {
+			if (sess->in_unreg_process == 0) {
+				sess->in_unreg_process = 1;
+				qlt_unreg_sess(sess);
+			} else {
+				printk("%s attention: port %8phC is in unreg process\n",
+					__func__, irp_port_name);
+			}
+			
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	list_for_each_entry_safe(fcport, tfcport, &vha->vp_fcports, list) {
+		if (fcport->port_type == FCT_INITIATOR &&
+			!memcmp(fcport->port_name, irp_port_name, size)) {
+			list_del(&fcport->list);
+			qla2x00_clear_loop_id(fcport);
+			kfree(fcport);
+			break;
+		}
+	}
+}
+
+
 
 /********************************** basic func ****************************************/
 int
@@ -6169,6 +6212,7 @@ qlt_port_start(void* arg)
 	port->port_populate_hba_details = qlt_populate_hba_fru_details;
 	port->port_info = qlt_info;
 	port->port_free_atio = qlt_free_atio;
+	port->port_logout_session = qlt_logout_session;
 	port->port_fca_version = FCT_FCA_MODREV_1;
 
 	if ((ret = fct_register_local_port(port)) != FCT_SUCCESS) {
