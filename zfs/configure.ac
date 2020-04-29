@@ -170,6 +170,7 @@ AC_CONFIG_FILES([
 	cmd/fm/fmdump/common/Makefile
 	cmd/fm/fmadm/Makefile
 	cmd/fm/fmadm/common/Makefile
+	cmd/fm/fm_simulate/Makefile
 	cmd/fm/modules/Makefile
 	cmd/fm/modules/common/Makefile
 	cmd/fm/modules/common/zfs-retire/Makefile

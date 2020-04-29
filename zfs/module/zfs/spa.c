@@ -7904,7 +7904,6 @@ spa_raidz_aggre_vdev_state(spa_t * spa, int aggre_num)
 	return (state);
 }
 
-
 #if defined(_KERNEL) && defined(HAVE_SPL)
 /* state manipulation functions */
 EXPORT_SYMBOL(spa_open);

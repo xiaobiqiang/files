@@ -2327,6 +2327,20 @@ zfs_do_hbx_process_ex(libzfs_handle_t * hdl, char * buffer, int size,
 	}
 }
 
+int 
+zfs_fm_simulate(libzfs_handle_t *hdl, char *diskname, int fault)
+{
+	zfs_cmd_t zc = {"\0"};
+	int err;
+
+	bzero(&zc, sizeof(zfs_cmd_t));
+	strncpy(zc.zc_name, diskname, strlen(diskname));
+	zc.zc_perm_action = fault;
+
+	err = ioctl(hdl->libzfs_fd, ZFS_IOC_FM_SIMULATE, &zc);
+	return (err);
+}
+
 int
 get_clusnodename(char *buf, int len)
 {
