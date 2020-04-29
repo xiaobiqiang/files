@@ -431,7 +431,7 @@ static void print_slices(char *diskname, dmg_map_t map, dmg_lun_t *lun);
 static int disk_mark(slice_req_t *);
 static int disk_clear_mark(slice_req_t *);
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
-extern int disk_get_poolname(const char *dev,char *pool_name);
+extern int disk_get_poolname(const char *dev,char *pool_name,int size);
 
 typedef struct zpool_list zpool_list_t;
 
@@ -894,7 +894,7 @@ int zpool_get_vdev_by_path(nvlist_t *nv,char *init_diskpath)
 			&child, &children) != 0) {
 			verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
 		
-				/*printf("path=%s;oldpath = %s\n",path,init_diskpath);*/
+				//printf("path=%s;oldpath = %s\n",path,init_diskpath);
 			if (strncmp(init_diskpath,path,strlen(init_diskpath)) == 0)
 				return 1;
 			return (0);
@@ -943,7 +943,7 @@ static int disk_analyze_partition(const char *dev)
 	}
 	
 	/* get pool name */
-	ret = disk_get_poolname(dev,pool_name);
+	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	
 	tmp_gzfs = libzfs_init();
 	/* check pool is exist or not */
@@ -1589,13 +1589,13 @@ static int disk_check_inuse(const char *dev)
 	char pool_name[256] = {0};
 	int ret;
 
-	if (strncmp(dev, "/dev/rdsk/", 10) != 0){
+	if (strncmp(dev, "/dev/disk/by-id/", 16) != 0){
 		printf("can't find the disk please check it\n");
 		return (-1);
 	}
 
 	/* get pool name */
-	ret = disk_get_poolname(dev,pool_name);
+	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	if (ret == 1) {
 		printf("the disk is inuse by %s pool,can't restore\n",pool_name);
 		return (-1);
@@ -1614,7 +1614,7 @@ disk_restore_init(slice_req_t *req)
 	int ret;
 	libzfs_handle_t *tmp_gzfs;
 
-	if (strncmp(req->disk_name, "/dev/rdsk/", 10) != 0) {
+	if (strncmp(req->disk_name, "/dev/disk/by-id/", 16) != 0) {
 		printf("can't find the disk please check it\n");
 		return (-1);
 	}
