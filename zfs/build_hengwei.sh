@@ -29,6 +29,11 @@ done
 if [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "deepin GNU/Linux 15.0 (kui)" ]; then 
 	[ ! -f /usr/bin/sw_64sw6-sunway-linux-gnu-gcc ] && ln -s /usr/bin/gcc /usr/bin/sw_64sw6-sunway-linux-gnu-gcc
 	[ ! -f /usr/bin/sw_64sw6-sunway-linux-gnu-ld ] && ln -s /usr/bin/ld /usr/bin/sw_64sw6-sunway-linux-gnu-ld
+	[ ! -f /usr/bin/sw_64sw6-unknown-linux-gnu-ar ]&& ln -s /usr/bin/ar /usr/bin/sw_64sw6-unknown-linux-gnu-ar
+	[ ! -f /usr/bin/sw_64sw6-unknown-linux-gnu-nm ]&& ln -s /usr/bin/nm /usr/bin/sw_64sw6-unknown-linux-gnu-nm
+	[ ! -f /usr/bin/sw_64sw6-unknown-linux-gnu-strip ]&& ln -s /usr/bin/strip /usr/bin/sw_64sw6-unknown-linux-gnu-strip
+	[ ! -f /usr/bin/sw_64sw6-unknown-linux-gnu-objdump ]&& ln -s /usr/bin/objdump /usr/bin/sw_64sw6-unknown-linux-gnu-objdump
+	[ ! -f /usr/bin/sw_64sw6-unknown-linux-gnu-objcopy ]&& ln -s /usr/bin/objcopy /usr/bin/sw_64sw6-unknown-linux-gnu-objcopy
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-gcc ]&& ln -s /usr/bin/gcc /usr/bin/sw_64sw2-unknown-linux-gnu-gcc
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-ld ]&& ln -s /usr/bin/ld /usr/bin/sw_64sw2-unknown-linux-gnu-ld
 	[ ! -f /usr/bin/sw_64sw2-unknown-linux-gnu-ar ]&& ln -s /usr/bin/ar /usr/bin/sw_64sw2-unknown-linux-gnu-ar
