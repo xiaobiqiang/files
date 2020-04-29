@@ -2038,12 +2038,19 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
     char *sum_err, char *en_id, char *slot_id, char *type, char *total_buf)
 {
 	xmlNodePtr node;
+	char * n = NULL;
 
 	if (strcmp(type, "root") == 0)
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"data", NULL);
 	else
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"vdev", NULL);
 
+	n = strchr(name,(int)'-');
+	if(n)
+	{
+		*n = '\0';
+	}
+	
 	xmlSetProp(node, (xmlChar *)"name", (xmlChar *) name);
 	xmlSetProp(node, (xmlChar *)"state", (xmlChar *) state);
 	if (strcmp(type, "root") == 0)
