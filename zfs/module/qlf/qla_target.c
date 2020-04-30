@@ -5336,6 +5336,7 @@ qlt_free_atio(void *fca_cmd)
 	}
 }
 
+/*
 void
 qlt_logout_session(struct fct_local_port *port, uint8_t *irp_port_name, int size)
 {
@@ -5374,7 +5375,7 @@ qlt_logout_session(struct fct_local_port *port, uint8_t *irp_port_name, int size
 		}
 	}
 }
-
+*/
 
 
 /********************************** basic func ****************************************/
@@ -6212,7 +6213,9 @@ qlt_port_start(void* arg)
 	port->port_populate_hba_details = qlt_populate_hba_fru_details;
 	port->port_info = qlt_info;
 	port->port_free_atio = qlt_free_atio;
+	/*
 	port->port_logout_session = qlt_logout_session;
+	*/
 	port->port_fca_version = FCT_FCA_MODREV_1;
 
 	if ((ret = fct_register_local_port(port)) != FCT_SUCCESS) {
