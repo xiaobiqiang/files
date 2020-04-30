@@ -18,6 +18,7 @@ typedef enum Mlsas_ioc {
 	Mlsas_Ioc_Diesvc,
 	Mlsas_Ioc_Newminor,
 	Mlsas_Ioc_Attach,
+	Mlsas_Ioc_Aggr_Virt,
 	Mlsas_Ioc_Last
 } Mlsas_ioc_e;
 
