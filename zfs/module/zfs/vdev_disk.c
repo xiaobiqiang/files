@@ -99,7 +99,7 @@ static int vdev_ev_mgt_register(vdev_t *vd)
     list_add_tail(&vdev_ev->list, &vdev_ev_mgt_list);
     spin_unlock(&vdev_ev_mgt_lock);
 
-    printk(KERN_ERR "register vdev:%s, wwn:%s[%s]\n", vd->vdev_path, vdev_ev->wwn_str, __func__);
+    //printk(KERN_ERR "register vdev:%s, wwn:%s[%s]\n", vd->vdev_path, vdev_ev->wwn_str, __func__);
 
     return 0;
 }
@@ -122,7 +122,7 @@ static int vdev_ev_mgt_unregister(vdev_t *vd)
     if(found == FALSE)
         return -1;
 
-    printk(KERN_ERR "unregister vdev:%s[%s]\n", vd->vdev_path, __func__);
+    //printk(KERN_ERR "unregister vdev:%s[%s]\n", vd->vdev_path, __func__);
 
     spa_strfree(vdev_ev->vdev_path);
     kmem_free(vdev_ev, sizeof (vdev_ev_mgt_t));
