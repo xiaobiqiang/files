@@ -274,7 +274,7 @@ function cm_lun_delete()
             return $CM_ERR_LUNMAP_EXISTS
         fi
     else
-        return $CM_ERR_NOT_EXISTS
+        CM_LOG "[${FUNCNAME}:${LINENO}]$pool/$lun lu not found"
     fi
     sleep 2
     zfs destroy -rRf $pool/$lun
