@@ -71,6 +71,7 @@ static int vdev_ev_mgt_register(vdev_t *vd)
     struct block_device *bdev = NULL;
     char *wwn_key = "scsi-3";
     char *wwn_pos = NULL;
+    unsigned long flags;
 
     wwn_pos = strstr(vd->vdev_path, wwn_key);
     if(wwn_pos == NULL) {
@@ -95,11 +96,11 @@ static int vdev_ev_mgt_register(vdev_t *vd)
         return -1;
     }
 
-    spin_lock(&vdev_ev_mgt_lock);
+    spin_lock_irqsave(&vdev_ev_mgt_lock, flags);
     list_add_tail(&vdev_ev->list, &vdev_ev_mgt_list);
-    spin_unlock(&vdev_ev_mgt_lock);
+    spin_unlock_irqrestore(&vdev_ev_mgt_lock, flags);
 
-    //printk(KERN_ERR "register vdev:%s, wwn:%s[%s]\n", vd->vdev_path, vdev_ev->wwn_str, __func__);
+    printk(KERN_ERR "reg vdev[%s]\n", vdev_ev->wwn_str);
 
     return 0;
 }
@@ -108,8 +109,9 @@ static int vdev_ev_mgt_unregister(vdev_t *vd)
 {
     vdev_ev_mgt_t *vdev_ev = NULL;
     int found = FALSE;
+    unsigned long flags;
 
-    spin_lock(&vdev_ev_mgt_lock);
+    spin_lock_irqsave(&vdev_ev_mgt_lock, flags);
     list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
         if(vdev_ev->vd == vd) {
             list_del_init(&vdev_ev->list);
@@ -117,12 +119,12 @@ static int vdev_ev_mgt_unregister(vdev_t *vd)
             break;
         }
     }
-    spin_unlock(&vdev_ev_mgt_lock);
+    spin_unlock_irqrestore(&vdev_ev_mgt_lock, flags);
 
     if(found == FALSE)
         return -1;
 
-    //printk(KERN_ERR "unregister vdev:%s[%s]\n", vd->vdev_path, __func__);
+    printk(KERN_ERR "unreg vdev[%s]\n", vdev_ev->wwn_str, __func__);
 
     spa_strfree(vdev_ev->vdev_path);
     kmem_free(vdev_ev, sizeof (vdev_ev_mgt_t));
@@ -177,13 +179,14 @@ static vdev_t* find_vdev_by_sas_addr(u64 sas_addr)
 {
     vdev_ev_mgt_t *vdev_ev = NULL;
     vdev_t  *ret = NULL;
+    unsigned long flags;
     /*char sas_wwn_str[WWN_STRLEN] = {0};
 
     sprintf(sas_wwn_str, "%016llx", sas_addr);
     printk(KERN_ERR "find for sas addr:0x%s\n", sas_wwn_str);
     printk(KERN_ERR "find for sas addr:0x%llx\n", sas_addr);*/
 
-    spin_lock(&vdev_ev_mgt_lock);
+    spin_lock_irqsave(&vdev_ev_mgt_lock, flags);
     list_for_each_entry(vdev_ev, &vdev_ev_mgt_list, list) {
         /*printk(KERN_ERR "iterate sas wwn:%s\n", vdev_ev->wwn_str);
         if(wwnstr_match(vdev_ev->wwn_str, sas_wwn_str)) {
@@ -193,7 +196,7 @@ static vdev_t* find_vdev_by_sas_addr(u64 sas_addr)
             break;
         }
     }
-    spin_unlock(&vdev_ev_mgt_lock);
+    spin_unlock_irqrestore(&vdev_ev_mgt_lock, flags);
 
     return ret;
 }
