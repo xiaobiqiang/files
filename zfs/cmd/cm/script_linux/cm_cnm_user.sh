@@ -2,13 +2,28 @@
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
 
+function cm_cnm_user_update_smbpasswd()
+{
+	local user=$1
+    local pwd=$2
+
+/usr/bin/expect<<-EOF
+spawn smbpasswd $user
+expect "*password:"
+send "$pwd\r"
+expect "*password:"
+send "$pwd\r"
+expect eof
+EOF
+}
+
 function cm_cnm_user_insert_pwd()
 {
 	local user=$1
 	local pwd=$2
 
     echo $user:$pwd | chpasswd
-
+    cm_cnm_user_update_smbpasswd $user $pwd
 }
 
 function cm_cnm_user_insert()
