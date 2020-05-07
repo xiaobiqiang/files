@@ -336,7 +336,7 @@ void* cm_cnm_user_update_pwd(void* arg)
 {
     cm_cnm_user_info_t* info = (cm_cnm_user_info_t *)arg;
 
-    cm_system("%s insert_pwd %s %s",cm_cnm_user_sh,info->name,info->pwd);
+    cm_system("%s insert_pwd '%s' '%s'",cm_cnm_user_sh,info->name,info->pwd);
     
     CM_FREE(info);
     return NULL;
