@@ -65,6 +65,7 @@
 #define Mlsas_Rst_PR_ReadA_Error	0x11
 #define Mlsas_Rst_PR_Complete_OK	0x12
 #define Mlsas_Rst_Done			0x13
+#define Mlsas_Rst_Abort_Diskio			0x14
 
 #define Mlsas_Devevt_To_Attach		0x01
 #define Mlsas_Devevt_Attach_Error	0x02
