@@ -444,7 +444,7 @@ static boolean_t __Mlsas_Dequeue_RTX(Mlsas_rtx_wq_t *wq, list_t *l)
 {
 	spin_lock_irq(&wq->rtq_lock);
 	list_move_tail(l, &wq->rtq_list);
-	spin_lock_irq(&wq->rtq_lock);
+	spin_unlock_irq(&wq->rtq_lock);
 
 	return !list_is_empty(l);
 }
