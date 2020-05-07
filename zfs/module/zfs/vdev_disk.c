@@ -981,12 +981,12 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 
     vd = find_vdev_by_sas_addr(sas_address);
     if(vd == NULL) {
-        printk( "event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
+        printk(KERN_ERR "event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
                     evt_type, sas_address, __FILE__, __LINE__);
         return NOTIFY_DONE;     /* Don't care */
     }
 
-    printk( "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
+    printk(KERN_ERR "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
                 evt_type, sas_address, vd->vdev_path, __FILE__, __LINE__);
 
 	switch(val) {
@@ -1002,13 +1002,13 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
         break;
 
     case SAS_EVT_DEV_NORESP:
-        zfs_ereport_post(FM_EREPORT_ZFS_DEV_NORESP, vd->vdev_spa, vd, NULL, 0, 0);
+        zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_NORESP, vd->vdev_spa, vd, NULL, 0, 0);
         break;
 
     case SAS_EVT_DEV_SMART_FAIL:
-        zfs_ereport_post(FM_EREPORT_ZFS_DEV_SMART_FAIL, vd->vdev_spa, vd, NULL, 0, 0);
+        zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_SMART_FAIL, vd->vdev_spa, vd, NULL, 0, 0);
         break;
-    
+
     default :
         break;
     }
