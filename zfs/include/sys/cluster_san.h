@@ -392,6 +392,7 @@ typedef struct cluster_target_port {
 	cluster_target_tran_data_free_t f_tran_free;
 	cluster_target_tran_data_fragment_t f_tran_fragment;
 	cluster_target_tran_data_fragment_t f_tran_fragment_sgl;
+	cluster_target_tran_data_fragment_t f_tran_fragment_bio;
 	cts_tran_start_t f_session_tran_start;
 	cts_tran_start_t f_session_tran_sgl_start;
 	cluster_target_session_init_t f_session_init;
@@ -551,6 +552,9 @@ boolean_t cluster_host_need_failover(uint32_t hostid);
 void cluster_san_broadcast_send(
 	void *data, uint64_t len, void *header, uint64_t header_len,
 	uint8_t msg_type, int pri);
+int cluster_san_host_send_bio(cluster_san_hostinfo_t *cshi,
+	void *data, uint64_t len, void *header, uint64_t header_len,
+	uint8_t msg_type, int pri, boolean_t need_reply, int retry_times);
 
 void cluster_set_host_ipmi_ip(uint32_t hostid, char *ipmi_ipaddr);
 void cluster_send_ipmi_ip(uint32_t hostid, char *ipmi_ipaddr);

@@ -288,6 +288,18 @@ cluster_target_init_skb(cluster_target_port_mac_t *port_mac,
 				skb->data_len += mblk->fragment_len;
 				skb->truesize += mblk->fragment_len;
 			}			
+		} else if (mblk->is_bio) {
+			struct bio_vec *bv = (struct bio_vec *)mblk->fragment_data;
+			if (bv) {
+                struct page *page = bv->bv_page;
+				BUG_ON(!page);
+                get_page(page);
+				skb_fill_page_desc(skb, skb_shinfo(skb)->nr_frags,
+					page, bv->bv_offset, bv->bv_len);
+				skb->len += bv->bv_len;
+				skb->data_len += bv->bv_len;
+				skb->truesize += bv->bv_len;
+			}	
 		} else {
 			skb_put(skb, mblk->fragment_len);
 			memcpy(skb->data, mblk->fragment_data, mblk->fragment_len);
@@ -671,6 +683,117 @@ static int cluster_target_mac_tran_data_fragment_sgl(
 		if(sg)
 			sg = sg_next(sg);
 	}while(sg!=NULL && remain);
+
+end_of_count_frarray:	
+	*fragmentations = data_array;
+	*cnt = fragment_cnt;
+	
+	return (0);
+}
+
+static int cluster_target_mac_tran_data_fragment_bio(
+	void *src, void *dst, cluster_tran_data_origin_t *origin_data,
+	cluster_target_tran_data_t **fragmentations, int *cnt)
+{
+	int fragment_cnt = 0;
+	int do_fragment_cnt = 0;
+	uint16_t ex_len;
+	uint64_t fragment_offset = 0;
+	int fragment_len = 0;
+	boolean_t has_frag = B_FALSE;
+	mblk_t *head_mp = NULL;
+	struct ether_header *eth_head;
+	cluster_target_msg_header_t *ct_head;
+	struct page *page = NULL;
+	struct bio *bio;
+	struct bio_vec bvec, *bv;
+	struct bvec_iter iter;
+	size_t head_len = sizeof(struct ether_header) +
+		sizeof(cluster_target_msg_header_t);
+	cluster_target_mac_tran_data_t *mac_tran_data;
+	cluster_target_tran_data_t *data_array = NULL;
+	cluster_target_port_mac_t *port_mac = src;
+	cluster_target_session_mac_t *sess_mac = dst;
+	int remain = origin_data->data_len;
+	boolean_t is_first = B_TRUE;
+	
+	bio = (struct bio *)origin_data->data;
+	if (bio && bio->bi_vcnt) {
+		fragment_cnt = bio->bi_vcnt;
+		has_frag = B_TRUE;
+	}
+	else{
+		fragment_cnt = 1;
+	}
+
+	if (has_frag)
+		bv = kmem_zalloc(sizeof(struct bio_vec) * fragment_cnt, KM_SLEEP);
+	data_array = kmem_zalloc((sizeof(cluster_target_tran_data_t) * fragment_cnt),
+		KM_SLEEP);
+	ex_len = origin_data->header_len;
+
+	if (!has_frag) {
+		head_mp = cluster_target_mac_get_mblk(NULL, KM_SLEEP);
+		if (head_mp == NULL) {
+			fragment_cnt = 0;
+			printk(KERN_WARNING "%s: alloc mblk failed\n",	__func__);
+			goto end_of_count_frarray;
+		}
+
+		mac_tran_data = kmem_zalloc(sizeof(cluster_target_mac_tran_data_t), KM_SLEEP);
+		mac_tran_data->mp = head_mp;
+		head_mp->origin_data = origin_data;
+		head_mp->is_bio = B_TRUE;
+		head_mp->is_first = is_first;
+		head_mp->is_sgl = B_FALSE;
+		head_mp->dst = dst;
+		head_mp->fragment_offset = fragment_offset;
+		head_mp->fragment_len = fragment_len = 0;
+		head_mp->fragment_data = NULL;		
+		mac_tran_data->len = head_len + ex_len + fragment_len;		
+		data_array[do_fragment_cnt].fragmentation = mac_tran_data;
+		if (is_first)
+			is_first = B_FALSE;
+		
+		if (ex_len)
+			ex_len = 0;
+		do_fragment_cnt++;
+		fragment_offset += fragment_len;
+		remain -= fragment_len;
+	} else {
+		bio_for_each_segment(bvec, bio, iter) {
+			head_mp = cluster_target_mac_get_mblk(NULL, KM_SLEEP);
+			if (head_mp == NULL) {
+				fragment_cnt = 0;
+				printk(KERN_WARNING "%s: alloc mblk failed\n",	__func__);
+				goto end_of_count_frarray;
+			}	
+	
+			mac_tran_data = kmem_zalloc(sizeof(cluster_target_mac_tran_data_t), KM_SLEEP);
+			mac_tran_data->mp = head_mp;
+			head_mp->origin_data = origin_data;
+			head_mp->is_bio = B_TRUE;
+			head_mp->is_sgl = B_FALSE;
+			head_mp->is_first = is_first;
+			head_mp->dst = dst;
+			head_mp->fragment_offset = fragment_offset;
+			fragment_len = min((size_t)bvec.bv_len, remain);
+			head_mp->fragment_len = fragment_len;
+			*(bv + do_fragment_cnt) = bvec;
+			head_mp->fragment_data = bv + do_fragment_cnt;
+			mac_tran_data->len = head_len + ex_len + fragment_len;		
+			data_array[do_fragment_cnt].fragmentation = mac_tran_data;
+			if (is_first)
+				is_first = B_FALSE;
+			
+			if (ex_len)
+				ex_len = 0;
+			do_fragment_cnt++;
+			fragment_offset += fragment_len;
+			remain -= fragment_len;
+		}
+
+	}
 
 end_of_count_frarray:	
 	*fragmentations = data_array;
@@ -1351,6 +1474,7 @@ int cluster_target_mac_port_init(
 	ctp->f_tran_free = cluster_target_mac_tran_data_free;
 	ctp->f_tran_fragment = cluster_target_mac_tran_data_fragment;
 	ctp->f_tran_fragment_sgl= cluster_target_mac_tran_data_fragment_sgl;
+	ctp->f_tran_fragment_bio= cluster_target_mac_tran_data_fragment_bio;
 	ctp->f_session_tran_start = cts_mac_tran_start;
 	ctp->f_session_init = cluster_target_mac_session_init;
 	ctp->f_session_fini = cluster_target_mac_session_fini;
