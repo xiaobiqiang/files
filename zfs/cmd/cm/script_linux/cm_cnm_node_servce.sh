@@ -6,7 +6,7 @@ source '/var/cm/script/cm_common.sh'
 
 UNDEFINE=0
 ONLINE=1
-OFFLINE=2
+OFFLINE=0
 PARTONLNE=3
 MAINTENANCE=4
 TRANSITION=5

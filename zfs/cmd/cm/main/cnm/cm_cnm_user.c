@@ -780,7 +780,7 @@ sint32 cm_cnm_group_delete(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         return CM_ERR_NOT_EXISTS;
     }
     id = (uint64)cm_exec_int("cat /etc/group | grep '^%s:' | awk -F':' '{printf $3}'",info->name);
-    if(id<100||id>1000)
+    if(id<100||id>5000)
     {
         return CM_PARAM_ERR;
     }

@@ -102,29 +102,55 @@ function cm_cnm_phys_ip_create()
     local ip=$1
     local netmask=$2
     local interface=$3
-    local dir='/etc/sysconfig/network-scripts/ifcfg-'
+    local os_type=`cm_systerm_version_get`
     local iRet=$CM_OK
     check_ip $ip
     if [ $? -ne $CM_OK ];then
         return $CM_PARAM_ERR
     fi
-    #echo "DEVICE=$interface" > $dir$interface
-    #echo "ONBOOT=yes" >> $dir$interface
-    #echo "BOOTPROTO=static" >> $dir$interface
-    #echo "IPADDR=$ip" >> $dir$interface
-    #if [ $netmask = 'null' ]; then
-    #    echo "NETMASK=255.255.255.0" >> $dir$interface
-    #else
-    #    echo "NETMASK=$netmask" >> $dir$interface
-    #fi
-
+    ###### 对应例如eth0:1这种情形 #########
+    # local sec_port=`echo $interface |grep ':'|wc -l`
+    # if [ $sec_port -eq 1 ];then
+    #    if [ $netmask = 'null' ]; then
+    #        ifconfig $interface $ip 
+    #    else
+    #        ifconfig $interface $ip netmask $netmask 
+    #    fi
+    #    iRet=$?
+    #    return $iRet
+    # fi
+    
+    if [ $os_type -ne $CM_OS_TYPE_DEEPIN ];then
+        local dir='/etc/sysconfig/network-scripts/ifcfg-'
+        echo "DEVICE=$interface" > $dir$interface
+        echo "ONBOOT=yes" >> $dir$interface
+        echo "BOOTPROTO=static" >> $dir$interface
+        echo "IPADDR=$ip" >> $dir$interface
+        if [ $netmask = 'null' ]; then
+            echo "NETMASK=255.255.255.0" >> $dir$interface
+        else
+            echo "NETMASK=$netmask" >> $dir$interface
+        fi
+    else
+        local dir='/etc/network/interfaces'
+        echo "auto $interface" >> $dir
+        echo "allow-hotplug $interface" >> $dir
+        echo "iface $interface inet static" >> $dir
+        echo "address $ip" >> $dir
+        if [ $netmask = 'null' ]; then
+            echo "netmask 255.255.255.0" >> $dir
+        else
+            echo "netmask $netmask" >> $dir
+        fi
+    
+    fi
+    
     if [ $netmask = 'null' ]; then
         ifconfig $interface $ip 
     else
         ifconfig $interface $ip netmask $netmask 
     fi
     iRet=$?
-
     return $iRet
 }
 
