@@ -100,6 +100,7 @@ static void __Mlsas_RX_Brw_Rsp(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
 static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
 static void __Mlsas_Partion_Map_toTtl(Mlsas_request_t *rq);
 static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb);
+static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
 
 
 static uint32_t Mlsas_npending = 0;
@@ -488,7 +489,7 @@ static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip)
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
 	__Mlsas_Do_Failoc_impl(Mlb);
-	kref_get(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
 failed_out:
 	if (invlp)
 		nvlist_free(invlp);
