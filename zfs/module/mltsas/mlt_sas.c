@@ -116,13 +116,18 @@ static const char *Mlsas_devst_name[Mlsas_Devst_Last] = {
 static const char *Mlsas_devevt_name[Mlsas_Devevt_Last] = {
 	[Mlsas_Devevt_To_Attach] 		= 	"To_Attach_Phys",
 	[Mlsas_Devevt_Attach_Error]		= 	"Attach_Error",
-	[Mlsas_Devevt_Attach_OK]		=	"Attach_OK"
+	[Mlsas_Devevt_Attach_OK]		=	"Attach_OK",
+	[Mlsas_Devevt_Attach_Local]		=	"Local_Attach",
+	[Mlsas_Devevt_Attach_PR]		=	"Peer_Attach",
+	[Mlsas_Devevt_Error_Switch]		=	"Error_Switch",
+	[Mlsas_Devevt_PR_Error_Sw]		=	"Peer_Error_Switch"
 };
 
 static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
 	[Mlsas_Mms_None] 		=	NULL,
 	[Mlsas_Mms_Attach]		=	__Mlsas_RX_Attach,
 	[Mlsas_Mms_Bio_RW]		= 	__Mlsas_RX_Bio_RW,
+	[Mlsas_Mms_Brw_Rsp]		=	__Mlsas_RX_Brw_Rsp,
 };
 
 static int Mlsas_Disk_Open(struct block_device *, fmode_t);

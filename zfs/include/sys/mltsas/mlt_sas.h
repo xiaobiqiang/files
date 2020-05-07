@@ -351,11 +351,8 @@ struct Mlsas {
 /* Message Type Define */
 #define Mlsas_Mms_None			0x00
 #define Mlsas_Mms_Attach		0x01
-#define Mlsas_Mms_Aggr_Virt 	0x02
-#define Mlsas_Mms_Aggr_Rsp 		0x03
-#define Mlsas_Mms_Bio_RW		0x04
-#define Mlsas_Mms_Bio_Disc		0x05
-#define Mlsas_Mms_Brw_Rsp		0x06
+#define Mlsas_Mms_Bio_RW		0x02
+#define Mlsas_Mms_Brw_Rsp		0x03
 #define Mlsas_Mms_Last			0x10
 
 #define Mlsas_RXfl_Sync			0x01
