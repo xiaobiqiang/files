@@ -364,7 +364,7 @@ void __Mlsas_Queue_RTX(Mlsas_rtx_wq_t *wq, Mlsas_rtx_wk_t *wk)
 	list_insert_tail(&wq->rtq_list, wk);
 	spin_unlock_irqrestore(&wq->rtq_lock, flags);
 	
-	wake_up(&wq->rtq_lock);
+	wake_up(&wq->rtq_wake);
 }
 
 int __Mlsas_RTx(Mlsas_thread_t *thi)
