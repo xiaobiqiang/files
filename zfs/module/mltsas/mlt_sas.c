@@ -664,6 +664,7 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 
 	__Mlsas_Attach_BDI(&Mlb->Mlb_bdi, path, phys);
 	__Mlsas_Attach_Virt_Queue(Mlb);
+	__Mlsas_Attach_Phys_size(Mlb);
 
 	__Mlsas_Thread_Start(&Mlb->Mlb_tx);
 	__Mlsas_Thread_Start(&Mlb->Mlb_rx);
@@ -674,6 +675,8 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Attach_OK);
 	st = Mlb->Mlb_st;
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
+
+	set_disk_ro(Mlb->Mlb_gdisk, 0);
 
 	mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t),
 		Mlsas_Mms_Attach, Mlb->Mlb_hashkey, &Atm);
