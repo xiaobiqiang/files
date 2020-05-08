@@ -281,6 +281,13 @@ function cm_topo_cache_update()
     local datestr=`date "+%Y%m%d%H%M%S"`
     local tmpfile="/tmp/cm_fmdtopo_$datestr.data"
     local fmdtopoexec='/usr/lib/fm/fmd/fmtopo'
+    
+    which fmtopo >/dev/null
+    local iRet=$?
+    if [ $iRet -eq $CM_OK ]; then
+        fmdtopoexec='fmtopo'
+    fi
+    
     local dbfile=$CM_DEVICE_DB
     
     if [ ! -f $dbfile ]; then

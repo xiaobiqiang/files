@@ -24,6 +24,8 @@
 
 #define SCSIHOST_DIR "/sys/class/scsi_host"
 #define MPT3CTL_DEV  "/dev/mpt3ctl"
+#define MPT2CTL_DEV  "/dev/mpt2ctl"
+
 
 typedef enum mpt_type {
     MPT2SAS,
@@ -198,7 +200,7 @@ static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
     while ( (dirent = readdir(dir)) != NULL ) {
         char filename[512];
         char procname[8];
-        char dev_num[8];
+        char dev_num[8] = {0};
 
         snprintf(filename, sizeof(filename), "%s/%s/proc_name", SCSIHOST_DIR, dirent->d_name);
 
@@ -239,6 +241,7 @@ static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
 
         close(fd);
 
+#ifdef USE_HENGWEI
         /* fetch scsi host sas device number. */
         snprintf(filename, sizeof(filename), "%s/%s/host_sas_dev_cnt", SCSIHOST_DIR, dirent->d_name);
 
@@ -253,6 +256,7 @@ static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
             continue;
 
         close(fd);
+#endif
 
         if (ids_idx == ids_sz)
         {
@@ -291,10 +295,18 @@ static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, mpt3simu_action_e action, 
     mpt_ioc_t *ids = NULL;
     int ids_nr = 0;
     int idx = 0;
+    char *mpt_ctl_dev;
+    
+#ifdef USE_HENGWEI
+    mpt_ctl_dev = MPT3CTL_DEV;
+#else
+    mpt_ctl_dev = MPT2CTL_DEV;
+#endif
 
-    int fd = open(MPT3CTL_DEV, O_RDWR);
+
+    int fd = open(mpt_ctl_dev, O_RDWR);
 	if (fd < 0) {
-		syslog(LOG_ERR, "Failed to open mpt device %s: %d (%m)", MPT3CTL_DEV, errno);
+		syslog(LOG_ERR, "Failed to open mpt device %s: %d (%m)", mpt_ctl_dev, errno);
 		return -1;
 	}
     

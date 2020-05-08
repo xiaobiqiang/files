@@ -1069,12 +1069,13 @@ extern uint_t num_metas(nvlist_t *nv);
 extern uint_t num_lows(nvlist_t *nv);
 extern void zpool_check_thin_luns(zfs_thinluns_t **statpp);
 extern void zfs_check_thin_luns(zfs_thin_luns_stat_t **statpp);
-extern int zfs_check_raidz_aggre_valid(nvlist_t *nv);
+extern int zfs_check_raidz_aggre_valid(nvlist_t *nv, nvlist_t *old);
 
 extern void cluster_log_init(const char *execname, const char * logpath,
 	int log_level, int log_flags);
 extern void cluster_log_framework(int severity, const char *format, ...);
 extern void trace_dbgmsgs_init(const char *script_path);
+extern int zfs_fm_simulate(libzfs_handle_t *hdl, char *diskname, int fault);
 
 #ifdef	__cplusplus
 }

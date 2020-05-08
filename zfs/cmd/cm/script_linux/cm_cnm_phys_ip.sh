@@ -184,7 +184,7 @@ function cm_cnm_phys_ip_physgetbatch()
         else
             duplex='half'
         fi
-        local speed=`mii-tool $name 2>/dev/null|grep baseT|awk '{print $3}'|sed 's/baseT-FD//g'`
+        local speed=`ethtool $name|grep Speed|awk '{printf("%u\n",$2)}'`
         if [ "X" = "X"$speed ]; then
             speed=0
         fi
@@ -200,7 +200,7 @@ function cm_cnm_phys_ip_physgetbatch()
 function cm_cnm_phys_ip_physget()
 {
     local name=$1
-    local list=($(ip addr|grep -w mtu|grep -w eth0|grep -v lo|awk '{print $5" "$9}'))
+    local list=($(ip addr|grep -w mtu|grep -w '$name'|grep -v lo|awk '{print $5" "$9}'))
     local mtu=${list[0]}
     typeset -l state
     state=${list[1]}
@@ -211,7 +211,7 @@ function cm_cnm_phys_ip_physget()
     else
         duplex='half'
     fi
-    local speed=`mii-tool $name 2>/dev/null|grep baseT|awk '{print $3}'|sed 's/baseT-FD//g'`
+    local speed=`ethtool $name|grep Speed|awk '{printf("%u\n",$2)}'`
     if [ "X" = "X"$speed ]; then
         speed=0
     fi

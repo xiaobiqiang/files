@@ -3551,6 +3551,38 @@ vdev_deadman(vdev_t *vd)
 	}
 }
 
+boolean_t
+vdev_find_disk(vdev_t *vdev, char *disk_name, vdev_t **vdp)
+{
+	int i;
+	boolean_t find = B_FALSE;
+
+	if (vdev->vdev_children == 0) {
+		if (strstr(vdev->vdev_path, disk_name)) {
+			*vdp = vdev;
+			find = B_TRUE;
+		}
+	} else {
+		for (i = 0; i < vdev->vdev_children; i++) {
+			find = vdev_find_disk(vdev->vdev_child[i], disk_name, vdp);
+			if (find)
+				break;
+		}
+	}
+	
+	return (find);
+}
+
+void
+vdev_simulate_fault(vdev_t *vdev, char *event)
+{
+	zfs_ereport_post(event, vdev->vdev_spa, vdev, NULL, 0, 0);
+	zfs_post_remove(vdev->vdev_spa, vdev);
+	vdev->vdev_remove_wanted = B_TRUE;
+	spa_async_request(vdev->vdev_spa, SPA_ASYNC_REMOVE);
+}
+
+
 #if defined(_KERNEL) && defined(HAVE_SPL)
 EXPORT_SYMBOL(vdev_fault);
 EXPORT_SYMBOL(vdev_degrade);
