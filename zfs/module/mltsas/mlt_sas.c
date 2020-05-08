@@ -349,8 +349,9 @@ static int Mlsas_Do_EnableSvc(void)
 	retry->Mlt_workq = create_singlethread_workqueue("Mlsas_retry");
 	INIT_WORK(&retry->Mlt_work, __Mlsas_RQ_Retry);
 
-	csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
-	
+	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
+	(void) cts_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
+		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
 	
 	cmn_err(CE_NOTE, "Mltsas Enable Complete.");
@@ -893,6 +894,19 @@ int Mlsas_TX(void *session, void *header, uint32_t hdlen,
 			msg_type, 0, B_TRUE, 3);
 
 	return rval;
+}
+
+static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi, 
+		cts_link_evt_t link_evt, void *arg)
+{
+	switch (link_evt) {
+	case LINK_EVT_UP_TO_DOWN:
+		break;
+	case LINK_EVT_DOWN_TO_UP:
+		break;
+	default:
+		VERIFY(0);
+	}
 }
 
 static blk_qc_t __Mlsas_Make_Request_fn(struct request_queue *rq, struct bio *bio)
