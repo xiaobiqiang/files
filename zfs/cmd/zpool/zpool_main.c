@@ -2040,17 +2040,17 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 	xmlNodePtr node;
 	char * n = NULL;
 
-	if (strcmp(type, "root") == 0)
+	if (strcmp(type, "root") == 0){
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"data", NULL);
-	else
+		n = strchr(name,(int)'-');
+		if(n)
+		{
+			*n = '\0';
+		}
+	}else{
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"vdev", NULL);
-
-	n = strchr(name,(int)'-');
-	if(n)
-	{
-		*n = '\0';
 	}
-	
+
 	xmlSetProp(node, (xmlChar *)"name", (xmlChar *) name);
 	xmlSetProp(node, (xmlChar *)"state", (xmlChar *) state);
 	if (strcmp(type, "root") == 0)
