@@ -23,6 +23,9 @@
 #define Mlsas_Mxbio_Segment	128
 #define Mlsas_DMA_Alimask	0x03
 
+#define Mlsas_Delayed_RQ	0x01
+#define Mlsas_Delayed_PR_RQ	0x02
+
 /*
  * use clustersan
  */
@@ -90,6 +93,7 @@ typedef enum Mlsas_ttype Mlsas_ttype_e;
 typedef struct Mlsas_backdev_info Mlsas_backdev_info_t;
 typedef struct Mlsas_blkdev Mlsas_blkdev_t;
 typedef struct Mlsas_pr_device Mlsas_pr_device_t;
+typedef struct Mlsas_delayed_obj Mlsas_Delayed_obj_t;
 typedef struct Mlsas_request Mlsas_request_t;
 typedef struct Mlsas_pr_req Mlsas_pr_req_t;
 typedef struct Mlsas_bio_and_error Mlsas_bio_and_error_t;
@@ -155,6 +159,7 @@ struct Mlsas_pr_device {
 	struct kref Mlpd_ref;
 
 	list_t Mlpd_rqs;
+	list_t Mlpd_pr_rqs;
 	
 	Mlsas_blkdev_t *Mlpd_mlb;
 	Mlsas_rh_t *Mlpd_rh;
@@ -203,6 +208,7 @@ struct Mlsas_blkdev {
 	list_t Mlb_pr_devices;
 	list_t Mlb_local_rqs;
 	list_t Mlb_peer_rqs;
+	list_t Mlb_topr_rqs;
 
 	struct sg_table *Mlb_w_sgl;
 	void *Mlb_txbuf;
@@ -237,7 +243,13 @@ struct Mlsas_blkdev {
 	uint32_t Mlb_error_cnt;
 };
 
+struct Mlsas_delayed_obj {
+	uint32_t dlo_magic;
+	list_node_t dlo_node;
+};
+
 struct Mlsas_request {
+	uint32_t Mlrq_delayed_magic;
 	list_node_t Mlrq_node;
 	list_node_t Mlrq_pr_node;
 	struct kref Mlrq_ref;
@@ -264,14 +276,39 @@ struct Mlsas_request {
 	sector_t Mlrq_sector;
 };
 
-#define Mlsas_PRRfl_Addl_Kmem 	0x01
-#define Mlsas_PRRfl_Ee_Error 	0x02
-#define Mlsas_PRRfl_Zero_Out	0x04
-#define Mlsas_PRRfl_Write		0x08
+#define Mlsas_PRRst_Tobe_Submit 	0x01
+#define Mlsas_PRRst_Discard_Error	0x02
+#define Mlsas_PRRst_Write_Error		0x03
+#define Mlsas_PRRst_Read_Error		0x04
+#define Mlsas_PRRst_ReadA_Error		0x05
+#define Mlsas_PRRst_Complete_OK		0x06
+#define Mlsas_PRRst_Queue_Net_Wrsp	0x07
+#define Mlsas_PRRst_Queue_Net_Rrsp	0x08
+#define Mlsas_PRRst_Send_Error		0x09
+#define Mlsas_PRRst_Send_OK			0x0A
+
+#define Mlsas_PRRfl_Addl_Kmem 	0x001
+#define Mlsas_PRRfl_Ee_Error 	0x002
+#define Mlsas_PRRfl_Zero_Out	0x004
+#define Mlsas_PRRfl_Write		0x008
+#define Mlsas_PRRfl_Pending		0x010
+#define Mlsas_PRRfl_Netpending	0x020
+#define Mlsas_PRRfl_IO_Done		0x040
+#define Mlsas_PRRfl_IO_OK		0x080
+#define Mlsas_PRRfl_Net_Done	0x100
+#define Mlsas_PRRfl_OK			0x200
+#define Mlsas_PRRfl_Continue	0x40000000
+#define Mlsas_PRRfl_Delayed		0x80000000
+
 struct Mlsas_pr_req {
+	uint32_t prr_delayed_magic;
 	list_node_t prr_node;
+	list_node_t prr_mlb_node;
+	struct kref prr_ref;
+	struct work_struct 
 	Mlsas_rtx_wk_t prr_wk;
 	Mlsas_pr_device_t *prr_pr;
+	uint32_t prr_completion_ref;
 	uint32_t prr_flags;
 	uint32_t prr_bsize;
 	uint64_t prr_bsector;
@@ -441,5 +478,5 @@ extern void __Mlsas_Complete_Master_Bio(Mlsas_request_t *rq,
 extern void __Mlsas_Free_PR_RQ(Mlsas_pr_req_t *prr);
 extern Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
                 uint64_t reqid, sector_t sec, size_t len);
-
+extern void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what);
 #endif

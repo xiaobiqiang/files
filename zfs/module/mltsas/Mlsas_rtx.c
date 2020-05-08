@@ -265,6 +265,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);
 	}
+	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, 
@@ -298,6 +299,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);
 	}
+	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, 
@@ -310,18 +312,21 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 
 int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 {
-	int rval = 0;
+	int rval = 0, what;
 	Mlsas_pr_req_t *prr = container_of(w, 
 		Mlsas_pr_req_t, prr_wk);
 	Mlsas_pr_device_t *pr = prr->prr_pr;
-
+	
 	__Mlsas_Setup_RWrsp_msg(prr);
 
-	if (prr->prr_flags & Mlsas_PRRfl_Write)
+	if (prr->prr_flags & Mlsas_PRRfl_Write) {
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
 			pr->Mlpd_mlb->Mlb_astx_buf,
 			pr->Mlpd_mlb->Mlb_astxbuf_used,
 			NULL, 0, B_FALSE);
+		if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem)
+			kmem_free(prr->prr_dt, prr->prr_dtlen);
+	}
 	else 
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
 			pr->Mlpd_mlb->Mlb_astx_buf,
@@ -329,9 +334,13 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 			prr->prr_dt, prr->prr_dtlen, 
 			B_FALSE);
 
-	if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem)
-		kmem_free(prr->prr_dt, prr->prr_dtlen);
-	__Mlsas_Free_PR_RQ(prr);
+	what = rval ? Mlsas_PRRst_Send_Error :
+		Mlsas_PRRst_Send_OK;
+	spin_lock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
+	__Mlsas_PR_RQ_stmt(prr, what);
+	spin_unlock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
+	
+//	__Mlsas_Free_PR_RQ(prr);
 	
 	return (0);
 }

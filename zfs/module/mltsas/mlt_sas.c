@@ -22,17 +22,17 @@
 
 #define strtoul             simple_strtoul
 
-static void __Mlsas_RQ_Retry(struct work_struct *w);
+static void __Mlsas_Retry(struct work_struct *w);
 static void __Mlsas_Complete_RQ(Mlsas_request_t *rq, 
 		Mlsas_bio_and_error_t *Mlbi);
-static void __Mlsas_Restart_DelayedRQ(Mlsas_request_t *rq);
+static void __Mlsas_Restart_DelayedRQ(Mlsas_Delayed_obj_t *obj);
 static uint32_t __Mlsas_Put_RQcomplete_Ref(Mlsas_request_t *rq,
 		uint32_t c_put, Mlsas_bio_and_error_t *Mlbi);
 static void __Mlsas_Req_St(Mlsas_request_t *rq, 
 		Mlsas_bio_and_error_t *Mlbi, 
 		uint32_t clear, uint32_t set);
 static void __Mlsas_Request_endio(struct bio *bio);
-static void Mlsas_Put_Request(Mlsas_request_t *rq, uint32_t k_put);
+static void Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put);
 static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb, 
 		struct bio *bio, uint64_t start_jif);
 static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb, struct bio *bio, 
@@ -101,7 +101,7 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
 static void __Mlsas_Partion_Map_toTtl(Mlsas_request_t *rq);
 static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
-
+static void __Mlsas_Release_PR_RQ(struct kref *);
 
 static uint32_t Mlsas_npending = 0;
 
@@ -344,10 +344,10 @@ static int Mlsas_Do_EnableSvc(void)
 		minclsyspri, 8, 256, TASKQ_PREPOPULATE);
 
 	spin_lock_init(&retry->Mlt_lock);
-	list_create(&retry->Mlt_writes, sizeof(Mlsas_request_t),
-		offsetof(Mlsas_request_t, Mlrq_node));
+	list_create(&retry->Mlt_writes, sizeof(Mlsas_Delayed_obj_t),
+		offsetof(Mlsas_Delayed_obj_t, dlo_node));
 	retry->Mlt_workq = create_singlethread_workqueue("Mlsas_retry");
-	INIT_WORK(&retry->Mlt_work, __Mlsas_RQ_Retry);
+	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
 
 	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
 	(void) cts_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
@@ -529,7 +529,9 @@ static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
 	list_create(&Mlb->Mlb_local_rqs, sizeof(Mlsas_request_t),
 		offsetof(Mlsas_request_t, Mlrq_node));
 	list_create(&Mlb->Mlb_peer_rqs, sizeof(Mlsas_pr_req_t),
-		offsetof(Mlsas_pr_req_t, prr_node));
+		offsetof(Mlsas_pr_req_t, prr_mlb_node));
+	list_create(&Mlb->Mlb_topr_rqs, sizeof(Mlsas_request_t),
+		offsetof(Mlsas_request_t, Mlrq_node));
 	list_create(&Mlb->Mlb_pr_devices, sizeof(Mlsas_pr_device_t),
 		offsetof(Mlsas_pr_device_t, Mlpd_node));
 
@@ -1062,7 +1064,7 @@ static void __Mlsas_Submit_Net_Prepare(Mlsas_request_t *rq)
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	
 	kref_get(&rq->Mlrq_ref);
-	list_insert_tail(&Mlb->Mlb_peer_rqs, rq);
+	list_insert_tail(&Mlb->Mlb_topr_rqs, rq);
 	list_insert_tail(&rq->Mlrq_pr->Mlpd_rqs, rq);
 	
 	if (rq->Mlrq_back_bio) {
@@ -1093,7 +1095,7 @@ static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb,
 	return ;
 	
 free_rq:
-	Mlsas_Put_Request(Mlr, 1);
+	Mlsas_RQ_put(Mlr, 1);
 failed:
 	atomic_dec_32(&Mlsas_npending);
 	atomic_dec_32(&Mlb->Mlb_npending);
@@ -1140,7 +1142,7 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 	mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
 }
 
-static void Mlsas_Put_Request(Mlsas_request_t *rq, uint32_t k_put)
+static void Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put)
 {
 	kref_sub(&rq->Mlrq_ref, k_put, __Mlsas_Release_RQ);
 }
@@ -1329,7 +1331,7 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		(clear & Mlsas_RQ_Net_Pending)) {
 		c_put++;
 		k_put++;
-		list_remove(&Mlb->Mlb_peer_rqs, rq);
+		list_remove(&Mlb->Mlb_topr_rqs, rq);
 		list_remove(&rq->Mlrq_pr->Mlpd_rqs, rq);
 	}
 
@@ -1363,13 +1365,13 @@ static uint32_t __Mlsas_Put_RQcomplete_Ref(Mlsas_request_t *rq,
 	return 1;
 }
 
-static void __Mlsas_Restart_DelayedRQ(Mlsas_request_t *rq)
+static void __Mlsas_Restart_DelayedRQ(Mlsas_Delayed_obj_t *obj)
 {
 	unsigned long flags;
 	Mlsas_retry_t *retry = &gMlsas_ptr->Ml_retry;
 	
 	spin_lock_irqsave(&retry->Mlt_lock, flags);
-	list_insert_tail(&retry->Mlt_writes, rq);
+	list_insert_tail(&retry->Mlt_writes, obj);
 	spin_unlock_irqrestore(&retry->Mlt_lock, flags);
 
 	queue_work(retry->Mlt_workq, &retry->Mlt_work);
@@ -1435,32 +1437,46 @@ void __Mlsas_Complete_Master_Bio(Mlsas_request_t *rq,
 	bio_endio(Mlbi->Mlbi_bio);
 }
 
-static void __Mlsas_RQ_Retry(struct work_struct *w)
+static void __Mlsas_Retry(struct work_struct *w)
 {
 	list_t writes;
+	Mlsas_Delayed_obj_t *obj;
 	Mlsas_request_t *rq;
-	Mlsas_retry_t *retry = container_of(
-		w, Mlsas_retry_t, Mlt_work);
+	Mlsas_pr_req_t *prr;
+	Mlsas_retry_t *retry = 
+		container_of(w, Mlsas_retry_t, Mlt_work);
 	
-	list_create(&writes, sizeof(Mlsas_request_t),
-		offsetof(Mlsas_request_t, Mlrq_node));
+	list_create(&writes, sizeof(Mlsas_Delayed_obj_t),
+		offsetof(Mlsas_Delayed_obj_t, dlo_node));
 
 	spin_lock_irq(&retry->Mlt_lock);
 	list_move_tail(&writes, &retry->Mlt_writes);
 	spin_unlock_irq(&retry->Mlt_lock);
 
-	while ((rq = list_remove_head(&writes)) != NULL) {
-		Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
-		struct bio *bio = rq->Mlrq_master_bio;
-		uint64_t start_jif = rq->Mlrq_start_jif;
+	while ((obj = list_remove_head(&writes)) != NULL) {
+		switch (obj->dlo_magic) {
+		case Mlsas_Delayed_RQ: 
+			rq = (Mlsas_request_t *)obj;
+			atomic_inc_32(&rq->Mlrq_bdev->Mlb_npending);
 
-		cmn_err(CE_NOTE, "request restart");
-
-		Mlsas_Put_Request(rq, 1);
-		
-		atomic_inc_32(&Mlb->Mlb_npending);
-
-		__Mlsas_Make_Request_impl(Mlb, bio, start_jif);
+			__Mlsas_Make_Request_impl(rq->Mlrq_bdev, 
+				rq->Mlrq_master_bio, 
+				rq->Mlrq_start_jif);
+			Mlsas_RQ_put(rq, 1);
+			break;
+		case Mlsas_Delayed_PR_RQ:
+			prr = (Mlsas_pr_req_t *)obj;
+			spin_lock_irq(&prr->prr_pr->Mlpd_mlb->Mlb_rq_spin);
+			prr->prr_flags &= ~Mlsas_PRRfl_Delayed;
+			if (prr->prr_flags & Mlsas_PRRfl_Write)
+				prr->prr_flags &= ~Mlsas_PRRfl_Addl_Kmem;
+			__Mlsas_PR_RQ_stmt(prr, prr->prr_flags & Mlsas_PRRfl_Write ?
+				Mlsas_PRRst_Queue_Net_Wrsp : Mlsas_PRRst_Queue_Net_Rrsp);
+			__Mlsas_Queue_RTX(&prr->prr_pr->Mlpd_mlb->Mlb_asender_wq,
+				&prr->prr_wk);
+			spin_unlock_irq(&prr->prr_pr->Mlpd_mlb->Mlb_rq_spin);
+			break;
+		}
 	}
 }
 
@@ -1666,6 +1682,18 @@ void __Mlsas_Free_PR_RQ(Mlsas_pr_req_t *prr)
 	mempool_free(prr, gMlsas_ptr->Ml_prr_mempool);
 }
 
+static void __Mlsas_Release_PR_RQ(struct kref *ref)
+{
+	Mlsas_pr_req_t *prr = container_of(ref,
+		Mlsas_pr_req_t, prr_ref);
+
+	if (!(prr->prr_flags & Mlsas_PRRfl_Write) &&
+		(prr->prr_flags & Mlsas_PRRfl_Addl_Kmem))
+		kmem_free(prr->prr_dt, prr->prr_dtlen);
+	
+	__Mlsas_Free_PR_RQ(prr);
+}
+
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
 		void *data, uint64_t dlen)
 {
@@ -1712,27 +1740,155 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 {
 	Mlsas_pr_req_t *prr = bio->bi_private;
 	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
+	uint32_t what;
 	
-	if (bio->bi_error) {
+	if (unlikely(bio->bi_error)) {
 		/* TODO */
 		prr->prr_error = bio->bi_error;
-		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
-		cmn_err(CE_NOTE, "peer request(Mlb(%llx) Sector(%llx)"
-			" Size(%llx) rw(%llx)), Error(%d)", Mlb->Mlb_hashkey,
-			prr->prr_bsector, prr->prr_bsize, bio->bi_rw, 
-			bio->bi_error);
-	}
+		if (unlikely(bio->bi_rw & REQ_DISCARD))
+			what = Mlsas_PRRst_Discard_Error;
+		else
+			what = (prr->prr_flags & Mlsas_PRRfl_Write) ? 
+				Mlsas_PRRst_Write_Error : (bio_rw(bio) == READ) ? 
+					Mlsas_PRRst_Read_Error : Mlsas_PRRst_ReadA_Error;
+	} else
+		what = Mlsas_PRRst_Complete_OK;
 
 	bio_put(bio);
 
+	if (!atomic_dec_32_nv(&prr->prr_pending_bios)) {
+		spin_lock_irq(&Mlb->Mlb_rq_spin);
+		__Mlsas_PR_RQ_stmt(prr, what);
+		__Mlsas_PR_RQ_stmt(prr, prr->prr_flags & Mlsas_PRRfl_Write ?
+			Mlsas_PRRst_Queue_Net_Wrsp : Mlsas_PRRst_Queue_Net_Rrsp);
+		spin_unlock_irq(&Mlb->Mlb_rq_spin);
+	}
+
 	__Mlsas_Complete_PR_RQ(prr);
+}
+
+void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what)
+{
+	switch (what) {
+	case Mlsas_PRRst_Tobe_Submit:
+		kref_get(&prr->prr_ref);
+		list_insert_tail(&prr->prr_pr->Mlpd_mlb->Mlb_peer_rqs, prr);
+		list_insert_tail(&prr->prr_pr->Mlpd_pr_rqs, prr);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Pending);
+		break;
+	case Mlsas_PRRst_Discard_Error:
+	case Mlsas_PRRst_Write_Error:
+	case Mlsas_PRRst_Read_Error:
+	case Mlsas_PRRst_ReadA_Error:
+		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Pending, Mlsas_PRRfl_IO_Done);
+		break;
+	case Mlsas_PRRst_Complete_OK:
+		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Pending, 
+			Mlsas_PRRfl_IO_Done | Mlsas_PRRfl_IO_OK);
+		break;
+	case Mlsas_PRRst_Queue_Net_Wrsp:
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Netpending);
+		__Mlsas_PR_RQ_Write_endio(prr);
+		break;
+	case Mlsas_PRRst_Queue_Net_Wrsp:
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Netpending);
+		__Mlsas_PR_RQ_Read_endio(prr);
+		break;
+	case Mlsas_PRRst_Send_Error:
+		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Netpending, Mlsas_PRRfl_Net_Done);
+		break;
+	case Mlsas_PRRst_Send_OK:
+		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Netpending, 
+			Mlsas_PRRfl_Net_Done | Mlsas_PRRfl_OK);
+		break;
+	}
+}
+
+static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s)
+{
+	uint32_t ofl = prr->prr_flags;
+	uint32_t c_put = 0;
+	uint32_t k_put = 0;
+	Mlsas_pr_device_t *pr = prr->prr_pr;
+		
+	prr->prr_flags &= ~c;
+	prr->prr_flags |= s;
+
+	if (prr->prr_flags == ofl)
+		return ;
+	
+	if (!(ofl & Mlsas_PRRfl_Pending) && (s & Mlsas_PRRfl_Pending))
+		atomic_inc_32(&prr->prr_completion_ref);
+
+	if (!(ofl & Mlsas_PRRfl_Netpending) && (s & Mlsas_PRRfl_Netpending))
+		atomic_inc_32(&prr->prr_completion_ref);
+
+	if (!(ofl & Mlsas_PRRfl_OK) && (s & Mlsas_PRRfl_OK)) {
+		list_remove(&pr->Mlpd_pr_rqs, prr);
+		list_remove(&pr->Mlpd_mlb->Mlb_peer_rqs, prr);
+		k_put++;
+	}
+
+	if ((ofl & Mlsas_PRRfl_Pending) && (c & Mlsas_PRRfl_Pending)) 
+		c_put++;
+
+	if ((ofl & Mlsas_PRRfl_Netpending) && (c & Mlsas_PRRfl_Netpending))
+		c_put++;
+
+	if (c_put)
+		k_put += __Mlsas_PR_RQ_Put_Completion_ref(prr, c_put);
+	if (k_put)
+		kref_sub(&prr->prr_ref, k_put, __Mlsas_Release_PR_RQ);
+	
+}
+
+static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr,
+		uint32_t c_put)
+{
+	if (atomic_sub_32_nv(&prr->prr_completion_ref, c_put))
+		return 0;
+
+	__Mlsas_PR_RQ_complete(prr);
+
+	if (prr->prr_flags & Mlsas_PRRfl_Continue)
+		return (0);
+	if (prr->prr_flags & Mlsas_PRRfl_Delayed) {
+		__Mlsas_Restart_DelayedRQ(prr);
+		return (0);
+	}
+
+	return (1);
+}
+
+static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
+{
+	boolean_t iook, ok;
+	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
+	
+	iook = prr->prr_flags & Mlsas_PRRfl_IO_OK;
+	ok = prr->prr_flags & Mlsas_PRRfl_OK;
+	/*
+	 * IO pending done
+	 */
+	if (!(prr->prr_flags & Mlsas_PRRfl_Net_Done)) {
+		if (!iook && (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch))
+			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch);
+		else if (iook)
+			Mlb->Mlb_error_cnt = 0;
+		prr->prr_flags |= Mlsas_PRRfl_Continue;
+	} else {
+		prr->prr_flags &= ~Mlsas_PRRfl_Continue;
+		if (!ok)
+			prr->prr_flags |= Mlsas_PRRfl_Delayed;
+	}
 }
 
 static void __Mlsas_Complete_PR_RQ(Mlsas_pr_req_t *prr)
 {
 	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
 	boolean_t is_write = prr->prr_flags & Mlsas_PRRfl_Write;
-
+	int remained_bios = atomic_dec_32_nv(&prr->prr_pending_bios);
+	
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	if (prr->prr_flags & Mlsas_PRRfl_Ee_Error) {
 		if (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch)
@@ -1741,7 +1897,7 @@ static void __Mlsas_Complete_PR_RQ(Mlsas_pr_req_t *prr)
 		Mlb->Mlb_error_cnt = 0;
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
-	if (!atomic_dec_32_nv(&prr->prr_pending_bios)) {
+	if (!remained_bios) {
 		if (is_write)
 			__Mlsas_PR_RQ_Write_endio(prr);
 		else 
@@ -1801,6 +1957,9 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 	kref_init(&pr->Mlpd_ref);
 	list_create(&pr->Mlpd_rqs, sizeof(Mlsas_request_t),
 		offsetof(Mlsas_request_t, Mlrq_pr_node));
+	list_create(&pr->Mlpd_pr_rqs, sizeof(Mlsas_pr_req_t),
+		offsetof(Mlsas_pr_req_t, prr_mlb_node));
+	
 	pr->Mlpd_st = st;
 	pr->Mlpd_hostid = id;
 	pr->Mlpd_mlb = Mlb;
@@ -1877,7 +2036,10 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 			prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
 			prr->prr_error = rval;
 		}
-		__Mlsas_Complete_PR_RQ(prr);
+		spin_lock_irq(&Mlb->Mlb_rq_spin);
+		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Discard_Error);
+		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Queue_Net_Wrsp);
+		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 		return ;
 	}
 
@@ -1888,7 +2050,7 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 		bt = bio;
 		bio = bio->bi_next;
 		bt->bi_next = NULL;
-		generic_make_request(bt);
+		(void) generic_make_request(bt);
 		
 		atomic_inc_32(&prr->prr_pending_bios);
 	} while (bio);
