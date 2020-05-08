@@ -9004,6 +9004,46 @@ void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_ad
 	fw_event_work_put(fw_event);
 }
 
+void mpt3sas_eh_strategy(struct Scsi_Host *shost)
+{
+    struct MPT3SAS_DEVICE *sas_device_priv_data;
+    struct MPT3SAS_ADAPTER *ioc;
+    struct scsi_cmnd *scmd, *next;
+    
+    unsigned long flags;
+    LIST_HEAD(eh_work_q);
+    LIST_HEAD(eh_done_q);    
+
+    printk(KERN_ERR "mpt3sas_eh_strategy entered\n");
+    
+    spin_lock_irqsave(shost->host_lock, flags);
+    list_splice_init(&shost->eh_cmd_q, &eh_work_q);
+    spin_unlock_irqrestore(shost->host_lock, flags);
+
+    list_for_each_entry_safe(scmd, next, &eh_work_q, eh_entry) {
+        sas_device_priv_data = scmd->device->hostdata;
+
+        if (sas_device_priv_data && 
+            sas_device_priv_data->sas_target &&
+            !sas_device_priv_data->sas_target->deleted) {
+            if(atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) > 0) {
+                printk(KERN_ERR "mpt3sas_eh_strategy remove target:%llx\n", 
+                        sas_device_priv_data->sas_target->sas_address);
+                ioc = shost_priv(scmd->device->host);
+                mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
+            }                
+        }
+
+        scsi_eh_finish_cmd(scmd, &eh_done_q);
+    }
+
+    spin_lock_irqsave(shost->host_lock, flags);
+    if (shost->eh_deadline != -1)
+        shost->last_reset = 0;
+    spin_unlock_irqrestore(shost->host_lock, flags);
+    scsi_eh_flush_done_q(&eh_done_q);
+}
+
 
 static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 {
@@ -9219,6 +9259,7 @@ _mpt3sas_init(void)
 		return -ENODEV;
 
     mpt3sas_transport_template->eh_timed_out = mpt3sas_trans_timeout;
+    mpt3sas_transport_template->eh_strategy_handler = mpt3sas_eh_strategy;
 
 	/* No need attach mpt3sas raid functions template
 	 * if hbas_to_enumarate value is one.

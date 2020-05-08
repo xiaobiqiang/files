@@ -44,7 +44,7 @@ uint_t num_logs(nvlist_t *nv);
  */
 
 nvlist_t *make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force,
-    int check_rep, boolean_t replacing, boolean_t dryrun, int argc,
+    int check_rep, boolean_t ignore_check, boolean_t replacing, boolean_t dryrun, int argc,
     char **argv);
 nvlist_t *split_mirror_vdev(zpool_handle_t *zhp, char *newname,
     nvlist_t *props, splitflags_t flags, int argc, char **argv);
@@ -65,6 +65,10 @@ int pool_list_count(zpool_list_t *);
 void pool_list_remove(zpool_list_t *, zpool_handle_t *);
 
 libzfs_handle_t *g_zfs;
+
+void cprint(const char *format,...);
+int zpool_lock(const char *poolname, const char *cmd);
+int zpool_unlock(int fd, const char *poolname);
 
 #ifdef	__cplusplus
 }

@@ -67,6 +67,7 @@ void print_info(disk_info_t *di, int count)
 static int
 get_scsi_rpm( disk_info_t *disk ) {
 	char *path = disk->dk_name ;
+	int u;
 	uint8_t output[ INQ_REPLY_LEN ] ;
 	uint8_t cmd[] = {0x12, 1, 0xB1, 0, INQ_REPLY_LEN, 0 } ;
 	int fd ;
@@ -98,7 +99,21 @@ get_scsi_rpm( disk_info_t *disk ) {
 	}
 
 	close(fd);
-	disk->dk_rpm = output[4] * 256 + output[5] ;
+	u= output[4] * 256 + output[5] ;
+	disk->dk_rpm = 0;
+	if (0 == u){
+		fprintf( stderr,"Medium rotation rate is not reported dev<%s>\n",path) ;
+	}
+    else if (1 == u){
+		/*ssd*/
+        disk->dk_rpm = 0;
+    }
+    else if ((u < 0x401) || (0xffff == u)){
+		fprintf( stderr,"Reserved [0x%x] dev<%s>\n",u,path) ;
+    }
+    else{
+		disk->dk_rpm = u;
+    }
 
 	return (0);
 }
@@ -311,12 +326,6 @@ int list_disks(int all)
 	FILE * fd = NULL;
 
 	create_xml_file();
-	fd = fopen("/var/fm/.blkid.txt","r");
-	if(fd == NULL){
-		system("blkid > /var/fm/.blkid.txt");
-	}else{
-		fclose(fd);
-	}
 	error = disk_get_info(&dt);
 	if (error != 0)
 		(void) printf("disk list failed\n");
@@ -422,7 +431,7 @@ static void print_slices(char *diskname, dmg_map_t map, dmg_lun_t *lun);
 static int disk_mark(slice_req_t *);
 static int disk_clear_mark(slice_req_t *);
 extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
-extern int disk_get_poolname(const char *dev,char *pool_name);
+extern int disk_get_poolname(const char *dev,char *pool_name,int size);
 
 typedef struct zpool_list zpool_list_t;
 
@@ -885,7 +894,7 @@ int zpool_get_vdev_by_path(nvlist_t *nv,char *init_diskpath)
 			&child, &children) != 0) {
 			verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
 		
-				/*printf("path=%s;oldpath = %s\n",path,init_diskpath);*/
+				//printf("path=%s;oldpath = %s\n",path,init_diskpath);
 			if (strncmp(init_diskpath,path,strlen(init_diskpath)) == 0)
 				return 1;
 			return (0);
@@ -934,7 +943,7 @@ static int disk_analyze_partition(const char *dev)
 	}
 	
 	/* get pool name */
-	ret = disk_get_poolname(dev,pool_name);
+	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	
 	tmp_gzfs = libzfs_init();
 	/* check pool is exist or not */
@@ -1507,13 +1516,11 @@ disk_init(slice_req_t *req)
 	
 	if (status = get_disk_name(req, SUBC_INIT))
 		return (status);
-	
-	(void) disk_get_system(args);
-	if (strncmp(args, req->disk_name, 8) == 0) {
-		printf("sorry, this is system disk!\n");
-		return (-1); 
-	}
 
+	if (disk_get_system(req->disk_name)) {
+		printf("sorry, this is system disk!\n");
+		return (-1);
+	}
 	/*
 	 * Initialize zfs label info
 	 */
@@ -1582,13 +1589,13 @@ static int disk_check_inuse(const char *dev)
 	char pool_name[256] = {0};
 	int ret;
 
-	if (strncmp(dev, "/dev/rdsk/", 10) != 0){
+	if (strncmp(dev, "/dev/disk/by-id/", 16) != 0){
 		printf("can't find the disk please check it\n");
 		return (-1);
 	}
 
 	/* get pool name */
-	ret = disk_get_poolname(dev,pool_name);
+	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	if (ret == 1) {
 		printf("the disk is inuse by %s pool,can't restore\n",pool_name);
 		return (-1);
@@ -1607,7 +1614,7 @@ disk_restore_init(slice_req_t *req)
 	int ret;
 	libzfs_handle_t *tmp_gzfs;
 
-	if (strncmp(req->disk_name, "/dev/rdsk/", 10) != 0) {
+	if (strncmp(req->disk_name, "/dev/disk/by-id/", 16) != 0) {
 		printf("can't find the disk please check it\n");
 		return (-1);
 	}

@@ -126,6 +126,11 @@ extern "C" {
 #define	FM_EREPORT_RESOURCE_AUTOREPLACE		"autoreplace"
 #define	FM_EREPORT_RESOURCE_STATECHANGE		"statechange"
 
+#define FM_SIMULATE_DEVICE_MERR		0
+#define FM_SIMULATE_DEV_REMOVED		1
+#define FM_SIMULATE_DEV_NORESP		2
+#define FM_SIMULATE_DEV_SMART_FAIL	3
+
 #ifdef	__cplusplus
 }
 #endif

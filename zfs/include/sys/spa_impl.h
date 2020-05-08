@@ -346,6 +346,8 @@ struct spa {
 	int			spa_space_reclaim_state;
 	kmutex_t	spa_space_reclaim_lock;
 	kcondvar_t	spa_space_reclaim_cv;	
+
+	int		spa_importing;
 };
 
 extern char *spa_config_path;
@@ -360,6 +362,9 @@ extern void spa_quantum_stop(spa_quantum_t *quantum);
 extern void spa_quantum_stop_all(spa_t *spa);
 extern void spa_choose_quantum_dev(spa_t *spa);
 extern void spa_quantum_start(spa_quantum_t *quantum);
+
+extern boolean_t spa_find_disk(spa_t *spa, char *disk_name, vdev_t **vdp);
+
 
 #ifdef	__cplusplus
 }

@@ -3374,6 +3374,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 		/* Make sure nobody created the struct except us */
 		
 		fct_queue_rp(iport, irp);
+		bcopy(fcport->port_name, irp->irp_port_name, sizeof(irp->irp_port_name));
 		stmf_wwn_to_devid_desc((scsi_devid_desc_t *)irp->irp_id,
 			    fcport->port_name, PROTOCOL_FIBRE_CHANNEL);
 		atomic_or_32(&irp->irp_flags, IRP_PLOGI_DONE);

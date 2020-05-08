@@ -9,6 +9,8 @@
 #include <sys/zfs_context.h>
 
 
+#define CLUSTER_SAN_MSG_MAGIC					0x12345678
+
 #define	CLUSTER_SAN_MEMFREE_DEALAY				0
 
 #define	TARGET_PROTOCOL_MIRROR					0x1
@@ -92,6 +94,7 @@ typedef enum cts_link_evt {
 } cts_link_evt_t;
 
 typedef struct cluster_target_msg_header {
+	uint32_t magic;
 	uint8_t msg_type;
 	uint8_t	need_reply;
 	uint8_t pad[4];

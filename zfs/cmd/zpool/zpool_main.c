@@ -565,59 +565,6 @@ add_prop_list_default(const char *propname, char *propval, nvlist_t **props,
 	return (add_prop_list(propname, propval, props, B_TRUE));
 }
 
-int
-zpool_do_add_check_aggre(nvlist_t *config, nvlist_t *nvroot)
-{
-	char *type;
-	nvlist_t **child, **child1;
-	uint_t c, children, newchildren, raidz_children;
-	nvlist_t *pool_nvroot;
-	uint64_t parity1, parity2;
-	uint64_t is_meta;
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		&pool_nvroot) == 0);
-	verify(nvlist_lookup_nvlist_array(pool_nvroot, ZPOOL_CONFIG_CHILDREN,
-		&child, &children) == 0);
-	for (c = 0; c < children; c++) {
-		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE,
-			&type) == 0);
-		if (strncmp(type, "raidz", 5) == 0)
-			break;
-	}
-	verify(c != children);
-
-	verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-		&child1, &raidz_children) == 0);
-	verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-		&parity1) == 0);
-	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-		&child, &children) == 0);
-	for (c = 0; c < children; c++) {
-		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE,
-			&type) == 0);
-		verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META,
-			&is_meta) == 0);
-		if (is_meta)
-			continue;
-		if (strncmp(type, "raidz", 5) != 0) {
-			printf("invalid vdev specification: "
-				"raidz needed.\n");
-			return (0);
-		}
-		verify(nvlist_lookup_nvlist_array(child[c], ZPOOL_CONFIG_CHILDREN,
-			&child1, &newchildren) == 0);
-		verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_NPARITY,
-			&parity2) == 0);
-		if (raidz_children != newchildren || parity1 != parity2) {
-			printf("invalid vdev specification: "
-				"aggre raidz requires %d devices\n", raidz_children);
-			return (0);
-		}
-	}
-	return (1);
-}
-
 
 /*
  * zpool add [-fgLnP] [-o property=value] <pool> <vdev> ...
@@ -717,19 +664,10 @@ zpool_do_add(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for processing */
-	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, B_FALSE, dryrun,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
-		return (1);
-	}
-
-	if (!zfs_check_raidz_aggre_valid(nvroot)) {
-		(void) fprintf(stderr, gettext("pool '%s' can't use raidz_aggre "
-			"configuration as metadata device\n"),
-			poolname);
-		zpool_close(zhp);
-		nvlist_free(nvroot);
 		return (1);
 	}
 
@@ -983,6 +921,7 @@ int
 zpool_do_create(int argc, char **argv)
 {
 	boolean_t force = B_FALSE;
+	boolean_t ignore_check = B_FALSE;
 	boolean_t dryrun = B_FALSE;
 	boolean_t enable_all_pool_feat = B_TRUE;
 	int c;
@@ -1002,11 +941,14 @@ zpool_do_create(int argc, char **argv)
 	int pool_success = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":fndR:m:o:O:t:")) != -1) {
+	while ((c = getopt(argc, argv, ":fbndR:m:o:O:t:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
 			break;
+		case 'b':
+			ignore_check = B_TRUE;
+			break;	
 		case 'n':
 			dryrun = B_TRUE;
 			break;
@@ -1135,7 +1077,7 @@ zpool_do_create(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for bulk processing */
-	nvroot = make_root_vdev(NULL, props, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(NULL, props, force, !force, ignore_check, B_FALSE, dryrun,
 	    argc - 1, argv + 1);
 	if (nvroot == NULL)
 		goto errout;
@@ -1678,37 +1620,6 @@ out:
 	return (ret);
 }
 
-static void
-cprint(const char *format, ...)
-{
-	va_list args;
-	FILE *fp;
-	char path[] = "/var/cluster/log/zpool.log";
-	char buf[512], *cp;
-	char timebuf[32];
-	struct timeval now;
-	struct tm ltime;
-
-	if (gettimeofday(&now, NULL) != 0)
-		return;
-
-	(void) strftime(timebuf, sizeof (timebuf), "%b %e %T",
-	    localtime_r(&now.tv_sec, &ltime));
-
-	(void) snprintf(buf, sizeof (buf), "%s: ", timebuf);
-	cp = strchr(buf, '\0');
-	va_start(args, format);
-	(void) vsnprintf(cp, sizeof (buf) - (cp - buf), format, args);
-	va_end(args);
-	(void) strcat(buf, "\n");
-
-	fp = fopen(path, "a");
-	if (fp == NULL)
-		return;
-	(void) fputs(buf, fp);
-	fclose(fp);
-}
-
 static int
 disable_share_services(int *sharenfs, int *sharesmb)
 {
@@ -1809,6 +1720,9 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	export_cbdata_t *cb = data;
 	nvlist_t *config;
 	uint64_t guid = 0;
+	int lock;
+
+	lock = zpool_lock(zpool_get_name(zhp), history_str);
 
 	if (zpool_disable_datasets(zhp, cb->force) != 0) {
 		cprint("pool %s disable datasets failed", zpool_get_name(zhp));
@@ -1825,10 +1739,12 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	if (cb->hardforce) {
 		if (zpool_export_force(zhp, history_str) != 0) {
 			cprint("pool %s export foece failed", zpool_get_name(zhp));
+			(void) zpool_unlock(lock, zpool_get_name(zhp));
 			return (1);
 		}
 	} else if (zpool_export(zhp, cb->force, history_str) != 0) {
 		cprint("pool %s export failed", zpool_get_name(zhp));
+		(void) zpool_unlock(lock, zpool_get_name(zhp));
 		return (1);
 	}
 
@@ -1839,6 +1755,7 @@ zpool_export_one(zpool_handle_t *zhp, void *data)
 	}
 	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 
+	(void) zpool_unlock(lock, zpool_get_name(zhp));
 	cprint("export '%s': export fini", zpool_get_name(zhp));
 	return (0);
 }
@@ -2056,12 +1973,19 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
     char *sum_err, char *en_id, char *slot_id, char *type, char *total_buf)
 {
 	xmlNodePtr node;
+	char * n = NULL;
 
 	if (strcmp(type, "root") == 0)
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"data", NULL);
 	else
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"vdev", NULL);
 
+	n = strchr(name,(int)'-');
+	if(n)
+	{
+		*n = '\0';
+	}
+	
 	xmlSetProp(node, (xmlChar *)"name", (xmlChar *) name);
 	xmlSetProp(node, (xmlChar *)"state", (xmlChar *) state);
 	if (strcmp(type, "root") == 0)
@@ -2201,8 +2125,12 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		} else if (strncmp((char *)name, (const char *)"raidz3", strlen("raidz3")) == 0) {
 			raid_type = "raid7";
 			sprintf(buf, "%s%s", raid_type, (char *) (name + strlen("raidz3")));
+		}else{
+			sprintf(buf, "%s", name);
 		}
-	} else {
+	}else if(strcmp(type, "raidz_s") == 0){
+		sprintf(buf, "%s", name);
+	}else {
 		if (children > 0 && strcmp(type, "mirror") != 0) {
 			sprintf(buf, "%s", "raid0");
 		} else if (strncmp((char *)name, (const char *)"mirror", strlen("mirror")) == 0) {
@@ -2955,6 +2883,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	uint64_t state;
 	uint64_t version;
 	uint64_t guid;
+	int lock;
 
 	/* write stamp */
 	int host_id;
@@ -3039,6 +2968,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		}
 	}
 
+	lock = zpool_lock(name, history_str);
+
 	if (!check_quantum(config)) {
 		(void) fprintf(stderr, gettext("cannot import "
 		    "'%s': pool may be in use from other "
@@ -3046,11 +2977,13 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 		cprint("cannot import "
 		    "'%s': pool may be in use from other "
 		    "system, the quantum index changed", name);
+		(void) zpool_unlock(lock, name);
 		return (1);
 	}
 
 	if (zpool_import_props(g_zfs, config, newname, props, flags) != 0) {
 		cprint("cannot import '%s': zpool_import_props error", name);
+		(void) zpool_unlock(lock, name);
 		return (1);
 	}
 
@@ -3059,6 +2992,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	if ((zhp = zpool_open_canfail(g_zfs, name)) == NULL) {
 		cprint("cannot import '%s': zpool_open error", name);
+		(void) zpool_unlock(lock, name);
 		return (1);
 	}
 
@@ -3068,6 +3002,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		zpool_close(zhp);
 		cprint("cannot import '%s': zpool_enable_datasets error", name);
+		(void) zpool_unlock(lock, name);
 		return (1);
 	}
 
@@ -3082,7 +3017,8 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	if (zc == NULL) {
 		syslog(LOG_NOTICE, "%s: not wait pool(%s)'s zvol create minor done",
 			__func__, name);
-		return ;
+		(void) zpool_unlock(lock, name);
+		return (1);
 	}
 	bzero(zc, sizeof(zfs_cmd_t));
 	assert(zc->zc_nvlist_src_size == 0);
@@ -3103,6 +3039,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) == 0);
 	(void) send_import_export_to_clusterd(zpool_get_name(zhp), guid, B_FALSE);
 	zpool_close(zhp);
+	(void) zpool_unlock(lock, name);
 	cprint("import '%s': import success", name);
 	return (0);
 }
@@ -4618,7 +4555,7 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 		return (1);
 	}
 
-	nvroot = make_root_vdev(zhp, props, force, B_FALSE, replacing, B_FALSE,
+	nvroot = make_root_vdev(zhp, props, force, B_FALSE, B_FALSE, replacing, B_FALSE,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
@@ -7579,6 +7516,7 @@ release_callback(zpool_handle_t *zhp, void *data)
 	int partner_id;
 	const char *pool_name;
 	struct link_list *node;
+	int lock;
 
 	pool_name = zpool_get_name(zhp);
 	partner_id = get_partner_id(g_zfs, cbp->cb_rid);
@@ -7602,11 +7540,14 @@ release_callback(zpool_handle_t *zhp, void *data)
 		return (0);
 	}
 
+	lock = zpool_lock(pool_name, history_str);
+
 	zfs_enable_avs(g_zfs, (char *)zpool_get_name(zhp), 0);
 	zfs_standby_all_lus(g_zfs, (char *)zpool_get_name(zhp));
 	if (zpool_disable_datasets(zhp, B_TRUE) != 0) {
 		syslog(LOG_ERR, "zpool disable datasets failed, errno:%d", errno);
 		cprint("release '%s': disable datasets error %d", pool_name, errno);
+		(void) zpool_unlock(lock, pool_name);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_export %s",zpool_get_name(zhp));
@@ -7614,11 +7555,13 @@ release_callback(zpool_handle_t *zhp, void *data)
 	if (zpool_export(zhp, B_TRUE, history_str) != 0) {
 		syslog(LOG_ERR, "zpool export force failed, errno:%d", errno);
 		cprint("release '%s': export error %d", pool_name, errno);
+		(void) zpool_unlock(lock, pool_name);
 		return (1);
 	}
 	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
+	(void) zpool_unlock(lock, pool_name);
 	cprint("release '%s': fini", pool_name);
 	return (0);
 }

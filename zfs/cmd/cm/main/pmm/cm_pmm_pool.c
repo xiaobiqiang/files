@@ -13,6 +13,7 @@
 #include "cm_omi.h"
 #include "cm_db.h"
 #include "cm_pmm_common.h"
+#include "cm_pmm.h"
 
 sint32 cm_cnm_pmm_pool_decode(
     const cm_omi_obj_t ObjParam, void**ppDecodeParam)

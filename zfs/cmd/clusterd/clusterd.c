@@ -37,7 +37,6 @@
 #include "cn_cluster.h"
 #include "systemd_util.h"
 #include "if_util/if_util.h"
-#include "cluster_log.h"
 #include "clusterd.h"
 
 #define	CLUSTERD_CONF	"/etc/default/clusterd"
@@ -46,6 +45,8 @@
 #ifndef	strlcpy
 #define	strlcpy	strncpy
 #endif
+
+#define	c_log	cluster_log_framework
 
 #define	DIR_PERMS	(S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 

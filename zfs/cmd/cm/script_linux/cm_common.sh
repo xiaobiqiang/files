@@ -161,7 +161,7 @@ function cm_software_version()
     if [ $issolaris -ne 0 ]; then
         sed -n 1p /lib/release |awk -F'.' '{print $3$4$5}' |sed 's/PRO//g'
     else
-        local version=`cat /etc/release`
+        local version=`cat /etc/release 2>/dev/null`
         if [ "X"$version = "X" ]; then
             echo "zfsonlinux_sw"
         else
@@ -172,56 +172,39 @@ function cm_software_version()
 
 function cm_get_localmanageport()
 {
-    local cfgfile='/var/cm/data/node_config.ini'
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        local port=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
-        echo "${port[0]}"
-        return 0
-    fi
+    local nic_conf="/var/cm/static/nic.conf"
     
-    if [ ! -f ${cfgfile} ]; then    
-        portlist=`ls /etc/sysconfig/network-scripts| grep ifcfg |grep -v lo|sort`
-        for portfile in $portlist
-        do
-            ipaddr=`cat /etc/sysconfig/network-scripts/$portfile| grep IPADDR|awk -F'=' '{print $2}'`
-            if [ "X$ipaddr" != "X" ]; then
-                cat /etc/sysconfig/network-scripts/$portfile| grep DEVICE|awk -F'=' '{print $2}'
-                break
-            fi
-        done
+    if [ -f $nic_conf ];then
+        local nic=`cat $nic_conf|sed -n 1p`
+        echo $nic
         return 0
+    else
+        CM_LOG "[${FUNCNAME}:${LINENO}] the management nic not set in systeminit.sh"
+        return 1
     fi
-    local mport=`grep '^mport' $cfgfile |sed 's/ //g' |awk -F'=' '{print $2}'`
-    if [ "X$mport" != "X" ]; then
-        echo $mport
-        return 0
-    fi
-    echo "eth0"
-    return 0
 }
 
 function cm_get_localmanageip()
 {
-    local port=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        local port_inet=(`grep 'iface' /etc/network/interfaces|grep -v 'lo'|awk '{printf $2" "}'`)
-        port_name=${port_inet[0]}
-        ip_line=`cat -n /etc/network/interfaces|grep 'iface'|grep -w $port_name|awk '{print $1}'`
-        ((ip_line=$ip_line+1))
-        ipaddr=`sed -n "$ip_line"p /etc/network/interfaces|grep address|awk '{print $2}'`
-        echo $ipaddr
+    local port=`cm_get_localmanageport`
+    if [ "X" == "X$port" ];then
+        return 1
+    fi
+    local ip
+    if [ `uname -r|grep deepin|wc -l` -eq 0 ]; then
+        ip=`cat /etc/sysconfig/network-scripts/ifcfg-$port|grep IPADDR|awk -F'=' '{print $2}'`
+    else
+        cnt=`cat /etc/network/interfaces|grep -n "iface $port"|awk -F':' '{print $1}'`
+        ((cnt=$cnt+1))
+        ip=`cat  /etc/network/interfaces|sed -n "$cnt p"|awk '{print $2}'`
+    fi
+    if [ "X" == "X$ip" ];then
+        CM_LOG "[${FUNCNAME}:${LINENO}] the $port not set ip"
+        return 1
+    else
+        echo $ip
         return 0
     fi
-    local cfgfile='/etc/sysconfig/network-scripts/ifcfg-'$port
-    
-    if [ ! -f ${cfgfile} ] || [ `cat $cfgfile|grep IPADDR|wc -l` -eq 0 ] ; then
-        ifconfig eth0|grep 'inet '|awk '{print $2}'
-        return 0
-    fi
-    cat $cfgfile|grep IPADDR |awk -F'=' '{print $2}'
-    return 0
 }
 
 function cm_check_isnum()

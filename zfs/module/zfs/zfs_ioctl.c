@@ -203,11 +203,9 @@
 
 #include <sys/fmd_transport.h>
 
-#ifdef USE_HENGWEI
 #include <linux/notifier.h>
 extern struct atomic_notifier_head mpt3sas_notifier_list;
 extern struct notifier_block vdev_disk_notifier;
-#endif
 
 kmutex_t zfsdev_state_lock;
 zfsdev_state_t *zfsdev_state_list;
@@ -6436,6 +6434,57 @@ zfs_ioc_do_lun_migrate(zfs_cmd_t *zc)
 	return (0);
 }
 
+struct
+{
+	int code;
+	char *event;
+} ereport_event[] = 
+{
+	{FM_SIMULATE_DEVICE_MERR,		FM_EREPORT_ZFS_DEVICE_MERR},
+	{FM_SIMULATE_DEV_REMOVED,		FM_EREPORT_ZFS_DEV_REMOVED},
+	{FM_SIMULATE_DEV_NORESP,		FM_EREPORT_ZFS_DEV_NORESP},
+	{FM_SIMULATE_DEV_SMART_FAIL,	FM_EREPORT_ZFS_DEV_SMART_FAIL}
+};
+#define ARRAYSIZE(X)  (sizeof(X) / sizeof(X[0]))
+
+static int
+zfs_ioc_fm_simulate(zfs_cmd_t *zc)
+{
+	spa_t *spa = NULL;
+	vdev_t *vd = NULL;
+	char *event;
+	int i;
+	
+	mutex_enter(&spa_namespace_lock);
+	
+	while ((spa = spa_next(NULL)) != NULL) {
+		if (spa_find_disk(spa, zc->zc_name, &vd))
+			break;
+	}
+	
+	mutex_exit(&spa_namespace_lock);
+
+	if (vd) {
+		for (i = 0; i < ARRAYSIZE(ereport_event); i++) {
+			if (ereport_event[i].code == (int)zc->zc_perm_action) {
+				event = ereport_event[i].event;
+				break;
+			}
+		}
+
+		if (event)
+			vdev_simulate_fault(vd, event);
+		else
+			cmn_err(CE_WARN, "no such fault code %"PRIu64, zc->zc_perm_action);
+	} else {
+		cmn_err(CE_NOTE, "%s not in local pools, not to simulate ereport",
+			zc->zc_name);
+	}
+	
+	return (0);
+}
+
+
 static zfs_ioc_vec_t zfs_ioc_vec[ZFS_IOC_LAST - ZFS_IOC_FIRST];
 
 static void
@@ -6816,6 +6865,9 @@ zfs_ioctl_init(void)
 		zfs_secpolicy_none, NO_NAME, B_FALSE, POOL_CHECK_NONE);
 
 	zfs_ioctl_register_legacy(ZFS_IOC_GET_ALL_DIRQUOTA, zfs_ioc_get_all_dirquota,
+		zfs_secpolicy_none, NO_NAME, B_FALSE, POOL_CHECK_NONE);
+
+	zfs_ioctl_register_legacy(ZFS_IOC_FM_SIMULATE, zfs_ioc_fm_simulate,
 		zfs_secpolicy_none, NO_NAME, B_FALSE, POOL_CHECK_NONE);
 }
 
@@ -7284,10 +7336,8 @@ _init(void)
 	tsd_create(&zfs_allow_log_key, zfs_allow_log_destroy);
 	cluster_proto_register();
 
-#ifdef USE_HENGWEI
     zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier);
-#endif
 
 	printk(KERN_NOTICE "ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
@@ -7323,10 +7373,8 @@ _fini(void)
 	zvol_fini();
 	cluster_proto_unregister();
 
-#ifdef USE_HENGWEI
     zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier);
-#endif
 
 	tsd_destroy(&zfs_fsyncer_key);
 	tsd_destroy(&rrw_tsd_key);

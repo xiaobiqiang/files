@@ -1263,7 +1263,7 @@ function cm_cnm_lun_update_exec()
     fi
     
     if [ "X${write_policy}" != "X" ] && [ "X${write_policy}" != "X${paramnull}" ]; then
-        CM_EXEC_CMD "zfs set origin:sync=${is_hot} ${lunname}"
+        CM_EXEC_CMD "zfs set origin:sync=${write_policy} ${lunname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             return $iRet
@@ -1426,20 +1426,23 @@ function cm_cnm_nas_set()
         else
             sharesmb="off"
         fi
-        CM_EXEC_CMD "zfs set sharesmb=${sharesmb} ${nasname}"
-        iRet=$?
-        if [ $iRet -ne $CM_OK ]; then
-            ((failnum=$failnum+1))
-        else
-            if [ "X${abe}" != "X" ] && [ "X${abe}" != "X${paramnull}" ]; then
-                /var/cm/script/cm_shell_exec.sh cm_set_abe ${nasname} "${abe}"
+        local status=`zfs get sharesmb ${nasname} |sed 1d |awk '{print $3}'`
+        if [ "X$status" != "X$sharesmb" ]; then
+            CM_EXEC_CMD "zfs set sharesmb=${sharesmb} ${nasname}"
+            iRet=$?
+            if [ $iRet -ne $CM_OK ]; then
+                ((failnum=$failnum+1))
+            else
+                if [ "X${abe}" != "X" ] && [ "X${abe}" != "X${paramnull}" ]; then
+                    /var/cm/script/cm_shell_exec.sh cm_set_abe ${nasname} "${abe}"
+                fi
             fi
         fi
     fi
     
     if [ "X${aclinherit}" != "X" ] && [ "X${aclinherit}" != "X${paramnull}" ]; then
         local wp=("discard" "noallow" "restricted" "passthrough" "passthrough-x")
-        CM_EXEC_CMD "zfs set origin:sync=${wp[$aclinherit]} ${nasname}"
+        CM_EXEC_CMD "zfs set aclinherit=${wp[$aclinherit]} ${nasname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then
             ((failnum=$failnum+1))
@@ -1447,7 +1450,6 @@ function cm_cnm_nas_set()
     fi
     
     if [ "X${quota}" != "X" ] && [ "X${quota}" != "X${paramnull}" ]; then
-        local wp=("unkown" "disk" "poweroff" "mirror" "standard" "always")
         CM_EXEC_CMD "zfs set quota=${quota} ${nasname}"
         iRet=$?
         if [ $iRet -ne $CM_OK ]; then

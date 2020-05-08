@@ -18,6 +18,8 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <scsi/sg.h>
+#include <libzfs.h>
+
 
 #include "disk-transport.h"
 #include "disk_db.h"
@@ -591,7 +593,7 @@ dt_get_scsi_rpm( disk_info_t *disk ) {
 	uint8_t cmd[] = {0x12, 1, 0xB1, 0, INQ_REPLY_LEN, 0 } ;
 	int fd ;
 	sg_io_hdr_t io_hdr ;
-
+	int u;
 	if( (fd = open( path, O_RDONLY ) ) == -1 ) {
 		fprintf( stderr, "in %s[%d]: cann't open dev<%s> for reading, error( %s )\n", __func__, __LINE__, path, strerror( errno ) ) ;
 		return (-1);
@@ -616,9 +618,23 @@ dt_get_scsi_rpm( disk_info_t *disk ) {
 		close(fd);
 		return (-1);
 	}
-
+	
 	close(fd);
-	disk->dk_rpm = output[4] * 256 + output[5] ;
+	
+	u= output[4] * 256 + output[5] ;
+	disk->dk_rpm = 0;
+	if (0 == u){
+        syslog(LOG_ERR,"  Medium rotation rate is not reported\n");
+	}
+    else if (1 == u){
+        syslog(LOG_ERR,"Non-rotating medium (e.g. solid state)\n");
+    }
+    else if ((u < 0x401) || (0xffff == u)){
+        syslog(LOG_ERR,"  Reserved [0x%x]\n", u);
+    }
+    else{
+		disk->dk_rpm = u;
+    }
 
 	return (0);
 }
@@ -679,9 +695,198 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
     return (0);
 }
 
+#define NVCHAR 0
+#if NVCHAR
+#else
+typedef struct find_cbdata {
+	uint64_t	cb_guid;
+	const char	*cb_devid;
+	const char	*cb_fru;
+	zpool_handle_t	*cb_zhp;
+	nvlist_t	*cb_vdev;
+} find_cbdata_t;
+
+static nvlist_t *
+find_vdev(libzfs_handle_t *zhdl, nvlist_t *nv, const char *search_devid,
+    uint64_t search_guid)
+{
+	uint64_t guid;
+	nvlist_t **child;
+	uint_t c, children;
+	nvlist_t *ret;
+
+	if (search_devid != NULL) {
+		/*  
+		 * because vdev's fru=0, so we use vdev's devid
+		 * to find the disk that will be failed.
+		 */
+#if 0
+		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0 &&
+			devid_str_compare(devid, (char *)search_devid) == 0)
+			return (nv);
+#endif
+	} else {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) == 0 &&
+		    guid == search_guid)
+			return (nv);
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_devid,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_devid,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_devid,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_METASPARES,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_devid,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
+
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_LOWSPARES,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_devid,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
+	return (NULL);
+}
+
+static int
+find_pool(zpool_handle_t *zhp, void *data)
+{
+	find_cbdata_t *cbp = data;
+
+	if (cbp->cb_guid ==
+	    zpool_get_prop_int(zhp, ZPOOL_PROP_GUID, NULL)) {
+		cbp->cb_zhp = zhp;
+		return (1);
+	}
+
+	zpool_close(zhp);
+	return (0);
+}
+
+static zpool_handle_t *
+find_by_guid(libzfs_handle_t *zhdl, uint64_t pool_guid, uint64_t vdev_guid,
+    nvlist_t **vdevp)
+{
+	find_cbdata_t cb;
+	zpool_handle_t *zhp;
+	nvlist_t *config, *nvroot;
+
+	/*
+	 * Find the corresponding pool and make sure the vdev still exists.
+	 */
+	cb.cb_guid = pool_guid;
+	if (zpool_iter(zhdl, find_pool, &cb) != 1)
+		return (NULL);
+
+	zhp = cb.cb_zhp;
+	config = zpool_get_config(zhp, NULL);
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) != 0) {
+		zpool_close(zhp);
+		return (NULL);
+	}
+
+	if (vdev_guid != 0) {
+		if ((*vdevp = find_vdev(zhdl, nvroot, NULL,
+		    vdev_guid)) == NULL) {
+			zpool_close(zhp);
+			return (NULL);
+		}
+	}
+
+	return (zhp);
+}
+#endif
+
 static void
 dt_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
+	char hostname[128] = {0};
+	char buff[512] = {0};
+#if NVCHAR
+	char vdev_type[32] = {0};
+	char vdev_path[128] = {0};
+	char * cpart;
+#else
+	uint64_t pool_guid, vdev_guid;
+	zpool_handle_t *zhp = NULL;
+	char * dev_name = NULL;
+	nvlist_t *vdev = NULL;
+	libzfs_handle_t *zhdl = libzfs_init();
+#endif
+	if (gethostname(hostname, sizeof(hostname)) < 0) {
+		syslog(LOG_ERR, "get hostname failed\n");
+	}
+
+#if NVCHAR
+	printf("recv class:%s\n",class);
+	
+	if(strcmp(class,"ereport.fs.zfs.dev.removed") == 0){
+		nvlist_lookup_string(nvl,FM_EREPORT_PAYLOAD_ZFS_VDEV_TYPE,&vdev_type);
+		
+		if(strcmp(vdev_type,"disk") == 0){
+			nvlist_lookup_string(nvl,FM_EREPORT_PAYLOAD_ZFS_VDEV_PATH,&vdev_path);
+			printf("recv class:%s path:%s\n",class,vdev_path);
+			cpart = strstr(vdev_path,"-part");
+			if(cpart)
+				*cpart = 0;
+			cm_alarm_cmd(buff,sizeof(buff), "%s %d \"%s,%s,-,-,-\"",
+                             "report", AMARM_ID_DISK_LOST,
+                             hostname, vdev_path);
+		}else{
+			printf("type:%s \n",vdev_type);
+		}
+	}
+#else
+	if(NULL == zhdl){
+		return;
+	}
+	if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
+		    &pool_guid) != 0 ||
+		    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID,
+		    &vdev_guid) != 0)
+			return;
+
+	if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
+	    &vdev)) == NULL)
+		return;
+
+	dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
+	cm_alarm_cmd(buff,sizeof(buff), "%s %d \"%s,%s,-,-,-\"",
+                             "report", AMARM_ID_DISK_LOST,
+                             hostname, dev_name);
+#endif
+
 	return;
 }
 

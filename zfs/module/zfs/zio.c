@@ -3403,11 +3403,11 @@ zio_done(zio_t *zio)
 	}
 
 	if (zio->io_error) {
-		zfs_dbgmsg("zio %p error %d flags %x reexcute %d",
-			zio, zio->io_error, zio->io_flags, zio->io_reexecute);
+		zfs_dbgmsg("zio error %d flags %x reexcute %d",
+			zio->io_error, zio->io_flags, zio->io_reexecute);
 		if (zio->io_vd != NULL) {
-			zfs_dbgmsg("zio %p vd_guid %llx",
-				zio, (u_longlong_t)zio->io_vd->vdev_guid);
+			zfs_dbgmsg("zio vd_guid %llx",
+				(u_longlong_t)zio->io_vd->vdev_guid);
 		}
 		/*
 		 * If this I/O is attached to a particular vdev,

@@ -12,6 +12,7 @@ DEFAULT_INCLUDES += \
 	-I/usr/include/libxml2
 
 libdisk_transport_la_LTLIBRARIES = libdisk_transport.la
+dist_libdisk_transport_la_DATA = libdisk_transport.conf
 
 USER_C = \
 	disk-transport.c \

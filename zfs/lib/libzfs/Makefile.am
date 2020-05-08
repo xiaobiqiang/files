@@ -26,7 +26,8 @@ USER_C = \
 	libzfs_status.c \
 	libzfs_util.c  \
 	libzfs_rpc.c	\
-	libzfs_zfs.c
+	libzfs_zfs.c	\
+	cluster_log.c
 
 KERNEL_C =
 

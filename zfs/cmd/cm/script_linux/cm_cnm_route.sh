@@ -4,13 +4,13 @@ source '/var/cm/script/cm_common.sh'
 
 function cm_cnm_route_getbatch()
 {
-	route |egrep -v 'Kernel|Destination'|awk '{print $1" "$2" "$3}'
+	route -n|egrep -v 'Kernel|Destination'|awk '{print $1" "$2" "$3}'
 	return $CM_OK
 }
 
 function cm_cnm_route_count()
 {
-	len=`route |egrep -v 'Kernel|Destination'|wc -l`
+	len=`route -n|egrep -v 'Kernel|Destination'|wc -l`
 	echo $len
 	return $CM_OK
 }
@@ -20,7 +20,7 @@ function cm_cnm_route_create()
 	local destination=$1
 	local netmask=$2
 	local geteway=$3
-	num=`route |grep "$destination"|grep "$netmask"|grep "$geteway"|wc -l`
+	num=`route -n|grep "$destination"|grep "$netmask"|grep "$geteway"|wc -l`
 	if [ $num -ne 0 ]; then
 		CM_LOG "[${FUNCNAME}:${LINENO}] already exsit"
 		return $CM_ERR_ALREADY_EXISTS
@@ -38,7 +38,7 @@ function cm_cnm_route_delete()
 	local destination=$1
 	local netmask=$2
 	local geteway=$3
-	num=`route |grep "$destination"|grep "$netmask"|grep "$geteway"|wc -l`
+	num=`route -n|grep "$destination"|grep "$netmask"|grep "$geteway"|wc -l`
 	if [ $num -eq 0 ]; then
 		CM_LOG "[${FUNCNAME}:${LINENO}] no exsit"
 		return $CM_ERR_NOT_EXISTS

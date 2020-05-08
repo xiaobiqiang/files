@@ -1073,7 +1073,7 @@ zpool_open_canfail(libzfs_handle_t *hdl, const char *pool)
 
 	if ((zhp = zfs_alloc(hdl, sizeof (zpool_handle_t))) == NULL)
 		return (NULL);
-
+	
 	zhp->zpool_hdl = hdl;
 	(void) strlcpy(zhp->zpool_name, pool, sizeof (zhp->zpool_name));
 

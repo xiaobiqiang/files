@@ -1,5 +1,5 @@
 fm_dictsdir = /var/fm/dict
-dist_fm_dicts_SCRIPTS = 		\
+dist_fm_dicts_DATA = 		\
 			AMD.dict	\
 			DISK.dict	\
 			FMD.dict	\
@@ -18,6 +18,3 @@ dist_fm_dicts_SCRIPTS = 		\
 			SUNOS.dict	\
 			TEST.dict	\
 			ZFS.dict
-install: 
-	@mkdir -p $(fm_dictsdir)
-	@cp -rvf $(dist_fm_dicts_SCRIPTS) $(fm_dictsdir) 

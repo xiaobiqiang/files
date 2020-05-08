@@ -1449,6 +1449,8 @@ dsl_scan_active(dsl_scan_t *scn)
 		return (B_FALSE);
 	if (spa_shutting_down(spa))
 		return (B_FALSE);
+	if (spa->spa_importing)
+		return (B_FALSE);
 	if (scn->scn_phys.scn_state == DSS_SCANNING ||
 	    (scn->scn_async_destroying && !scn->scn_async_stalled))
 		return (B_TRUE);

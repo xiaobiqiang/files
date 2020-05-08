@@ -2327,6 +2327,20 @@ zfs_do_hbx_process_ex(libzfs_handle_t * hdl, char * buffer, int size,
 	}
 }
 
+int 
+zfs_fm_simulate(libzfs_handle_t *hdl, char *diskname, int fault)
+{
+	zfs_cmd_t zc = {"\0"};
+	int err;
+
+	bzero(&zc, sizeof(zfs_cmd_t));
+	strncpy(zc.zc_name, diskname, strlen(diskname));
+	zc.zc_perm_action = fault;
+
+	err = ioctl(hdl->libzfs_fd, ZFS_IOC_FM_SIMULATE, &zc);
+	return (err);
+}
+
 int
 get_clusnodename(char *buf, int len)
 {
@@ -2345,101 +2359,44 @@ get_clusnodename(char *buf, int len)
  *
  */
 int
-disk_get_poolname(const char *dev,char *pool_name)
+disk_get_poolname(const char *dev,char *pool_name,int size)
 {
-	int fd;
 	vdev_label_t label;
-	char *path = NULL, *buf = label.vl_vdev_phys.vp_nvlist;
+	char path[128] = {0};
+	char *buf = label.vl_vdev_phys.vp_nvlist;
 	size_t buflen = sizeof (label.vl_vdev_phys.vp_nvlist);
 	struct stat64 statbuf;
 	uint64_t psize, ashift;
 	int tmp_len = strlen(dev) + 1;
-	int len;
 	char *tmp_path = NULL;
-	int l;
+	int l = 0;
 	int ret = 0;
-
-	if (strncmp(dev, "/dev/dsk/", 9) == 0) {
-		tmp_len++;
-		if((tmp_path = malloc(tmp_len)) == NULL) {
-			return -1;
-		}
-		(void) snprintf(tmp_path, tmp_len, "%s%s", "/dev/rdsk/", dev + 9);
-	} else {
-		tmp_path = strdup(dev);
-	}
-
-	len = strlen(tmp_path) +3;
-	if ((path = malloc(len + 3)) == NULL) {	
-		return -1;
-
-	}
-
-
-	if (*(tmp_path + len - 2) != 's'){
-		(void) snprintf(path, len, "%ss0", tmp_path);
-	}else
-		(void) snprintf(path, len, "%s", tmp_path);
-	free(tmp_path);
-	tmp_path = NULL;
-
-
-	if ((fd = open64(path, O_RDONLY)) < 0) {
-		free(path);
-		return ret;
-	}
-
-	if (fstat64(fd, &statbuf) != 0) {
-		(void) printf("failed to stat '%s': %s\n", path,
-		    strerror(errno));
-		free(path);
-		(void) close(fd);
-		return ret;
-
-	}
-
-	if (S_ISBLK(statbuf.st_mode)) {
-		(void) printf("cannot use '%s': character device required\n",
-		    path);
-		free(path);
-		(void) close(fd);
-		return ret;
-	}
-
-	psize = statbuf.st_size;
-	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
-
-	for (l = 0; l < VDEV_LABELS; l++) {
-		nvlist_t *config = NULL;
-		char *tmp_pool_name;
-
-		if (pread64(fd, &label, sizeof (label),
-		    label_offset(psize, l)) != sizeof (label)) {
-			(void) printf("failed to read label %d\n", l);
-			continue;
-		}
-
-		if (nvlist_unpack(buf, buflen, &config, 0) != 0) {
-			/* do not have inuse */
-			ret = 0;
-			continue;
-		} else {
-			free(path);
-			(void) close(fd);
-			if (nvlist_lookup_string(config,
-					ZPOOL_CONFIG_POOL_NAME, &tmp_pool_name) == 0) {
-						ret = 1;
-				strcpy(pool_name,tmp_pool_name);
-			} else {
-				ret = 2;
-			}
-			nvlist_free(config);
-			return ret;
-		}
-	}
+	FILE *fp1 = NULL,*fp2 = NULL;
+	char lab[128] = {0};
+	char mountcmd[512] = {0};
+	char blkcmd[512] = {0};
 	
-	free(path);
-	(void) close(fd);
+	(void) snprintf(path, sizeof(path), "%s-part1", dev);
+	(void) snprintf(blkcmd,sizeof(blkcmd),"blkid -s LABEL -o value %s",path);
+	//(void) snprintf(blkcmd,sizeof(blkcmd),"blkid -s LABEL -o value");
+	fp1 = popen(blkcmd,"r");
+	if(fp1 == NULL){
+		return 0;
+	}
+	memset(pool_name,0,size);
+	if(fgets(lab, sizeof(lab), fp1) != NULL) {
+		strncpy(pool_name,lab,sizeof(lab));
+		l = strlen(pool_name);
+		if(l != 0){
+			if(pool_name[l - 1] == '\r'||pool_name[l - 1] == '\n'){
+				pool_name[l - 1] = '\0';
+			}
+		}
+		ret = 1;
+	}else{
+		ret = 0;
+	}
+	pclose(fp1);
 	return ret;
 }
 
@@ -4000,7 +3957,10 @@ void zpool_check_thin_luns(zfs_thinluns_t **statpp)
         check_pool_thinlun_data_t *cbdata;
         zfs_thinluns_t *luns_stat;
         
-        tmp_gzfs = libzfs_init();
+        if((tmp_gzfs = libzfs_init()) == NULL){
+			return;
+		}
+		
         cbdata  = calloc(1, sizeof(check_pool_thinlun_data_t));
         bzero(cbdata, sizeof(check_pool_thinlun_data_t));
         cbdata->thinluns_stat = calloc(MAX_POOl_NUM, sizeof(pool_thinluns_stat_t));
@@ -4572,12 +4532,37 @@ zfs_start_lun_migrate(libzfs_handle_t *hdl, const char *dst, char *pool, char *g
 	return (zfs_lun_migrate_check(hdl, dst, pool, guid) != 0);
 }
 
-boolean_t
-zfs_check_raidz_aggre_valid(nvlist_t *nv)
+static boolean_t
+zfs_has_meta_device(nvlist_t *nv)
 {
-	nvlist_t **child;
+        nvlist_t **child;
+        uint_t c, children;
+	uint64_t meta_avail = 0;
+
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_META, &meta_avail) == 0) {
+		if (meta_avail)
+			return (B_TRUE);
+	}
+	
+        if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
+            &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if (zfs_has_meta_device(child[c]))
+				return (B_TRUE);
+		}
+	}
+	
+	return (B_FALSE);
+}
+
+int
+zfs_check_raidz_aggre_valid(nvlist_t *nv, nvlist_t *old)
+{
+	nvlist_t **child, *vdev_tree = NULL;
 	uint_t c, children;
 	uint64_t is_meta;
+	int has_raidz_aggre = 0;
+	int has_meta = 0;
 	char *type;
 	
 	if(nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -4588,12 +4573,30 @@ zfs_check_raidz_aggre_valid(nvlist_t *nv)
 		verify(nvlist_lookup_string(child[c], ZPOOL_CONFIG_TYPE, &type) == 0);
 		if (strcmp(type, VDEV_TYPE_RAIDZ_AGGRE) == 0) {
 			/* can't use raidz_aggre configuration as metadata device */
+			has_raidz_aggre = 1;
 			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
 			if (is_meta)
-				return (B_FALSE);
+				return (RAIDZS_USE_AS_META);
+		} else {
+			/* raidz_aggre need metadata device */
+			verify(nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_META, &is_meta) == 0);
+			if (is_meta)
+				has_meta = 1;
 		}
 	}
 
-	return (B_TRUE);	
+	if (has_raidz_aggre) {
+		if (!has_meta) {
+			if (old) {
+				verify(nvlist_lookup_nvlist(old,
+			    		ZPOOL_CONFIG_VDEV_TREE, &vdev_tree) == 0);
+				has_meta = zfs_has_meta_device(vdev_tree);
+			}
+		}
+
+		return has_meta ? 0 : RAIDZS_NEED_META;	
+	}
+	
+	return (0);
 }
 

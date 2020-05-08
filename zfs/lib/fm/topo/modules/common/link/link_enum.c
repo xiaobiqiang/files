@@ -756,7 +756,7 @@ int fc_link_walk(conn_handle_t *chp){/*{{{*/
 	fp1 = popen("ls -l /sys/class/fc_host/|awk -F' ' '/host/{print $9}'", "r");
 	while(fgets(linkname, CMDLEN, fp1)){
 		linkname[strlen(linkname)-1] = 0;
-		sprintf(cmd, "cat /sys/class/fc_host/%s/port_state", linkname);
+		sprintf(cmd, "cat /sys/class/fc_host/%s/port_state 2>/dev/null", linkname);
 		fp2 = popen(cmd, "r");
 		fgets(state, CMDLEN, fp2);
 		state[strlen(state)-1] = 0;

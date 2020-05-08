@@ -5,6 +5,8 @@ source '/var/cm/script/cm_common.sh'
 ZVOL_DIR='/dev/zvol'
 PROC_DISKSTATS='/proc/diskstats'
 FC_DIR='/sys/class/fc_host/'
+PROC_STMF_DIR="/proc/spl/kstat/stmf"
+
 #==============================================================================
 #调用说明
 #./cm_shell_exec.sh <functionname> <arg1> <arg2> <...>
@@ -47,7 +49,8 @@ function cm_pmm_nics()
 
 function cm_pmm_node_stat()
 {
-    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{print ob" "rb}'`
+    # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题
+    local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{printf("%.0f %.0f",ob,rb)}'`
     #*100是为了uint64取值，之后会/100取得正确结果
     local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs*100" "ws*100}'`
     local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print ($1+$3)*100" "$6*100}'`
@@ -187,9 +190,10 @@ function cm_get_hoststrid()
 
 function cm_get_localcmid()
 {
-    local mport=`cm_get_localmanageport`
-    local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
-    echo $interid
+    local myip=`cm_get_localmanageip`
+    #local interid=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'|awk -F'.' '{myid=$3*512+$4;print myid}'`
+    #echo $interid
+    echo $myip  |awk -F'.' '{myid=$3*512+$4;print myid}'
     return 0
 }
 
@@ -205,12 +209,7 @@ function cm_get_nodeinfo()
     if [ $ostype -ne $CM_OS_TYPE_DEEPIN ];then
         devtype=`dmidecode | grep Maufacturer|awk '{print $2}'`
     fi
-    local myip="127.0.0.1"
-    local mport=`cm_get_localmanageport`
-    if [ "X"$mport = "X" ]; then
-        mport=`ifconfig -a| head -n 1|awk -F':' '{print $1}'`
-    fi
-    myip=`ifconfig ${mport} | grep 'inet '|awk '{print $2}'`
+    local myip=`cm_get_localmanageip`
     if [ "X"$myip = "X" ]; then
         myip='0.0.0.0'
     fi
@@ -229,6 +228,8 @@ function cm_get_nodeinfo()
 function cm_disk_update_cache()
 {
     cp /var/cm/data/db_disk.db /var/cm/data/cm_db_disk.db 2>/dev/null
+    
+    cm_check_node_offine
     return 0
 }
 
@@ -273,7 +274,7 @@ function cm_lun_delete()
             return $CM_ERR_LUNMAP_EXISTS
         fi
     else
-        return $CM_ERR_NOT_EXISTS
+        CM_LOG "[${FUNCNAME}:${LINENO}]$pool/$lun lu not found"
     fi
     sleep 2
     zfs destroy -rRf $pool/$lun
@@ -456,7 +457,7 @@ function cm_pmm_get_lu()
     return $?    
 }
 
-function cm_pmm_lun()
+function cm_pmm_lun_back()
 {
     local full_name=$1
     local pool_name=`echo $full_name|awk -F'/' '{print $1}'`
@@ -490,6 +491,23 @@ function cm_pmm_lun()
     return $?
 }
 
+function cm_pmm_lun()
+{
+#   echo "name      nread    nwritten reads    writes   wtime    wlentime wupdate  rtime    rlentime rupdate  wcnt     rcnt"
+    local name=$1
+    local luns=`ls $PROC_STMF_DIR |grep "stmf_lu_f"`
+    for lu in $luns
+    do
+        local lu_id=`echo "$lu" |awk -F'_' '{print $3}'`
+        local lu_name=`grep 'lun-alias' $PROC_STMF_DIR/$lu |awk '{print $3}'|sed 's:/dev/zvol/::g'`
+        if [ "X$lu_name" == "X$name" ];then
+            local lu_data=`sed -n 3p $PROC_STMF_DIR/stmf_lu_io_${lu_id}|awk '{printf $1" "$2" "$3" "$4}'`
+            echo "${lu_data}"
+        fi
+    done
+    return $CM_OK
+}
+
 function cm_pmm_lun_check()
 {
     local name=$1
@@ -499,17 +517,34 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    local read=`cat /proc/net/dev|grep $name|awk '{print $2}'`
-    local write=`cat /proc/net/dev|grep $name|awk '{print $10}'`
+    local read=`cat /proc/net/dev|grep $name:|awk '{print $2}'`
+    local write=`cat /proc/net/dev|grep $name:|awk '{print $10}'`
+    local rerr=`cat /proc/net/dev|grep "$name:"|awk '{print $4}'`
+    local werr=`cat /proc/net/dev|grep "$name:"|awk '{print $12}'`
     
-    echo "0 0 100000000 2 0 0 $write $write 0 $read $read"
+    
+    echo "0 $rerr 100000000 2 0 0 $write $write $werr $read $read"
     return $?
 }
 
 function cm_pmm_dup_ifspeed()
 {
     local name=$1
-    kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    
+    if [ "X"$name = "X" ]; then
+        return $CM_FAIL
+    fi
+    #kstat -m link -n $name|egrep 'link_duplex|ifspeed'|awk '{printf $2" "}'
+    local duplex=`ethtool $name|grep Duplex|awk '{print $2}'`
+    local speed=`ethtool $name|grep Speed|awk '{print $2}'|sed "s/Mb\/s//g"`
+    ((speed=$speed*1024*1024))
+    
+    if [ duplex='Full' ]; then
+        echo "$speed 2.0"    
+    else
+        echo "$speed 1.0"
+    fi
+    
     return $?
 }
 
@@ -580,6 +615,18 @@ function cm_pmm_cache()
     $1=="l2_misses"{printf $2" "}
     $1=="size"{printf $2" "}
     $1=="l2_size"{printf $2" "}'
+}
+
+function cm_create_lu()
+{
+    local lun=$1
+    local version=`uname -a|grep Linux|wc -l`
+    if [ $version -eq 0 ];then
+        stmfadm create-lu /dev/zvol/rdsk/$lun
+    else
+        stmfadm create-lu /dev/zvol/$lun
+    fi
+    return $?
 }
 #==============================================================================
 #执行函数

@@ -3818,6 +3818,14 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	
 	if (sbd_is_zvol(sl->sl_meta_filename)) {
 		char *zvol_name = sbd_get_zvol_name(sl);
+		cmn_err(CE_WARN, "%s %s create minor", __func__, zvol_name);
+		ret = zvol_create_minor(zvol_name);
+		if (ret) {
+			cmn_err(CE_WARN, "%s %s create minor failed", __func__, zvol_name);
+			kmem_free(zvol_name, strlen(zvol_name) + 1);
+			*err_ret = SBD_RET_META_FILE_LOOKUP_FAILED;
+			goto sim_err_out;
+		}
 		ret = zvol_get_disk_name(zvol_name, disk_name, sizeof(disk_name));
 		kmem_free(zvol_name, strlen(zvol_name) + 1);
 		sl->sl_flags |= SL_ZFS_META;

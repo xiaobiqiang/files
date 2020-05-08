@@ -230,7 +230,7 @@ main(int argc, char *argv[])
 {
 	int		ret = 0;
 	int		idx = NULL_SUBCMD;
-	char		c;
+	signed char		c;
 	int		newargc = argc;
 	char		**newargv = NULL;
 	char		*objp;

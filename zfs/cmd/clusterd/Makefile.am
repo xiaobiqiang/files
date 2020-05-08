@@ -14,8 +14,6 @@ sbin_PROGRAMS = clusterd
 clusterd_SOURCES = \
 	clusterd.c \
 	clusterd.h \
-	cluster_log.c \
-	cluster_log.h \
 	cn_cluster.c \
 	cn_cluster.h \
 	deflt.c \

@@ -549,27 +549,36 @@ static int is_root_disk_new(const char *dev_path)
 	int
 disk_get_enid_slotid(const char *dev ,int *en_id,int *slot_id)
 {
-
-	int fd;
 	int ret = -1;
-	un_locate_info_t un_info;
-
-	if ((fd = open(dev, O_RDWR | O_NDELAY)) >= 0) {
-
-		/* to get enclosure id and slot id info */
-		if (ioctl(fd, DKIOCGETLUNEXT, &un_info) == 0) {
-
-			*en_id = un_info.en_id;
-			*slot_id = un_info.slot_id;
-			ret = 0;
-		}
-
-		close(fd);
-	} else {
-		syslog(LOG_ERR, "open path:<%s> failed.", dev);
-		ret = -1;
+	FILE * fd;
+	char path[128] = {0};
+	char tmp[1024] = {0};
+	
+	system("/usr/local/sbin/get_en_slot.sh > /dev/null");
+	fflush(NULL);
+	fd = fopen("/tmp/.sasdisk","r");
+	if(NULL == fd){
+		*en_id = 0;
+		*slot_id = 0;
+		return -1;
 	}
-	return ret;
+
+	while (fgets(tmp, sizeof(tmp), fd)) {
+		if (tmp[0] == '\n' || tmp[0] == '\r') 
+			continue;
+		sscanf(tmp,"%d %d %s",en_id,slot_id,path);
+		path[17] = 0;
+		if (strcasestr(dev,(path + 2))) {
+			fclose(fd);
+			return 0;
+		} else {
+			continue;
+		}
+	}
+
+	fclose(fd);
+	
+	return 0;
 }
 
 
@@ -1503,7 +1512,7 @@ int disk_get_info(disk_table_t *dt)
 	}
 
 	for (di_cur = dt->next; di_cur != NULL; di_cur = di_cur->next) {
-		if (disk_get_system(di_cur->dk_name)) {
+		if (disk_get_system(di_cur->dk_scsid)) {
 			di_cur->dk_is_sys = 1;
 		}
 	}
@@ -1521,16 +1530,17 @@ int disk_get_system(char *disk_name)
 	char dev[ARGS_LEN] = {0};
 	char tmp[CMD_TMP_LEN] = {0};
 
-	fp = popen("grep ceres_sys /var/fm/.blkid.txt", "r");
+	fp = fopen("/var/fm/systemdisk", "r");
 	if(fp == NULL) {
-		return; 
+		return 0; 
 	}
+	
 	while (fgets(tmp, sizeof(tmp), fp)) {
 		if (tmp[0] == '\n' || tmp[0] == '\r') 
 			continue;
 		
 		sscanf(tmp, "%s", dev);
-		if (strncmp(dev, disk_name, 8) == 0) {
+		if (strcasestr(disk_name,dev)) {
 			pclose(fp);
 			return 1;
 		} else {

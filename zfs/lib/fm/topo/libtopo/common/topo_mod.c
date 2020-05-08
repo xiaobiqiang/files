@@ -90,12 +90,14 @@
 #include <alloca.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <syslog.h>
 #include <ctype.h>
 #include <sys/param.h>
 #include <sys/utsname.h>
 //#include <sys/smbios.h>
 #include <sys/fm/protocol.h>
-
+#include <sys/types.h>
+#include <fcntl.h>
 #include <topo_protocol.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
@@ -940,7 +942,7 @@ topo_fru_setime(const char *name, int status, char *diskname,
             fru->tf_status |= status;
             fru->nor_count = 0;
             fru->err_count++;
-            fru->flag = status;         
+            fru->flag = status; 
             return fru;
         } else if (fru->err_count < 3) {
             fru->nor_count = 0;
@@ -1052,3 +1054,520 @@ topo_fru_hash_destroy(void)
 		sizeof (void *) * TOPO_FRUHASH_BUCKETS);
 }
 
+void
+cm_alarm_cmd(char *buf, int size,const char *format, ...)
+{
+	va_list arg;
+	int n = 0;
+    char* p = NULL;
+
+	memset(buf, size, 0);
+	n = snprintf(buf, CM_ALARM_CMD_LEN, CM_ALARM_CMD_T);
+	
+	va_start(arg, format);
+	vsnprintf(buf + n, CM_ALARM_CMD_LEN, format, arg);
+	va_end(arg);
+
+    p = buf;
+    while(*p != '\0'){
+        if(*p == '\n'){
+            *p = ' ';
+        }
+        p++;
+    }
+        
+	if (system(buf) != 0)
+		syslog(LOG_ERR, "system error: %s\n", buf);
+}
+
+/*topo alarm xml*/
+#define TOPO_FRU_XML_PATH "/var/fm/topo_fru.xml"
+static pthread_mutex_t g_topo_fru_xml_lock;
+static xmlDocPtr topo_xml_doc;
+
+#define ALARMED "alarm"
+#define NON_ALARMED "non-alarm"
+#define ISCLEAR 0x1 << 1
+#define TISSET 	0x1	<< 2
+#define SETCNT	0x1	<< 3
+
+#define INFOMAXLEN 512
+#define ISFINELEN(a)\
+	(((a) > (INFOMAXLEN))||((a) < (0)))
+typedef xmlNodePtr topo_xml_hd_t;
+
+typedef struct xml_node_list{
+	int cnt;
+	int tocm;
+	int alarmid;
+	xmlNodePtr xmlNode;
+	struct xml_node_list *nodeNext;
+}xml_node_list_t;
+
+typedef struct xml_nodes {
+	xml_node_list_t * xmlHead;
+	int 	   xmlLen;
+}xml_nodes_t;
+
+enum{
+	TOPO_XML_SUCCESS,
+	TOPO_XML_FAULT,
+	TOPO_NODE_EXIST,
+	TOPO_NODE_NON_EXIST,
+	TOPO_SET_INFO_OK,
+	TOPO_SET_INFO_FAULT
+};
+
+#define HOSTNAMEXML 64
+
+static int topo_fru_xml_exist();
+static void topo_fru_xml_node_list_instert(xml_nodes_t *,xmlNodePtr,int,int);
+
+
+#define TOPO_FRU_XML_IS_EXIST topo_fru_xml_exist()
+
+static xml_node_list_t * topo_fru_xml_alloc()
+{
+	return (xml_node_list_t *)topo_zalloc(sizeof(xml_node_list_t), 1);
+}
+
+static void topo_fru_xml_free(xml_node_list_t * ptr)
+{
+	topo_free(ptr,sizeof(xml_node_list_t));
+}
+
+static void
+topo_fru_xml_lock(void)
+{
+	(void) pthread_mutex_lock(&g_topo_fru_xml_lock);
+}
+
+static void
+topo_fru_xml_unlock(void)
+{
+	(void) pthread_mutex_unlock(&g_topo_fru_xml_lock);
+}
+
+static void topo_fru_zero_buff(char * info, int size)
+{
+	memset(info,0,size);
+	return;
+}
+
+static int topo_fru_is_system_ready(char * hostname)
+{
+	if(!strncasecmp(hostname,"Prodigy",strlen("Prodigy"))){
+		return TOPO_XML_FAULT;
+	}
+
+	return TOPO_XML_SUCCESS;
+}
+
+static int topo_fru_get_hostname(char * hostname,int len){
+	if (gethostname(hostname, len) < 0) {
+			return TOPO_XML_FAULT;
+	}
+	return topo_fru_is_system_ready(hostname);
+}
+
+static int
+topo_fru_tocm_info_set(char * info, int size,va_list ap)
+{
+	int ret = TOPO_SET_INFO_OK;
+	topo_xml_type_t type;
+	char buff[INFOMAXLEN] = {0};
+	int maxlen = size - 1;
+	char * strp = NULL;
+		
+	if(ISFINELEN(size))
+		return TOPO_XML_FAULT;
+
+	topo_fru_zero_buff(info,size);
+	
+	while (ret == TOPO_SET_INFO_OK) {
+		type = va_arg(ap,topo_xml_type_t);
+		topo_fru_zero_buff(info,size);
+		strncpy(info,buff,size);
+		topo_fru_zero_buff(buff,sizeof(buff));
+		switch (type) {
+		case TOPO_XML_UINT32:
+			snprintf(buff,maxlen,"%s,%u",info,va_arg(ap, uint32_t));
+			break;
+		case TOPO_XML_INT32:
+			snprintf(buff,maxlen,"%s,%d",info,va_arg(ap, int32_t));
+			break;
+		case TOPO_XML_UINT64:
+			snprintf(buff,maxlen,"%s,%llu",info,va_arg(ap, uint64_t));
+			break;
+		case TOPO_XML_INT64:
+			snprintf(buff,maxlen,"%s,%lld",info,va_arg(ap, int64_t));
+			break;
+		case TOPO_XML_STRING:
+			strp =  va_arg(ap, char *);
+			if(strp)
+				snprintf(buff,maxlen,"%s,%s",info,strp);
+			else
+				snprintf(buff,maxlen,"%s,-",info);
+			break;
+		case TOPO_XML_DOUBLE:
+			snprintf(buff,maxlen,"%s,%llf",info,va_arg(ap, double));
+			break;
+		case TOPO_XML_LONG:
+			snprintf(buff,maxlen,"%s,%ld",info,va_arg(ap, long));
+			break;
+		case TOPO_XML_DONE:
+			ret = TOPO_XML_SUCCESS;
+			break;
+		default:
+			ret = TOPO_XML_FAULT;
+		}
+	}
+	return (ret);
+}
+
+static void topo_fru_node_list_free(xml_nodes_t * xml_nodesp){
+	xml_node_list_t * xml_cnt_node = xml_nodesp->xmlHead;
+	for(;(xml_cnt_node);xml_cnt_node = xml_cnt_node->nodeNext){
+		topo_fru_xml_free(xml_cnt_node);
+	}
+}
+
+void topo_fru_alarm_xml_init()
+{
+	xmlChar *xmlbuff;
+	int buffersize;
+	if(!TOPO_FRU_XML_IS_EXIST){
+		xmlDocPtr doc = xmlNewDoc((xmlChar *)"1.0");
+		xmlNodePtr root_node = xmlNewNode(NULL, (xmlChar *)"root");
+		xmlDocSetRootElement(doc, root_node);
+
+		xmlSaveFormatFileEnc(TOPO_FRU_XML_PATH, doc, "UTF-8", 1);
+		xmlFreeDoc(doc);
+	}
+
+	(void) pthread_mutex_init(&g_topo_fru_xml_lock, NULL);
+}
+
+static topo_xml_hd_t topo_fru_open_xml()
+{
+	xmlNodePtr rootNode;
+	xmlKeepBlanksDefault(0);
+	topo_xml_doc = xmlReadFile(TOPO_FRU_XML_PATH,"UTF-8",XML_PARSE_RECOVER);
+	if (NULL == topo_xml_doc) {
+		return NULL;
+	}
+	
+	rootNode = xmlDocGetRootElement(topo_xml_doc);
+	if (NULL == rootNode) {
+		xmlFreeDoc(topo_xml_doc);
+		return NULL;
+	}
+
+	return rootNode;
+}
+
+static void topo_fru_close_xml()
+{
+	xmlChar *xmlbuff;
+	int buffersize;
+	xmlDocDumpFormatMemory(topo_xml_doc, &xmlbuff, &buffersize, 1);
+
+	xmlSaveFormatFileEnc(TOPO_FRU_XML_PATH, topo_xml_doc, "UTF-8", 1);
+	xmlFreeDoc(topo_xml_doc);
+	xmlCleanupParser();
+	xmlMemoryDump();
+	return;
+}
+
+static int topo_fru_xml_exist(){
+	topo_xml_hd_t xml_hd;
+	
+	xml_hd = topo_fru_open_xml();
+	if(NULL == xml_hd){
+		return 0;
+	}else{
+		topo_fru_close_xml();
+	}
+	return 1;
+}
+
+static void topo_set_alarm_status_node(xmlNodePtr xmlNode)
+{
+	xmlSetProp(xmlNode,BAD_CAST("status"),BAD_CAST(ALARMED));
+}
+
+static int topo_fru_add_node_xml(topo_xml_hd_t rootNode,const char * name,
+	const int alarmid,const char * tocm){
+	xmlNodePtr node;
+	char num[64] = {0};
+	node = xmlNewChild((xmlNodePtr)rootNode, NULL, BAD_CAST("node"), NULL);
+	xmlSetProp(node,BAD_CAST("status"),BAD_CAST(ALARMED));
+	xmlSetProp(node,BAD_CAST("cnt"),BAD_CAST("0"));
+	xmlSetProp(node,BAD_CAST("tocm"),BAD_CAST(tocm));
+	snprintf(num,sizeof(num),"%d",alarmid);
+	xmlSetProp(node,BAD_CAST("alarmid"),BAD_CAST(num));
+	xmlNodeSetContent(node, BAD_CAST(name));
+	return 0;
+}
+
+static int topo_fru_delete_node_xml(xmlNodePtr xmlNode)
+{
+	xmlNodePtr nextNode = xmlNode->next;
+	xmlNodePtr prevNode = xmlNode->prev;
+	
+	xmlUnlinkNode(xmlNode);
+	xmlFreeNode(xmlNode);
+	if(prevNode)
+		prevNode->next = nextNode;
+	return 0;
+}
+
+static int topo_fru_get_alarm_cnt(xmlNodePtr xmlNode){
+	xmlChar * cnt;
+	cnt = xmlGetProp(xmlNode,BAD_CAST("cnt"));
+	return (int)atoi((char *)cnt);
+}
+
+static int topo_fru_increase_alarm_cnt(xmlNodePtr xmlNode)
+{
+	char num[64] = {0};
+	int cnt = topo_fru_get_alarm_cnt(xmlNode);
+	cnt = cnt + 1;
+	snprintf(num,sizeof(num),"%d",cnt);
+	xmlSetProp(xmlNode,BAD_CAST("cnt"),BAD_CAST(num));
+	return (cnt);
+}
+
+static int topo_fru_get_tocm_xml(xmlNodePtr xmlNode){
+	xmlChar * tocm;
+	int ret = TOPO_XML_SUCCESS;
+	tocm = xmlGetProp(xmlNode,BAD_CAST("tocm"));
+	if(xmlStrEqual(tocm,BAD_CAST("no"))){
+		ret = TOPO_XML_FAULT;
+	}
+	
+	return (ret);
+}
+
+static int topo_fru_get_alarmid_xml(xmlNodePtr xmlNode){
+	char * alarmidStr = NULL;
+	alarmidStr = (char *)xmlGetProp(xmlNode,BAD_CAST("alarmid"));
+	return (int)atoi(alarmidStr);
+}
+
+static void topo_fru_set_tocm_xml(xmlNodePtr xmlNode){
+	xmlSetProp(xmlNode,BAD_CAST("tocm"),BAD_CAST("yes"));
+	return;
+}
+
+static int topo_fru_search_fault_xml(
+	topo_xml_hd_t xml_hd,const char *name,xml_nodes_t * xml_nodesp,int flag){
+	int ret = TOPO_NODE_NON_EXIST;
+	int cnt = 0;
+	int tocm = TOPO_XML_SUCCESS;
+	xmlChar * content ;
+	xmlChar * status;
+	xmlNodePtr curNode = (xmlNodePtr)xml_hd->xmlChildrenNode;
+	
+	while(curNode){
+		content = xmlNodeGetContent(curNode);
+		if(!xmlStrncmp(content,BAD_CAST(name),strlen(name))){
+			status = xmlGetProp(curNode,BAD_CAST("status"));
+			if(xmlStrEqual(status,BAD_CAST(NON_ALARMED))){
+				ret = TOPO_NODE_EXIST;
+				if(flag & TISSET)
+					xmlSetProp(curNode,BAD_CAST("status"),BAD_CAST(ALARMED));
+				if(flag & SETCNT){
+					tocm = topo_fru_get_tocm_xml(curNode);
+					if(TOPO_XML_FAULT == tocm)
+						cnt = topo_fru_increase_alarm_cnt(curNode);
+				}
+				
+				if(NULL == xml_nodesp){
+					break;
+				}else{
+					topo_fru_xml_node_list_instert(xml_nodesp,curNode,cnt,tocm);
+				}
+			}else if(flag & ISCLEAR){
+				xmlSetProp(curNode,BAD_CAST("status"),BAD_CAST(NON_ALARMED));
+			}
+		}
+		curNode = curNode->next;
+	}
+	return (ret);
+}
+
+static xmlChar * topo_fru_get_name_xml(xmlNodePtr xmlNode)
+{
+	return xmlNodeGetContent(xmlNode);
+}
+
+static void topo_fru_free_cm_alarm_node(xmlNodePtr xmlNode,const int alarmid,const char *hostname)
+{
+	char cmd_buf[INFOMAXLEN] = {0};
+	xmlChar * name = topo_fru_get_name_xml(xmlNode);
+	switch(alarmid)
+	{
+		case AMARM_ID_ZFS_THINLUN:
+		case AMARM_ID_USER_QUOTA:
+			cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"recovery %d \"%s,%s,-,-,-\"", alarmid, hostname, (char *)name);
+			break;
+		case AMARM_ID_QUOTA:
+		case AMARM_ID_DIR_QUOTA:
+		case AMARM_ID_POOL_STATE:
+			cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"recovery %d \"%s,%s,-,-\"", alarmid, hostname, (char *)name);
+			break;
+		case AMARM_ID_FC_LINK:	
+		case AMARM_ID_ETH_LINK:		
+		case AMARM_ID_HEART_LINK:
+			cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"recovery %d \"%s,%s,-\"", alarmid, hostname, (char *)name);
+			break;
+		case AMARM_ID_SYS_TEMP:
+		case AMARM_ID_P_DIMM:
+		case AMARM_ID_CPU_DIMM:
+		case AMARM_ID_CPU_CORE:
+		case AMARM_ID_CPU_TEMP:
+			cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"recovery %d \"%s,%s\"", alarmid, hostname, (char *)name);
+			break;
+	}
+	return;
+}
+
+static void topo_fru_set_cm_alarm_node_z(
+	const int alarmid,const char *hostname,const char *name,va_list ap)
+{
+	char cmd_buf[INFOMAXLEN] = {0};
+	char	info[INFOMAXLEN] = {0};
+	topo_fru_tocm_info_set(info,sizeof(info),ap);
+	cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"report %d \"%s,%s%s\"", alarmid, hostname,name,info);
+	return;
+}
+
+
+static void topo_fru_set_cm_alarm_node(
+	xml_nodes_t * xml_nodesp,const int alarmid,const char *hostname,const char *name,va_list ap)
+{
+	char cmd_buf[INFOMAXLEN] = {0};
+	char	info[INFOMAXLEN] = {0};
+	topo_fru_tocm_info_set(info,sizeof(info),ap);
+	cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"report %d \"%s,%s%s\"", alarmid, hostname,name,info);
+	topo_fru_set_tocm_xml(xml_nodesp->xmlHead->xmlNode);
+	return;
+}
+
+static void topo_fru_xml_node_list_instert(xml_nodes_t * xml_hd,
+	xmlNodePtr xmlNode,const int cnt,const int tocm)
+{
+	xml_node_list_t * xml_head_node = NULL;
+	xml_node_list_t * xml_cnt_node =NULL;
+	xml_node_list_t * xml_list_node = topo_fru_xml_alloc();
+	
+	xml_list_node->xmlNode = xmlNode;
+	xml_list_node->nodeNext= NULL;
+	xml_list_node->cnt = cnt;
+	xml_list_node->tocm = tocm;
+	xml_list_node->alarmid = topo_fru_get_alarmid_xml(xmlNode);
+	if(NULL == xml_hd->xmlHead){
+		xml_hd->xmlHead = xml_list_node;
+	}else{
+		for(xml_cnt_node = xml_hd->xmlHead;
+			xml_cnt_node->nodeNext;
+			xml_cnt_node = xml_cnt_node->nodeNext);
+
+		xml_cnt_node->nodeNext = xml_list_node;
+	}
+	xml_hd->xmlLen++;
+}
+
+static void topo_fru_xml_nodes_list_delete(
+	xml_nodes_t * xml_nodesp,const char *hostname){
+	int indx = 0;
+	xml_node_list_t * xml_cnt_node = xml_nodesp->xmlHead;
+	
+	for(indx = 0;(xml_cnt_node && indx < xml_nodesp->xmlLen);
+		++indx,xml_cnt_node = xml_cnt_node->nodeNext){
+		topo_fru_free_cm_alarm_node(xml_cnt_node->xmlNode,xml_cnt_node->alarmid,hostname);
+		topo_fru_delete_node_xml(xml_cnt_node->xmlNode);
+		topo_fru_xml_free(xml_cnt_node);
+	}
+}
+
+int topo_fru_set_fault_xml(
+	const int alarmid,const char *name,const int alarm_cnt,...)
+{
+	topo_xml_hd_t	xml_hd;
+	int	fault_is_exist = 1;
+	xml_nodes_t	xml_nodes = {0};
+	va_list	ap;
+	char hostname[HOSTNAMEXML];
+	
+	topo_fru_xml_lock();
+	xml_hd = topo_fru_open_xml();
+	if(NULL == xml_hd){
+		topo_fru_xml_unlock();
+		return 0;
+	}
+
+	if(TOPO_XML_FAULT == topo_fru_get_hostname(hostname,sizeof(hostname))){
+		topo_fru_close_xml();
+		topo_fru_xml_unlock();
+		return 0;
+	}
+	
+	/*search fault*/
+	if(TOPO_NODE_NON_EXIST == 
+		topo_fru_search_fault_xml(xml_hd,name,&xml_nodes,TISSET|SETCNT)){
+		/*insert fault*/
+		if(0 == alarm_cnt){
+			va_start(ap, alarm_cnt);
+			topo_fru_set_cm_alarm_node_z(alarmid,hostname,name,ap);
+			va_end(ap);
+			topo_fru_add_node_xml(xml_hd,name,alarmid,"yes");
+		}else{
+			topo_fru_add_node_xml(xml_hd,name,alarmid,"no");
+		}
+		fault_is_exist = 0;
+	}else {
+		topo_set_alarm_status_node(xml_nodes.xmlHead->xmlNode);
+		if(((xml_nodes.xmlHead->cnt) >= alarm_cnt) 
+			&& ((xml_nodes.xmlHead->tocm) == TOPO_XML_FAULT)){
+			va_start(ap, alarm_cnt);
+			topo_fru_set_cm_alarm_node(&xml_nodes,alarmid,hostname,name,ap);
+			va_end(ap);
+		}
+	}
+	
+	topo_fru_node_list_free(&xml_nodes);
+	topo_fru_close_xml();
+	topo_fru_xml_unlock();
+
+	return (fault_is_exist);
+}
+
+void topo_fru_clear_fault_xml(const char* name)
+{
+	topo_xml_hd_t xml_hd;
+	xml_nodes_t xml_nodes = {0};
+	char hostname[HOSTNAMEXML];
+	
+	topo_fru_xml_lock();
+	xml_hd = topo_fru_open_xml();
+	if(NULL == xml_hd){
+		topo_fru_xml_unlock();
+		return;
+	}
+	
+	if(TOPO_XML_FAULT == topo_fru_get_hostname(hostname,sizeof(hostname))){
+		topo_fru_close_xml();
+		topo_fru_xml_unlock();
+		return;
+	}
+	
+	/*search fault*/
+	if(TOPO_NODE_EXIST == topo_fru_search_fault_xml(xml_hd,name,&xml_nodes,ISCLEAR)){
+		topo_fru_xml_nodes_list_delete(&xml_nodes,hostname);
+	}
+
+	topo_fru_close_xml();
+	topo_fru_xml_unlock();
+}

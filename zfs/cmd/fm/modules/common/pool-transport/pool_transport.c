@@ -562,6 +562,7 @@ pt_check_pool_status(zpool_handle_t *zhp, void *data)
 	pool_scan_stat_t *ps = NULL;
 	char scan_buf[1024];
 	char pool_name[128];
+	char hostname[32] = {0};
 
 	if ((config = zpool_get_config(zhp, NULL)) == NULL ||
 		nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
@@ -602,6 +603,11 @@ pt_check_pool_status(zpool_handle_t *zhp, void *data)
 		(void) topo_fru_setime(pool_name, SXML_CRITICAL,
 			pool_health, scan_buf, NULL, NULL);
 		
+		topo_fru_set_fault_xml(AMARM_ID_POOL_STATE,pool_name,0,
+				TOPO_XML_STRING,pool_health,
+				TOPO_XML_STRING,scan_buf,
+				TOPO_XML_DONE);
+		
 		pt_send_snmptrap(ptp->pt_hdl, ptp->pt_xprt, "pool", "trapinfo",
 			ena, path, zpool_get_name(zhp), health, locate_path);
 		if (locate_path != NULL)
@@ -628,6 +634,7 @@ pt_pool_check(fmd_hdl_t *hdl)
 
 	cbdata.hdl = hdl;
 	(void) zpool_iter(zhdl, pt_check_pool_status, &cbdata);
+	topo_fru_clear_fault_xml("Resource/Pool");
 }
 
 static void

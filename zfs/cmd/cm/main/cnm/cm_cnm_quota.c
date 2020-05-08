@@ -622,7 +622,7 @@ sint32 cm_cnm_ipshift_local_create(
         return CM_ERR_ALREADY_EXISTS;
     }
 
-    cut = cm_cnm_exec_count(info->nid,"dladm show-link| grep '^%s'|wc -l",info->adapter);
+    cut = cm_cnm_exec_count(info->nid,"ip a| grep '^%s'|wc -l",info->adapter);
     if(0 == cut)
     {
         return CM_PARAM_ERR;

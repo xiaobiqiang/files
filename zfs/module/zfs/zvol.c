@@ -1159,6 +1159,7 @@ zvol_first_open(zvol_state_t *zv)
 	uint64_t ro;
 	
 	ASSERT(MUTEX_HELD(&zv->zv_state_lock));
+	zfs_dbgmsg("%s state %d", zv->zv_name, zv->zv_state);
 	if (zv->zv_state == ZVOL_VALID) {
 		/* lie and say we're read-only */
 		error = dmu_objset_own(zv->zv_name, DMU_OST_ZVOL, B_TRUE,
@@ -1210,6 +1211,8 @@ out_owned:
 		dmu_objset_disown(os, zvol_tag);
 		zv->zv_objset = NULL;
 	}
+
+	zfs_dbgmsg("%s fini, error %d", zv->zv_name, error);
 	
 	return (SET_ERROR(-error));
 }
@@ -1271,8 +1274,10 @@ zvol_open(struct block_device *bdev, fmode_t flag)
 		error = -ENXIO;
 		goto out_mutex;
 	}
+	zfs_dbgmsg("%s", zv->zv_name);
 	if (zv->zv_flags & ZVOL_WANT_REMOVE) {
 		cmn_err(CE_WARN, "[SPA_REF] zvol_open %p %s want remove", zv, zv->zv_name);
+		zfs_dbgmsg("[SPA_REF] zvol_open %p %s want remove", zv, zv->zv_name);
 		error = -ENXIO;
 		goto out_mutex;
 	}
@@ -1302,6 +1307,7 @@ zvol_open(struct block_device *bdev, fmode_t flag)
 	zv->zv_open_count++;
 	
 	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);
+	zfs_dbgmsg("%s open_count %d", zv->zv_name, zv->zv_open_count);
 	check_disk_change(bdev);
 
 out_open_count:
@@ -1313,6 +1319,8 @@ out_mutex:
        mutex_exit(&zv->zv_state_lock);
 	if (drop_mutex)
 		mutex_exit(&zvol_state_lock);
+
+	zfs_dbgmsg("%s fini, error %d", zv->zv_name, error);
 
 	return (SET_ERROR(error));
 }
@@ -1329,6 +1337,7 @@ zvol_release(struct gendisk *disk, fmode_t mode)
 
 	if (zv!=NULL) {
 		printk(KERN_WARNING "%s %s\n", __func__, zv->zv_name);
+		zfs_dbgmsg("%s", zv->zv_name);
 	}
 	else{
 		printk(KERN_WARNING "%s data_opened zv is null \n", __func__);
@@ -1351,6 +1360,7 @@ zvol_release(struct gendisk *disk, fmode_t mode)
     mutex_enter(&zv->zv_state_lock);
 	zv->zv_open_count--;
 	printk(KERN_WARNING "%s %s zv_open_count=%d \n", __func__, zv->zv_name, zv->zv_open_count);	
+	zfs_dbgmsg("%s open_count %d", zv->zv_name, zv->zv_open_count);
 	if (zv->zv_open_count == 0) {
 		zvol_last_close(zv);
 		cv_signal(&zv->zv_rele_cv);
@@ -1975,6 +1985,7 @@ out:
 		 * zvol_state_lock, and then takes bd_disk->bd_mutex.
 		 */
 		mutex_exit(&zvol_state_lock);
+		zfs_dbgmsg("zvol %s add disk", name);
 		add_disk(zv->zv_disk);
 	} else {
 		mutex_exit(&zvol_state_lock);
@@ -2490,6 +2501,12 @@ zvol_set_snapdev(const char *ddname, zprop_source_t source, uint64_t snapdev)
 	    zvol_set_snapdev_sync, &zsda, 0, ZFS_SPACE_CHECK_NONE));
 }
 
+int
+zvol_create_minor(const char *name)
+{
+	return zvol_create_minor_impl(name);
+}
+
 void
 zvol_create_minors(spa_t *spa, const char *name, boolean_t async)
 {
@@ -2744,6 +2761,8 @@ zvol_objset_replay_all_cache(void *arg)
 	zvol_replay_arg_t *replay_arg;
 	boolean_t bmdata;
 
+	zfs_dbgmsg("zvol %s replay cache", zv->zv_name);
+
 	replay_arg = (zvol_replay_arg_t *)arg;
 	zv = replay_arg->zv;
 	bmdata = replay_arg->bmdata;
@@ -2784,6 +2803,7 @@ zvol_objset_replay_all_cache(void *arg)
 	mutex_exit(&zv->zv_state_lock);
 	cmn_err(CE_NOTE, "%s: zvol create minor done, elapsed time:%"PRId64"ms",
 		zv->zv_name, (gethrtime() - elapsed_time)/1000000);
+	zfs_dbgmsg("zvol %s replay cache fini", zv->zv_name);
 
 	if (!bmdata) {
 		mutex_enter(&spa->spa_do_zvol_lock);
@@ -2888,6 +2908,8 @@ zvol_fini(void)
 	mutex_destroy(&zvol_state_lock);
 	cluster_san_fini();
 }
+
+EXPORT_SYMBOL(zvol_create_minor);
 
 module_param(zvol_inhibit_dev, uint, 0644);
 MODULE_PARM_DESC(zvol_inhibit_dev, "Do not create zvol device nodes");
