@@ -671,6 +671,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
             zfs_case_solve(hdl, zcp, "fault.fs.zfs.dev.merr",  B_TRUE);
         } else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.smart_fail")) {
             zfs_case_solve(hdl, zcp, "fault.fs.zfs.dev.smart_fail",  B_TRUE);
+        } else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.noresponse")) {
+            zfs_case_solve(hdl, zcp, "fault.fs.zfs.dev.noresponse",  B_TRUE);
         } else {
             /*
     		 * Device fault.
