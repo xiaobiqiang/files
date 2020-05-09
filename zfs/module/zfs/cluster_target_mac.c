@@ -575,6 +575,7 @@ static int cluster_target_mac_tran_data_fragment(
 		}
 		head_mp->origin_data = origin_data;
 		head_mp->is_sgl = 0;
+		head_mp->is_bio = 0;
 		head_mp->is_first = is_first;
 		head_mp->dst = dst;
 		head_mp->fragment_offset = fragment_offset;
@@ -663,6 +664,7 @@ static int cluster_target_mac_tran_data_fragment_sgl(
 		mac_tran_data->mp = head_mp;
 		head_mp->origin_data = origin_data;
 		head_mp->is_sgl = B_TRUE;
+		head_mp->is_bio = B_FALSE;
 		head_mp->is_first = is_first;
 		head_mp->dst = dst;
 		head_mp->fragment_offset = fragment_offset;
@@ -1536,7 +1538,8 @@ int cluster_proto_register(void)
 	register_netdevice_notifier_rh(&cluster_netdev_notifier);
 
 	mblk_cache = kmem_cache_create("mblk_cache",
-		sizeof (mblk_t), 0, NULL, NULL, NULL, NULL, NULL, KMC_SLAB);
+		sizeof (mblk_t), SLAB_HWCACHE_ALIGN, NULL, NULL, 
+		NULL, NULL, NULL, KMC_SLAB);
 	return (0);
 }
 int cluster_proto_unregister(void)
