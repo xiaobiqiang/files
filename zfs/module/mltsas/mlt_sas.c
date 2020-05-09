@@ -1946,6 +1946,8 @@ static Mlsas_rh_t *__Mlsas_Alloc_RH(uint32_t id, void *tran_ss)
 	mutex_init(&rh->Mh_mtx, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&rh->Mh_devices, sizeof(Mlsas_pr_device_t),
 		offsetof(Mlsas_pr_device_t, Mlpd_rh_node));
+
+	return rh;
 }
 
 static void __Mlsas_Release_RH(struct kref *ref)
