@@ -1620,6 +1620,29 @@ zpool_clear_label(int fd)
 	return (0);
 }
 
+int
+zpool_clear_label_by_path(const char *path)
+{
+	char prefix[] = "/dev/disk/by-id/scsi-";
+	char suffix[] = "-part1";
+	char dev[MAXPATHLEN];
+	size_t len;
+	int fd, ret;
+
+	if (strncmp(path, prefix, strlen(prefix)) != 0)
+		return (-1);
+	strncpy(dev, path, MAXPATHLEN);
+	len = strlen(dev);
+	if ((strncmp(dev + (len - strlen(suffix)), suffix, strlen(suffix))) != 0)
+		strcat(dev, suffix);
+
+	if ((fd = open(dev, O_RDWR)) < 0)
+		return (-1);
+	ret = zpool_clear_label(fd);
+	close(fd);
+	return (ret);
+}
+
 #ifdef HAVE_LIBBLKID
 /*
  * Use libblkid to quickly search for zfs devices

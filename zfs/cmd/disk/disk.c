@@ -1562,6 +1562,10 @@ disk_init(slice_req_t *req)
 		}
 	}
 #endif
+
+	if (zpool_clear_label_by_path(req->disk_name) < 0)
+		printf("clear label failed: %s\n", req->disk_name);
+
 	/* add init efi */
 	(void) disk_init_efi(req->disk_name);
 

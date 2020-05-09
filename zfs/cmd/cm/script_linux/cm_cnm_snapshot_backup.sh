@@ -6,8 +6,8 @@ CM_LOG_ENABLE=1
 
 CM_SSHD_CFG_FILE="/etc/ssh/sshd_config"
 CM_USER_ATTR_FILE="/etc/user_attr"
-CM_SSH_KEY_DIR="/etc/root/.ssh"
-CM_ETC_HOSTS="/etc/inet/hosts"
+CM_SSH_KEY_DIR="/root/.ssh"
+CM_ETC_HOSTS="/etc/hosts"
 
 function cm_cnm_snapshot_backup_init_sshd()
 {
@@ -185,7 +185,7 @@ function cm_cnm_snapshot_backup_init()
 			return $CM_FAIL
 		fi 
 		# 重启ssh服务让配置生效
-		svcadm restart ssh
+		#svcadm restart ssh
 /usr/bin/expect<<-EOF
 set timeout 5
 spawn ssh $remote_ip
@@ -200,7 +200,7 @@ EOF
 			CM_LOG "[${FUNCNAME}:${LINENO}] snapshot backup remote init fail"
 			return $CM_FAIL
 		fi
-		svcadm restart ssh
+		#svcadm restart ssh
 		# dstdir是lun的话需要删除LU，不然会报dataset is busy错误
 		cm_cnm_snapshot_backup_delete_lu $dstdir
 	fi
@@ -251,7 +251,7 @@ function cm_cnm_snapshot_backup_term()
 	cm_cnm_snapshot_backup_term_user_attr
 	cm_cnm_snapshot_backup_term_hosts $local_ip $remote_ip
 	cm_cnm_snapshot_backup_term_ssh_key
-	svcadm restart ssh
+	#svcadm restart ssh
     return $CM_OK
 }
 
@@ -268,8 +268,8 @@ function cm_cnm_snapshot_backup_main()
 		term):
 			[ $# -lt 4 ]&&return $CM_PARAM_ERR
 			# <local_ip> <param> <flag>(local remote)
-			cm_cnm_snapshot_backup_term "$2" "$3" "$4" 
-			return $?
+			#cm_cnm_snapshot_backup_term "$2" "$3" "$4" 
+			return 0
 			;;
 		*):
 			return $CM_ERR_NOT_SUPPORT
