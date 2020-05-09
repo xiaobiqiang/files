@@ -52,8 +52,8 @@ function cm_pmm_node_stat()
     # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题
     local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{printf("%.0f %.0f",ob,rb)}'`
     #*100是为了uint64取值，之后会/100取得正确结果
-    local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs*100" "ws*100}'`
-    local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print ($1+$3)*100" "$6*100}'`
+    local iops=`iostat -dx 1 2|grep '\.'|egrep -v Linux|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{printf("%.0f %.0f",rs*100/2,ws*100/2)}'`
+    local cpu=`iostat -c 1 2|grep '\.'|egrep -v Linux|sed 1d|awk '{print ($1+$3)*100" "$6*100}'`
     local mem=`free -t|grep Mem|awk '{print $3/$2*100}'`
     
     if [ "X$bandwidth" == "X " ]; then
