@@ -102,6 +102,11 @@ static void __Mlsas_Partion_Map_toTtl(Mlsas_request_t *rq);
 static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Release_PR_RQ(struct kref *);
+static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
+		cts_link_evt_t link_evt, void *arg);
+static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s);
+static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr, uint32_t c_put);
+static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 
 static uint32_t Mlsas_npending = 0;
 
@@ -350,7 +355,7 @@ static int Mlsas_Do_EnableSvc(void)
 	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
 
 	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
-	(void) cts_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
+	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
 		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
 	
@@ -1764,7 +1769,7 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	}
 
-	__Mlsas_Complete_PR_RQ(prr);
+//	__Mlsas_Complete_PR_RQ(prr);
 }
 
 void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what)
@@ -1790,7 +1795,7 @@ void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what)
 		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Netpending);
 		__Mlsas_PR_RQ_Write_endio(prr);
 		break;
-	case Mlsas_PRRst_Queue_Net_Wrsp:
+	case Mlsas_PRRst_Queue_Net_Rrsp:
 		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Netpending);
 		__Mlsas_PR_RQ_Read_endio(prr);
 		break;

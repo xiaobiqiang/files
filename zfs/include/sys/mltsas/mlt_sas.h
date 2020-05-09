@@ -305,7 +305,6 @@ struct Mlsas_pr_req {
 	list_node_t prr_node;
 	list_node_t prr_mlb_node;
 	struct kref prr_ref;
-	struct work_struct 
 	Mlsas_rtx_wk_t prr_wk;
 	Mlsas_pr_device_t *prr_pr;
 	uint32_t prr_completion_ref;
