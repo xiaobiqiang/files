@@ -336,7 +336,7 @@ void* cm_cnm_user_update_pwd(void* arg)
 {
     cm_cnm_user_info_t* info = (cm_cnm_user_info_t *)arg;
 
-    cm_system("%s insert_pwd %s %s",cm_cnm_user_sh,info->name,info->pwd);
+    cm_system("%s insert_pwd '%s' '%s'",cm_cnm_user_sh,info->name,info->pwd);
     
     CM_FREE(info);
     return NULL;
@@ -780,10 +780,7 @@ sint32 cm_cnm_group_delete(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         return CM_ERR_NOT_EXISTS;
     }
     id = (uint64)cm_exec_int("cat /etc/group | grep '^%s:' | awk -F':' '{printf $3}'",info->name);
-    if(id<100||id>1000)
-    {
-        return CM_PARAM_ERR;
-    }
+    
     
     return cm_sync_delete(CM_SYNC_OBJ_GROUP,id);
 }
