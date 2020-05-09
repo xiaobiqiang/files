@@ -658,16 +658,13 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	dcb.count = 0;
 
 	disk_get_info(&dt);
-	
-    if(disk_db_init() == 0)
+	dmp->dm_dbhdl = NULL;
+    if((dmp->dm_dbhdl = disk_db_init()) == NULL)
     {
-        dmp->dm_dbhdl = disk_db_get();
-    }
-	else
-    {
+    	fprintf(stderr,"disk_db_init fail\n");
 		return(0);
 	}
-
+	
 	for (current = dt.next; current != NULL; current = current->next) {
 		dt_get_scsi_rpm( current ) ;
 		//dnode->dt_blksize = current->dk_blocks;

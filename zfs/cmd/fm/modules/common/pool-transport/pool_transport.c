@@ -681,7 +681,7 @@ pt_status_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
 		pt_walk_zfs_dataset(hdl, ptp);
 		pt_close_fsxml_file();
 		pt_close_luxml_file();
-//		system("/usr/local/sbin/zpool status -x");
+		system("/zpool status  -x > /dev/null  2> /dev/null");
 	}
 
 	if (ptp->pt_status_changed)

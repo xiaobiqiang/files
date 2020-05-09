@@ -841,7 +841,7 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 	thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 	if((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, lt_check_links, lmp, &err)) == NULL){
 		fmd_hdl_topo_rele(hdl, thp);
-		fmd_hdl_error(hdl, "failed to get topology: %s\n",
+		fprintf(stderr, "failed to get topology: %s\n",
 		    topo_strerror(err));
 		return;
 	}
