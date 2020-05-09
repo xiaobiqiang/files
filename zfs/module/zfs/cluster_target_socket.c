@@ -221,11 +221,7 @@ cluster_target_socket_refcnt_wait_ref_async(
 cluster_status_t
 cluster_target_socket_create(int family, int type, int prot, struct socket **skp)
 {
-#ifdef USE_HENGWEI
 	return sock_create_kern(&init_net, family, type, prot, skp);
-#else
-	return sock_create_kern(family, type, prot, skp);
-#endif
 }
 
 static void
