@@ -56,6 +56,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/spa_impl.h>
+#include <sys/vdev_impl.h>
 #include <sys/efi_partition.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -789,12 +790,16 @@ zpool_do_labelclear(int argc, char **argv)
 	pool_state_t state;
 	boolean_t inuse = B_FALSE;
 	boolean_t force = B_FALSE;
+	boolean_t force_hard = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "f")) != -1) {
+	while ((c = getopt(argc, argv, "fF")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
+			break;
+		case 'F':
+			force_hard = B_TRUE;
 			break;
 		default:
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -829,6 +834,8 @@ zpool_do_labelclear(int argc, char **argv)
 
 		return (1);
 	}
+	if (force_hard)
+		goto wipe_label;
 
 	if (inuse) {
 		switch (state) {
@@ -2014,6 +2021,75 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 
 }
 
+static int
+get_disk_label_state(nvlist_t *nv, nvlist_t **config,
+uint64_t *vs_aux, char **state)
+{
+	int fd;
+	vdev_label_t label;
+	char *path, *buf = label.vl_vdev_phys.vp_nvlist;
+	size_t buflen = sizeof (label.vl_vdev_phys.vp_nvlist);
+	struct stat64 statbuf;
+	uint64_t psize, state_val;
+	int l, ret = -1;
+
+	verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
+
+	if ((fd = open64(path, O_RDONLY)) < 0) {
+		cprint("cannot open '%s': %s", path, strerror(errno));
+		goto fail;
+	}
+
+	if (fstat64_blk(fd, &statbuf) != 0) {
+		cprint("failed to stat '%s': %s", path,
+			strerror(errno));
+		goto fail;
+	}
+
+	psize = statbuf.st_size;
+	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
+
+	for (l = 0; l < VDEV_LABELS; l++) {
+		if (pread64(fd, &label, sizeof (label),
+			vdev_label_offset(psize, l, 0)) != sizeof (label)) {
+			cprint("failed to read label %d", l);
+			continue;
+		}
+
+		if (nvlist_unpack(buf, buflen, config, 0) != 0) {
+			cprint("failed to unpack label %d", l);
+		} else {
+			if (nvlist_lookup_uint64(*config,
+				ZPOOL_CONFIG_POOL_STATE, &state_val) != 0) {
+				nvlist_free(*config);
+				*config = NULL;
+			} else
+				break;
+		}
+	}
+
+	if (l < VDEV_LABELS) {
+		if (state_val == POOL_STATE_ACTIVE ||
+			state_val == POOL_STATE_EXPORTED) {
+			*state = gettext("INUSE");
+			*vs_aux = VDEV_AUX_SPARED;
+		} else
+			*state = gettext("AVAIL");
+		ret = 0;
+	}
+
+fail:
+	if (ret != 0) {
+		*state = gettext("UNAVAIL");
+		*vs_aux = VDEV_AUX_OPEN_FAILED;
+		*config = NULL;
+	}
+
+	if (fd >= 0)
+		(void) close(fd);
+	return (ret);
+}
+
 slot_map_t g_sm;;
 disk_info_t g_di_cur;
 
@@ -2037,6 +2113,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	uint64_t notpresent;
 	spare_cbdata_t cb;
 	char *state;
+	nvlist_t *config;
 	const char *raid_type;
 	uint64_t quantum;
 	xmlNodePtr node = NULL;
@@ -2058,8 +2135,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		 */
 		if (vs->vs_aux == VDEV_AUX_SPARED)
 			state = "INUSE";
-		else if (vs->vs_state == VDEV_STATE_HEALTHY)
-			state = "AVAIL";
+		else if (vs->vs_state == VDEV_STATE_HEALTHY) {
+			(void) get_disk_label_state(nv, &config, &vs->vs_aux, &state);
+			nvlist_free(config);
+		}
 	}
 
 	(void) printf("\t%*s%-*s  %-8s", depth, "", namewidth - depth,

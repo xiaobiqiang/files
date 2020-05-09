@@ -9027,6 +9027,7 @@ void mpt3sas_eh_strategy(struct Scsi_Host *shost)
             sas_device_priv_data->sas_target &&
             !sas_device_priv_data->sas_target->deleted) {
             if(atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) > 0) {
+                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &sas_device_priv_data->sas_target->sas_address);
                 printk(KERN_ERR "mpt3sas_eh_strategy remove target:%llx\n", 
                         sas_device_priv_data->sas_target->sas_address);
                 ioc = shost_priv(scmd->device->host);
@@ -9062,14 +9063,13 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 
     sas_device = sas_device_priv_data->sas_target->sdev;
 
-    printk(KERN_ERR "scmd(%p) no response, [host's target adderess:%llx], [target's host address:%llx], cnt:%ld\n",
+    printk(KERN_ERR "scmd(%p) no response, [target:%llx], cnt:%ld\n",
         scmd,
-        sas_device_priv_data->sas_target->sas_address,
         target_priv_data->sas_address,
         atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) + 1);
 
-    atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
     if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 6) {
+        atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
         mpt3sas_trigger_remove_target_event(ioc, target_priv_data->sas_address);
     }
 
