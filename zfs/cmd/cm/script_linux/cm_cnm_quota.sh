@@ -12,7 +12,7 @@ source '/var/cm/script/cm_types.sh'
 #       CM_OK
 #       ...
 #==================================================================================
-function cm_cnm_quota_getbatch()
+function cm_cnm_quota_getbatch_x()
 {
     local usertype=$1
     local filesystem=$2
@@ -132,19 +132,37 @@ function cm_cnm_quota_update()
 #==================================================================================
 function cm_cnm_quota_delete()
 {
-	local usertype=$1
-	local name=$2
-	local filesystem=$3
-	if [ $usertype -eq 0 ]; then
-		zfs set userquota@$name=none $filesystem
-		zfs set softuserquota@$name=none $filesystem
-	fi
-	
-	if [ $usertype -eq 1 ]; then
-		zfs set groupquota@$name=none $filesystem
-		zfs set softgroupquota@$name=none $filesystem
-	fi
-	return $CM_OK
+    local usertype=$1
+    local name=$2
+    local filesystem=$3
+    local domain=$4
+    /var/cm/script/cm_cnm_user.sh test "$domain" "$usertype" "$name"
+    iret=$?
+    if [ $iret -ne $CM_OK ]; then
+        return $iret
+    fi
+    if [ $usertype -eq 0 ]; then
+        zfs set userquota@$name=none $filesystem
+        if [ $? -ne 0 ]; then
+            return $CM_FAIL
+        fi
+        zfs set softuserquota@$name=none $filesystem
+        if [ $? -ne 0 ]; then
+            return $CM_FAIL
+        fi
+    fi
+
+    if [ $usertype -eq 1 ]; then
+        zfs set groupquota@$name=none $filesystem
+        if [ $? -ne 0 ]; then
+            return $CM_FAIL
+        fi
+        zfs set softgroupquota@$name=none $filesystem
+        if [ $? -ne 0 ]; then
+            return $CM_FAIL
+        fi
+    fi
+    return $CM_OK
 }
 
 #==================================================================================
@@ -158,7 +176,7 @@ function cm_cnm_quota_delete()
 #       CM_OK
 #       ...
 #==================================================================================
-function cm_cnm_quota_count()
+function cm_cnm_quota_count_x()
 {
     local usertype=$1
     local filesystem=$2
@@ -174,7 +192,7 @@ function cm_cnm_quota_count()
     return $CM_OK
 }
 
-function cm_cnm_quota_count_x()
+function cm_cnm_quota_count()
 {
     local usertype=$1
     local filesystem=$2
@@ -188,7 +206,7 @@ function cm_cnm_quota_count_x()
     return $CM_OK
 }
 
-function cm_cnm_quota_getbatch_x()
+function cm_cnm_quota_getbatch()
 {
     local usertype=$1
     local filesystem=$2
