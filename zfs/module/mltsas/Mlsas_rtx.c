@@ -96,7 +96,7 @@ static int __Mlsas_Thread_Run_impl(Mlsas_thread_t *thi)
 	int rval;
 	unsigned long flags;
 
-	if (!complete_done(&thi->Ml_stop))
+	if (!completion_done(&thi->Ml_stop))
 		complete(&thi->Ml_stop);
 
 again:
