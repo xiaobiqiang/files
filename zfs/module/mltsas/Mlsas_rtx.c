@@ -42,6 +42,7 @@ void __Mlsas_Thread_Start(Mlsas_thread_t *thi)
 			(void *)thi, thi->Mt_name)));
 		thi->Mt_w = nt;
 		wake_up_process(nt);
+		wait_for_completion(&thi->Ml_stop);
 		break;
 	case Mt_Exit:
 		thi->Mt_state = Mt_Restart;
@@ -94,6 +95,9 @@ static int __Mlsas_Thread_Run_impl(Mlsas_thread_t *thi)
 {
 	int rval;
 	unsigned long flags;
+
+	if (!complete_done(&thi->Ml_stop))
+		complete(&thi->Ml_stop);
 
 again:
 	rval = thi->Mt_fn(thi);
