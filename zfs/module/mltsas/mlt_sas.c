@@ -971,6 +971,9 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 		break;
 	case 0x2:
 		__Mlsas_Submit_Local_Prepare(req);
+		req->Mlrq_wk2.rtw_fn = bio_data_dir(req->Mlrq_back_bio) == WRITE ?
+			__Mlsas_Tx_biow : __Mlsas_Tx_bior;
+		__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &req->Mlrq_wk2);
 		__Mlsas_Req_Stmt(req, Mlsas_Rst_Submit_Local, NULL);
 		submit_backing = B_TRUE;
 		break;
@@ -993,7 +996,7 @@ static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb,
 	if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached))
 		*do_local = 1;
 
-	if (*do_local)
+	if (*do_local) 
 		return ;
 
 	pr = list_head(&Mlb->Mlb_pr_devices);
@@ -1063,6 +1066,7 @@ static void __Mlsas_Submit_Local_Prepare(Mlsas_request_t *rq)
 {
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	
+	kref_get(&rq->Mlrq_ref);
 	kref_get(&rq->Mlrq_ref);
 	list_insert_tail(&Mlb->Mlb_local_rqs, rq);
 }
@@ -1603,10 +1607,13 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	Mlsas_pr_device_t *pr = RWm->rw_mlbpr;
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
-	if (RWm->rw_flags & Mlsas_RXfl_Write)
+	cmn_err(CE_NOTE, "receive req");
+	csh_rx_data_free_ext(xd);
+
+/*	if (RWm->rw_flags & Mlsas_RXfl_Write)
 		w->rtw_fn = __Mlsas_Rx_biow;
 	else 
-		w->rtw_fn = __Mlsas_Rx_bior;
+		w->rtw_fn = __Mlsas_Rx_bior; */
 	
 	__Mlsas_Queue_RTX(&pr->Mlpd_mlb->Mlb_rx_wq, xd); 
 }

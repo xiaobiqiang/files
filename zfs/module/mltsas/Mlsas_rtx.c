@@ -155,6 +155,8 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 	uint32_t rwfl;
 	Mlsas_bio_and_error_t m;
 
+	cmn_err(CE_NOTE, "coming into %s", __func__);
+
 	rwfl = __Mlsas_Setup_RWmsg(rq)->rw_flags;
 
 	if (rwfl & Mlsas_RXfl_Disc)
@@ -171,6 +173,11 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 			rq->Mlrq_bsize, B_TRUE);
 	}
 
+	Mlsas_RQ_put(rq, 1);
+
+	cmn_err(CE_NOTE, "out of %s", __func__);
+
+/*
 	what = rval ? Mlsas_Rst_Net_Send_Error : 
 		Mlsas_Rst_Net_Send_OK;
 	spin_lock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
@@ -178,7 +185,7 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 	spin_unlock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
 
 	if (m.Mlbi_bio)
-		__Mlsas_Complete_Master_Bio(rq, &m);
+		__Mlsas_Complete_Master_Bio(rq, &m); */
 
 	return (0);
 }
@@ -216,21 +223,27 @@ int __Mlsas_Tx_bior(Mlsas_rtx_wk_t *w)
 	Mlsas_rh_t *rh = rq->Mlrq_pr->Mlpd_rh;
 	Mlsas_bio_and_error_t m;
 
+	cmn_err(CE_NOTE, "coming into %s", __func__);
+
 	__Mlsas_Setup_RWmsg(rq);
 
 	rval = Mlsas_TX(rh->Mh_session, 
 		rq->Mlrq_bdev->Mlb_txbuf, 
 		rq->Mlrq_bdev->Mlb_txbuf_used, 
 		NULL, 0, B_FALSE);
+	
+	Mlsas_RQ_put(rq, 1);
 
-	what = rval ? Mlsas_Rst_Net_Send_Error : 
+	cmn_err(CE_NOTE, "out of %s", __func__);
+
+/*	what = rval ? Mlsas_Rst_Net_Send_Error : 
 		Mlsas_Rst_Net_Send_OK;
 	spin_lock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
 	__Mlsas_Req_Stmt(rq, what, &m);
 	spin_unlock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
 	
 	if (m.Mlbi_bio)
-		__Mlsas_Complete_Master_Bio(rq, &m);
+		__Mlsas_Complete_Master_Bio(rq, &m); */
 
 	return (0);
 }
