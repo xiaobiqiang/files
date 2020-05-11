@@ -264,7 +264,6 @@ struct Mlsas_request {
 
 	Mlsas_pr_device_t *Mlrq_pr;
 	Mlsas_rtx_wk_t Mlrq_wk;
-	Mlsas_rtx_wk_t Mlrq_wk2;
 
 	uint32_t Mlrq_switch;
 	uint32_t Mlrq_error_now;
