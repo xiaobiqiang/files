@@ -162,14 +162,14 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
 			NULL, 0, B_FALSE);
-	else {
-		VERIFY(rwfl & Mlsas_RXfl_Write);
+	else if (rwfl & Mlsas_RXfl_Write)
 		rval = Mlsas_TX(rh->Mh_session, 
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
 			rq->Mlrq_master_bio, 
 			rq->Mlrq_bsize, B_TRUE);
-	}
+	else 
+		cmn_err(CE_PANIC, "!(rwfl & (Mlsas_RXfl_Disc | Mlsas_RXfl_Write))");
 
 	what = rval ? Mlsas_Rst_Net_Send_Error : 
 		Mlsas_Rst_Net_Send_OK;
