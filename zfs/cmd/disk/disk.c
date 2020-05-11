@@ -946,7 +946,7 @@ static int disk_analyze_partition(const char *dev)
 	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	
 	tmp_gzfs = libzfs_init();
-	if(tmp_gzfs){
+	if(!tmp_gzfs){
 		printf("libzfs_init fail\n");
 		return -1;
 	}
