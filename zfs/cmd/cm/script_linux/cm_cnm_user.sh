@@ -249,19 +249,15 @@ function cm_cnm_user_cache_getbatch()
     local type=$2
     local begin=0
     local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=113
-    else
-        begin=100
-    fi
+    
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
+            cat /etc/passwd |awk -F':' '($3>='$BEGIN_UID'&&$3<=60000){print $3" "$1}'
         else
-            cat /etc/group |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
+            cat /etc/group |awk -F':' '($3>='$BEGIN_GID'&&$3<=60000){print $3" "$1}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
@@ -285,20 +281,15 @@ function cm_cnm_user_cache_count()
     local type=$2
     local begin=0
     local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=113
-    else
-        begin=100
-    fi
     
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>='$BEGIN_UID'&&$3<=60000){cnt++}END{print cnt}'
         else
-            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>='$BEGIN_GID'&&$3<=60000){cnt++}END{print cnt}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
