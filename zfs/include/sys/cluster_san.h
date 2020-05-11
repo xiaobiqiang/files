@@ -120,6 +120,7 @@ typedef struct cluster_target_tran_data {
 
 typedef struct cs_rx_data {
 	list_node_t		node;
+	void			*cs_cache_private;
 	uint64_t		data_index;
 	uint64_t		data_len;
 	uint8_t			msg_type;
@@ -128,7 +129,6 @@ typedef struct cs_rx_data {
 	uint64_t		ex_len;
 	void			*ex_head;
 	char			*data;
-	void			*cs_cache_private;
 	void 			*cs_private;
 } cs_rx_data_t;
 

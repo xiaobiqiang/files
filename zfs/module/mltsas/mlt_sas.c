@@ -1608,7 +1608,7 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	else 
 		w->rtw_fn = __Mlsas_Rx_bior;
 	
-	__Mlsas_Queue_RTX(&pr->Mlpd_mlb->Mlb_rx_wq, xd);
+	__Mlsas_Queue_RTX(&pr->Mlpd_mlb->Mlb_rx_wq, xd); 
 }
 
 static void __Mlsas_RX_Brw_Rsp(Mlsas_Msh_t *mms, 
@@ -1702,17 +1702,63 @@ static void __Mlsas_Release_PR_RQ(struct kref *ref)
 	__Mlsas_Free_PR_RQ(prr);
 }
 
+static inline unsigned long
+__Mlsas_Bio_nrpages(void *bio_ptr, unsigned int bio_size)
+{
+	return ((((unsigned long)bio_ptr + bio_size + PAGE_SIZE - 1) >>
+	    PAGE_SHIFT) - ((unsigned long)bio_ptr >> PAGE_SHIFT));
+}
+
+static uint32_t
+__Mlsas_Bio_map(struct bio *bio, void *bio_ptr, unsigned int bio_size)
+{
+	unsigned int offset, size, i;
+	struct page *page;
+
+	offset = offset_in_page(bio_ptr);
+	for (i = 0; i < bio->bi_max_vecs; i++) {
+		size = PAGE_SIZE - offset;
+
+		if (bio_size <= 0)
+			break;
+
+		if (size > bio_size)
+			size = bio_size;
+
+		if (is_vmalloc_addr(bio_ptr))
+			page = vmalloc_to_page(bio_ptr);
+		else
+			page = virt_to_page(bio_ptr);
+
+		ASSERT3S(page_count(page), >, 0);
+
+		if (bio_add_page(bio, page, size, offset) != size)
+			break;
+
+		bio_ptr  += size;
+		bio_size -= size;
+		offset = 0;
+	}
+
+	return (bio_size);
+}
+
+
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
 		void *data, uint64_t dlen)
 {
 	uint64_t remain = dlen;
 	uint64_t offset = 0, len = 0;
 	sector_t sector = prr->prr_bsector;
-	uint32_t bvec_cnt = ((dlen + PAGE_SIZE - 1) >> PAGE_SHIFT) + 1;
+	uint32_t bvec_cnt = __Mlsas_Bio_nrpages(data, dlen); 
 	struct page *pg = NULL;
 	struct bio *bio = NULL, *bios = NULL;
 
-new_bio:	
+	/* the scsi layer expects a bio_vec it can use */
+	if (rw & REQ_DISCARD)
+		bvec_cnt = 1;
+
+new_bio:
 	bio = bio_alloc(GFP_NOIO, bvec_cnt);
 	bio->bi_iter.bi_sector = sector;
 	bio->bi_bdev = prr->prr_pr->Mlpd_mlb->Mlb_bdi.Mlbd_bdev;
@@ -1733,7 +1779,7 @@ new_bio:
 		offset = offset_in_page(data);
 		len = (remain >= (PAGE_SIZE - offset)) ? 
 			(PAGE_SIZE - offset) : min(remain, PAGE_SIZE);
-		if (!bio_add_page(bio, pg, offset, len)) 
+		if (bio_add_page(bio, pg, offset, len) != len) 
 			goto new_bio;
 		remain -= len;
 		data += len;
