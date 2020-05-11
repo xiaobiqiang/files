@@ -1281,6 +1281,7 @@ void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
 	case Mlsas_Rst_Net_Send_OK:
 		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Net_Queued, 
 			Mlsas_RQ_Net_Sent);
+		break;
 	case Mlsas_Rst_PR_Write_Error:
 	case Mlsas_Rst_PR_Read_Error:
 	case Mlsas_Rst_PR_ReadA_Error:
