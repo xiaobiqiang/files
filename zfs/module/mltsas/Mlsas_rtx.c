@@ -192,7 +192,7 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 
 Mlsas_RW_msg_t *__Mlsas_Setup_RWmsg(Mlsas_request_t *rq)
 {
-	Mlsas_blkdev_t *Mlb = rq->Mlrq_pr->Mlpd_mlb;
+	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_Msh_t *mms = rq->Mlrq_bdev->Mlb_txbuf;
 	Mlsas_RW_msg_t *rwm = mms + 1;
 
@@ -283,7 +283,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 		return (0);
 	}
 	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
-	spin_lock_irq(&Mlb->Mlb_rq_spin);
+	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, 
 		__Mlsas_RTX_rxfl_bfl(Wm->rw_flags), 
@@ -317,7 +317,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 		return (0);
 	}
 	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
-	spin_lock_irq(&Mlb->Mlb_rq_spin);
+	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, 
 		__Mlsas_RTX_rxfl_bfl(Rm->rw_flags), 
