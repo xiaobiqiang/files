@@ -45,7 +45,7 @@ extern int sqlite3_exec(sqlite3* handle, const char *sql,
 	sqlite3_callback callback, void *arg, char **errmsg);
 
 
-extern int disk_db_init(void);
+extern disk_db_handle_t disk_db_init(void);
 extern disk_db_handle_t disk_db_get(void);
 extern int disk_db_open(const char* pname, disk_db_handle_t *phandle);
 extern int disk_db_open_ext(const char* pname, disk_db_handle_t *phandle);
