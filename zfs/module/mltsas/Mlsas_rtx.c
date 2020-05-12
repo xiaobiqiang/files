@@ -264,7 +264,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 	}
 	
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
-	if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) {
+	if (!__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) {
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);
@@ -298,7 +298,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 	}
 	
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
-	if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) {
+	if (!__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) {
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);

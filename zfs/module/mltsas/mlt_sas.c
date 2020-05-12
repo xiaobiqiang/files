@@ -1683,6 +1683,8 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 	prr->prr_bsize = len;
 	prr->prr_pr_rq = reqid;
 	prr->prr_pr = pr;
+
+	kref_init(&prr->prr_ref);
 	return prr;
 }
 
@@ -1725,11 +1727,8 @@ __Mlsas_Bio_map(struct bio *bio, void *bio_ptr, unsigned int bio_size)
 
 		if (size > bio_size)
 			size = bio_size;
-
-		if (is_vmalloc_addr(bio_ptr))
-			page = vmalloc_to_page(bio_ptr);
-		else
-			page = virt_to_page(bio_ptr);
+		
+		page = virt_to_page(bio_ptr);
 
 		ASSERT3S(page_count(page), >, 0);
 
@@ -1744,29 +1743,37 @@ __Mlsas_Bio_map(struct bio *bio, void *bio_ptr, unsigned int bio_size)
 	return (bio_size);
 }
 
+static struct bio *__Mlsas_PR_RQ_New_bio(uint32_t bv_cnt, sector_t sect,
+		uint32_t rw, struct block_device *bdev)
+{
+	struct bio *bio;
+
+	if (bv_cnt == 0)
+		bv_cnt = 1;
+
+	bio = bio_alloc(GFP_NOIO, bv_cnt);
+	bio->bi_iter.bi_sector = sect;
+	bio->bi_bdev = bdev;
+	bio->bi_rw = rw;
+	bio->bi_end_io = __Mlsas_PR_RQ_endio;
+
+	return bio;
+}
 
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
 		void *data, uint64_t dlen)
 {
-	uint64_t remain = dlen;
-	uint64_t offset = 0, len = 0;
-	sector_t sector = prr->prr_bsector;
-	uint32_t bvec_cnt = __Mlsas_Bio_nrpages(data, dlen); 
-	struct page *pg = NULL;
+	uint32_t remained;
 	struct bio *bio = NULL, *bios = NULL;
-
-	/* the scsi layer expects a bio_vec it can use */
-	if (rw & REQ_DISCARD)
-		bvec_cnt = 1;
+	sector_t sector = prr->prr_bsector;
+	uint32_t bv_cnt = __Mlsas_Bio_nrpages(data, dlen); 
+	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
+	struct block_device *backing_dev = Mlb->Mlb_bdi.Mlbd_bdev;
 
 new_bio:
-	bio = bio_alloc(GFP_NOIO, bvec_cnt);
-	bio->bi_iter.bi_sector = sector;
-	bio->bi_bdev = prr->prr_pr->Mlpd_mlb->Mlb_bdi.Mlbd_bdev;
-	bio->bi_rw = rw;
-	bio->bi_end_io = __Mlsas_PR_RQ_endio;
+	bv_cnt = __Mlsas_Bio_nrpages(data, dlen);
+	bio = __Mlsas_PR_RQ_New_bio(bv_cnt, sector, rw, backing_dev);
 	bio->bi_private = prr;
-
 	bio->bi_next = bios;
 	bios = bio;
 
@@ -1775,17 +1782,11 @@ new_bio:
 		return bio;
 	}
 	
-	while (remain) {
-		pg = virt_to_page(data);
-		offset = offset_in_page(data);
-		len = (remain >= (PAGE_SIZE - offset)) ? 
-			(PAGE_SIZE - offset) : min(remain, PAGE_SIZE);
-		if (bio_add_page(bio, pg, offset, len) != len) 
-			goto new_bio;
-		remain -= len;
-		data += len;
-		sector += len >> 9;
-		bvec_cnt--;
+	if ((remained = __Mlsas_Bio_map(bio, data, dlen)) != 0) {
+		data += (dlen - remained);
+		dlen = remained;
+		sector += ((dlen - remained) >> 9);
+		goto new_bio;
 	}
 
 	return bio;
