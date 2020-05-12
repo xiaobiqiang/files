@@ -1683,6 +1683,7 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 	prr->prr_bsize = len;
 	prr->prr_pr_rq = reqid;
 	prr->prr_pr = pr;
+	prr->prr_delayed_magic = Mlsas_Delayed_PR_RQ;
 
 	kref_init(&prr->prr_ref);
 	return prr;
@@ -2016,7 +2017,7 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 	list_create(&pr->Mlpd_rqs, sizeof(Mlsas_request_t),
 		offsetof(Mlsas_request_t, Mlrq_pr_node));
 	list_create(&pr->Mlpd_pr_rqs, sizeof(Mlsas_pr_req_t),
-		offsetof(Mlsas_pr_req_t, prr_mlb_node));
+		offsetof(Mlsas_pr_req_t, prr_node));
 	
 	pr->Mlpd_st = st;
 	pr->Mlpd_hostid = id;
