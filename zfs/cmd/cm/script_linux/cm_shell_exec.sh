@@ -52,8 +52,9 @@ function cm_pmm_node_stat()
     # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题
     local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{printf("%.0f %.0f",ob,rb)}'`
     #*100是为了uint64取值，之后会/100取得正确结果
-    local iops=`iostat -dx 1 2|grep '\.'|egrep -v Linux|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{printf("%.0f %.0f",rs*100/2,ws*100/2)}'`
-    local cpu=`iostat -c 1 2|grep '\.'|egrep -v Linux|sed 1d|awk '{print ($1+$3)*100" "$6*100}'`
+    local sdnum=`iostat -dx|grep '\.'|egrep -v Linux|wc -l`
+    local iops=`iostat -dx 1 2|grep '\.'|egrep -v Linux|awk 'BEGIN{rs=0;ws=0}NR>'$sdnum'{rs+=$4;ws+=$5}END{printf("%.0f %.0f",rs*100,ws*100)}'`
+    local cpu=`iostat -c 1 2|grep '\.'|egrep -v Linux|sed 1d|awk '{print (100-$6)*100" "$6*100}'`
     local mem=`free -t|grep Mem|awk '{print $3/$2*100}'`
     
     if [ "X$bandwidth" == "X " ]; then
@@ -563,7 +564,7 @@ function cm_pmm_disk_instance()
     cat /proc/diskstats| grep -n -w "$diskname" |awk -F':' '{print $1}'
 }
 
-function cm_pmm_disk()
+function cm_pmm_disk_bak()
 {
     local num=$1
     #kstat -m sd -c disk -i $num \
@@ -574,6 +575,22 @@ function cm_pmm_disk()
     local read=${array[1]}
     local wiops=${array[2]}
     local write=${array[3]}
+    
+    echo "0 $read $write $riops 0 0 0 0 $wiops 0"
+    return $?
+}
+
+function cm_pmm_disk()
+{
+    local name=$1
+    #prtconf -a /dev/rdsk/$name|grep -w disk|awk -F'#' '{print $2}'
+    name=`cat /tmp/disk.xml |grep "$name"|awk -F'>' '{print $2}'|awk -F'<' '{print $1}'`
+    local diskname=`ls -l $name|awk -F'->' '{print $2}'|awk -F'/' '{print $3}'`
+    local data=(`iostat -dx 1 2|grep -w $diskname|sed 1d|awk '{print $4" "$5" "$6" "$7}'`)
+    local riops=${data[0]}
+    local read=${data[2]}
+    local wiops=${data[1]}
+    local write=${data[3]}
     
     echo "0 $read $write $riops 0 0 0 0 $wiops 0"
     return $?
