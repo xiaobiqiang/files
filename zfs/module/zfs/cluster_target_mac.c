@@ -88,11 +88,18 @@ unsigned int cluster_target_mac_nrxworker = 16;
 #ifndef SOLARIS
 #define	ETHERTYPE_CLUSTERSAN	(0x8908)	/* cluster san */
 
-#ifdef USE_HENGWEI
-	#define NET_IP_ALIGN_C	0
+#ifdef  SPEC_NET_IP_ALIGN
+        #define NET_IP_ALIGN_C  2
 #else
-	#define NET_IP_ALIGN_C	2
+
+#ifdef USE_HENGWEI
+        #define NET_IP_ALIGN_C  0
+#else
+        #define NET_IP_ALIGN_C  2
 #endif
+
+#endif
+
 struct ether_header
 {
 	unsigned char	h_dest[ETH_ALEN];	/* destination eth addr	*/

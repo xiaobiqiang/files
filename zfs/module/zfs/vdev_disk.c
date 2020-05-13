@@ -100,7 +100,7 @@ static int vdev_ev_mgt_register(vdev_t *vd)
     list_add_tail(&vdev_ev->list, &vdev_ev_mgt_list);
     spin_unlock_irqrestore(&vdev_ev_mgt_lock, flags);
 
-    printk(KERN_ERR "reg vdev[%s]\n", vdev_ev->wwn_str);
+    zfs_dbgmsg( "reg vdev[%s]\n", vdev_ev->wwn_str);
 
     return 0;
 }
@@ -124,7 +124,7 @@ static int vdev_ev_mgt_unregister(vdev_t *vd)
     if(found == FALSE)
         return -1;
 
-    printk(KERN_ERR "unreg vdev[%s]\n", vdev_ev->wwn_str, __func__);
+    zfs_dbgmsg( "unreg vdev[%s]\n", vdev_ev->wwn_str, __func__);
 
     spa_strfree(vdev_ev->vdev_path);
     kmem_free(vdev_ev, sizeof (vdev_ev_mgt_t));
