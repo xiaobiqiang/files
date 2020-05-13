@@ -857,13 +857,13 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgGroup[] =
     {
         CM_OMI_CMD_ADD, CM_OMI_PERMISSION_ALL,
         cm_cnm_group_decode, cm_cnm_group_create, cm_omi_encode_taskid,
-        NULL
+        cm_cnm_group_oplog_create
     },
     /* delete */
     {
         CM_OMI_CMD_DELETE, CM_OMI_PERMISSION_ALL,
         cm_cnm_group_decode, cm_cnm_group_delete, cm_omi_encode_taskid,
-        NULL
+        cm_cnm_group_oplog_delete
     },
 };
 
@@ -1607,6 +1607,12 @@ const cm_omi_object_cmd_cfg_t g_CmOmiObjectCfgCnmExplorer[] =
     {
         CM_OMI_CMD_GET_BATCH, CM_OMI_PERMISSION_ALL,
         cm_cnm_explorer_decode, cm_cnm_explorer_getbatch, cm_cnm_explorer_encode,
+        NULL
+    },
+    /*get*/
+    {
+        CM_OMI_CMD_GET, CM_OMI_PERMISSION_ALL,
+        cm_cnm_explorer_decode, cm_cnm_explorer_get, cm_cnm_explorer_encode,
         NULL
     },
     /*count*/

@@ -436,10 +436,55 @@ function cm_cnm_user_group_count()
     cat /etc/group |awk -F':' '$3==1||($3>'$BEGIN_GID'&&$3<50000)' |wc -l
     return $?
 }
-function cm_cnm_user_group_maxid()
+
+function cm_cnm_user_check_uid()
 {
-    cat /etc/group | awk -F':' 'BEGIN {max='$BEGIN_GID'}{if(($3>'$BEGIN_GID'&&$3<50000)&&($3>max)) max=$3} END{printf max}'
-    return $?
+    local uid=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    return 0
 }
+
+function cm_cnm_user_check_uname()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_gid()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gname()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' '$3=='$uid'{print $1;break}'
+    return 0
+}
+
+function cm_cnm_user_check_gname()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_uid()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gid()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    return 0
+}
+
 cm_cnm_user_"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$7"
 exit $?

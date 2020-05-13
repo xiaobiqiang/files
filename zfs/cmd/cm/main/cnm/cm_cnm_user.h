@@ -112,6 +112,13 @@ extern sint32 cm_cnm_group_sync_get(uint64 data_id, void **pdata, uint32 *plen);
 
 extern sint32 cm_cnm_group_sync_delete(uint64 id);
 
+extern void cm_cnm_group_oplog_create(
+    const sint8* sessionid, const void *pDecodeParam, sint32 Result);   
+
+extern void cm_cnm_group_oplog_delete(
+    const sint8* sessionid, const void *pDecodeParam, sint32 Result);  
+
+
 /********************************************************
                   
 *********************************************************/
@@ -126,7 +133,7 @@ typedef struct
     cm_time_t mtime; 
     cm_time_t ctime; 
     sint8 name[CM_STRING_256];
-    sint8 dir[CM_STRING_256];
+    sint8 dir[CM_NAME_LEN_DIR];
     sint8 user[CM_STRING_64];
     sint8 group[CM_STRING_64];
     sint8 find[CM_STRING_64];
@@ -150,6 +157,9 @@ extern sint32 cm_cnm_explorer_create(
 extern sint32 cm_cnm_explorer_count(
     const void *pDecodeParam,void **ppAckData, uint32 *pAckLen);
 
+extern sint32 cm_cnm_explorer_get(
+    const void *pDecodeParam, void **ppAckData, uint32 *pAckLen);
+
 extern sint32 cm_cnm_explorer_local_getbatch(
     void *param, uint32 len,
     uint64 offset, uint32 total, 
@@ -159,6 +169,10 @@ extern sint32 cm_cnm_explorer_local_count(
     void *param, uint32 len,
     uint64 offset, uint32 total, 
     void **ppAck, uint32 *pAckLen);
+extern sint32 cm_cnm_explorer_local_get(
+    void *param, uint32 len,
+    uint64 offset, uint32 total, 
+    void **ppAck, uint32 *pAckLen);    
 
 extern sint32 cm_cnm_explorer_local_create(
     void *param, uint32 len,
