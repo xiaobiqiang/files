@@ -332,6 +332,8 @@ typedef struct failover_ip_check{
 }failover_ip_check_t;
 failover_ip_check_t failover_ip_check;
 
+#define	IFCONFIG_CMD	"/usr/sbin/ifconfig"
+
 /*
  * These pools are ready to import/export by release message handler or
  * mac offline event handler, do_ip_failover()/do_ip_restore() shuold
@@ -5512,7 +5514,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	strlcpy(ifp->eth, conf->eth, MAXLINKNAMELEN);
 	strlcpy(ifp->alias, alias, IFALIASZ);
 	strlcpy(ifp->ip_addr, conf->ip_addr, INET6_ADDRSTRLEN);
-	strlcpy(ifp->netmask, conf->netmask, INET6_ADDRSTRLEN);
+	//strlcpy(ifp->netmask, conf->netmask, INET6_ADDRSTRLEN);
 	ifp->prefixlen = conf->prefixlen;
 	/* 
 	 * if restore_flag is set and ip_on_link == 1,
@@ -7089,7 +7091,7 @@ handle_check_failover_message(cluster_mq_message_t *mq_message)
 		pthread_cond_signal(&failover_ip_check.cond);
 		pthread_mutex_unlock(&failover_ip_check.lock);
 	}else {
-		syslog(LOG_ERR, FUNC_LINE" msgtype unexpected. msgtype = ", func_line, mq_message->msgtype);
+		syslog(LOG_ERR, FUNC_LINE" msgtype unexpected. msgtype = %d.", func_line, mq_message->msgtype);
 	}
 }
 
