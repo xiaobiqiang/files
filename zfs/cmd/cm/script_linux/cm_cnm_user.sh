@@ -161,6 +161,13 @@ function cm_cnm_user_maxid()
 	echo $cut
 }
 
+function cm_cnm_user_newgid()
+{
+    local cut=`cat /etc/group| awk -F':' '{print $3}'| sort -n | awk -F':' 'BEGIN {max='$BEGIN_UID'}{if(($1>'$BEGIN_UID'&&$1<50000)&&($1-max==1)) max=$1} END{printf max}'`
+	((cut=$cut+1))
+	echo $cut
+}
+
 function cm_cnm_user_explorer_init()
 {
     mkdir -p '/tmp/explorer/flag'
@@ -440,49 +447,49 @@ function cm_cnm_user_group_count()
 function cm_cnm_user_check_uid()
 {
     local uid=$1
-    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++}END{print cnt}'
     return 0
 }
 
 function cm_cnm_user_check_uname()
 {
     local uname=$1
-    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++}END{print cnt}'
     return 0
 }
 
 function cm_cnm_user_check_gid()
 {
     local uid=$1
-    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++}END{print cnt}'
     return 0
 }
 
 function cm_cnm_user_get_gname()
 {
     local uid=$1
-    cat /etc/group | awk -F':' '$3=='$uid'{print $1;break}'
+    cat /etc/group | awk -F':' '$3=='$uid'{print $1}'
     return 0
 }
 
 function cm_cnm_user_check_gname()
 {
     local uname=$1
-    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++}END{print cnt}'
     return 0
 }
 
 function cm_cnm_user_get_uid()
 {
     local uname=$1
-    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3}END{print cnt}'
     return 0
 }
 
 function cm_cnm_user_get_gid()
 {
     local uname=$1
-    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3}END{print cnt}'
     return 0
 }
 
