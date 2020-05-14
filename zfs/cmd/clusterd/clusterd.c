@@ -5366,59 +5366,6 @@ check_ip_exist(int af, const char *eth, const char *ip)
 	return (0);
 }
 
-static int
-check_ip_enable(int af, const char *if_name, const char *ip_addr,
-	char *ret_if, size_t ifsize)
-{
-	char *buf;
-	unsigned buflen;
-	int n;
-	struct lifreq *lifrp;
-	char ipaddr[INET6_ADDRSTRLEN];
-	struct sockaddr_storage *ss;
-	const char *p;
-
-	if ((n = get_all_ifs(&buf, &buflen)) <= 0)
-		return (-1);
-	lifrp = (struct lifreq *)buf;
-	for (; n > 0; n--, lifrp++) {
-		ss = &(lifrp->lifr_addr);
-		if ((af != AF_UNSPEC) && (ss->ss_family != af))
-			continue;
-		p = strchr(lifrp->lifr_name, ':');
-		if ((if_name != NULL) &&
-			(strncmp(lifrp->lifr_name, if_name, 
-			p ? p - lifrp->lifr_name : strlen(lifrp->lifr_name)) != 0))
-			continue;
-		if (ss->ss_family == AF_INET) {
-			p = inet_ntop(AF_INET, &(((struct sockaddr_in *)ss)->sin_addr), 
-					ipaddr, INET_ADDRSTRLEN);
-		} else if (ss->ss_family == AF_INET6) {
-			p = inet_ntop(AF_INET6, &(((struct sockaddr_in6 *)ss)->sin6_addr), 
-					ipaddr, INET6_ADDRSTRLEN);
-		} else {
-			syslog(LOG_ERR, "Unsupported protocol: %d", ss->ss_family);
-			continue;
-		}
-		if (p == NULL) {
-			syslog(LOG_ERR, "inet_ntop error: %d", errno);
-			continue;
-		}
-		if (strncmp(ip_addr, ipaddr, INET6_ADDRSTRLEN) == 0) {
-			if (ret_if != NULL)
-				strlcpy(ret_if, lifrp->lifr_name, ifsize);
-			if (get_if_flags(lifrp) < 0)
-				continue;
-			if (lifrp->lifr_flags & IFF_UP) {
-				free(buf);
-				return (1);
-			}
-		}
-	}
-	free(buf);
-	return (0);
-}
-
 /*
  * return 1 if ip up, return 0 if ip down, otherwise return -1
  */
@@ -7064,19 +7011,10 @@ config_and_enable_failover_ip(service_if_t *ifp)
 	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) != 1) {
 		syslog(LOG_ERR, "%s: failover ip %s:%s not config.", __func__, ifp->eth, ifp->ip_addr);
 
-		sprintf(cmd, "%s %s %s plumb addif %s %s %s", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "",
+		sprintf(cmd, "%s %s %s %s %s %s up", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "",
 			ifp->ip_addr, ifp->netmask[0] == '\0' ? "" : "netmask", ifp->netmask);
 		if ((err = excute_ifconfig(cmd)) != 0) {
 			syslog(LOG_ERR, "%s: excute ifconfig addif error - %d", __func__, err);
-		}
-	}
-
-	if(check_ip_enable(ifp->af, ifp->eth, ifp->ip_addr, ifname, MAXLINKNAMELEN) != 1) {
-		syslog(LOG_ERR, "%s: failover ip %s:%s not enable.", __func__, ifp->eth, ifp->ip_addr);
-
-		sprintf(cmd, "%s %s %s up", IFCONFIG_CMD, ifname, ifp->af == AF_INET6 ? "inet6" : "");
-		if ((err = ifconfig_up(cmd, ifp->af, ifp->eth, ifp->ip_addr, 1)) != 1) {
-			syslog(LOG_ERR, "%s: ifconfig up error - %d", __func__, err);
 		}
 	}
 }
@@ -7088,14 +7026,13 @@ disable_failover_ip(service_if_t *ifp)
 	char cmd[128];
 	int err;
 
-	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) == 1 ||
-		check_ip_enable(ifp->af, ifp->eth, ifp->ip_addr, ifname, MAXLINKNAMELEN) == 1) {
+	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) == 1) {
 		syslog(LOG_ERR, "%s: failover ip %s:%s not in failover_ip_list but config or enable, delete it.",
 			__func__, ifp->eth, ifp->ip_addr);
 
-		sprintf(cmd, "%s %s %s removeif %s", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "", ifp->ip_addr);
+		sprintf(cmd, "%s %s %s del %s", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "", ifp->ip_addr);
 		if ((err = excute_ifconfig(cmd)) != 1) {
-			syslog(LOG_ERR, "%s: removeif error - %d", __func__, err);
+			syslog(LOG_ERR, "%s: del error - %d", __func__, err);
 		}
 	}
 }
