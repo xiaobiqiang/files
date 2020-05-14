@@ -309,7 +309,7 @@ sint32 cm_cnm_snapshot_backup_cbk_task_report
     pAck->task_pid = pSnd->task_pid;
     pAck->task_prog = prog;
     /*start  for 00006382 by wbn */
-    if(0 == cm_exec_int("ps -ef|awk '{print $2}'|grep -w %u|wc -l",pSnd->task_pid))
+    if(0 == cm_exec_int("ps -ef -o pid  %u|egrep -v PID|wc -l",pSnd->task_pid))
     {
         CM_LOG_ERR(CM_MOD_CNM, "pid[%u] not found",pSnd->task_pid);
         pAck->task_state = CM_TASK_STATE_WRONG;
