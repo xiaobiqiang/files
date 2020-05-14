@@ -75,6 +75,9 @@ zfs_dbgmsg_addr(kstat_t *ksp, loff_t n)
 {
 	zfs_dbgmsg_t *zdm = (zfs_dbgmsg_t *)ksp->ks_private;
 
+	if (!virt_addr_valid(zdm))
+		return -1;
+
 	ASSERT(MUTEX_HELD(&zfs_dbgmsgs_lock));
 
 	if (n == 0)
@@ -95,7 +98,7 @@ zfs_dbgmsg_purge(int max_size)
 
 	while (zfs_dbgmsg_size > max_size) {
 		zdm = list_remove_head(&zfs_dbgmsgs);
-		if (zdm == NULL)
+		if (!virt_addr_valid(zdm))
 			return;
 
 		size = zdm->zdm_size;
