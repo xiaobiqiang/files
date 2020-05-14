@@ -10610,25 +10610,35 @@ stmf_itl_task_done(stmf_i_scsi_task_t *itask)
 		cmn_err(CE_WARN,   "%s  task=%p cdb0=%02x elapsed_time = %ld",__func__,task, task->task_cdb[0],(long) elapsed_time/1000000);
 		STMF_TASK_KSTAT_UPDATE_DONE_OVER_THRES(&stmf_state);
 	}
-	
+
 	if (task->task_flags & TF_READ_DATA) {
-		kip->reads++;
-		kip->nread += itask->itask_read_xfer;
-		itli->i_task_read_elapsed.value.ui64 += elapsed_time;
-		itli->i_lu_read_elapsed.value.ui64 +=
-		    itask->itask_lu_read_time;
-		itli->i_lport_read_elapsed.value.ui64 +=
-		    itask->itask_lport_read_time;
+		if (virt_addr_valid(kip)) {
+			kip->reads++;
+			kip->nread += itask->itask_read_xfer;
+		}
+
+		if (virt_addr_valid(itli)) {
+			itli->i_task_read_elapsed.value.ui64 += elapsed_time;
+			itli->i_lu_read_elapsed.value.ui64 +=
+			    itask->itask_lu_read_time;
+			itli->i_lport_read_elapsed.value.ui64 +=
+			    itask->itask_lport_read_time;
+		}
 	}
 
 	if (task->task_flags & TF_WRITE_DATA) {
-		kip->writes++;
-		kip->nwritten += itask->itask_write_xfer;
-		itli->i_task_write_elapsed.value.ui64 += elapsed_time;
-		itli->i_lu_write_elapsed.value.ui64 +=
-		    itask->itask_lu_write_time;
-		itli->i_lport_write_elapsed.value.ui64 +=
-		    itask->itask_lport_write_time;
+		if (virt_addr_valid(kip)) {
+			kip->writes++;
+			kip->nwritten += itask->itask_write_xfer;
+		}
+
+		if (virt_addr_valid(itli)) {
+			itli->i_task_write_elapsed.value.ui64 += elapsed_time;
+			itli->i_lu_write_elapsed.value.ui64 +=
+			    itask->itask_lu_write_time;
+			itli->i_lport_write_elapsed.value.ui64 +=
+			    itask->itask_lport_write_time;
+		}
 	}
 
 	if (itask->itask_flags & ITASK_KSTAT_IN_RUNQ) {
@@ -10691,13 +10701,15 @@ stmf_lu_xfer_done(scsi_task_t *task, boolean_t read, uint64_t xfer_bytes,
 
 	kip = KSTAT_IO_PTR(itl->itl_kstat_lu_xfer);
 	mutex_enter(ilu->ilu_kstat_io->ks_lock);
-	kstat_runq_exit(kip);
-	if (read) {
-		kip->reads++;
-		kip->nread += xfer_bytes;
-	} else {
-		kip->writes++;
-		kip->nwritten += xfer_bytes;
+	if (virt_addr_valid(kip)) {
+		kstat_runq_exit(kip);
+		if (read) {
+			kip->reads++;
+			kip->nread += xfer_bytes;
+		} else {
+			kip->writes++;
+			kip->nwritten += xfer_bytes;
+		}
 	}
 	mutex_exit(ilu->ilu_kstat_io->ks_lock);
 }
@@ -10754,12 +10766,14 @@ stmf_lport_xfer_done(stmf_i_scsi_task_t *itask, stmf_data_buf_t *dbuf)
 	*/
 	kip = KSTAT_IO_PTR(itl->itl_kstat_lport_xfer);
 	mutex_enter(ilp->ilport_kstat_io->ks_lock);
-	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
-		kip->reads++;
-		kip->nread += xfer_size;
-	} else {
-		kip->writes++;
-		kip->nwritten += xfer_size;
+	if (virt_addr_valid(kip)) {
+		if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
+			kip->reads++;
+			kip->nread += xfer_size;
+		} else {
+			kip->writes++;
+			kip->nwritten += xfer_size;
+		}
 	}
 	mutex_exit(ilp->ilport_kstat_io->ks_lock);
 
