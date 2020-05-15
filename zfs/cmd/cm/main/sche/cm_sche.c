@@ -446,7 +446,7 @@ static void cm_sche_check(struct tm *tmnow,cm_db_handle_t db_handle)
     minute = tmnow->tm_min;
     hour = 1<<tmnow->tm_hour;
     week_day = 1<<tmnow->tm_wday;
-    month_day = 1<<tmnow->tm_mday;
+    month_day = 1<<(tmnow->tm_mday-1);
     
     do
     {

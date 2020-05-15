@@ -117,7 +117,7 @@ sint32 cm_cnm_user_create(const void *pDecodeParam,void **ppAckData,uint32 * pAc
         return CM_PARAM_ERR;
     }
     
-    cut = (uint32)cm_exec_int("cat /etc/passwd | grep  '^%s:' | wc -l",info->name);
+    cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_uname '%s'",info->name);
     if(cut != 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"name[%s] exits",info->name);
@@ -127,6 +127,12 @@ sint32 cm_cnm_user_create(const void *pDecodeParam,void **ppAckData,uint32 * pAc
     if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_USER_ID))
     {
         id = info->id;
+        cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_uid '%u'",id);
+        if(cut != 0)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"name[%s] exits",info->name);
+            return CM_ERR_ALREADY_EXISTS;
+        }
     }else{
         id = (uint32)cm_exec_int("%s maxid",cm_cnm_user_sh);
     }
@@ -157,13 +163,13 @@ sint32 cm_cnm_user_delete(const void * pDecodeParam,void **ppAckData,uint32 * pA
         return CM_FAIL;
     }
 
-    cut = (uint32)cm_exec_int("cat /etc/passwd | grep -w '%s' | wc -l",info->name);
+    cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_uname '%s'",info->name);
     if(cut == 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"name[%s] no exits",info->name);
         return CM_ERR_NOT_EXISTS;
     }
-    id = (uint32)cm_exec_int("cat /etc/passwd | grep '^%s:' | awk -F':' '{printf $3}'",info->name);
+    id = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh get_uid '%s'",info->name);
     if(id == 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"id 0");
@@ -223,14 +229,14 @@ sint32 cm_cnm_user_count(const void * pDecodeParam,void **ppAckData,uint32 *pAck
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     const cm_cnm_user_info_t *info = NULL;
     uint64 cut = 0;
-
-    cut = (uint64)cm_exec_int("%s count",cm_cnm_user_sh);
+    uint32 gid=0;
 
     if(decode != NULL&&CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_USER_GID))
     {
         info = (const cm_cnm_user_info_t *)decode->data;
-        cut = (uint64)cm_exec_int("%s count %u",cm_cnm_user_sh,info->gid);
+        gid = info->gid;
     }
+    cut=cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh count %u",gid);
     
     return cm_cnm_ack_uint64(cut,ppAckData,pAckLen);
 }
@@ -366,10 +372,10 @@ sint32 cm_cnm_user_sync_request(uint64 data_id, void *pdata, uint32 len)
   
             if(0 != strlen(info_user->path))
             {
-                iRet =cm_system("%s insert %s %s %llu %u",cm_cnm_user_sh,info_user->name,info_user->path,data_id,info_user->gid);
+                iRet =cm_system("%s insert '%s' '%s' %llu %u",cm_cnm_user_sh,info_user->name,info_user->path,data_id,info_user->gid);
             }else
             {
-                iRet =cm_system("%s insert %s null %llu %u",cm_cnm_user_sh,info_user->name,data_id,info_user->gid);
+                iRet =cm_system("%s insert '%s' null %llu %u",cm_cnm_user_sh,info_user->name,data_id,info_user->gid);
             }
             if(iRet != CM_OK)
             {
@@ -387,7 +393,7 @@ sint32 cm_cnm_user_sync_request(uint64 data_id, void *pdata, uint32 len)
         }
         else
         {
-            return cm_system("%s request_false %s %s %s",cm_cnm_user_sh,info->passwd,info->shadow,info->smbpasswd);
+            return cm_system("%s request_false '%s' '%s' '%s'",cm_cnm_user_sh,info->passwd,info->shadow,info->smbpasswd);
         }
     }
     
@@ -410,16 +416,16 @@ sint32 cm_cnm_user_sync_request(uint64 data_id, void *pdata, uint32 len)
         }
         if(0 != strlen(info->user.path))
         {
-            iRet = cm_system("%s update %s %u %s %u",cm_cnm_user_sh,info->user.name,info->user.gid,info->user.path,info->user.id);
+            iRet = cm_system("%s update '%s' %u '%s' %u",cm_cnm_user_sh,info->user.name,info->user.gid,info->user.path,info->user.id);
         }else
         {
-            iRet = cm_system("%s update %s %u null %u",cm_cnm_user_sh,info->user.name,info->user.gid,info->user.id);
+            iRet = cm_system("%s update '%s' %u null %u",cm_cnm_user_sh,info->user.name,info->user.gid,info->user.id);
         }
         return iRet;
     }
     else
     {      
-        return cm_system("%s request_true %s %s %s",cm_cnm_user_sh,info->user.name,info->shadow,info->smbpasswd);
+        return cm_system("%s request_true '%s' '%s' '%s'",cm_cnm_user_sh,info->user.name,info->shadow,info->smbpasswd);
     }
     return CM_OK;
 }
@@ -683,15 +689,14 @@ sint32 cm_cnm_group_getbatch(const void *pDecodeParam,void **ppAckData,uint32 *p
     const cm_cnm_decode_info_t *decode = pDecodeParam;
     uint32 offset = 0;
     uint32 total = CM_CNM_MAX_RECORD;
-    sint8 cmd[CM_STRING_256] = {0};
     sint32 iRet = CM_OK;
     if(decode != NULL)
     {
         offset = decode->offset;
         total = decode->total;
     }
-    CM_VSPRINTF(cmd,CM_STRING_256,"%s group_getbatch",cm_cnm_user_sh);
-    iRet = cm_cnm_exec_get_list(cmd,cm_cnm_group_get_each,
+
+    iRet = cm_cnm_exec_get_list(CM_SCRIPT_DIR"cm_cnm_user.sh group_getbatch",cm_cnm_group_get_each,
         offset,sizeof(cm_cnm_group_info_t),ppAckData,&total);
     if(CM_OK != iRet)
     {
@@ -706,7 +711,7 @@ sint32 cm_cnm_group_count(const void *pDecodeParam,void **ppAckData,uint32 *pAck
 {
     uint64 cut = 0;
 
-    cut = (uint64)cm_exec_int("%s group_count",cm_cnm_user_sh);
+    cut = (uint64)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh group_count");
 
     return cm_cnm_ack_uint64(cut,ppAckData,pAckLen);
 }
@@ -729,7 +734,7 @@ sint32 cm_cnm_group_create(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         return CM_PARAM_ERR;
     }
 
-    cut = (uint32)cm_exec_int("cat /etc/group | grep -w '%s' | wc -l",info->name); 
+    cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_gname '%s'",info->name);
     if(cut!= 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"name[%s] exits",info->name);
@@ -739,17 +744,17 @@ sint32 cm_cnm_group_create(const void *pDecodeParam,void **ppAckData,uint32 *pAc
     if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_GROUP_ID))
     {
         maxid = info->id;
+        cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_gid '%u'",maxid); 
+        if(cut!= 0)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"id[%u] exits",maxid);
+            return CM_ERR_ALREADY_EXISTS;
+        }
     }else
     {
-        maxid = (uint32)cm_exec_int("%s group_maxid",cm_cnm_user_sh);
-        maxid++;
+        maxid = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh newgid");
     }
-    cut = (uint32)cm_exec_int("cat /etc/group | grep ':%u:' | wc -l",maxid); 
-    if(cut!= 0)
-    {
-        CM_LOG_ERR(CM_MOD_CNM,"id[%u] exits",maxid);
-        return CM_ERR_ALREADY_EXISTS;
-    }
+    
     
     return cm_sync_request(CM_SYNC_OBJ_GROUP,maxid,(void*)info,sizeof(cm_cnm_group_info_t));
 }
@@ -773,14 +778,17 @@ sint32 cm_cnm_group_delete(const void *pDecodeParam,void **ppAckData,uint32 *pAc
         return CM_PARAM_ERR;
     }
 
-    cut = (uint32)cm_exec_int("cat /etc/group | grep -w '%s' | wc -l",info->name);
+    cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_gname '%s'",info->name);
     if(cut == 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"name[%s] no exits",info->name);
         return CM_ERR_NOT_EXISTS;
     }
-    id = (uint64)cm_exec_int("cat /etc/group | grep '^%s:' | awk -F':' '{printf $3}'",info->name);
-    
+    id = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh get_gid '%s'",info->name);
+    if(id == 0)
+    {
+        return CM_PARAM_ERR;
+    }
     
     return cm_sync_delete(CM_SYNC_OBJ_GROUP,id);
 }
@@ -793,7 +801,7 @@ sint32 cm_cnm_group_sync_request(uint64 data_id,void *pdata,uint32 len)
     {
         return CM_PARAM_ERR;
     }
-    cut = (uint32)cm_exec_int("cat /etc/group | grep -w '%s' | wc -l",info->name); 
+    cut = (uint32)cm_exec_int(CM_SCRIPT_DIR"cm_cnm_user.sh check_gname '%s'",info->name); 
     if(cut!= 0)
     {
         CM_LOG_ERR(CM_MOD_CNM,"name[%s] exist",info->name);
@@ -855,6 +863,53 @@ sint32 cm_cnm_group_sync_delete(uint64 id)
     cm_system("groupdel %s",name);
     return CM_OK;
 }
+
+void cm_cnm_group_oplog_create(
+    const sint8* sessionid, const void *pDecodeParam, sint32 Result)
+{
+    uint32 alarmid = (Result == CM_OK)? CM_ALARM_LOG_USERGROUP_CREATE_OK : CM_ALARM_LOG_USERGROUP_CREATE_FAIL;
+    const cm_cnm_decode_info_t *req = pDecodeParam;
+    const uint32 cnt = 2;
+    
+    if(NULL == pDecodeParam)
+    {   
+        cm_cnm_oplog_report(sessionid,alarmid,NULL,cnt,NULL);
+    }    
+    else    
+    {       
+        const cm_cnm_group_info_t *info = (const cm_cnm_group_info_t*)req->data;
+         
+        cm_cnm_oplog_param_t params[2] = {
+            {CM_OMI_DATA_STRING,CM_OMI_FIELD_GROUP_NAME,strlen(info->name),info->name},
+            {CM_OMI_DATA_INT,CM_OMI_FIELD_GROUP_ID,sizeof(info->id),&info->id},
+        };
+        cm_cnm_oplog_report(sessionid,alarmid,params,cnt,&req->set);
+    }  
+    return; 
+}    
+
+void cm_cnm_group_oplog_delete(
+    const sint8* sessionid, const void *pDecodeParam, sint32 Result)
+{
+    uint32 alarmid = (Result == CM_OK)? CM_ALARM_LOG_USERGROUP_DELETE_OK : CM_ALARM_LOG_USERGROUP_DELETE_FAIL;
+    const cm_cnm_decode_info_t *req = pDecodeParam;
+    const uint32 cnt = 1;
+    
+    if(NULL == pDecodeParam)
+    {   
+        cm_cnm_oplog_report(sessionid,alarmid,NULL,cnt,NULL);
+    }    
+    else    
+    {       
+        const cm_cnm_group_info_t *info = (const cm_cnm_group_info_t*)req->data;
+         
+        cm_cnm_oplog_param_t params[1] = {
+            {CM_OMI_DATA_STRING,CM_OMI_FIELD_GROUP_NAME,strlen(info->name),info->name},
+        };
+        cm_cnm_oplog_report(sessionid,alarmid,params,cnt,&req->set);
+    }  
+    return; 
+}    
 
 
 /********************************************************
@@ -962,6 +1017,12 @@ sint32 cm_cnm_explorer_create(const void *pDecodeParam, void **ppAckData, uint32
         pDecodeParam, ppAckData, pAckLen);
 }
 
+sint32 cm_cnm_explorer_get(const void *pDecodeParam, void **ppAckData, uint32 *pAckLen)
+{
+    return cm_cnm_request_comm(CM_OMI_OBJECT_EXPLORER,CM_OMI_CMD_GET,sizeof(cm_cnm_explorer_info_t),
+        pDecodeParam, ppAckData, pAckLen);
+}
+
 
 static uint32 cm_cnm_explorer_get_permission(uint32 mode)
 {
@@ -1066,8 +1127,13 @@ static sint32 cm_cnm_explorer_get_each(void* ptemp,const sint8* dir,const sint8*
 {
     struct stat buf;
     cm_cnm_explorer_info_t *info = (cm_cnm_explorer_info_t*)ptemp;
-
-    stat(dir,&buf);
+    
+    sint32 iRet = stat(dir,&buf);
+    if(CM_OK != iRet)
+    {
+        CM_LOG_ERR(CM_MOD_CNM,"%s, %d",dir,iRet);
+        return CM_FAIL;
+    }
 
     if(NULL != name)
     {
@@ -1385,6 +1451,53 @@ sint32 cm_cnm_explorer_local_getbatch(
     *pAckLen = total * sizeof(cm_cnm_explorer_info_t);
     return CM_OK;
 }
+
+sint32 cm_cnm_explorer_local_get(
+    void * param,uint32 len,
+    uint64 offset,uint32 total,
+    void **ppAck,uint32 *pAckLen)
+{
+    cm_cnm_decode_info_t *decode = param;
+    cm_cnm_explorer_info_t *info = decode->data;
+    sint32 iRet = CM_OK;
+    sint8 *pfiledir=NULL;
+    cm_cnm_explorer_info_t *pdata=NULL;
+
+    if(!CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_EXPLORER_DIR)
+        || !CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_EXPLORER_NAME))
+    {
+        return CM_PARAM_ERR;
+    }
+    iRet=strlen(info->dir)+strlen(info->name)+5;
+    
+    pfiledir=CM_MALLOC(iRet);
+    if(NULL == pfiledir)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"malloc(%d) fail");
+        return CM_FAIL;
+    }
+    CM_VSPRINTF(pfiledir,iRet,"%s/%s",info->dir,info->name);
+    pdata = CM_MALLOC(sizeof(cm_cnm_explorer_info_t));
+    if(NULL == pdata)
+    {
+        CM_LOG_ERR(CM_MOD_NONE,"malloc(info) fail");
+        CM_FREE(pfiledir);
+        return CM_FAIL;
+    }
+    iRet = cm_cnm_explorer_get_each(pdata,pfiledir,info->name);
+    CM_FREE(pfiledir);
+    if(CM_OK != iRet)
+    {
+        *pAckLen = 0;
+        CM_FREE(pdata);
+        return iRet;
+    }
+    
+    *ppAck = pdata;
+    *pAckLen = sizeof(cm_cnm_explorer_info_t);
+    return CM_OK;
+}
+
 
 sint32 cm_cnm_explorer_local_count(
     void * param,uint32 len,
