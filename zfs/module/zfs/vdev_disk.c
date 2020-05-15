@@ -981,12 +981,12 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 
     vd = find_vdev_by_sas_addr(sas_address);
     if(vd == NULL) {
-        printk(KERN_ERR "event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
+        zfs_dbgmsg( "event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
                     evt_type, sas_address, __FILE__, __LINE__);
         return NOTIFY_DONE;     /* Don't care */
     }
 
-    printk(KERN_ERR "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
+    zfs_dbgmsg( "event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
                 evt_type, sas_address, vd->vdev_path, __FILE__, __LINE__);
 
 	switch(val) {
