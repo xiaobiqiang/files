@@ -194,7 +194,7 @@ function cm_get_localmanageip()
     if [ `uname -r|grep deepin|wc -l` -eq 0 ]; then
         ip=`cat /etc/sysconfig/network-scripts/ifcfg-$port|grep IPADDR|awk -F'=' '{print $2}'`
     else
-        cnt=`cat /etc/network/interfaces|grep -n "iface $port"|awk -F':' '{print $1}'`
+        cnt=`cat /etc/network/interfaces|grep -n "iface $port "|awk -F':' '{print $1}'`
         ((cnt=$cnt+1))
         ip=`cat  /etc/network/interfaces|sed -n "$cnt p"|awk '{print $2}'`
     fi
