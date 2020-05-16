@@ -845,6 +845,10 @@ spl_magazine_destroy(spl_kmem_cache_t *skc)
 
 	kfree(skc->skc_mag);
 }
+static void init_once(void *foo)
+{
+        return;
+}
 
 /*
  * Create a object cache based on the following arguments:
@@ -1002,7 +1006,7 @@ spl_kmem_cache_create(char *name, size_t size, size_t align,
 #endif
 
 		skc->skc_linux_cache = kmem_cache_create(
-		    skc->skc_name, size, align, slabflags, NULL);
+		    skc->skc_name, size, align, slabflags, init_once);
 		if (skc->skc_linux_cache == NULL) {
 			rc = ENOMEM;
 			goto out;
