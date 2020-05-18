@@ -148,19 +148,19 @@ struct link_list {
 };
 
 typedef struct service_if {
-	char eth[MAXLINKNAMELEN];
 	char ip_addr[INET6_ADDRSTRLEN];
-	char netmask[INET6_ADDRSTRLEN];
-	char alias[IFALIASZ];
 	int prefixlen;
-	int zpool_refs;
 	int refs;
-	int flag;
-	int rdma_ib;
-	int af;
 	list_node_t list;
+
+	char eth[MAXLINKNAMELEN];
+	char alias[IFALIASZ];
 	struct link_list *zpool_list;
+	int zpool_refs;
 	failover_conf_t *failover_config;
+
+	int flag;
+	int af;
 } service_if_t;
 
 list_t failover_ip_list;
@@ -5523,6 +5523,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	ifp->zpool_list = NULL;
 	ifp->zpool_refs = 0;
 	ifp->flag = 0;
+	ifp->af = conf->af;
 	ifp->failover_config = dup_failover_config(conf);
 
 	list_insert_head(&failover_ip_list, ifp);
