@@ -2373,13 +2373,28 @@ disk_get_poolname(const char *dev,char *pool_name,int size)
 	int ret = 0;
 	FILE *fp1 = NULL,*fp2 = NULL;
 	char lab[128] = {0};
+	char fstype[64] = {0};
 	char mountcmd[512] = {0};
-	char blkcmd[512] = {0};
+	char blkcmd1[512] = {0};
+	char blkcmd2[512] = {0};
 	
 	(void) snprintf(path, sizeof(path), "%s-part1", dev);
-	(void) snprintf(blkcmd,sizeof(blkcmd),"blkid -s LABEL -o value %s",path);
-	//(void) snprintf(blkcmd,sizeof(blkcmd),"blkid -s LABEL -o value");
-	fp1 = popen(blkcmd,"r");
+	(void) snprintf(blkcmd1,sizeof(blkcmd1),"blkid -s LABEL -o value %s",path);
+	(void) snprintf(blkcmd2,sizeof(blkcmd2),"blkid -s PARTLABEL -o value %s",path);
+
+	fp2 = popen(blkcmd2,"r");
+	if(fp2 == NULL){
+		return 0;
+	}
+	if(fgets(fstype, sizeof(fstype), fp2) != NULL) {
+		if(strncmp(fstype,"zfs-",4)){
+			pclose(fp2);
+			return 0;
+		}
+	}
+	pclose(fp2);
+
+	fp1 = popen(blkcmd1,"r");
 	if(fp1 == NULL){
 		return 0;
 	}
@@ -2394,7 +2409,7 @@ disk_get_poolname(const char *dev,char *pool_name,int size)
 		}
 		ret = 1;
 	}else{
-		ret = 0;
+		ret = 2;
 	}
 	pclose(fp1);
 	return ret;

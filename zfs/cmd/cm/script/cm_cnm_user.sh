@@ -20,131 +20,140 @@ EOF
 
 function cm_cnm_user_insert()
 {
-	local user=$1
-	local path=$2
-	local uid=$3
-	local gid=$4
-	local iRet=$CM_OK
-	
+    local user=$1
+    local path=$2
+    local uid=$3
+    local gid=$4
+    local iRet=$CM_OK
 
-	if [ $path != "null" ]; then
-		useradd -u $uid -g $gid -d $path $user
-		iRet=$?
-	else
-		useradd -u $uid -g $gid $user
-		iRet=$?
-	fi
 
-	return $iRet
+    if [ $path != "null" ]; then
+        useradd -u $uid -g $gid -d $path $user
+        iRet=$?
+    else
+        useradd -u $uid -g $gid $user
+        iRet=$?
+    fi
+
+    return $iRet
 }
 
 function cm_cnm_user_update()
 {
-	local name=$1
-	local gid=$2
-	local path=$3
-	local uid=$4
-	local iRet=$CM_OK
-	
-	if [ $gid -ne 0 ]; then
-		usermod -g $gid $name
-		iRet=$?
-		if [ $iRet != $CM_OK ];then
-			return $CM_FAIL
-		fi
-	fi
-	
-	if [ $uid -ne 0 ]; then
-		usermod -u $uid $name
-		iRet=$?
-		if [ $iRet != $CM_OK ];then
-			return $CM_FAIL
-		fi
-	fi
-	
-	if [ $path != 'null' ]; then
-		usermod -d $path $name
-		iRet=$?
-		if [ $iRet != $CM_OK ];then
-			return $CM_FAIL
-		fi
-	fi
-	
-	return $iRet
+    local name=$1
+    local gid=$2
+    local path=$3
+    local uid=$4
+    local iRet=$CM_OK
+
+    if [ $gid -ne 0 ]; then
+        usermod -g $gid $name
+        iRet=$?
+        if [ $iRet != $CM_OK ];then
+            return $CM_FAIL
+        fi
+    fi
+
+    if [ $uid -ne 0 ]; then
+        usermod -u $uid $name
+        iRet=$?
+        if [ $iRet != $CM_OK ];then
+            return $CM_FAIL
+        fi
+    fi
+
+    if [ $path != 'null' ]; then
+        usermod -d $path $name
+        iRet=$?
+        if [ $iRet != $CM_OK ];then
+            return $CM_FAIL
+        fi
+    fi
+
+    return $iRet
 }
 
 function cm_cnm_user_request_false()
 {
-	local passwd=$1
-	local shadow=$2
-	local smbpasswd=$3
-	
-	echo $passwd>>/etc/passwd
-	echo $shadow>>/etc/shadow
-	echo $smbpasswd >>/var/smb/smbpasswd
+    local passwd=$1
+    local shadow=$2
+    local smbpasswd=$3
+
+    echo $passwd>>/etc/passwd
+    echo $shadow>>/etc/shadow
+    echo $smbpasswd >>/var/smb/smbpasswd
 }
 
 function cm_cnm_user_request_true()
 {
-	local name=$1
-	local shadow=$2
-	local smbpasswd=$3
-	
-	sed "/$name:/d" /etc/shadow > /etc/shadow_copy
-	echo "$shadow" >> /etc/shadow_copy
-	mv /etc/shadow_copy /etc/shadow
-	
-	sed "/$name:/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
-	echo "$smbpasswd" >> /var/smb/smbpasswd_copy
-	mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
+    local name=$1
+    local shadow=$2
+    local smbpasswd=$3
+
+    sed "/$name:/d" /etc/shadow > /etc/shadow_copy
+    echo "$shadow" >> /etc/shadow_copy
+    mv /etc/shadow_copy /etc/shadow
+
+    sed "/$name:/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
+    echo "$smbpasswd" >> /var/smb/smbpasswd_copy
+    mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
 }
 
 function cm_cnm_user_delete()
 {
-	local iRet=$CM_OK
-	local uid=$1
-	local name=`cat /etc/passwd |grep "x:$uid:"|awk -F':' '{print $1}'`
-	
-	sed "/$name/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
-	mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
-	userdel $name
-	iRet=$?
-	
-	return $iRet
+    local iRet=$CM_OK
+    local uid=$1
+    local name=`cat /etc/passwd |grep "x:$uid:"|awk -F':' '{print $1}'`
+
+    sed "/$name/d" /var/smb/smbpasswd > /var/smb/smbpasswd_copy
+    mv /var/smb/smbpasswd_copy /var/smb/smbpasswd
+    userdel $name
+    iRet=$?
+
+    return $iRet
 }
 
 function cm_cnm_user_get()
 {
-	local name=$1
-	cat /etc/passwd|grep "^$name:"|awk -F':' '{print $3" "$4" "$1" "$6}'
+    local name=$1
+    cat /etc/passwd|grep "^$name:"|awk -F':' '{print $3" "$4" "$1" "$6}'
 }
 
 function cm_cnm_user_getbatch()
 {
-	local gid=$1
-	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3 " " $4 " " $1 " " $6}'|sort -n
-	else
-		cat /etc/passwd |awk -F':' '($3>99&&$3<50000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
-	fi
+    local gid=$1
+    if [ "X$gid" == "X" ] || [ "X$gid" == "X0" ] || [ "X$gid" == "Xnull" ]; then
+        cat /etc/passwd | awk -F':' '($3>99&&$3<60000) {print $3 " " $4 " " $1 " " $6}'|sort -n
+    else
+        cat /etc/passwd |awk -F':' '($3>99&&$3<60000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
+    fi
 }
 
 function cm_cnm_user_count()
 {
-	local gid=$1
-	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>99&&$3<50000) {print $3}'| wc -l
-	else
-		cat /etc/passwd |awk -F':' '($3>99&&$3<50000)&&($4=='$gid') {print $3}'| wc -l
-	fi
+    local gid=$1
+    if [ "X$gid" == "X" ] || [ "X$gid" == "X0" ] || [ "X$gid" == "Xnull" ]; then
+        cat /etc/passwd | awk -F':' '($3>99&&$3<60000) {print $3}'| wc -l
+    else
+        cat /etc/passwd |awk -F':' '($3>99&&$3<60000)&&($4=='$gid') {print $3}'| wc -l
+    fi
 }
 
 
 function cm_cnm_user_maxid()
 {
-	local cut=`cat /etc/passwd| awk -F':' '{print $3}'| sort -n | awk -F':' 'BEGIN {max=99}{if(($1>99&&$1<50000)&&($1-max==1)) max=$1} END{printf max}'`
-	((cut=$cut+1))
-	echo $cut
+    awk -F':' '{print $3}' /etc/passwd \
+        |sort -n \
+        |awk 'BEGIN{id=100}$1<id{continue}$1==id{id++;continue}$1>id{break}END{print id}'
+    echo $cut
+}
+
+function cm_cnm_user_newgid()
+{
+    awk -F':' '{print $3}' /etc/group \
+        |sort -n \
+        |awk 'BEGIN{id=100}$1<id{continue}$1==id{id++;continue}$1>id{break}END{print id}'
+    return 0
 }
 
 function cm_cnm_user_explorer_init()
@@ -249,9 +258,9 @@ function cm_cnm_user_cache_getbatch()
             return $CM_OK
         fi
         if [ $type -eq $CM_NAME_USER ]; then
-            idmap dump -n |egrep "^winuser:.*@"$dname |awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
+            idmap dump -n |egrep "^winuser:.*@"$dname |grep -v 'unixuser:' |awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
         else
-            idmap dump -n |egrep "^wingroup:.*@"$dname |awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
+            idmap dump -n |egrep "^wingroup:.*@"$dname |grep -v 'unixgroup:'|awk -F':' '{print $3" "$2}' |awk -F'@' '{print $1}'
         fi
     else
         return $CM_OK
@@ -280,9 +289,9 @@ function cm_cnm_user_cache_count()
             return $CM_OK
         fi
         if [ $type -eq $CM_NAME_USER ]; then
-            idmap dump -n |egrep "^winuser:.*@"$dname |wc -l |awk '{print $1}'
+            idmap dump -n |egrep "^winuser:.*@"$dname |grep -v 'unixuser:'|wc -l |awk '{print $1}'
         else
-            idmap dump -n |egrep "^wingroup:.*@"$dname |wc -l |awk '{print $1}'
+            idmap dump -n |egrep "^wingroup:.*@"$dname |grep -v 'unixgroup:'|wc -l |awk '{print $1}'
         fi
     else
         echo '0'
@@ -310,8 +319,8 @@ function cm_cnm_user_ad_getidbyname()
         CM_LOG "[${FUNCNAME}:${LINENO}] $utype $uname domain null"
         return $CM_ERR_NOT_EXISTS
     fi
-    local uid=`idmap show -c ${utype}:"${uname}"@${dname} 2>/dev/null|awk -F':' '{print $3}'`
-    if [ "X$uid" == "X60001" ];then
+    local uid=`idmap show -c ${utype}:"${uname}"@${dname} 2>/dev/null |grep ${utype} |awk -F':' '{print $3}'`
+    if [ "X$uid" == "X60001" ] || [ "X$uid" == "X" ];then
         CM_LOG "[${FUNCNAME}:${LINENO}] $utype $uname $uid"
         return $CM_ERR_NOT_EXISTS
     fi
@@ -406,6 +415,67 @@ function cm_cnm_user_test()
         return $CM_ERR_NOT_EXISTS
     fi
     return $CM_OK
+}
+
+function cm_cnm_user_group_getbatch()
+{
+    cat /etc/group | awk -F':' '$3==1||($3>99&&$3<60000) {print $3" "$1}'
+    return 0
+}
+
+function cm_cnm_user_group_count()
+{
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3==1||($3>99&&$3<60000){cnt++}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_uid()
+{
+    local uid=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_uname()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_gid()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gname()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' '$3=='$uid'{print $1;break}'
+    return 0
+}
+
+function cm_cnm_user_check_gname()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_uid()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gid()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3;break}END{print cnt}'
+    return 0
 }
 
 cm_cnm_user_"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$7"

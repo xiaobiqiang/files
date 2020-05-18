@@ -1990,6 +1990,13 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 			*n = '\0';
 		}
 	}else{
+		if(strcmp(type,"disk") != 0){
+			n = strchr(name,(int)'-');
+			if(n)
+			{
+				*n = '\0';
+			}
+		}
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"vdev", NULL);
 	}
 

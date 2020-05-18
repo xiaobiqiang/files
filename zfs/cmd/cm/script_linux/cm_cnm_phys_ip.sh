@@ -163,26 +163,23 @@ function cm_cnm_phys_ip_delete()
     if [ "X$nic" == "X$mport" ]; then
         return $CM_ERR_NOT_SUPPORT
     fi
-    ifconfig -a|grep -B 1 'inet '|grep -v "-" \
+    local info=($(ifconfig -a|grep -B 1 'inet '|grep -v "-" \
         | sed 'N;s/\n//g'|grep -v "lo"|awk '{print $1" "$6}'\
-        |while read line
-    do
-        local info=($line)
-        local ip=${info[1]}
-        if [ "X$ipaddr" != "X$ip" ]; then
-            continue
-        fi
-        local name=${info[0]}
-        name=${name%?}
-        if [ "X$name" == "X$mport" ]; then
-            return $CM_ERR_NOT_SUPPORT
-        fi
-        if [ "X$nic" != "X" ] && [ "X$nic" != "X$name" ]; then
-            continue
-        fi
-        ip addr del $ipaddr dev $name
+        |grep $ipaddr))
+    local ip=${info[1]}
+    if [ "X$ipaddr" != "X$ip" ]; then
+        return
+    fi
+    local name=${info[0]}
+    name=${name%?}
+    if [ "X$name" == "X$mport" ]; then
+        return $CM_ERR_NOT_SUPPORT
+    fi
+    if [ "X$nic" != "X" ] && [ "X$nic" != "X$name" ]; then
+        return
+    fi
+    ip addr del $ipaddr dev $name
         #rm -f /etc/hostname.$name
-    done
     return $CM_OK
 }
 
