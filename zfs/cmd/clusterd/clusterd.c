@@ -5514,7 +5514,6 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	strlcpy(ifp->eth, conf->eth, MAXLINKNAMELEN);
 	strlcpy(ifp->alias, alias, IFALIASZ);
 	strlcpy(ifp->ip_addr, conf->ip_addr, INET6_ADDRSTRLEN);
-	//strlcpy(ifp->netmask, conf->netmask, INET6_ADDRSTRLEN);
 	ifp->prefixlen = conf->prefixlen;
 	/* 
 	 * if restore_flag is set and ip_on_link == 1,
@@ -7006,17 +7005,21 @@ cluster_failover_ip_check(void *arg)
 static void
 config_and_enable_failover_ip(service_if_t *ifp)
 {
+	char alias[IFLABELMAXLEN];
 	char ifname[MAXLINKNAMELEN];
 	char cmd[128];
 	int err;
 
 	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) != 1) {
-		syslog(LOG_ERR, "%s: failover ip %s:%s not config.", __func__, ifp->eth, ifp->ip_addr);
+		syslog(LOG_ERR, FUNC_LINE" failover ip %s:%s not config.", func_line, ifp->eth, ifp->ip_addr);
 
-		sprintf(cmd, "%s %s %s %s %s %s up", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "",
-			ifp->ip_addr, ifp->netmask[0] == '\0' ? "" : "netmask", ifp->netmask);
+		snprintf(alias, IFLABELMAXLEN, "%s:%s:%s",
+			ifp->eth, ifp->failover_config->prop_id, ifp->failover_config->zpool_name);
+		snprintf(cmd, BUFSIZ, "%s addr add %s/%d brd + label %s dev %s", IP_CMD, ifp->ip_addr,
+			ifp->prefixlen > 0 ? ifp->prefixlen : 24, alias, ifp->eth);
+
 		if ((err = excute_ifconfig(cmd)) != 0) {
-			syslog(LOG_ERR, "%s: excute ifconfig addif error - %d", __func__, err);
+			syslog(LOG_ERR, FUNC_LINE" excute ifconfig addif error - %d", func_line, err);
 		}
 	}
 }
@@ -7029,10 +7032,11 @@ disable_failover_ip(service_if_t *ifp)
 	int err;
 
 	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) == 1) {
-		syslog(LOG_ERR, "%s: failover ip %s:%s not in failover_ip_list but config or enable, delete it.",
-			__func__, ifp->eth, ifp->ip_addr);
+		syslog(LOG_ERR, FUNC_LINE" failover ip %s:%s not in failover_ip_list but config or enable, delete it.",
+			func_line, ifp->eth, ifp->ip_addr);
 
-		sprintf(cmd, "%s %s %s del %s", IFCONFIG_CMD, ifp->eth, ifp->af == AF_INET6 ? "inet6" : "", ifp->ip_addr);
+		snprintf(cmd, 128, "%s addr del %s/%d dev %s", IP_CMD, 
+			ifp->ip_addr, ifp->prefixlen > 0 ? ifp->prefixlen : 24, ifp->eth);
 		if ((err = excute_ifconfig(cmd)) != 1) {
 			syslog(LOG_ERR, "%s: del error - %d", __func__, err);
 		}
