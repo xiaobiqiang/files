@@ -160,6 +160,7 @@ typedef struct service_if {
 	failover_conf_t *failover_config;
 
 	int flag;
+	int af;
 } service_if_t;
 
 list_t failover_ip_list;
@@ -323,6 +324,16 @@ struct shielding_failover_pools {
 #define FUNC_LINE       "[%s %d]"
 #define func_line       __func__, __LINE__
 
+typedef struct failover_ip_check{
+	int exit_flag;
+	int event_falg;
+	pthread_mutex_t lock;
+	pthread_cond_t  cond;
+}failover_ip_check_t;
+failover_ip_check_t failover_ip_check;
+
+#define	IFCONFIG_CMD	"/usr/sbin/ifconfig"
+
 /*
  * These pools are ready to import/export by release message handler or
  * mac offline event handler, do_ip_failover()/do_ip_restore() shuold
@@ -350,6 +361,11 @@ static int cluster_poweron_remote_event_handler(const void *buffer,
 	int bufsize);
 static boolean_t cluster_pool_in_local(const char *poolname,
 	uint64_t pool_guid);
+static void *cluster_failover_ip_check(void *arg);
+static void cluster_failover_ip_check_init();
+static void cluster_failover_ip_check_fini();
+static void enable_all_ips_losted_in_failover_list();
+static void handle_check_failover_message(cluster_mq_message_t *mq_message);
 
 static int cluster_get_eth_ip(char *eth_name, char *ip_buf)
 {
@@ -1189,6 +1205,7 @@ static int cluster_remote_abnormal_handle(void *arg)
 
 	/* notify mirror can't timeout */
 	hbx_do_cluster_cmd("off", 4, ZFS_HBX_MIRROR_TIMEOUT_SWITCH);
+	pthread_mutex_lock(&failover_ip_check.lock);
 
 	bzero(&idata, sizeof(importargs_t));
 	idata.cluster_switch = 1;
@@ -1462,6 +1479,9 @@ EXIT:
 	cluster_failover_state->failover_running = 0;
 
 	cluster_failover_host_rele(cluster_failover_state);
+	failover_ip_check.event_falg = 1;
+	pthread_cond_signal(&failover_ip_check.cond);
+	pthread_mutex_unlock(&failover_ip_check.lock);
 
 	return (error);
 }
@@ -1927,7 +1947,12 @@ cluster_change_pool_owner(char *buf, size_t buflen)
 		return;
 	}
 
+	pthread_mutex_lock(&failover_ip_check.lock);
 	(void) cluster_do_import(spa_name, 0);
+	failover_ip_check.event_falg = 1;
+	pthread_cond_signal(&failover_ip_check.cond);
+	pthread_mutex_unlock(&failover_ip_check.lock);
+
 	nvlist_free(ripool);
 }
 
@@ -5498,6 +5523,7 @@ do_ip_failover(failover_conf_t *conf, int flag)
 	ifp->zpool_list = NULL;
 	ifp->zpool_refs = 0;
 	ifp->flag = 0;
+	ifp->af = conf->af;
 	ifp->failover_config = dup_failover_config(conf);
 
 	list_insert_head(&failover_ip_list, ifp);
@@ -6283,6 +6309,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 		goto exit_func;
 	}
 
+	pthread_mutex_lock(&failover_ip_check.lock);
 	/* step 2: import the pools */
 	c_log(LOG_ERR, FUNC_LINE"step 2: import the pools.", func_line);
 	for (p = pool_list; p != NULL; p = p->next) {
@@ -6314,6 +6341,9 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	}
 
 	c_log(LOG_ERR, FUNC_LINE"release pools finished.", func_line);
+	failover_ip_check.event_falg = 1;
+	pthread_cond_signal(&failover_ip_check.cond);
+	pthread_mutex_unlock(&failover_ip_check.lock);
 
 	unshielding_failover_poollist(pool_list);
 exit_func:
@@ -6375,6 +6405,8 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		pool_list = node;
 	}
 
+	pthread_mutex_lock(&failover_ip_check.lock);
+
 	if (err != 0) {
 		c_log(LOG_ERR, "%s: handle release message failed", __func__);
 	} else {
@@ -6433,6 +6465,9 @@ handle_release_message_common(release_pools_message_t *r_msg)
 		}
 	}
 
+	failover_ip_check.event_falg = 1;
+	pthread_cond_signal(&failover_ip_check.cond);
+	pthread_mutex_unlock(&failover_ip_check.lock);
 	unshielding_failover_poollist(pool_list);
 exit_release:
 	if (pool_list != NULL) {
@@ -6515,6 +6550,10 @@ handle_mq_message_thread(void *arg)
 	case cluster_msgtype_import:
 	case cluster_msgtype_export:
 		(void) handle_export_pool_message(&msg);
+		break;
+
+	case cluster_msgtype_check_failover:
+		handle_check_failover_message(&msg);
 		break;
 
 	default:
@@ -6880,6 +6919,12 @@ main(int argc, char *argv[])
 	/* initialize failover handle */
 	cluster_failover_handle_init();
 
+	cluster_failover_ip_check_init();
+	if (pthread_create(&tid, NULL, cluster_failover_ip_check, NULL) != 0) {
+		syslog(LOG_ERR, FUNC_LINE"pthread_create(): create cluster_failover_ip_check failed", func_line);
+		exit(1);
+	}
+
 	/* create cluster thread to process event */
 	error= cluster_thread_create();
 	if (error != 0){
@@ -6911,5 +6956,147 @@ main(int argc, char *argv[])
 	cn_cluster_init(NULL);
 	cluster_thread_exit();
 	cluster_failover_handle_fini();
+	cluster_failover_ip_check_fini();
 	return (error);
 }
+
+static void
+cluster_failover_ip_check_init()
+{
+	pthread_mutex_init(&failover_ip_check.lock, NULL);
+	pthread_cond_init(&failover_ip_check.cond, NULL);
+	failover_ip_check.exit_flag = 0;
+	failover_ip_check.event_falg = 0;
+}
+
+static void
+cluster_failover_ip_check_fini()
+{
+	pthread_mutex_destroy(&failover_ip_check.lock);
+	pthread_cond_destroy(&failover_ip_check.cond);
+	failover_ip_check.exit_flag = 1;
+	failover_ip_check.event_falg = 1;
+}
+
+void *
+cluster_failover_ip_check(void *arg)
+{
+	timespec_t ts;
+
+	pthread_detach(pthread_self());
+
+	while(!failover_ip_check.exit_flag) {
+		pthread_mutex_lock(&failover_ip_check.lock);
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec += 600;
+
+		if(!failover_ip_check.event_falg) {
+			(void)pthread_cond_timedwait(&failover_ip_check.cond, &failover_ip_check.lock, &ts);
+		}
+		failover_ip_check.event_falg = 0;
+
+		init_zpool_failover_conf();
+		enable_all_ips_losted_in_failover_list();
+		pthread_mutex_unlock(&failover_ip_check.lock);
+	}
+
+	return (NULL);
+}
+
+static void
+config_and_enable_failover_ip(service_if_t *ifp)
+{
+	char alias[IFLABELMAXLEN];
+	char ifname[MAXLINKNAMELEN];
+	char cmd[128];
+	int err;
+
+	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) != 1) {
+		syslog(LOG_ERR, FUNC_LINE" failover ip %s:%s not config.", func_line, ifp->eth, ifp->ip_addr);
+
+		snprintf(alias, IFLABELMAXLEN, "%s:%s:%s",
+			ifp->eth, ifp->failover_config->prop_id, ifp->failover_config->zpool_name);
+		snprintf(cmd, BUFSIZ, "%s addr add %s/%d brd + label %s dev %s", IP_CMD, ifp->ip_addr,
+			ifp->prefixlen > 0 ? ifp->prefixlen : 24, alias, ifp->eth);
+
+		if ((err = excute_ifconfig(cmd)) != 0) {
+			syslog(LOG_ERR, FUNC_LINE" excute ifconfig addif error - %d", func_line, err);
+		}
+	}
+}
+
+static void
+disable_failover_ip(service_if_t *ifp)
+{
+	char ifname[MAXLINKNAMELEN];
+	char cmd[128];
+	int err;
+
+	if(check_ip_exist(ifp->af, ifp->eth, ifp->ip_addr) == 1) {
+		syslog(LOG_ERR, FUNC_LINE" failover ip %s:%s not in failover_ip_list but config or enable, delete it.",
+			func_line, ifp->eth, ifp->ip_addr);
+
+		snprintf(cmd, 128, "%s addr del %s/%d dev %s", IP_CMD, 
+			ifp->ip_addr, ifp->prefixlen > 0 ? ifp->prefixlen : 24, ifp->eth);
+		if ((err = excute_ifconfig(cmd)) != 1) {
+			syslog(LOG_ERR, "%s: del error - %d", __func__, err);
+		}
+	}
+}
+
+static boolean_t
+find_pool_in_local_pools(service_if_t *ifp)
+{
+	struct link_list *p;
+	service_zpool_t *zp;
+
+	for(p = ifp->zpool_list; p; p = p->next) {
+		zp = (service_zpool_t *)p->ptr;
+
+		if(cluster_pool_in_local(zp->zpool_name, 0))
+			return B_TRUE;
+	}
+
+	return B_FALSE;
+}
+
+static void
+enable_all_ips_losted_in_failover_list()
+{
+	service_if_t *ifp, *tmp;
+
+	pthread_mutex_lock(&failover_list_lock);
+	for (ifp = list_head(&failover_ip_list); ifp; ifp = list_next(&failover_ip_list, ifp)) {
+		if(!find_pool_in_local_pools(ifp)) {
+			disable_failover_ip(ifp);
+			tmp = list_prev(&failover_ip_list, ifp);
+			list_remove(&failover_ip_list, ifp);
+			free(ifp);
+			ifp = tmp;
+			if(ifp != NULL)
+				continue;
+			else {
+				syslog(LOG_ERR, FUNC_LINE"failover_ip_list is null.", func_line);
+				break;
+			}
+		}
+
+		config_and_enable_failover_ip(ifp);
+	}
+
+	pthread_mutex_unlock(&failover_list_lock);
+}
+
+static void
+handle_check_failover_message(cluster_mq_message_t *mq_message)
+{
+	if (mq_message->msgtype == cluster_msgtype_check_failover) {
+		pthread_mutex_unlock(&failover_ip_check.lock);
+		failover_ip_check.event_falg = 1;
+		pthread_cond_signal(&failover_ip_check.cond);
+		pthread_mutex_unlock(&failover_ip_check.lock);
+	}else {
+		syslog(LOG_ERR, FUNC_LINE" msgtype unexpected. msgtype = %d.", func_line, mq_message->msgtype);
+	}
+}
+
