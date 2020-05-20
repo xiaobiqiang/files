@@ -159,6 +159,7 @@ function cm_cnm_phys_ip_delete()
     local ipaddr=$1
     local nic=$2
     local mport=`cm_get_localmanageport`
+    local os_type=`cm_systerm_version_get`
     CM_LOG "[${FUNCNAME}:${LINENO}]$nic $ipaddr"
     if [ "X$nic" == "X$mport" ]; then
         return $CM_ERR_NOT_SUPPORT
@@ -179,7 +180,17 @@ function cm_cnm_phys_ip_delete()
         return
     fi
     ip addr del $ipaddr dev $name
-        #rm -f /etc/hostname.$name
+    if [ $os_type -ne $CM_OS_TYPE_DEEPIN ];then
+        rm -f /etc/sysconfig/network-scripts/ifcfg-$name
+    else
+        netmask_line=`grep -n -w "iface $name" /etc/network/interfaces|awk -F':' '{print $1}'`
+        ((netmask_line=$netmask_line+2))
+        sed "$netmask_line"d /etc/network/interfaces>/tmp/interfaces
+        sed "/$name/d" /tmp/interfaces|sed "/$ipaddr/d" > /tmp/interfaces_bak
+        cat /tmp/interfaces_bak>/etc/network/interfaces
+    fi
+    #rm -f /etc/hostname.$name
+
     return $CM_OK
 }
 
