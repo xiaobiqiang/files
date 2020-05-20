@@ -178,6 +178,9 @@ function cm_cnm_phys_ip_delete()
     if [ "X$nic" != "X" ] && [ "X$nic" != "X$name" ]; then
         return
     fi
+    if [ $ipaddr = `grep 'ip ' /var/cm/data/cm_cluster.ini|awk '{print $3}'` ]; then
+        return $CM_ERR_NOT_SUPPORT
+    fi
     ip addr del $ipaddr dev $name
         #rm -f /etc/hostname.$name
     return $CM_OK
