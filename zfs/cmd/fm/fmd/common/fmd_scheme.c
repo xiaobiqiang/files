@@ -382,7 +382,7 @@ fmd_scheme_hash_lookup(fmd_scheme_hash_t *shp, const char *name)
 		char path[PATH_MAX];
 
 		(void) snprintf(path, sizeof (path),
-		    "%s/%s.so", shp->sch_dirpath, sp->sch_name);
+		    "%s/libscheme_%s.so", shp->sch_dirpath, sp->sch_name);
 
 		TRACE((FMD_DBG_FMRI, "dlopen scheme %s", sp->sch_name));
 		sp->sch_dlp = dlopen(path, RTLD_LOCAL | RTLD_NOW);
