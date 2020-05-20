@@ -60,7 +60,7 @@ static int
 zfs_dbgmsg_data(char *buf, size_t size, void *data)
 {
 	zfs_dbgmsg_t *zdm = (zfs_dbgmsg_t *)data;
-#ifdef __KERNEL
+#ifdef _KERNEL
 	if (!virt_addr_valid(zdm))
 		return -1;
 #endif
@@ -74,7 +74,7 @@ static void *
 zfs_dbgmsg_addr(kstat_t *ksp, loff_t n)
 {
 	zfs_dbgmsg_t *zdm = (zfs_dbgmsg_t *)ksp->ks_private;
-#ifdef __KERNEL
+#ifdef _KERNEL
 	if (!virt_addr_valid(zdm))
 		return -1;
 #endif
@@ -98,7 +98,7 @@ zfs_dbgmsg_purge(int max_size)
 
 	while (zfs_dbgmsg_size > max_size) {
 		zdm = list_remove_head(&zfs_dbgmsgs);
-#ifdef __KERNEL
+#ifdef _KERNEL
 		if (!virt_addr_valid(zdm))
 			return;
 #endif

@@ -142,6 +142,7 @@ static int zpool_do_scanthin(int argc, char **argv);
 static void zpool_init_efi(char *path);
 
 static int send_cluster_message(cluster_mq_message_t *);
+static int send_check_failover_ip_to_clusterd();
 
 xmlDocPtr pool_doc;
 xmlNodePtr pool_root_node;
@@ -7644,6 +7645,9 @@ release_callback(zpool_handle_t *zhp, void *data)
 		(void) zpool_unlock(lock, pool_name);
 		return (1);
 	}
+
+	(void)send_check_failover_ip_to_clusterd();
+
 	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
@@ -8032,5 +8036,24 @@ zpool_do_scanthin(int argc, char **argv)
 	}
 
 	return (0);
+}
+
+static int
+send_check_failover_ip_to_clusterd()
+{
+	cluster_mq_message_t *mq_message;
+	int error;
+
+	mq_message = malloc(sizeof(cluster_mq_message_t));
+	if (mq_message == NULL)
+		return (ENOMEM);
+	memset(mq_message, 0, sizeof(cluster_mq_message_t));
+	mq_message->msglen = 1;
+
+	mq_message->msgtype = cluster_msgtype_check_failover;
+	error = send_cluster_message(mq_message);
+	free(mq_message);
+
+	return (error);
 }
 
