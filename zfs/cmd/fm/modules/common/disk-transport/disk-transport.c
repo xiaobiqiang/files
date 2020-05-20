@@ -108,8 +108,8 @@ typedef struct dt_disk_node {
 	uint32_t	dt_slot;
 	int			dt_slice_count;
 	uint32_t	dt_rpm;
+	char		dt_dim[2];
 	char 		dt_gsize[64];
-	char		dt_dim[24];
 	char		interface_type[12];
 	int         	is_ssd;
 	char 		*dt_busy;	
@@ -656,6 +656,7 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	dcb.hdl = hdl;
 	dcb.thp = thp;
 	dcb.count = 0;
+	int c = 0;
 
 	disk_get_info(&dt);
 	dmp->dm_dbhdl = NULL;
@@ -671,21 +672,37 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 		dnode.dt_slot = current->dk_slot;
 		dnode.dt_enc = current->dk_enclosure;
 		scsid = strstr(current->dk_scsid,"scsi-");
-		if(scsid != NULL)
+		if(scsid != NULL){
 			dnode.dt_lpath = scsid;
+		}else{
+			syslog(LOG_ERR,"error path %s",current->dk_scsid);
+			continue;
+		}
 		dnode.dt_busy = current->dk_busy;
 		len = strlen(current->dk_gsize);
 		if(len != 0){
-			strncpy(dnode.dt_dim,(char *)((long)current->dk_gsize + len - 1),sizeof(dnode.dt_dim));
+			if(current->dk_gsize[len - 1] == 'M' ||
+				current->dk_gsize[len - 1] == 'G' ||
+				current->dk_gsize[len - 1] == 'T' ||
+				current->dk_gsize[len - 1] == 'P'){
+				dnode.dt_dim[0] = current->dk_gsize[len - 1];
+				dnode.dt_dim[1] = '\0';
+			}
+			else{
+				syslog(LOG_ERR,"gsize %s",current->dk_gsize);
+				continue;
+			}
 			current->dk_gsize[len - 1] = 0;
 			strncpy(dnode.dt_gsize,current->dk_gsize,sizeof(dnode.dt_gsize));
+		}else{
+			continue;
 		}
 		dnode.dt_rpm = current->dk_rpm;
 		dnode.dt_serial = current->dk_serial;
 		dnode.dt_mfg = current->dk_vendor;
 		dt_insert_disk(hdl, &dnode);
 	}
-	
+	(void) disk_info_free(&dt);
     disk_db_close(dmp->dm_dbhdl);
     dmp->dm_dbhdl = NULL;
 
