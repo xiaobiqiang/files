@@ -673,8 +673,8 @@ pt_status_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
 
 	time1 = gethrtime();
 	deleta = time1 - time;
-	
-	if (deleta > 0ull) {
+	/*0.5*/
+	if (deleta > 500000000ull) {
 		time = time1;
 		system("zpool status  -x > /dev/null  2> /dev/null");
 		pt_create_fsxml_file();
