@@ -31,6 +31,11 @@ else
     if [ `ls |grep libcm|grep deb|wc -l` -eq 0 ]; then
         cm_rpm=`ls |grep libcm|grep rpm`
         alien $cm_rpm
+    else
+        cm_deb=`ls |grep libcm|grep deb`
+        cm_rpm=`ls |grep libcm|grep rpm`
+        rm -rf $cm_deb
+        alien $cm_rpm
     fi
     cd -
     cp $SPL_DIR/*.deb $RPM_DIR/spl

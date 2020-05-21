@@ -179,6 +179,9 @@ function cm_cnm_phys_ip_delete()
     if [ "X$nic" != "X" ] && [ "X$nic" != "X$name" ]; then
         return
     fi
+    if [ $ipaddr = `grep 'ip ' /var/cm/data/cm_cluster.ini|awk '{print $3}'` ]; then
+        return $CM_ERR_NOT_SUPPORT
+    fi
     ip addr del $ipaddr dev $name
     if [ $os_type -ne $CM_OS_TYPE_DEEPIN ];then
         rm -f /etc/sysconfig/network-scripts/ifcfg-$name
