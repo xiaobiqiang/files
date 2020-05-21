@@ -318,14 +318,15 @@ static void
 zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
     boolean_t checkunusable)
 {
-//	libzfs_handle_t *zhdl = fmd_hdl_getspecific(hdl);
+	libzfs_handle_t *zhdl = fmd_hdl_getspecific(hdl);
 	nvlist_t *detector, *fault;
 	boolean_t serialize;
 	nvlist_t *fru = NULL;
-//	nvlist_t *fmri, *fru;
-//	topo_hdl_t *thp;
-//	int err;
-
+#ifdef HAVE_LIBTOPO
+	nvlist_t *fmri;
+	topo_hdl_t *thp;
+	int err;
+#endif
 	/*
 	 * Construct the detector from the case data.  The detector is in the
 	 * ZFS scheme, and is either the pool or the vdev, depending on whether
@@ -356,7 +357,7 @@ zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
 		return;
 	}
 
-#if 0
+#ifdef HAVE_LIBTOPO
 	fru = NULL;
 	if (zcp->zc_fru != NULL &&
 	    (thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) != NULL) {
@@ -431,6 +432,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	boolean_t isresource;
 	char *fru, *type;
     char *fm_class;
+
 	/*
 	 * We subscribe to notifications for vdev or pool removal.  In these
 	 * cases, there may be cases that no longer apply.  Purge any cases
@@ -492,7 +494,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	}
 
     if(nvlist_lookup_string(nvl, FM_CLASS, &fm_class) == 0) {
-        syslog(LOG_ERR, "%s received by zfs-diagnose\n", fm_class);
+        syslog(LOG_ERR, "%s received by zfs-diagnose, line:[%d]\n", fm_class, __LINE__);
     }
 
 	/*

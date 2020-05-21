@@ -51,10 +51,10 @@
 
 #include "make_vdev.h"
 
-#define	DISK_LED_CMD	"/usr/local/sbin/disk led -d %s -o fault &"
-#define	DISK_LED_NORMAL_CMD	"/usr/local/sbin/disk led -d %s -o normal &"
-#define ZPOOL_SCRUB_POOL	"/usr/local/sbin/zpool scrub %s &"
-#define	DISK_LED_LPATH	"/dev/rdsk/%s"
+#define	DISK_LED_CMD	"/sbin/disk led -d %s -o fault &"
+#define	DISK_LED_NORMAL_CMD	"/sbin/disk led -d %s -o normal &"
+#define ZPOOL_SCRUB_POOL	"/sbin/zpool scrub %s &"
+#define	DISK_LED_LPATH	"/dev/disk/by-id/%s"
 #define	MAXDEVPATHLEN		128
 #define	PARTATIONMAX		10
 
@@ -913,7 +913,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	zfs_retire_data_t *zdp = fmd_hdl_getspecific(hdl);
 	libzfs_handle_t *zhdl = zdp->zrd_hdl;
 	boolean_t fault_device, degrade_device;
-	boolean_t is_repair, is_segment_error = B_FALSE;
+	boolean_t is_repair = B_FALSE, is_segment_error = B_FALSE;
 	char *scheme, *devid;
 	nvlist_t *vdev = NULL;
 	char *uuid;
@@ -941,11 +941,21 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
 		    &vdev)) == NULL)
 			return;
-		
+
 		if (fmd_prop_get_int32(hdl, "spare_on_remove"))
 			replace_with_spare(hdl, zhp, vdev);
 		/* (void) zpool_vdev_clear(zhp, vdev_guid); */
+        
+        if(vdev != NULL)
+            dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
 		zpool_close(zhp);
+
+        if(strcmp(class, "resource.fs.zfs.removed") == 0)
+            goto disk_led;
+
+        if(dev_name != NULL)
+            free(dev_name);
+
 		return;
 	}
 
@@ -1001,10 +1011,15 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		    "fault.fs.zfs.device")) {
 			fault_device = B_FALSE;
 		} else if (fmd_nvl_class_match(hdl, fault,
-		    "fault.fs.zfs.dev.merr")) {
-			fault_device = B_TRUE;
+            "fault.fs.zfs.dev.merr")) {
+            syslog(LOG_ERR,"zfs_retire merr");
+            fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault,
 		    "fault.fs.zfs.dev.smart_fail")) {
+			fault_device = B_TRUE;
+        } else if (fmd_nvl_class_match(hdl, fault,
+            "fault.fs.zfs.dev.noresponse")) {
+            syslog(LOG_ERR,"zfs_retire noresponse");
 			fault_device = B_TRUE;
 		} else if (fmd_nvl_class_match(hdl, fault, "fault.io.*")) {
 			is_disk = B_TRUE;
@@ -1162,15 +1177,16 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 && repair_done &&
 	    nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0)
 		fmd_case_uuresolved(hdl, uuid);
-	
+
+disk_led:
 	if (dev_name != NULL && !is_repair) {
 		sprintf(dev_lpath, DISK_LED_LPATH, dev_name);
-		syslog(LOG_ERR,"zfs retire faild dev_name is %s", dev_lpath);
+		syslog(LOG_ERR,"zfs_retire light failed dev_name:%s", dev_lpath);
 		zfs_retire_diskled(dev_lpath);
 		free(dev_name);
 	} else if (dev_name != NULL && is_repair) {
 		sprintf(dev_lpath, DISK_LED_LPATH, dev_name);
-		syslog(LOG_ERR,"zfs recover faild dev_name is %s", dev_lpath);
+		syslog(LOG_ERR,"zfs_retire recover failed dev_name:%s", dev_lpath);
 		zfs_recover_diskled(dev_lpath);
 		free(dev_name);
 	}
