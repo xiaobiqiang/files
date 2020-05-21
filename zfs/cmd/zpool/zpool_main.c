@@ -597,9 +597,10 @@ zpool_do_add(int argc, char **argv)
 	nvlist_t *props = NULL;
 	char *propval;
 	boolean_t isaggre = B_FALSE;
+	boolean_t ignore_check = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "fgLno:P")) != -1) {
+	while ((c = getopt(argc, argv, "fbgLno:P")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
@@ -612,6 +613,9 @@ zpool_do_add(int argc, char **argv)
 			break;
 		case 'n':
 			dryrun = B_TRUE;
+			break;
+		case 'b':
+			ignore_check = B_TRUE;
 			break;
 		case 'o':
 			if ((propval = strchr(optarg, '=')) == NULL) {
@@ -665,7 +669,7 @@ zpool_do_add(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for processing */
-	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, B_FALSE, dryrun,
+	nvroot = make_root_vdev(zhp, props, force, !force, ignore_check, B_FALSE, dryrun,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
