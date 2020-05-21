@@ -2387,13 +2387,13 @@ zfs_do_upgrade(int argc, char **argv)
 
 /* us_field_types, us_field_hdr and us_field_names should be kept in sync */
 enum us_field_types {
+	USFIELD_PROP,
 	USFIELD_TYPE,
 	USFIELD_NAME,
-	USFIELD_USED,
-	USFIELD_QUOTA
+	USFIELD_VALUE
 };
-static char *us_field_hdr[] = { "TYPE", "NAME", "USED", "QUOTA" };
-static char *us_field_names[] = { "type", "name", "used", "quota" };
+static char *us_field_hdr[] = { "PROP", "TYPE", "NAME", "VALUE" };
+static char *us_field_names[] = {"prop", "type", "name", "value" };
 #define	USFIELD_LAST	(sizeof (us_field_names) / sizeof (char *))
 
 #define	USTYPE_PSX_GRP	(1 << 0)
@@ -2476,8 +2476,8 @@ us_compare(const void *larg, const void *rarg, void *unused)
 		boolean_t reverse = sortcol->sc_reverse;
 
 		switch (prop) {
-		case ZFS_PROP_TYPE:
-			propname = "type";
+		case ZFS_PROP_PROP:
+			propname = "prop";
 			(void) nvlist_lookup_uint32(lnvl, propname, &lv32);
 			(void) nvlist_lookup_uint32(rnvl, propname, &rv32);
 			if (rv32 != lv32)
@@ -2655,6 +2655,19 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	    nvlist_add_boolean_value(props, "smbentity", smbentity) != 0)
 		nomem();
 
+	/* Calculate/update width of PROP field */
+	if (prop == ZFS_PROP_USERUSED || prop == ZFS_PROP_GROUPUSED \
+		|| prop == ZFS_PROP_USEROBJUSED || prop == ZFS_PROP_GROUPOBJUSED ) {
+		propname = "used";
+	} else {
+		propname = "quota";
+	}
+	sizeidx = us_field_index("prop");
+	if (sizelen > cb->cb_width[sizeidx])
+		cb->cb_width[sizeidx] = sizelen;
+	if (nvlist_add_string(props, "prop", propname) != 0)
+		nomem();
+
 	/* Calculate/update width of TYPE field */
 	typestr = us_type2str(type);
 	typelen = strlen(gettext(typestr));
@@ -2691,28 +2704,18 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		props = node->usn_nvl;
 	}
 
-	/* Calculate/update width of USED/QUOTA fields */
+	/* Calculate/update width of value fields */
 	if (cb->cb_nicenum)
 		zfs_nicenum(space, sizebuf, sizeof (sizebuf));
 	else
 		(void) snprintf(sizebuf, sizeof (sizebuf), "%llu",
 		    (u_longlong_t)space);
 	sizelen = strlen(sizebuf);
-	if (prop == ZFS_PROP_USERUSED || prop == ZFS_PROP_GROUPUSED \
-		|| prop == ZFS_PROP_USEROBJUSED || prop == ZFS_PROP_GROUPOBJUSED ) {
-		propname = "used";
-		if (!nvlist_exists(props, "quota"))
-			(void) nvlist_add_uint64(props, "quota", 0);
-	} else {
-		propname = "quota";
-		if (!nvlist_exists(props, "used"))
-			(void) nvlist_add_uint64(props, "used", 0);
-	}
-	sizeidx = us_field_index(propname);
+	sizeidx = us_field_index("value");
 	if (sizelen > cb->cb_width[sizeidx])
 		cb->cb_width[sizeidx] = sizelen;
 
-	if (nvlist_add_uint64(props, propname, space) != 0)
+	if (nvlist_add_uint64(props, "value", space) != 0)
 		nomem();
 
 	return (0);
@@ -2764,7 +2767,11 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 
 		switch (field) {
 		case USFIELD_TYPE:
-			strval = (char *)us_type2str(val32);
+			if (val32 == ZFS_PROP_GROUPUSED || val32== ZFS_PROP_GROUPQUOTA || val32 == ZFS_PROP_SOFTGROUPQUOTA)
+				strval = "group";
+			else
+				strval = "user";
+
 			break;
 		case USFIELD_NAME:
 			if (type == DATA_TYPE_UINT64) {
@@ -2773,8 +2780,9 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 				strval = valstr;
 			}
 			break;
-		case USFIELD_USED:
-		case USFIELD_QUOTA:
+		case USFIELD_PROP:
+			break;
+		case USFIELD_VALUE:
 			if (type == DATA_TYPE_UINT64) {
 				if (parsable) {
 					(void) sprintf(valstr, "%llu",
@@ -2783,7 +2791,7 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 					zfs_nicenum(val64, valstr,
 					    sizeof (valstr));
 				}
-				if (field == USFIELD_QUOTA &&
+				if (field == USFIELD_VALUE &&
 				    strcmp(valstr, "0") == 0)
 					strval = "none";
 				else
@@ -2855,7 +2863,7 @@ zfs_do_userspace(int argc, char **argv)
 	uu_avl_t *avl_tree;
 	uu_avl_walk_t *walk;
 	char *delim;
-	char deffields[] = "type,name,used,quota";
+	char deffields[] = "prop,type,name,value";
 	char *ofield = NULL;
 	char *tfield = NULL;
 	int cfield = 0;
@@ -2990,7 +2998,7 @@ zfs_do_userspace(int argc, char **argv)
 		nomem();
 
 	/* Always add default sorting columns */
-	(void) zfs_add_sort_column(&sortcol, "type", B_FALSE);
+	(void) zfs_add_sort_column(&sortcol, "prop", B_FALSE);
 	(void) zfs_add_sort_column(&sortcol, "name", B_FALSE);
 
 	cb.cb_sortcol = sortcol;
