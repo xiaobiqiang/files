@@ -1607,19 +1607,6 @@ sint32 cm_cnm_pooldisk_local_add(
     {
         return CM_PARAM_ERR;
     }
-    CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f %s",req->name);
-
-    if((CM_POOL_DISK_DATA < req->type) && (req->type < CM_POOL_DISK_BUTT))
-    {
-        disktype = cm_cnm_get_enum_str(&CmCnmPoolMapDiskTypeUserCfg,req->type);
-        if(NULL == disktype)
-        {
-            CM_LOG_ERR(CM_MOD_CNM,"type[%u]",req->type);
-            return CM_PARAM_ERR;
-        }
-        CM_SNPRINTF_ADD(cmd,buf_len," %s",disktype);
-    }
-    
     if(req->raid < CM_RAID_BUTT)
     {
         switch(req->raid)
@@ -1651,7 +1638,25 @@ sint32 cm_cnm_pooldisk_local_add(
             return CM_PARAM_ERR;
         }
     }
-
+    if(raid_num == CM_RAID5 || raid_num == CM_RAID6 || raid_num == CM_RAID7)
+    {
+        CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f -b %s",req->name);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f %s",req->name);        
+    }
+    if((CM_POOL_DISK_DATA < req->type) && (req->type < CM_POOL_DISK_BUTT))
+    {
+        disktype = cm_cnm_get_enum_str(&CmCnmPoolMapDiskTypeUserCfg,req->type);
+        if(NULL == disktype)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"type[%u]",req->type);
+            return CM_PARAM_ERR;
+        }
+        CM_SNPRINTF_ADD(cmd,buf_len," %s",disktype);
+    }
+    
     cut = cm_cnm_pool_raid_judge(req);
     if(CM_FALSE == cut)
     {
