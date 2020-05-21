@@ -560,7 +560,7 @@ _HSTNAME_
 						echo $line >> ${nicpath}_tmp
 				fi
 			done < $nicpath
-			cp ${nicpath}_tmp ${nicpath}
+			mv ${nicpath}_tmp ${nicpath}
 			
 			cat >> $nicpath << _HSTNAME_
 auto $dst
