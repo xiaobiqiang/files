@@ -639,6 +639,19 @@ dt_get_scsi_rpm( disk_info_t *disk ) {
 	return (0);
 }
 
+static void dt_disk_info_free(disk_table_t *tb)
+{
+	int i = 0;
+	disk_info_t *temp = NULL;
+	disk_info_t *current = NULL;
+	
+	for (current = tb->next; current != NULL; ) {
+		temp = current->next;
+		free(current);
+		current = temp;
+	}
+}
+
 
 static int
 dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
@@ -702,7 +715,7 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 		dnode.dt_mfg = current->dk_vendor;
 		dt_insert_disk(hdl, &dnode);
 	}
-	(void) disk_info_free(&dt);
+	(void) dt_disk_info_free(&dt);
     disk_db_close(dmp->dm_dbhdl);
     dmp->dm_dbhdl = NULL;
 
