@@ -155,6 +155,9 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 	uint32_t rwfl;
 	Mlsas_bio_and_error_t m;
 
+	cmn_err(CE_NOTE, "%s master bio rw_flags(0x%llx)", __func__,
+		rq->Mlrq_master_bio->bi_rw);
+
 	rwfl = __Mlsas_Setup_RWmsg(rq)->rw_flags;
 
 	if (rwfl & Mlsas_RXfl_Disc)
