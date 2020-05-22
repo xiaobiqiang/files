@@ -9006,7 +9006,7 @@ void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_ad
 void mpt3sas_eh_strategy(struct Scsi_Host *shost)
 {
     struct MPT3SAS_DEVICE *sas_device_priv_data;
-    struct MPT3SAS_ADAPTER *ioc;
+    //struct MPT3SAS_ADAPTER *ioc;
     struct scsi_cmnd *scmd, *next;
     
     unsigned long flags;
@@ -9049,7 +9049,7 @@ void mpt3sas_eh_strategy(struct Scsi_Host *shost)
 
 static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 {
-    struct MPT3SAS_ADAPTER *ioc = shost_priv(scmd->device->host);
+    //struct MPT3SAS_ADAPTER *ioc = shost_priv(scmd->device->host);
     struct MPT3SAS_DEVICE *sas_device_priv_data;
     struct _sas_device *sas_device = NULL;
     struct scsi_target *starget = scmd->device->sdev_target;
