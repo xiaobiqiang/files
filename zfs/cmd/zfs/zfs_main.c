@@ -2695,7 +2695,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	 * otherwise add new node to the list.
 	 */
 	if ((n = uu_avl_find(avl, node, &sortinfo, &idx)) == NULL) {
-		(void)fprintf(stderr, "propname = %s, name = %s\n", propname, name);
 		uu_avl_insert(avl, node, idx);
 	} else {
 		nvlist_free(props);
@@ -2717,8 +2716,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 	if (nvlist_add_uint64(props, "value", space) != 0)
 		nomem();
-
-	(void)fprintf(stderr, "value = %d\n", space);
 
 	return (0);
 }
@@ -2793,11 +2790,7 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 					zfs_nicenum(val64, valstr,
 					    sizeof (valstr));
 				}
-				if (field == USFIELD_VALUE &&
-				    strcmp(valstr, "0") == 0)
-					strval = "none";
-				else
-					strval = valstr;
+				strval = valstr;
 			}
 			break;
 		}
