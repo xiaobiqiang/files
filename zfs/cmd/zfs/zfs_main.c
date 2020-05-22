@@ -2478,10 +2478,10 @@ us_compare(const void *larg, const void *rarg, void *unused)
 		switch (prop) {
 		case ZFS_PROP_PROP:
 			propname = "prop";
-			(void) nvlist_lookup_uint32(lnvl, propname, &lv32);
-			(void) nvlist_lookup_uint32(rnvl, propname, &rv32);
-			if (rv32 != lv32)
-				rc = (rv32 < lv32) ? 1 : -1;
+			(void) nvlist_lookup_string(lnvl, propname, &lvstr);
+			(void) nvlist_lookup_string(rnvl, propname, &rvstr);
+			(void)fprintf(stderr, "lvstr = %s, rvstr = %s", lvstr, rvstr);
+			rc = strcmp(lvstr, rvstr);
 			break;
 		case ZFS_PROP_NAME:
 			propname = "name";
@@ -2497,6 +2497,7 @@ us_compare(const void *larg, const void *rarg, void *unused)
 				    &lvstr);
 				(void) nvlist_lookup_string(rnvl, propname,
 				    &rvstr);
+				(void)fprintf(stderr, "lvstr = %s, rvstr = %s", lvstr, rvstr);
 				rc = strcmp(lvstr, rvstr);
 			}
 			break;
@@ -2691,11 +2692,10 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	if (namelen > cb->cb_width[nameidx])
 		cb->cb_width[nameidx] = namelen;
 
-	uu_avl_insert(avl, node, idx);
 	/*
 	 * Check if this type/name combination is in the list and update it;
 	 * otherwise add new node to the list.
-	 
+	 */
 	if ((n = uu_avl_find(avl, node, &sortinfo, &idx)) == NULL) {
 		uu_avl_insert(avl, node, idx);
 	} else {
@@ -2703,7 +2703,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		free(node);
 		node = n;
 		props = node->usn_nvl;
-	}*/
+	}
 
 	/* Calculate/update width of value fields */
 	if (cb->cb_nicenum)
