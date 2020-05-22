@@ -15,6 +15,8 @@
 #include "cm_cnm_common.h"
 #include "cm_pmm_common.h"
 
+#define LINUX CM_TRUE
+
 sint32 cm_cnm_pmm_lun_init(void)
 {
     return CM_OK;
@@ -365,13 +367,22 @@ void cm_pmm_disk_cal_data(void* olddata,void* newdata,void* data)
     cm_cnm_pmm_disk_info_t *pre = (cm_cnm_pmm_disk_info_t *)olddata;
     cm_cnm_pmm_disk_info_t *cur = (cm_cnm_pmm_disk_info_t *)newdata;
     cm_cnm_pmm_disk_info_t *info = (cm_cnm_pmm_disk_info_t *)data;
-
+#if(CM_FALSE == LINUX)
     CM_PMM_NODE_DATA_CAL(info->nread,pre->nread,cur->nread,CM_PMM_TIME_INTERVAL);
     CM_PMM_NODE_DATA_CAL(info->nwritten,pre->nwritten,cur->nwritten,CM_PMM_TIME_INTERVAL);
     CM_PMM_NODE_DATA_CAL(info->reads,pre->reads,cur->reads,CM_PMM_TIME_INTERVAL);
     CM_PMM_NODE_DATA_CAL(info->writes,pre->writes,cur->writes,CM_PMM_TIME_INTERVAL);
     info->nread_kb = info->nread / 1024;
-    info->nwritten_kb = info->nwritten / 1024;
+    info->nwritten_kb = info->nwritten / 1024; 
+#else
+    info->nread = cur->nread * 1024;
+    info->nwritten = cur->nwritten * 1024;
+    info->reads = cur->reads;
+    info->writes = cur->writes;
+    info->nread_kb = cur->nread;
+    info->nwritten_kb = cur->nwritten;
+#endif
+    
     info->rtime = cur->rtime;
     info->wtime = cur->wtime;
     info->snaptime = cur->snaptime;
@@ -385,11 +396,16 @@ void cm_pmm_disk_get_data(const sint8 *name,void* data)
 
     cm_cnm_pmm_disk_info_t *info = (cm_cnm_pmm_disk_info_t *)data;    
     sint32 iRet = CM_OK;    
-    uint32 num = (uint32)cm_cnm_disk_get_instance(name);
     CM_MEM_ZERO(info,sizeof(cm_cnm_pmm_disk_info_t));
+#if(CM_FALSE == LINUX)
+    uint32 num = (uint32)cm_cnm_disk_get_instance(name);
     iRet = cm_cnm_exec_get_col(cm_cnm_pmm_disk_local_get_each,info,        
-        CM_SHELL_EXEC" cm_pmm_disk %u",num);       
-    if(CM_OK != iRet)    
+        CM_SHELL_EXEC" cm_pmm_disk %u",num);
+#else
+    iRet = cm_cnm_exec_get_col(cm_cnm_pmm_disk_local_get_each,info,        
+        CM_SHELL_EXEC" cm_pmm_disk %s",name);
+#endif
+    if(CM_OK != iRet)
     {        
     	CM_LOG_ERR(CM_MOD_CNM,"iRet[%d] get_col_fail",iRet);        
         return;    

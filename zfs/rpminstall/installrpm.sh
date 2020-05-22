@@ -36,6 +36,7 @@ function install_gui()
             ln -s /usr/lib64/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so
         fi
     fi
+    chmod 755 /etc/rc.d/rc.local
 }
 
 function install_type_rpm()
@@ -144,13 +145,53 @@ function install_version()
     cp $VERSION_FILE /etc
 }
 
+function install_mptsas2()
+{
+    gzip -d mpt2sas.ko.gz
+    if [  ! -f mpt2sas.ko ]; then
+        echo "no mpt2sas.ko"
+        return
+    fi
+    
+    if [ `file /root/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
+        cp mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
+        return 
+    fi
+    
+    mkdir mptsas2
+    cp  /boot/initramfs-3.10.0-514.el7.x86_64.img  /boot/initramfs-3.10.0-514.el7.x86_64.img_bak
+    cp  /boot/initramfs-3.10.0-514.el7.x86_64.img mptsas2 
+    cd mptsas2
+    gzip -dc initramfs-3.10.0-514.el7.x86_64.img | cpio -ivd
+    rm -rf initramfs-3.10.0-514.el7.x86_64.img
+
+    cp ../mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
+    find . 2>/dev/null | cpio -c -o | gzip > ../initramfs-3.10.0-514.el7.x86_64.img
+    cp ../initramfs-3.10.0-514.el7.x86_64.img /boot
+    cd -
+}
+
+function install_drbd()
+{
+    local drbdrpm=`ls |grep drbd`
+    if [ "X"$drbdrpm = "X" ]; then
+        return
+    fi
+    local drbddir=`echo $drbdrpm|sed 's/.tar.gz//g'`
+
+    tar -xzvf $drbdrpm
+    rpm -ivh $drbddir/drbd-rpm/*
+    rpm -ivh $drbddir/drbd-utils-rpm/*
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
         echo "no rpm"
         return
     fi
-    
+    install_mptsas2
+    install_drbd
     tar -xzvf zfsonlinuxrpm.tar.gz
         
     if [ $IS_DEEP -eq 0 ]; then

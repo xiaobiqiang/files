@@ -254,7 +254,7 @@ fmd_device_event(fmd_msg_t *msg)
 	}
 
 	ftp = fmd_topo_hold();
-	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time_end, NULL, ftp);
+	e = fmd_event_create(FMD_EVT_TOPO, evtime, NULL, ftp);
 	fmd_modhash_dispatch(fmd.d_mod_hash, e);
 
 	/* if the removed disk in pool, we shold do 

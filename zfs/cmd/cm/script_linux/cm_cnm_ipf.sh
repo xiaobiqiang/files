@@ -1,145 +1,169 @@
 #!/bin/bash
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
-CM_IPF_CFG='/etc/ipf/ipf.conf'
+CM_IPTABLES_CFG='/etc/sysconfig/iptables'
 
-function cm_cnm_ipf_add()
-{
-    local act=$1
-    local nic=$2
-    local ip=$3
-    local port=$4
-    local quick=' quick'
-    local from='all'
-    CM_LOG "[${FUNCNAME}:${LINENO}]$*"
-    if [ "X$nic" == "Xany" ]; then
-        nic=''
-    else
-        nic=" on $nic"
-    fi
-    if [ "X$ip" == "Xany" ] && [ "X$port" == "X0" ]; then
-        from='all'
-        quick=''
-    elif [ "X$ip" == "Xany" ]; then
-        from="from any to any port=$port"
-    elif [ "X$port" == "X0" ]; then
-        from="from $ip to any"
-    else
-        from="from $ip to any port=$port"
-    fi
-    CM_LOG "[${FUNCNAME}:${LINENO}]$act in${quick}${nic} $from"
-    
-    if [ "X$act" == "Xpass" ]; then
-        echo "$act in${quick}${nic} $from" > $CM_IPF_CFG".tmp"
-        cat $CM_IPF_CFG >> $CM_IPF_CFG".tmp"
-        mv $CM_IPF_CFG".tmp" $CM_IPF_CFG        
-    else
-        echo "$act in${quick}${nic} $from" >> $CM_IPF_CFG
-    fi
-    ipf -Fa -f $CM_IPF_CFG
-    return $CM_OK
-}
+if [ ! -f $CM_IPTABLES_CFG ];then
+    mkdir -p /etc/sysconfig
+    touch $CM_IPTABLES_CFG
+fi
 
-function cm_cnm_ipf_deny()
+function cm_cnm_iptables_getbatch()
 {
-    cm_cnm_ipf_add 'block' $*
-    return $?
-}
-
-function cm_cnm_ipf_allow()
-{
-    cm_cnm_ipf_add 'pass' $*
-    return $?
-}
-
-function cm_cnm_ipf_delete()
-{
-    local operate=$1 
-    local nic=$2
-    local ip=$3
-    local port=$4
-    local partern="$operate in.*"
-    CM_LOG "[${FUNCNAME}:${LINENO}]$*"
-    if [ "X$nic" != "Xany" ]; then
-        partern="${partern} on ${nic}.*"
-    fi
-    
-    if [ "X$ip" != "Xany" ] && [ "X$port" != "X0" ]; then
-        partern="$partern from $ip to any port=$port"
-    elif [ "X$ip" != "Xany" ]; then
-        partern="$partern from $ip to any"
-    elif [ "X$port" != "X0" ]; then
-        partern="$partern from any to any port=$port"
-    else
-        partern="$partern all"
-    fi
-    CM_LOG "[${FUNCNAME}:${LINENO}]$partern"
-    egrep -v "$partern" $CM_IPF_CFG >$CM_IPF_CFG".tmp"
-    mv $CM_IPF_CFG".tmp" $CM_IPF_CFG
-    ipf -Fa -f $CM_IPF_CFG
-    return $CM_OK
-}
-
-function get_ipf_info()
-{
-    local row=($1)
-    local state=${row[0]}
-    local conf_item=$2
-    local col_num=${#row[*]}
-    if [ "X$conf_item" == "Xstate" ];then
-        echo $state
-        return $CM_OK
-    fi
-    for((i=0; i<=$col_num; i++))
-    do  
-        case ${row[$i]} in
-            $conf_item)
-            ((i++))
-            echo ${row[i]}
-            return $CM_OK
-            ;;
-            *)
-            ;;
-        esac  
-    done
-    echo "any"
-    return $CM_OK  
-}
-function format_ipf_info()
-{
-    local status=$2
-    local row=`echo "$1"|sed "s/=/ /g"`
-    local state=`get_ipf_info "$row" "state"`
-    local nic=`get_ipf_info "$row" "on"`
-    local ip=`get_ipf_info "$row" "from"`
-    local port=`get_ipf_info "$row" "port"`    
-    echo "$state $nic $ip $port $status"
-    return $CM_OK
-}
-
-function cm_cnm_ipf_getbatch()
-{
-    local status=`svcs ipfilter |sed 1d|awk '{print $1}'`
-    sed "/^#/d" $CM_IPF_CFG|egrep 'pass|block'|while read line
+    iptables -L INPUT -n -v --line-numbers 2>/dev/null |sed 1,2d |egrep "ACCEPT |DROP " \
+        |egrep -v "ctstate |udp " |sed 's/dpt://g' \
+        |sed 's/ACCEPT/pass/g' |sed 's/DROP/block/g' \
+        |awk '$7!="lo"{print $1" "$4" "$7" "$9" "$12}' \
+        |while read line
     do
-        format_ipf_info "$line" "$status"
-    done    
-    return $CM_OK
+        local info=($line)
+        local cnt=${#info[*]}
+        local port="any"
+        if [ $cnt -eq 5 ]; then
+            port=${info[4]}
+        fi
+        local act=${info[1]}
+        local nic=${info[2]}
+        local ips=${info[3]}
+        
+        if [ "$nic" == '*' ];then
+            nic="any"
+        fi
+        
+        if [[ "X$ips" == "X0.0.0.0"* ]];then
+            ips="any"
+        fi
+        echo "$act $nic $ips $port online"
+    done 
+    return 0
 }
 
-function cm_cnm_ipf_count()
+function cm_cnm_iptables_count()
 {
-    local record=`sed "/^#/d" $CM_IPF_CFG|egrep 'pass|block'|wc -l`
-    echo $record
-    return $CM_OK
+    iptables -L INPUT -n -v --line-numbers 2>/dev/null |sed 1,2d |egrep "ACCEPT |DROP " \
+        |egrep -v "ctstate |udp " |sed 's/dpt://g' \
+        |awk 'BEGIN{c=0}$7!="lo"{c=c+1}END{print c}' 
+    return 0
 }
 
-function cm_cnm_ipf_update()  
+function cm_cnm_iptables_add()
 {
-    local update=$1
-    svcadm $update ipfilter
+    local act=$1  #pass | block
+    local nic=$2  #any
+    local ip=$3   #any 
+    local port=$4 #0
+
+    local cmd=""
+    if [ "X$nic" != "X" ] && [ "X$nic" != "Xany" ]; then
+        cmd="$cmd -i $nic"
+    fi
+
+    if [ "X$ip" != "X" ] && [ "X$ip" != "Xany" ]; then
+        cmd="$cmd -s $ip"
+    fi
+
+    if [ "X$port" != "X" ] && [ "X$port" != "X0" ]; then
+        cmd="$cmd -p tcp --dport $port"
+    fi
+
+    if [ "X$act" == "Xpass" ]; then
+        cmd="iptables -I INPUT $cmd -j ACCEPT"
+    else
+        cmd="iptables -A INPUT $cmd -j DROP"
+    fi
+    $cmd
+    local iRet=$?
+
+    if [ $iRet -eq 0 ]; then
+        iptables-save >${CM_IPTABLES_CFG}
+    fi
+    return $iRet
+}
+
+function cm_cnm_iptabls_getid()
+{
+    local act=$1  #pass | block
+    local nic=$2  #any
+    local ips=$3   #any 
+    local port=$4 #0
+    if [ "X$act" == "Xpass" ]; then
+        act="ACCEPT"
+    else
+        act="DROP"
+    fi
+    iptables -L INPUT -n -v --line-numbers 2>/dev/null |sed 1,2d |egrep "$act " \
+        |egrep -v "ctstate |udp " |sed 's/dpt://g' \
+        |awk '{print $1" "$7" "$9" "$12}' \
+        |while read line
+    do
+        local info=($line)
+        local cnt=${#info[*]}
+        local portx="0"
+        if [ $cnt -eq 4 ]; then
+            portx=${info[3]}
+        fi
+        if [ "X$portx" != "X$port" ]; then
+            continue
+        fi
+        local nicx=${info[1]}
+        local ipsx=${info[2]}
+        if [ "$nicx" == '*' ];then
+            nicx="any"
+        fi
+        
+        if [ "X$nic" != "X$nicx" ]; then
+            continue
+        fi
+        if [[ "X$ipsx" == "X0.0.0.0"* ]];then
+            ipsx="any"
+        fi
+        if [ "X$ips" != "X$ipsx" ]; then
+            continue
+        fi
+        echo "${info[0]}"
+        break
+    done
+    return 0
+}
+
+function cm_cnm_iptables_delete()
+{
+    local id=`cm_cnm_iptabls_getid $*`
+    if [ "X$id" == "X" ]; then
+        return 0
+    fi
+    iptables -D INPUT $id
+    local iRet=$?
+
+    if [ $iRet -eq 0 ]; then
+        iptables-save >${CM_IPTABLES_CFG}
+    fi
+    return $iRet
+}
+
+function cm_cnm_iptables_deny()
+{
+    cm_cnm_iptables_add 'block' $*
     return $?
 }
 
-cm_cnm_ipf_$*
+function cm_cnm_iptables_allow()
+{
+    cm_cnm_iptables_add 'pass' $*
+    return $?
+}
+
+function cm_cnm_iptables_update()
+{
+    return 0
+}
+
+function cm_cnm_iptables_check_nic()
+{
+    local nic=$1
+    local num=`ifconfig -a|grep -w $nic|wc -l`
+    echo $num
+    return $?
+}
+cm_cnm_iptables_$*
 exit $?

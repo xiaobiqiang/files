@@ -18,7 +18,8 @@ enum cluster_mq_msg_type {
 	cluster_msgtype_remove_failover,
 	cluster_msgtype_release,
 	cluster_msgtype_import,
-	cluster_msgtype_export
+	cluster_msgtype_export,
+	cluster_msgtype_check_failover
 };
 
 typedef struct cluster_mq_message {

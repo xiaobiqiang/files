@@ -4,7 +4,7 @@ source '/var/cm/script/cm_common.sh'
 
 function cm_cnm_route_getbatch()
 {
-	route -n|egrep -v 'Kernel|Destination'|awk '{print $1" "$2" "$3}'
+	route -n|egrep -v 'Kernel|Destination'|awk '{print $1" "$3" "$2}'
 	return $CM_OK
 }
 

@@ -932,6 +932,7 @@ extern int zpool_in_use(libzfs_handle_t *, int, pool_state_t *, char **,
  */
 extern int zpool_read_label(int, nvlist_t **, int *);
 extern int zpool_clear_label(int);
+extern int zpool_clear_label_by_path(const char *);
 
 /* needby disk.c */
 extern int zpool_restore_label(int fd);

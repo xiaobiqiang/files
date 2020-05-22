@@ -630,6 +630,8 @@ dsl_pool_sync_done(dsl_pool_t *dp, uint64_t txg)
 	while (ds_synced = list_remove_head(&dp->dp_synced_datasets)) {
 #ifdef _KERNEL
 	 	os = ds_synced->ds_objset;
+        if(os == NULL) 
+            continue;
 	    ds_object = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object: 0;
 	    zfs_mirror_log_clean(os, spa_guid(os->os_spa), ds_object,
 	        txg, 0, MIRROR_DATA_ALIGNED);

@@ -45,7 +45,11 @@ fi
 
 cp module/Makefile_hengwei.in module/Makefile.in
 ./autogen.sh
-./configure --enable-hengwei=yes --with-spl=$1 --prefix=/usr --sbindir=/sbin
+if [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "deepin GNU/Linux 15.0 (kui)" ]; then
+        ./configure --enable-hengwei=yes --with-spl=$1 --enable-spec-net-ip-align=yes --prefix=/usr --sbindir=/sbin
+elif [ "`cat /etc/os-release | grep PRETTY_NAME | cut -d '"' -f 2`" == "NeoKylin 5 (Five)" ]; then
+        ./configure --enable-hengwei=yes --with-spl=$1 --prefix=/usr --sbindir=/sbin
+fi
 make -j 16 && make install
 
 cp -f /lib/modules/$(uname -r)/extra/mpt3sas/mpt3sas.ko /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko

@@ -1,14 +1,32 @@
 #!/bin/bash
 source '/var/cm/script/cm_types.sh'
 source '/var/cm/script/cm_common.sh'
+BEGIN_UID=999
+BEGIN_GID=999
+
+
+function cm_cnm_user_update_smbpasswd()
+{
+	local user=$1
+    local pwd=$2
+
+/usr/bin/expect<<-EOF
+spawn smbpasswd $user
+expect "*password:"
+send "$pwd\r"
+expect "*password:"
+send "$pwd\r"
+expect eof
+EOF
+}
 
 function cm_cnm_user_insert_pwd()
 {
-	local user=$1
-	local pwd=$2
+    local user=$1
+    local pwd=$2
 
     echo $user:$pwd | chpasswd
-
+    cm_cnm_user_update_smbpasswd $user $pwd
 }
 
 function cm_cnm_user_insert()
@@ -115,42 +133,37 @@ function cm_cnm_user_get()
 function cm_cnm_user_getbatch()
 {
 	local gid=$1
-	local begin=0
 	local ostype=`cm_systerm_version_get`
-	if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-		begin=112
-	else
-		begin=99
-    	fi
+
 	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>'$begin'&&$3<50000) {print $3 " " $4 " " $1 " " $6}'|sort -n
+		cat /etc/passwd | awk -F':' '($3>'$BEGIN_UID'&&$3<50000) {print $3 " " $4 " " $1 " " $6}'|sort -n
 	else
-		cat /etc/passwd |awk -F':' '($3>'$begin'&&$3<50000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
+		cat /etc/passwd |awk -F':' '($3>'$BEGIN_UID'&&$3<50000)&&($4=='$gid') {print $3 " " $4 " " $1 " " $6}'|sort -n
 	fi
 }
 
 function cm_cnm_user_count()
 {
 	local gid=$1
-	local begin=0
 	local ostype=`cm_systerm_version_get`
-	if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-		begin=112
-	else
-		begin=99
-	fi
-    
 	if [ $gid = "null" ]; then
-		cat /etc/passwd | awk -F':' '($3>'$begin'&&$3<50000) {print $3}'| wc -l
+		cat /etc/passwd | awk -F':' '($3>'$BEGIN_UID'&&$3<50000) {print $3}'| wc -l
 	else
-		cat /etc/passwd |awk -F':' '($3>'$begin'&&$3<50000)&&($4=='$gid') {print $3}'| wc -l
+		cat /etc/passwd |awk -F':' '($3>'$BEGIN_UID'&&$3<50000)&&($4=='$gid') {print $3}'| wc -l
 	fi
 }
 
 
 function cm_cnm_user_maxid()
 {
-	local cut=`cat /etc/passwd| awk -F':' '{print $3}'| sort -n | awk -F':' 'BEGIN {max=99}{if(($1>99&&$1<50000)&&($1-max==1)) max=$1} END{printf max}'`
+	local cut=`cat /etc/passwd| awk -F':' '{print $3}'| sort -n | awk -F':' 'BEGIN {max='$BEGIN_UID'}{if(($1>'$BEGIN_UID'&&$1<50000)&&($1-max==1)) max=$1} END{printf max}'`
+	((cut=$cut+1))
+	echo $cut
+}
+
+function cm_cnm_user_newgid()
+{
+    local cut=`cat /etc/group| awk -F':' '{print $3}'| sort -n | awk -F':' 'BEGIN {max='$BEGIN_UID'}{if(($1>'$BEGIN_UID'&&$1<50000)&&($1-max==1)) max=$1} END{printf max}'`
 	((cut=$cut+1))
 	echo $cut
 }
@@ -243,19 +256,15 @@ function cm_cnm_user_cache_getbatch()
     local type=$2
     local begin=0
     local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=113
-    else
-        begin=100
-    fi
+    
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
+            cat /etc/passwd |awk -F':' '($3>='$BEGIN_UID'&&$3<=60000){print $3" "$1}'
         else
-            cat /etc/group |awk -F':' '($3>='$begin'&&$3<=60000){print $3" "$1}'
+            cat /etc/group |awk -F':' '($3>='$BEGIN_GID'&&$3<=60000){print $3" "$1}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
@@ -279,20 +288,15 @@ function cm_cnm_user_cache_count()
     local type=$2
     local begin=0
     local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=113
-    else
-        begin=100
-    fi
     
     if [ "X$domain" == "X" ] || [ "X$type" == "X" ]; then
         return $CM_PARAM_ERR
     fi
     if [ $domain -eq $CM_DOMAIN_LOCAL ]; then
         if [ $type -eq $CM_NAME_USER ]; then
-            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/passwd |awk -F':' 'BEGIN{cnt=0}($3>='$BEGIN_UID'&&$3<=60000){cnt++}END{print cnt}'
         else
-            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>='$begin'&&$3<=60000){cnt++}END{print cnt}'
+            cat /etc/group |awk -F':' 'BEGIN{cnt=0}($3>='$BEGIN_GID'&&$3<=60000){cnt++}END{print cnt}'
         fi
     elif [ $domain -eq $CM_DOMAIN_AD ]; then
         local dname=`smbadm list |sed -n 2p |awk '{print $2}' |sed 's/\[//g' |sed 's/\]//g'`
@@ -431,41 +435,62 @@ function cm_cnm_user_test()
 
 function cm_cnm_user_group_getbatch()
 {
-    local begin=0
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=116
-    else
-        begin=99
-    fi
-    cat /etc/group | awk -F':' '$3==1||($3>'$begin'&&$3<50000) {print $3" "$1}'
+    cat /etc/group | awk -F':' '$3==1||($3>'$BEGIN_GID'&&$3<50000) {print $3" "$1}'
     return $?
 }
-
 function cm_cnm_user_group_count()
 {
-    local begin=0
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=116
-    else
-        begin=99
-    fi
-    cat /etc/group |awk -F':' '$3==1||($3>'$begin'&&$3<50000)' |wc -l
+    cat /etc/group |awk -F':' '$3==1||($3>'$BEGIN_GID'&&$3<50000)' |wc -l
     return $?
 }
 
-function cm_cnm_user_group_maxid()
+function cm_cnm_user_check_uid()
 {
-    local begin=0
-    local ostype=`cm_systerm_version_get`
-    if [ $ostype -eq $CM_OS_TYPE_DEEPIN ];then
-        begin=116
-    else
-        begin=99
-    fi
-    cat /etc/group | awk -F':' 'BEGIN {max='$begin'}{if(($3>'$begin'&&$3<50000)&&($3>max)) max=$3} END{printf max}'
-    return $?
+    local uid=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_uname()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_check_gid()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$3=='$uid'{cnt++}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gname()
+{
+    local uid=$1
+    cat /etc/group | awk -F':' '$3=='$uid'{print $1}'
+    return 0
+}
+
+function cm_cnm_user_check_gname()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt++}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_uid()
+{
+    local uname=$1
+    cat /etc/passwd | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3}END{print cnt}'
+    return 0
+}
+
+function cm_cnm_user_get_gid()
+{
+    local uname=$1
+    cat /etc/group | awk -F':' 'BEGIN{cnt=0}$1=="'$uname'"{cnt=$3}END{print cnt}'
+    return 0
 }
 
 cm_cnm_user_"$1" "$2" "$3" "$4" "$5" "$6" "$7" "$7"

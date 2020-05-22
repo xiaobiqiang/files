@@ -946,6 +946,11 @@ static int disk_analyze_partition(const char *dev)
 	ret = disk_get_poolname(dev,pool_name,sizeof(pool_name));
 	
 	tmp_gzfs = libzfs_init();
+	if(!tmp_gzfs){
+		printf("libzfs_init fail\n");
+		return -1;
+	}
+	
 	/* check pool is exist or not */
 	if (pool_name != NULL) {
 		zhp = zpool_open_canfail(tmp_gzfs, pool_name);
@@ -1557,6 +1562,10 @@ disk_init(slice_req_t *req)
 		}
 	}
 #endif
+
+	if (zpool_clear_label_by_path(req->disk_name) < 0)
+		printf("clear label failed: %s\n", req->disk_name);
+
 	/* add init efi */
 	(void) disk_init_efi(req->disk_name);
 

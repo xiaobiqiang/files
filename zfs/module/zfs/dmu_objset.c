@@ -2614,8 +2614,12 @@ mirror_compare(const void *x1, const void *x2)
 	uint64_t data2_e = data2->start_addr + data2->data_len;
 	uint8_t type = data1->type;
 
-	VERIFY(data1_s < data1_e);
-	VERIFY(data2_s < data2_e);
+	/* 
+	 * maybe contain some commands 
+	 * like discard, whose length is 0. 
+	 */
+	VERIFY(data1_s <= data1_e);
+	VERIFY(data2_s <= data2_e);
 
 	// check
 	if (0 == type) {
@@ -2671,7 +2675,9 @@ void dmu_mirror_add_tree(mirror_tree_t *record)
 		mirror_data->data_len = header->len;
 		mirror_data->count = 0;
 		mirror_data->type = 1; 
-
+		if (mirror_data->data_len == 0)
+			cmn_err(CE_NOTE, "%s replay zero datalen, blkoff(0x%llx)",
+				__func__, mirror_data->start_addr);
 		data = avl_find(&record->record_tree, mirror_data, &where);
 		if (NULL != data) {
 			mirror_tree_data_t *repeat_data = (mirror_tree_data_t *)data;

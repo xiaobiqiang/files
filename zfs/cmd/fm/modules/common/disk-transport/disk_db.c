@@ -184,7 +184,7 @@ static int disk_init_db(disk_db_handle_t handle)
     return iRet;
 }
 
-int disk_db_init(void)
+disk_db_handle_t disk_db_init(void)
 {
     int iRet = CM_OK;
     disk_db_data_t *pinfo = &g_disk_db_data;
@@ -195,16 +195,17 @@ int disk_db_init(void)
     if(CM_OK != iRet)
     {
         syslog(LOG_ERR,"open %s fail", CM_DISK_DB_RECORD);
-        return iRet;
+        return NULL;
     }
     iRet = disk_init_db(pinfo->db_handle);
     if(CM_OK != iRet)
     {
+    	disk_db_close(pinfo->db_handle);
         syslog(LOG_ERR,"init db fail");
-        return iRet;
+        return NULL;
     }
 
-    return CM_OK;
+    return (pinfo->db_handle);
 }
 
 

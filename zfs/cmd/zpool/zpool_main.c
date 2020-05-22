@@ -56,6 +56,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/spa_impl.h>
+#include <sys/vdev_impl.h>
 #include <sys/efi_partition.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -141,6 +142,7 @@ static int zpool_do_scanthin(int argc, char **argv);
 static void zpool_init_efi(char *path);
 
 static int send_cluster_message(cluster_mq_message_t *);
+static int send_check_failover_ip_to_clusterd();
 
 xmlDocPtr pool_doc;
 xmlNodePtr pool_root_node;
@@ -596,9 +598,10 @@ zpool_do_add(int argc, char **argv)
 	nvlist_t *props = NULL;
 	char *propval;
 	boolean_t isaggre = B_FALSE;
+	boolean_t ignore_check = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "fgLno:P")) != -1) {
+	while ((c = getopt(argc, argv, "fbgLno:P")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
@@ -611,6 +614,9 @@ zpool_do_add(int argc, char **argv)
 			break;
 		case 'n':
 			dryrun = B_TRUE;
+			break;
+		case 'b':
+			ignore_check = B_TRUE;
 			break;
 		case 'o':
 			if ((propval = strchr(optarg, '=')) == NULL) {
@@ -664,7 +670,7 @@ zpool_do_add(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for processing */
-	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, B_FALSE, dryrun,
+	nvroot = make_root_vdev(zhp, props, force, !force, ignore_check, B_FALSE, dryrun,
 	    argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
@@ -789,12 +795,16 @@ zpool_do_labelclear(int argc, char **argv)
 	pool_state_t state;
 	boolean_t inuse = B_FALSE;
 	boolean_t force = B_FALSE;
+	boolean_t force_hard = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "f")) != -1) {
+	while ((c = getopt(argc, argv, "fF")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
+			break;
+		case 'F':
+			force_hard = B_TRUE;
 			break;
 		default:
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -829,6 +839,8 @@ zpool_do_labelclear(int argc, char **argv)
 
 		return (1);
 	}
+	if (force_hard)
+		goto wipe_label;
 
 	if (inuse) {
 		switch (state) {
@@ -1975,17 +1987,24 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 	xmlNodePtr node;
 	char * n = NULL;
 
-	if (strcmp(type, "root") == 0)
+	if (strcmp(type, "root") == 0){
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"data", NULL);
-	else
+		n = strchr(name,(int)'-');
+		if(n)
+		{
+			*n = '\0';
+		}
+	}else{
+		if(strcmp(type,"disk") != 0){
+			n = strchr(name,(int)'-');
+			if(n)
+			{
+				*n = '\0';
+			}
+		}
 		node = xmlNewChild(parent_node, NULL, (xmlChar *)"vdev", NULL);
-
-	n = strchr(name,(int)'-');
-	if(n)
-	{
-		*n = '\0';
 	}
-	
+
 	xmlSetProp(node, (xmlChar *)"name", (xmlChar *) name);
 	xmlSetProp(node, (xmlChar *)"state", (xmlChar *) state);
 	if (strcmp(type, "root") == 0)
@@ -2014,6 +2033,75 @@ xmlNodePtr create_item_node(xmlNodePtr parent_node, const char *name, char *stat
 
 }
 
+static int
+get_disk_label_state(nvlist_t *nv, nvlist_t **config,
+uint64_t *vs_aux, char **state)
+{
+	int fd;
+	vdev_label_t label;
+	char *path, *buf = label.vl_vdev_phys.vp_nvlist;
+	size_t buflen = sizeof (label.vl_vdev_phys.vp_nvlist);
+	struct stat64 statbuf;
+	uint64_t psize, state_val;
+	int l, ret = -1;
+
+	verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
+
+	if ((fd = open64(path, O_RDONLY)) < 0) {
+		cprint("cannot open '%s': %s", path, strerror(errno));
+		goto fail;
+	}
+
+	if (fstat64_blk(fd, &statbuf) != 0) {
+		cprint("failed to stat '%s': %s", path,
+			strerror(errno));
+		goto fail;
+	}
+
+	psize = statbuf.st_size;
+	psize = P2ALIGN(psize, (uint64_t)sizeof (vdev_label_t));
+
+	for (l = 0; l < VDEV_LABELS; l++) {
+		if (pread64(fd, &label, sizeof (label),
+			vdev_label_offset(psize, l, 0)) != sizeof (label)) {
+			cprint("failed to read label %d", l);
+			continue;
+		}
+
+		if (nvlist_unpack(buf, buflen, config, 0) != 0) {
+			cprint("failed to unpack label %d", l);
+		} else {
+			if (nvlist_lookup_uint64(*config,
+				ZPOOL_CONFIG_POOL_STATE, &state_val) != 0) {
+				nvlist_free(*config);
+				*config = NULL;
+			} else
+				break;
+		}
+	}
+
+	if (l < VDEV_LABELS) {
+		if (state_val == POOL_STATE_ACTIVE ||
+			state_val == POOL_STATE_EXPORTED) {
+			*state = gettext("INUSE");
+			*vs_aux = VDEV_AUX_SPARED;
+		} else
+			*state = gettext("AVAIL");
+		ret = 0;
+	}
+
+fail:
+	if (ret != 0) {
+		*state = gettext("UNAVAIL");
+		*vs_aux = VDEV_AUX_OPEN_FAILED;
+		*config = NULL;
+	}
+
+	if (fd >= 0)
+		(void) close(fd);
+	return (ret);
+}
+
 slot_map_t g_sm;;
 disk_info_t g_di_cur;
 
@@ -2037,6 +2125,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	uint64_t notpresent;
 	spare_cbdata_t cb;
 	char *state;
+	nvlist_t *config;
 	const char *raid_type;
 	uint64_t quantum;
 	xmlNodePtr node = NULL;
@@ -2058,8 +2147,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		 */
 		if (vs->vs_aux == VDEV_AUX_SPARED)
 			state = "INUSE";
-		else if (vs->vs_state == VDEV_STATE_HEALTHY)
-			state = "AVAIL";
+		else if (vs->vs_state == VDEV_STATE_HEALTHY) {
+			(void) get_disk_label_state(nv, &config, &vs->vs_aux, &state);
+			nvlist_free(config);
+		}
 	}
 
 	(void) printf("\t%*s%-*s  %-8s", depth, "", namewidth - depth,
@@ -7558,6 +7649,9 @@ release_callback(zpool_handle_t *zhp, void *data)
 		(void) zpool_unlock(lock, pool_name);
 		return (1);
 	}
+
+	(void)send_check_failover_ip_to_clusterd();
+
 	syslog(LOG_NOTICE, "to do zpool_release_pool %s",zpool_get_name(zhp));
 	zpool_release_pool(zhp, (char *)zpool_get_name(zhp),
 	    ZFS_HBX_CHANGE_POOL, partner_id);
@@ -7946,5 +8040,24 @@ zpool_do_scanthin(int argc, char **argv)
 	}
 
 	return (0);
+}
+
+static int
+send_check_failover_ip_to_clusterd()
+{
+	cluster_mq_message_t *mq_message;
+	int error;
+
+	mq_message = malloc(sizeof(cluster_mq_message_t));
+	if (mq_message == NULL)
+		return (ENOMEM);
+	memset(mq_message, 0, sizeof(cluster_mq_message_t));
+	mq_message->msglen = 1;
+
+	mq_message->msgtype = cluster_msgtype_check_failover;
+	error = send_cluster_message(mq_message);
+	free(mq_message);
+
+	return (error);
 }
 

@@ -840,19 +840,17 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 
 	thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 	if((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, lt_check_links, lmp, &err)) == NULL){
-		fmd_hdl_topo_rele(hdl, thp);
-		fmd_hdl_error(hdl, "failed to get topology: %s\n",
+		fprintf(stderr, "failed to get topology: %s\n",
 		    topo_strerror(err));
-		return;
+		goto end;
 	}
 
 	topo_fru_clear_fault_xml("Resource/link");
 
 	if(topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR){
 		topo_walk_fini(twp);
-		fmd_hdl_topo_rele(hdl, thp);
 		fmd_hdl_error(hdl, "failed to walk topology\n");
-		return;
+		goto end;
 	}
 
 	topo_walk_fini(twp);
@@ -874,8 +872,9 @@ static void lt_timeout(fmd_hdl_t *hdl, id_t id, void *data){/*{{{*/
 	if (check_map & ZFSTHINLUN_CHECK_FLAG)
 		zfs_thinlun_check(hdl, lmp);
 	//node_state_check(hdl, lmp);
-	fmd_hdl_topo_rele(hdl, thp);
 
+end:
+	fmd_hdl_topo_rele(hdl, thp);
 	lmp->lm_timer = fmd_timer_install(hdl, NULL, NULL, lmp->lm_interval);
 }/*}}}*/
 

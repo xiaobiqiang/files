@@ -31,6 +31,10 @@ function stmfadm_list_all_luns()
 #==============================================================================
 #节点性能统计,除了内存之外其他是累加的情况，C代码中计算差值
 #输出 (bandwidth)rbytes obytes (iops)reads writes (cpu)ticks ilds (mem)rate 
+#/proc/net/dev 文件说明：
+#Inter-|   Receive                                                |  Transmit
+#          写流量                                                    读流量
+#          read                                                      write
 #==============================================================================
 function cm_pmm_nics()
 {
@@ -39,8 +43,8 @@ function cm_pmm_nics()
         local info=($line)
         local name=${info[0]}
         name=${name%?}
-        local read=${info[1]}
-        local write=${info[2]}
+        local read=${info[2]}
+        local write=${info[1]}
         
         echo "$name $read $write"
     done
@@ -49,11 +53,12 @@ function cm_pmm_nics()
 
 function cm_pmm_node_stat()
 {
-    # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题
+    # 解决当数值过大时会被系统自动转化为科学计数法表示输出的问题                             
     local bandwidth=`cm_pmm_nics |awk 'BEGIN{ob=0;rb=0}{ob+=$2;rb+=$3}END{printf("%.0f %.0f",ob,rb)}'`
     #*100是为了uint64取值，之后会/100取得正确结果
-    local iops=`iostat -dx|sed "1,3d"|awk 'BEGIN{rs=0;ws=0}{rs+=$4;ws+=$5}END{print rs*100" "ws*100}'`
-    local cpu=`iostat -c | grep '\.'|egrep -v Linux|awk '{print ($1+$3)*100" "$6*100}'`
+    local sdnum=`iostat -dx|grep '\.'|egrep -v Linux|wc -l`
+    local iops=`iostat -dx 1 2|grep '\.'|egrep -v Linux|awk 'BEGIN{rs=0;ws=0}NR>'$sdnum'{rs+=$4;ws+=$5}END{printf("%.0f %.0f",rs*100,ws*100)}'`
+    local cpu=`iostat -c 1 2|grep '\.'|egrep -v Linux|sed 1d|awk '{print (100-$6)*100" "$6*100}'`
     local mem=`free -t|grep Mem|awk '{print $3/$2*100}'`
     
     if [ "X$bandwidth" == "X " ]; then
@@ -517,12 +522,17 @@ function cm_pmm_lun_check()
 function cm_pmm_nic()
 {
     local name=$1
-    local read=`cat /proc/net/dev|grep $name:|awk '{print $2}'`
-    local write=`cat /proc/net/dev|grep $name:|awk '{print $10}'`
-    local rerr=`cat /proc/net/dev|grep "$name:"|awk '{print $4}'`
-    local werr=`cat /proc/net/dev|grep "$name:"|awk '{print $12}'`
+    local data=(`cat /proc/net/dev|grep $name:|awk '{print $2" "$10" "$4" "$12}'`)
     
+    local read=${data[0]}
+    local write=${data[1]}
+    local rerr=${data[2]}
+    local werr=${data[3]}
     
+    #local read=`cat /proc/net/dev|grep $name:|awk '{print $2}'`
+    #local write=`cat /proc/net/dev|grep $name:|awk '{print $10}'`
+    #local rerr=`cat /proc/net/dev|grep "$name:"|awk '{print $4}'`
+    #local werr=`cat /proc/net/dev|grep "$name:"|awk '{print $12}'`
     echo "0 $rerr 100000000 2 0 0 $write $write $werr $read $read"
     return $?
 }
@@ -563,7 +573,7 @@ function cm_pmm_disk_instance()
     cat /proc/diskstats| grep -n -w "$diskname" |awk -F':' '{print $1}'
 }
 
-function cm_pmm_disk()
+function cm_pmm_disk_bak()
 {
     local num=$1
     #kstat -m sd -c disk -i $num \
@@ -574,6 +584,22 @@ function cm_pmm_disk()
     local read=${array[1]}
     local wiops=${array[2]}
     local write=${array[3]}
+    
+    echo "0 $read $write $riops 0 0 0 0 $wiops 0"
+    return $?
+}
+
+function cm_pmm_disk()
+{
+    local name=$1
+    #prtconf -a /dev/rdsk/$name|grep -w disk|awk -F'#' '{print $2}'
+    name=`cat /tmp/disk.xml |grep "$name"|awk -F'>' '{print $2}'|awk -F'<' '{print $1}'`
+    local diskname=`ls -l $name|awk -F'->' '{print $2}'|awk -F'/' '{print $3}'`
+    local data=(`iostat -dx 1 2|grep -w $diskname|sed 1d|awk '{print $4" "$5" "$6" "$7}'`)
+    local riops=${data[0]}
+    local read=${data[2]}
+    local wiops=${data[1]}
+    local write=${data[3]}
     
     echo "0 $read $write $riops 0 0 0 0 $wiops 0"
     return $?

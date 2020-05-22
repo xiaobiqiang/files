@@ -1152,7 +1152,7 @@ static void cm_pmm_cfg_init(cm_pmm_cfg_t *cfg)
 
 sint32 cm_pmm_cfg_update(cm_pmm_cfg_t *cfg)
 {
-    return cm_sync_request(CM_SYNC_OBJ_PMM_CONFIG,0,cfg,sizeof(cfg));
+    return cm_sync_request(CM_SYNC_OBJ_PMM_CONFIG,0,cfg,sizeof(cm_pmm_cfg_t));
 }
 
 sint32 cm_pmm_cfg_sync_request(uint64 data_id, void *pdata, uint32 len)

@@ -1607,19 +1607,6 @@ sint32 cm_cnm_pooldisk_local_add(
     {
         return CM_PARAM_ERR;
     }
-    CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f %s",req->name);
-
-    if((CM_POOL_DISK_DATA < req->type) && (req->type < CM_POOL_DISK_BUTT))
-    {
-        disktype = cm_cnm_get_enum_str(&CmCnmPoolMapDiskTypeUserCfg,req->type);
-        if(NULL == disktype)
-        {
-            CM_LOG_ERR(CM_MOD_CNM,"type[%u]",req->type);
-            return CM_PARAM_ERR;
-        }
-        CM_SNPRINTF_ADD(cmd,buf_len," %s",disktype);
-    }
-    
     if(req->raid < CM_RAID_BUTT)
     {
         switch(req->raid)
@@ -1640,6 +1627,19 @@ sint32 cm_cnm_pooldisk_local_add(
                 raid_num = CM_RAID7;
                 raid_x = CM_TRUE;
                 break;
+            case CM_RAIDZ50:
+                raid_num = CM_RAIDZ5;
+                raid_x = CM_TRUE;
+                break;
+            case CM_RAIDZ60:
+                raid_num = CM_RAIDZ6;
+                raid_x = CM_TRUE;
+                break;
+            case CM_RAIDZ70:
+                raid_num = CM_RAIDZ7;
+                raid_x = CM_TRUE;
+                break;
+
             default:
                 raid_num = req->raid;
                 break;
@@ -1651,7 +1651,25 @@ sint32 cm_cnm_pooldisk_local_add(
             return CM_PARAM_ERR;
         }
     }
-
+    if(raid_num == CM_RAIDZ5 || raid_num == CM_RAIDZ6 || raid_num == CM_RAIDZ7)
+    {
+        CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f -b %s",req->name);
+    }
+    else
+    {
+        CM_SNPRINTF_ADD(cmd,buf_len,"zpool add -f %s",req->name);        
+    }
+    if((CM_POOL_DISK_DATA < req->type) && (req->type < CM_POOL_DISK_BUTT))
+    {
+        disktype = cm_cnm_get_enum_str(&CmCnmPoolMapDiskTypeUserCfg,req->type);
+        if(NULL == disktype)
+        {
+            CM_LOG_ERR(CM_MOD_CNM,"type[%u]",req->type);
+            return CM_PARAM_ERR;
+        }
+        CM_SNPRINTF_ADD(cmd,buf_len," %s",disktype);
+    }
+    
     cut = cm_cnm_pool_raid_judge(req);
     if(CM_FALSE == cut)
     {

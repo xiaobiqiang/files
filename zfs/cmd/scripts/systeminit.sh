@@ -548,14 +548,26 @@ netmask $MASK
 _HSTNAME_
 		elif [ "deepin" == ${osversion:0:6} ]; then
 			echo "CREATING $dst config file."
-			if [ `cat $nicpath | grep -w $dst | wc -l` -eq 0 ]; then 
+			local find=0
+			# clear old inteface configuration
+			while read line; do
+				if [ X"auto $dst" == X"$line" ]; then
+						find=1
+				elif [[ X$line != X && $(echo $line | cut -d " " -f 1) == auto ]]; then
+						find=0
+				fi
+				if [ $find -lt 1 ]; then
+						echo $line >> ${nicpath}_tmp
+				fi
+			done < $nicpath
+			mv ${nicpath}_tmp ${nicpath}
+			
 			cat >> $nicpath << _HSTNAME_
 auto $dst
 iface $dst inet static
 address $IPADDR
 netmask $MASK
 _HSTNAME_
-			fi
 		else
 			echo "creating $dst config file."
 			cat > $nicpath$dst << _HSTNAME_

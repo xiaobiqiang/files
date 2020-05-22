@@ -302,12 +302,13 @@ sint32 cm_cnm_dirquota_local_get(
     sint32 iRet = CM_OK;
     sint8 cmd[CM_STRING_1K] = {0};
     sint8 nas[CM_STRING_256] = {0};
+    sint8 dir[CM_STRING_256] = {0};
     if(NULL == req)
     {
         return CM_OK;
     }
     dirquota_info = (const cm_cnm_dirquota_info_t *)req->data;
-    cm_cnm_dirquota_anlysis_path(dirquota_info->dir_path,nas,sizeof(nas),NULL,0);
+    cm_cnm_dirquota_anlysis_path(dirquota_info->dir_path,nas,sizeof(nas),dir,sizeof(dir));
     
     CM_LOG_INFO(CM_MOD_CNM,"nas:%s  dir_path:%s",nas,dirquota_info->dir_path);
     CM_VSPRINTF(cmd,sizeof(cmd),"%s get %s %s",g_cm_cnm_dirquota_script,nas,dirquota_info->dir_path);

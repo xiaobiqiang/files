@@ -66,6 +66,8 @@ uint32_t cluster_target_session_count = 0;
 unsigned int cluster_target_session_nrxworker = 16;
 unsigned int cluster_san_host_nrxworker = 16;
 
+int cluster_san_debug = 0;
+
 #define	CLUSTER_SESSION_SEL_ROUNDROBIN			0x1
 #define	CLUSTER_SESSION_SEL_LOADBALANCING		0x2
 
@@ -4000,6 +4002,10 @@ static void cluster_target_broadcast_handle(cts_fragment_data_t *fragment)
 	ctp = fragment->target_port;
 	ct_head = fragment->ct_head;
 	ret = nvlist_unpack(fragment->data, fragment->len, &hostinfo, KM_SLEEP);
+	if (cluster_san_debug > 0) {
+		cmn_err(CE_WARN, "data %p len %llu ret %d",
+			fragment->data, (u_longlong_t)fragment->len, ret);
+	}
 	if (ret != 0) {
 		return;
 	}
@@ -5999,6 +6005,9 @@ MODULE_PARM_DESC(cluster_target_session_nrxworker, "cluster_target_session_nrxwo
 
 module_param(cluster_san_host_nrxworker, uint, 0644);
 MODULE_PARM_DESC(cluster_san_host_nrxworker, "cluster_san_host_nrxworker");
+
+module_param(cluster_san_debug, int, 0644);
+MODULE_PARM_DESC(cluster_san_debug, "cluster_san_debug");
 
 EXPORT_SYMBOL(clustersan_vsas_set_levent_callback);
 EXPORT_SYMBOL(cluster_san_hostinfo_rele);

@@ -1671,10 +1671,10 @@ sbd_alloc_proxy_dbuf(uint32_t size)
 static void
 sbd_free_proxy_dbuf(struct stmf_data_buf *dbuf)
 {
-	if (!dbuf)
+	if (!virt_addr_valid(dbuf))
 		return;
 
-	if (dbuf->db_sglist[0].seg_addr) {
+	if (virt_addr_valid(dbuf->db_sglist[0].seg_addr)) {
 		kmem_free(dbuf->db_sglist[0].seg_addr, dbuf->db_sglist[0].seg_length);
 	}
 	kmem_free(dbuf, sizeof(*dbuf));

@@ -863,12 +863,15 @@ const sint8* g_cm_cnm_ipf_script = "/var/cm/script/cm_cnm_ipf.sh";
 extern const cm_omi_map_enum_t CmOmiMapIpfStatusEnumBoolType;
 extern const cm_omi_map_enum_t CmOmiMapIpfopEnumBoolType;
 extern const cm_omi_map_enum_t CmOmiMapIpfoptionEnumBoolType;
+
 sint32 cm_cnm_ipf_init(void)
 {
     return CM_OK;
 }
+
 #define cm_cnm_ipf_request(cmd,param,ppAck,plen) \
     cm_cnm_request_comm(CM_OMI_OBJECT_IPF,cmd,sizeof(cm_cnm_ipf_info_t),param,ppAck,plen)
+    
 static sint32 cm_cnm_ipf_decode_check_status(void *val)
 {
     uint8 status = *((uint8*)val);
@@ -1017,7 +1020,7 @@ sint32  cm_cnm_ipf_local_insert(
     if(CM_OMI_FIELDS_FLAG_ISSET(&decode->set,CM_OMI_FIELD_IPF_NIC)
         && (0 != strcmp(info->nic,"any")))
     {
-        cnt = cm_exec_int("dladm show-link|awk '{print $1}'|grep -w '%s'|wc -l",info->nic);
+        cnt = cm_exec_int("%s check_nic %s",g_cm_cnm_ipf_script,info->nic);
         if(cnt == 0)
         {
             return CM_ERR_NOT_EXISTS;
