@@ -4405,7 +4405,7 @@ _scsih_smart_predicted_fault(struct MPT3SAS_ADAPTER *ioc, u16 handle)
 	mpt3sas_ctl_add_to_event_log(ioc, event_reply);
 	kfree(event_reply);
     atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_SMART_FAIL, &sas_target_priv_data->sas_address);
-    mpt3sas_trigger_remove_target_event(ioc, sas_target_priv_data->sas_address);
+    /*mpt3sas_trigger_remove_target_event(ioc, sas_target_priv_data->sas_address);*/
 out:
 	if (sas_device)
 		sas_device_put(sas_device);
@@ -4594,7 +4594,7 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 
                 atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, &sas_device_priv_data->sas_target->sas_address);
 
-                mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
+                /*mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);*/
             }
         }
 	}
@@ -9030,8 +9030,10 @@ void mpt3sas_eh_strategy(struct Scsi_Host *shost)
                 atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &sas_device_priv_data->sas_target->sas_address);
                 printk(KERN_ERR "mpt3sas_eh_strategy remove target:%llx\n", 
                         sas_device_priv_data->sas_target->sas_address);
+                /*
                 ioc = shost_priv(scmd->device->host);
                 mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
+                */
             }                
         }
 
@@ -9070,7 +9072,7 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
 
     if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 6) {
         atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
-        mpt3sas_trigger_remove_target_event(ioc, target_priv_data->sas_address);
+        /*mpt3sas_trigger_remove_target_event(ioc, target_priv_data->sas_address);*/
     }
 
     return BLK_EH_NOT_HANDLED;   /* for scsi_times_out to abort this command. */

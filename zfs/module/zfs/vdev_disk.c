@@ -972,6 +972,11 @@ vdev_ops_t vdev_disk_ops = {
 
 #include <linux/notifier.h>
 
+
+/* NOTICE: 
+ * This function need be refactored.
+ * It may sleep at some point. But scheduling is forbidden in atomic context.
+ */
 static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 			      void *args)
 {

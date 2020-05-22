@@ -101,6 +101,8 @@
 #define MPT3FAULTSIMU   _IOWR(MPT3_MAGIC_NUMBER, 33, \
 	struct mpt3_fault_simu_info)
 
+#define MPT3RMTGTINFO   _IOWR(MPT3_MAGIC_NUMBER, 34, \
+	struct mpt3_rm_tgt_info)
 
 /**
  * struct mpt3_ioctl_header - main header structure
@@ -458,6 +460,12 @@ struct mpt3_fault_simu_info {
     uint64_t wwn;
     void *    priv_data;
 };
+
+struct mpt3_rm_tgt_info {
+    struct mpt3_ioctl_header hdr;
+    uint64_t wwn;
+};
+
 
 typedef enum {
     MPT3_NORESP,
