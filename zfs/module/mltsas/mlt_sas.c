@@ -2104,6 +2104,8 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 
 	VERIFY(bio = __Mlsas_PR_RQ_bio(prr, rw, 
 		prr->prr_dt, prr->prr_dtlen));
+
+	cmn_err(CE_NOTE, "%s rw_flags(0x%llx)", __func__, bio->bi_rw);
 	
 	do {
 		bt = bio;
