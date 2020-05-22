@@ -160,12 +160,12 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 
 	rwfl = __Mlsas_Setup_RWmsg(rq)->rw_flags;
 
-	if (rwfl & Mlsas_RXfl_Disc)
+	if (rwfl & REQ_DISCARD)
 		rval = Mlsas_TX(rh->Mh_session, 
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
 			NULL, 0, B_FALSE);
-	else if (rwfl & Mlsas_RXfl_Write)
+	else if (rwfl & REQ_WRITE)
 		rval = Mlsas_TX(rh->Mh_session, 
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
@@ -198,13 +198,14 @@ Mlsas_RW_msg_t *__Mlsas_Setup_RWmsg(Mlsas_request_t *rq)
 	mms->Mms_len = sizeof(Mlsas_Msh_t) + 
 		((sizeof(Mlsas_RW_msg_t) + 7) & ~7);
 
-	rwm->rw_flags = __Mlsas_RTX_bfl_rxfl(rq->Mlrq_master_bio->bi_rw);
+//	rwm->rw_flags = __Mlsas_RTX_bfl_rxfl(rq->Mlrq_master_bio->bi_rw);
+	rwm->rw_flags = rq->Mlrq_master_bio->bi_rw;
 	rwm->rw_sector = rq->Mlrq_sector;
 	rwm->rw_rqid = (uint64_t)rq;
 	rwm->rw_mlbpr = rq->Mlrq_pr->Mlpd_pr;
 
-	if ((rwm->rw_flags & Mlsas_RXfl_Disc) ||
-		!(rwm->rw_flags & Mlsas_RXfl_Write))
+	if ((rwm->rw_flags & REQ_DISCARD) ||
+		!(rwm->rw_flags & REQ_WRITE))
 		((Mlsas_Disc_msg_t *)rwm)->t_size = rq->Mlrq_bsize;
 
 	VERIFY((Mlb->Mlb_txbuf_used = mms->Mms_len) <= Mlb->Mlb_txbuf_len);
@@ -246,7 +247,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 	uint32_t bsize = xd->data_len;
 	Mlsas_pr_req_t *prr = NULL;
 
-	if (Wm->rw_flags & Mlsas_RXfl_Disc)
+	if (Wm->rw_flags & REQ_DISCARD)
 		bsize = ((Mlsas_Disc_msg_t *)Wm)->t_size;
 	
 	VERIFY((prr = __Mlsas_Alloc_PR_RQ(Wm->rw_mlbpr, 
@@ -254,7 +255,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 			bsize)) != NULL);	
 	prr->prr_flags |= Mlsas_PRRfl_Write;
 	
-	if (!(Wm->rw_flags & Mlsas_RXfl_Disc)) {
+	if (!(Wm->rw_flags & REQ_DISCARD)) {
 		prr->prr_flags |= Mlsas_PRRfl_Addl_Kmem;
 		prr->prr_dt = xd->data;
 		prr->prr_dtlen = xd->data_len;
@@ -275,9 +276,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
-	__Mlsas_Submit_PR_request(Mlb, 
-		__Mlsas_RTX_rxfl_bfl(Wm->rw_flags), 
-		prr);
+	__Mlsas_Submit_PR_request(Mlb, Wm->rw_flags, prr);
 
 	csh_rx_data_free_ext(xd);
 	return (0);
@@ -288,7 +287,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 	cs_rx_data_t *xd = container_of(w, cs_rx_data_t, node);
 	Mlsas_Disc_msg_t *Rm = ((Mlsas_Msh_t *)xd->ex_head) + 1;
 	Mlsas_blkdev_t *Mlb = ((Mlsas_pr_device_t *)Rm->rw_mlbpr)->Mlpd_mlb;
-	unsigned long rw = __Mlsas_RTX_rxfl_bfl(Rm->rw_flags);
+	unsigned long rw = Rm->rw_flags;
 	Mlsas_pr_req_t *prr = NULL;
 	
 	VERIFY((prr = __Mlsas_Alloc_PR_RQ(Rm->rw_mlbpr, 
@@ -309,9 +308,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
-	__Mlsas_Submit_PR_request(Mlb, 
-		__Mlsas_RTX_rxfl_bfl(Rm->rw_flags), 
-		prr);
+	__Mlsas_Submit_PR_request(Mlb, Rm->rw_flags, prr);
 
 	csh_rx_data_free_ext(xd);
 	return (0);

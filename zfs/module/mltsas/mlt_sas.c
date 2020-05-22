@@ -1604,7 +1604,7 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	Mlsas_pr_device_t *pr = RWm->rw_mlbpr;
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
-	if (RWm->rw_flags & Mlsas_RXfl_Write)
+	if (RWm->rw_flags & REQ_WRITE)
 		w->rtw_fn = __Mlsas_Rx_biow;
 	else 
 		w->rtw_fn = __Mlsas_Rx_bior;
@@ -2088,15 +2088,17 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 	struct bio *bio = NULL, *bt = NULL;
 
 	if (prr->prr_flags & Mlsas_PRRfl_Zero_Out) {
+		uint32_t what = Mlsas_PRRst_Complete_OK;
 		atomic_inc_32(&prr->prr_pending_bios);
 		if ((rval = blkdev_issue_zeroout(Mlb->Mlb_bdi.Mlbd_bdev,
 				prr->prr_bsector, prr->prr_bsize >> 9, 
 				GFP_NOIO, false)) != 0) {
 			prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
 			prr->prr_error = rval;
+			what = Mlsas_PRRst_Discard_Error;
 		}
 		spin_lock_irq(&Mlb->Mlb_rq_spin);
-		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Discard_Error);
+		__Mlsas_PR_RQ_stmt(prr, what);
 		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Queue_Net_Wrsp);
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 		return ;
