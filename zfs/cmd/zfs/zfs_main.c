@@ -2625,7 +2625,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 		return (-1);
 #endif /* HAVE_IDMAP */
-	}
+//	}
 /*
 	if (cb->cb_sid2posix || domain == NULL || domain[0] == '\0') {
 		/* POSIX or -i */
