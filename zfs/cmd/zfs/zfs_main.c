@@ -2555,7 +2555,6 @@ us_type2str(unsigned field_type)
 	}
 }
 
-/*
 static int
 userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 {
@@ -2589,7 +2588,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	if (domain != NULL && domain[0] != '\0') {
 #ifdef HAVE_IDMAP
 		/* SMB */
-/*
 		char sid[ZFS_MAXNAMELEN + 32];
 		uid_t id;
 		uint64_t classes;
@@ -2625,12 +2623,10 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 		return (-1);
 #endif /* HAVE_IDMAP */
-//	}
-/*
+	}
+
 	if (cb->cb_sid2posix || domain == NULL || domain[0] == '\0') {
 		/* POSIX or -i */
-		/*
-
 		if (prop == ZFS_PROP_GROUPUSED || prop == ZFS_PROP_GROUPQUOTA) {
 			type = USTYPE_PSX_GRP;
 			if (!cb->cb_numname) {
@@ -2655,14 +2651,11 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	 * SID to POSIX ID translation (hence changing the type from SMB to
 	 * POSIX).
 	 */
-	 /*
 	if (cb->cb_sid2posix &&
 	    nvlist_add_boolean_value(props, "smbentity", smbentity) != 0)
 		nomem();
 
 	/* Calculate/update width of PROP field */
-	/*
-
 	if (prop == ZFS_PROP_USERUSED || prop == ZFS_PROP_GROUPUSED \
 		|| prop == ZFS_PROP_USEROBJUSED || prop == ZFS_PROP_GROUPOBJUSED ) {
 		propname = "used";
@@ -2676,8 +2669,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		nomem();
 
 	/* Calculate/update width of TYPE field */
-	/*
-
 	typestr = us_type2str(type);
 	typelen = strlen(gettext(typestr));
 	typeidx = us_field_index("type");
@@ -2687,8 +2678,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		nomem();
 
 	/* Calculate/update width of NAME field */
-	/*
-
 	if ((cb->cb_numname && cb->cb_sid2posix) || name == NULL) {
 		if (nvlist_add_uint64(props, "name", rid) != 0)
 			nomem();
@@ -2702,11 +2691,11 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	if (namelen > cb->cb_width[nameidx])
 		cb->cb_width[nameidx] = namelen;
 
+	uu_avl_insert(avl, node, idx);
 	/*
 	 * Check if this type/name combination is in the list and update it;
 	 * otherwise add new node to the list.
-	 */
-	 /*
+	 
 	if ((n = uu_avl_find(avl, node, &sortinfo, &idx)) == NULL) {
 		uu_avl_insert(avl, node, idx);
 	} else {
@@ -2714,11 +2703,9 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		free(node);
 		node = n;
 		props = node->usn_nvl;
-	}
+	}*/
 
 	/* Calculate/update width of value fields */
-	/*
-
 	if (cb->cb_nicenum)
 		zfs_nicenum(space, sizebuf, sizeof (sizebuf));
 	else
@@ -2731,54 +2718,6 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 	if (nvlist_add_uint64(props, "value", space) != 0)
 		nomem();
-
-	return (0);
-}*/
-static int
-userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
-{
-	zfs_userquota_prop_t *typep = arg;
-	zfs_userquota_prop_t p = *typep;
-	char *name = NULL;
-	char *ug, *propname;
-	char namebuf[32];
-	char sizebuf[32];
-
-	if (domain == NULL || domain[0] == '\0') {
-		if (p == ZFS_PROP_GROUPUSED || 
-			p == ZFS_PROP_GROUPQUOTA || 
-			p == ZFS_PROP_SOFTGROUPQUOTA) {
-			struct group *g = getgrgid(rid);
-			if (g)
-				name = g->gr_name;
-		} else {
-			struct passwd *p = getpwuid(rid);
-			if (p)
-				name = p->pw_name;
-		}
-	}
-
-	if (p == ZFS_PROP_GROUPUSED || p == ZFS_PROP_GROUPQUOTA || p == ZFS_PROP_SOFTGROUPQUOTA)
-		ug = "group";
-	else
-		ug = "user";
-
-	if (p == ZFS_PROP_USERUSED || p == ZFS_PROP_GROUPUSED)
-		propname = "used";
-	else if (p == ZFS_PROP_USERQUOTA || p == ZFS_PROP_GROUPQUOTA)
-		propname = "quota";
-	else
-		propname = "softquota";
-
-	if (name == NULL) {
-		(void) snprintf(namebuf, sizeof (namebuf),
-			"%llu", (longlong_t)rid);
-		name = namebuf;
-	}
-	zfs_nicenum(space, sizebuf, sizeof (sizebuf));
-
-	(void) printf("%-10s %-6s %s%c%-8s %-6s\n", propname, ug, domain,
-		domain[0] ? '-' : ' ', name, sizebuf);
 
 	return (0);
 }
@@ -2921,47 +2860,6 @@ zfs_do_userspace(int argc, char **argv)
 {
 	zfs_handle_t *zhp;
 	zfs_userquota_prop_t p;
-	int error;
-
-	/*
-	 * Try the python version.	If the execv fails, we'll continue
-	 * and do a simplistic implementation.
-	 */
-	/*(void) execv(pypath, argv-1);
-
-	(void) printf("internal error: %s not found\n"
-		"falling back on built-in implementation, "
-		"some features will not work\n", pypath);*/
-
-	if ((zhp = zfs_open(g_zfs, argv[argc-1], ZFS_TYPE_DATASET)) == NULL) {
-			return (1);
-	}
-	
-	(void) printf("PROP 	  TYPE	  NAME	  VALUE\n");
-
-	/* Set to remote by RPC */
-	//error = zfs_group_userspace_send(argv[1]);
-	/*if(0 == error)
-	{
-		return (error);
-	}else{*/
-		for (p = 0; p < ZFS_NUM_USERQUOTA_PROPS; p++) {
-			error = zfs_userspace(zhp, p, userspace_cb, &p);
-			if (error)
-				break;
-		}
-		return (error);
-
-	//}
-	
-}
-
-/*
-static int
-zfs_do_userspace(int argc, char **argv)
-{
-	zfs_handle_t *zhp;
-	zfs_userquota_prop_t p;
 	uu_avl_pool_t *avl_pool;
 	uu_avl_t *avl_tree;
 	uu_avl_walk_t *walk;
@@ -2993,7 +2891,6 @@ zfs_do_userspace(int argc, char **argv)
 
 	if (strcmp(argv[0], "groupspace") == 0)
 		/* Toggle default group types */
-/*
 		types = USTYPE_PSX_GRP | USTYPE_SMB_GRP;
 
 	while ((c = getopt(argc, argv, "nHpo:s:S:t:i")) != -1) {
@@ -3050,8 +2947,6 @@ zfs_do_userspace(int argc, char **argv)
 	}
 
 	/* Use default output fields if not specified using -o */
-	/*
-
 	if (ofield == NULL)
 		ofield = deffields;
 	do {
@@ -3068,8 +2963,6 @@ zfs_do_userspace(int argc, char **argv)
 	fields[cfield] = USFIELD_LAST;
 
 	/* Override output types (-t option) */
-	/*
-
 	if (tfield != NULL) {
 		types = 0;
 
@@ -3106,8 +2999,6 @@ zfs_do_userspace(int argc, char **argv)
 		nomem();
 
 	/* Always add default sorting columns */
-	/*
-
 	(void) zfs_add_sort_column(&sortcol, "prop", B_FALSE);
 	(void) zfs_add_sort_column(&sortcol, "name", B_FALSE);
 
@@ -3135,8 +3026,6 @@ zfs_do_userspace(int argc, char **argv)
 	}
 
 	/* Sort the list */
-	/*
-
 	if ((node = uu_avl_first(avl_tree)) == NULL)
 		return (0);
 
@@ -3167,16 +3056,12 @@ zfs_do_userspace(int argc, char **argv)
 	uu_list_pool_destroy(listpool);
 
 	/* Print and free node nvlist memory */
-	/*
-
 	print_us(scripted, parsable, fields, types, cb.cb_width, B_TRUE,
 	    cb.cb_avl);
 
 	zfs_free_sort_columns(sortcol);
 
 	/* Clean up the AVL tree */
-	/*
-
 	if ((walk = uu_avl_walk_start(cb.cb_avl, UU_WALK_ROBUST)) == NULL)
 		nomem();
 
@@ -3190,7 +3075,7 @@ zfs_do_userspace(int argc, char **argv)
 	uu_avl_pool_destroy(avl_pool);
 
 	return (ret);
-}*/
+}
 
 static int dirquota_cb(const char *dirpath, 
     uint64_t quota, uint64_t used)
