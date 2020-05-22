@@ -78,7 +78,6 @@ static int _scsih_add_device(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 	u8 retry_count, u8 is_pd);
 
 static int mpt3sas_check_sdev_in_removed_list(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
-void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
 
 static u8 _scsih_check_for_pending_tm(struct MPT3SAS_ADAPTER *ioc, u16 smid);
 
