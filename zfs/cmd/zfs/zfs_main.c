@@ -2480,7 +2480,6 @@ us_compare(const void *larg, const void *rarg, void *unused)
 			propname = "prop";
 			(void) nvlist_lookup_string(lnvl, propname, &lvstr);
 			(void) nvlist_lookup_string(rnvl, propname, &rvstr);
-			(void)fprintf(stderr, "lvstr = %s, rvstr = %s", lvstr, rvstr);
 			rc = strcmp(lvstr, rvstr);
 			break;
 		case ZFS_PROP_NAME:
@@ -2497,7 +2496,6 @@ us_compare(const void *larg, const void *rarg, void *unused)
 				    &lvstr);
 				(void) nvlist_lookup_string(rnvl, propname,
 				    &rvstr);
-				(void)fprintf(stderr, "lvstr = %s, rvstr = %s", lvstr, rvstr);
 				rc = strcmp(lvstr, rvstr);
 			}
 			break;
@@ -2697,6 +2695,7 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 	 * otherwise add new node to the list.
 	 */
 	if ((n = uu_avl_find(avl, node, &sortinfo, &idx)) == NULL) {
+		(void)fprintf(stderr, "propname = %s, name = %s\n", propname, name);
 		uu_avl_insert(avl, node, idx);
 	} else {
 		nvlist_free(props);
@@ -2718,6 +2717,8 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 
 	if (nvlist_add_uint64(props, "value", space) != 0)
 		nomem();
+
+	(void)fprintf(stderr, "value = %d\n", space);
 
 	return (0);
 }
