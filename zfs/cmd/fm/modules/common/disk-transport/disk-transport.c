@@ -710,8 +710,8 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 			}
 			
 		}else{
-			strncpy(dnode.dt_dim,"0",sizeof(dnode.dt_dim));
-			strncpy(dnode.dt_gsize,"-",sizeof(dnode.dt_gsize));
+			strncpy(dnode.dt_dim,"-",sizeof(dnode.dt_dim));
+			strncpy(dnode.dt_gsize,"0",sizeof(dnode.dt_gsize));
 		}
 		dnode.dt_rpm = current->dk_rpm;
 		dnode.dt_serial = current->dk_serial;
