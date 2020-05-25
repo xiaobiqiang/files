@@ -109,7 +109,7 @@ static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr, uint32_t c_put)
 static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 
 static uint32_t Mlsas_npending = 0;
-
+static uint32_t Mlsas_minors = 16; 
 static Mlsas_t Mlsas;
 static Mlsas_t *gMlsas_ptr = &Mlsas;
 
@@ -592,6 +592,7 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 
 	set_disk_ro(disk, true);
 	disk->queue = rq;
+	disk->minors = Mlsas_minors;
 	disk->major = Mlsas_MAJOR;
 	disk->first_minor = minor;
 	disk->fops = &Mlsas_disk_ops;
@@ -2176,6 +2177,7 @@ static void __exit __Mlsas_Exit(void)
 }
 
 module_param(Mlsas_npending, int, 0644);
+module_param(Mlsas_minors, int, 0644);
 
 module_init(__Mlsas_Init);
 module_exit(__Mlsas_Exit);
