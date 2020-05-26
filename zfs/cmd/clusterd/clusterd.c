@@ -6776,7 +6776,7 @@ main(int argc, char *argv[])
 	char *log_path = NULL;
 	int log_level = 0;
 	int log_flags = 0;
-	int trace_dbgmsgs_enable = 1;
+	int trace_dbgmsgs_enable = 0;
 
 	/*
 	 * There is no check for non-global zone and Trusted Extensions.
