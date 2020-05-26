@@ -12,6 +12,7 @@ CM_ERR_CONN_FAIL=14
 CM_ERR_NODE_DB_NO_RECORD=12
 CM_ERR_NODE_NO_IP=250
 CM_ERR_NODE_NONE_CLUSTER_CONF=252
+CM_IPMI_IP='/var/cm/static/ipmi_ip.conf'
 
 function set_nas_rpc_nics
 {
@@ -176,6 +177,7 @@ function cm_node_cluster_init
         # 首先得有集群SAN才能打开集群NAS
         #zfs multiclus -e
     fi
+    
     return 0
 }
 
@@ -405,10 +407,10 @@ function cm_node_power_on
     local rem_hid=$(sqlite3 /var/cm/data/cm_node.db "SELECT idx FROM record_t WHERE id=$1")
     [ -z $rem_hid ]&&return $CM_FAIL
     # 根据hostid查找到对应的ipmi_ip
-    local ipmi_ip=$(zfs clustersan list-host -f | awk "{a[NR]=\$0;if(a[NR-2]~/hostid        : ${rem_hid}/){print \$4}}")
+    local ipmi_ip=$(cat $CM_IPMI_IP|grep -w $rem_hid|awk '{print $1}')
     is_ipv4_dot_notation "$ipmi_ip"
     [ $? -ne 0 ]&&return $CM_FAIL
-    ping $ipmi_ip 1 1>/dev/null 2>/dev/null
+    ping $ipmi_ip -i 1 -c 1 >/dev/null
     [ $? -ne 0 ]&&return $CM_ERR_CONN_FAIL
     
     local user=$2
