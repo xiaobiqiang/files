@@ -12,8 +12,10 @@
 #include <assert.h>
 #include <getopt.h>
 #include <errno.h>
-#include <sys/kmem.h>
 #include <cmdparse.h>
+#include <sys/zfs_context.h>
+#include <sys/avl.h>
+#include <sys/thread_pool.h>
 #include <mltsas_comm.h>
 
 static int Mlsas_enable(int, char **, cmdOptions_t *, void *);
@@ -69,14 +71,14 @@ static int Mlsas_enable(int, char **, cmdOptions_t *, void *);
 typedef enum Mlsas_async_event {
 	Mlsas_EV_First,
 	Mlsas_EV_New_Virt,
+	Mlsas_EV_Del_Virt,
 	Mlsas_EV_Last
 } Mlsas_async_event_e;
 
 typedef struct Mlsas_virt {
-	list_node_t vt_one_phase_node;
-	list_node_t vt_node;
-	uint8_t vt_hash;
-	uint8_t vt_pad[7];
+	avl_node_t vt_one_phase_node;
+	avl_node_t vt_node;
+	uint64_t vt_hash;
 	char 	vt_path[64];
 } Mlsas_virt_t;
 
@@ -102,11 +104,9 @@ typedef struct Mlsas_async_evt {
 typedef struct Mlsas_Srv {
 	int MS_fd;
 	kmutex_t MS_mtx;
-	list_t MS_virt_one_phase_list;
-	/* one phase */
-	Mlsas_virt_slot_t MS_one_phase_vslt[Mlsas_n_Slot];
-	/* two phase */
-	Mlsas_virt_slot_t MS_vslt[Mlsas_n_Slot];
+
+	avl_tree_t	MS_one_phase_vtree;
+	avl_tree_t	MS_vtree;
 
 	kmutex_t MS_lpc_mtx;
 	kcondvar_t MS_lpc_cv;
@@ -208,6 +208,7 @@ static int Mlsas_Exec_for_iter_line(
 		llen = 0;
 	}
 
+	pclose(ebuf);
 	return rval;
 }
 
@@ -230,62 +231,40 @@ static void Mlsas_close(int fd)
 		close(fd);
 }
 
-static uint8_t Mlsas_Virt_id(const char *path)
+static uint64_t Mlsas_Virt_id(const char *path)
 {
 	VERIFY(strlen(path) == 22 && 
 		strncmp(path, "scsi-3", 6) == 0);
 	
-	return (path[20] << 8 | path[21]);
+	return strtoull(path + 6, NULL, 16);
 }
 
-static Mlsas_virt_t *Mlsas_Lookup_virt_locked(Mlsas_virt_slot_t *slot,
-		const char *path)
+static int Mlsas_Virt_comp(Mlsas_virt_t *vt1, Mlsas_virt_t *vt2)
 {
-	Mlsas_virt_t *tmp, *next;
+	int64_t diff = vt1->vt_hash - vt2->vt_hash;
 
-	VERIFY(MUTEX_HELD(&slot->slt_mtx));
-
-	for (tmp = list_head(&slot->slt_virt_list);
-		tmp != NULL; 
-		next = list_next(&slot->slt_virt_list, tmp), 
-			tmp = next) {
-		if (!strncmp(tmp->vt_path, path, strlen(path))) {
-			mutex_exit(&slot->slt_mtx);
-			return tmp;
-		}
-	}
-
-	return NULL;
+	return ((diff > 0) ? 1 : (diff < 0 ? -1 : 0));
 }
 
-static Mlsas_virt_t *Mlsas_Iter_virt_locked(Mlsas_virt_slot_t *slot,
-		const char *path)
+static Mlsas_virt_t *Mlsas_Lookup_virt_locked(avl_tree_t *tree,
+		uint64_t vtid)
 {
-	Mlsas_virt_t *tmp, *next;
+	Mlsas_virt_t vt;
+	avl_index_t index;
 
-	VERIFY(MUTEX_HELD(&slot->slt_mtx));
-
-	for (tmp = list_head(&slot->slt_virt_list);
-		tmp != NULL; 
-		next = list_next(&slot->slt_virt_list, tmp), 
-			tmp = next) {
-		if (!strncmp(tmp->vt_path, path, strlen(path))) {
-			mutex_exit(&slot->slt_mtx);
-			return tmp;
-		}
-	}
-
-	return NULL;
+	VERIFY(MUTEX_HELD(&gMlsas_Srv->MS_mtx));
+	
+	vt.vt_hash = vtid;
+	return avl_find(tree, &vt, &index);
 }
 
 static Mlsas_virt_t *Mlsas_New_virt(const char *path)
 {
 	Mlsas_virt_t *vt = NULL;
-	uint8_t hash = Mlsas_Virt_id(path);
+	uint64_t hash = Mlsas_Virt_id(path);
 
 	VERIFY((vt = malloc(sizeof(Mlsas_virt_t))) != NULL);
-	list_link_init(&vt->vt_one_phase_node);
-	list_link_init(&vt->vt_node);
+	bzero(vt, sizeof(Mlsas_virt_t));
 	strncpy(vt->vt_path, path, sizeof(vt->vt_path));
 	vt->vt_hash = hash;
 
@@ -294,35 +273,91 @@ static Mlsas_virt_t *Mlsas_New_virt(const char *path)
 
 static void Mlsas_Free_virt(Mlsas_virt_t *vt)
 {
-	VERIFY(!list_link_active(&vt->vt_node));
 	free(vt);
 }
 
-static int Mlsas_Ins_new_virt(Mlsas_virt_slot_t *slot, Mlsas_virt_t *vt)
+static Mlsas_async_evt_t *Mlsas_New_async_event(char *path, 
+		Mlsas_async_event_e event, uint32_t wait, 
+		kmutex_t *mtx, kcondvar_t *cv)
 {
-	int rval = Mlsas_OK;
+	Mlsas_async_evt_t *evt = NULL;
 
-	mutex_enter(&slot->slt_mtx);
-	if ((vt = Mlsas_Lookup_virt_locked(slot, 
-			vt->vt_path)) != NULL)
-		rval = -EEXIST;
+	VERIFY(!wait || (mtx && cv));
 
-	if (rval == Mlsas_OK) {
-		list_insert_tail(&slot->slt_virt_list, vt);
-		slot->slt_nele++;
-	}
+	VERIFY((evt = malloc(sizeof(Mlsas_async_evt_t))) != NULL);
+	bzero(evt, sizeof(Mlsas_async_evt_t));
 
-out:
-	mutex_exit(&slot->slt_mtx);
+	list_link_init(&evt->ev_node);
+	strncpy(evt->ev_path, path, sizeof(evt->ev_path));
+	evt->ev_waiting = wait;
+	evt->ev_type = event;
+
+	return evt;
+}
+
+static void Mlsas_Free_async_event(Mlsas_async_evt_t *ev)
+{
+	VERIFY(ev->ev_waiting == 0);
+	free(ev);
+}
+
+static void Mlsas_Post_async_event(Mlsas_async_evt_t *ev)
+{
+	VERIFY(!list_link_active(&ev->ev_node));
+	
+	mutex_enter(&gMlsas_Srv->MS_event_mtx);
+	list_insert_tail(&gMlsas_Srv->MS_event_list, ev);
+	Mlsas_WAKE_event_locked;
+	mutex_exit(&gMlsas_Srv->MS_event_mtx);
+}
+
+static boolean_t Mlsas_Last_TXG_complete(void)
+{
+	boolean_t rval = B_FALSE;
+	
+	mutex_enter(&gMlsas_Srv->MS_event_mtx);
+	rval = list_is_empty(&gMlsas_Srv->MS_event_list);
+	mutex_exit(&gMlsas_Srv->MS_event_mtx);
+
 	return rval;
 }
 
-static void Mlsas_Remove_virt_locked(Mlsas_virt_slot_t *slot, Mlsas_virt_t *vt)
+static int Mlsas_Ins_new_virt_locked(avl_tree_t *tree, Mlsas_virt_t *vt)
 {
-	VERIFY(Mlsas_Lookup_virt_locked(slot, vt->vt_path) == vt);
+	int rval = Mlsas_OK;
+	avl_index_t index;
 
-	list_remove(&slot->slt_virt_list, vt);
-	slot->slt_nele--;
+	if (avl_find(tree, vt, &index) != NULL)
+		rval = -EEXIST;
+
+	if (rval == Mlsas_OK) 
+		avl_add(tree, vt);
+
+	return rval;
+}	
+
+static int Mlsas_Ins_new_virt(avl_tree_t *tree, Mlsas_virt_t *vt)
+{
+	int rval = Mlsas_OK;
+	
+	mutex_enter(&gMlsas_Srv->MS_mtx);
+	rval = Mlsas_Ins_new_virt_locked(tree, vt);
+	mutex_exit(&gMlsas_Srv->MS_mtx);
+	
+	return rval;
+}
+
+static Mlsas_virt_t *Mlsas_Remove_virt(avl_tree_t *tree, Mlsas_virt_t *vt)
+{
+	avl_index_t index;
+	Mlsas_virt_t *old = NULL;
+
+	mutex_enter(&gMlsas_Srv->MS_mtx);
+	if ((old = avl_find(tree, vt, &index)) != NULL)
+		avl_remove(tree, old);
+	mutex_exit(&gMlsas_Srv->MS_mtx);
+
+	return old;
 }
 
 static int Mlsas_Ena_ioctl(int fd)
@@ -386,11 +421,12 @@ static int Mlsas_Reg_phys_virt(void *priv, char *line, int llen, void *tag)
 
 	errno = 0;
 	if ((rval = ioctl(gMlsas_Srv->MS_fd, 
-			Mlsas_Ioc_Newminor, &xd)) != 0)
+			Mlsas_Ioc_Newminor, &xd)) != 0) {
 		rval = errno;
 		fprintf(stdout, 
 			"Reg_phys_virt[path=%s] ioctl[errno=%d]\n", 
 			path, errno);
+	}
 	else
 		fprintf(stdout, 
 			"Reg_phys_virt[path=%s] succeed\n", path);
@@ -414,13 +450,8 @@ static int Mlsas_Ena_reg_virt(void *priv, char *line, int llen)
 
 	vt = Mlsas_New_virt(line);
 	
-	VERIFY(Mlsas_Ins_new_virt(
-		&gMlsas_Srv->MS_vslt[vt->vt_hash], 
-		vt) == Mlsas_OK);
-	
-	VERIFY(Mlsas_Ins_new_virt(
-		&gMlsas_Srv->MS_one_phase_vslt[vt->vt_hash], 
-		vt) == Mlsas_OK);
+	VERIFY(Mlsas_Ins_new_virt(&gMlsas_Srv->MS_one_phase_vtree, vt) == Mlsas_OK);
+	VERIFY(Mlsas_Ins_new_virt(&gMlsas_Srv->MS_vtree, vt) == Mlsas_OK);
 
 out:
 	return Mlsas_OK;
@@ -452,25 +483,37 @@ static void Mlsas_HDL_async_event_NEW_VIRT(Mlsas_async_evt_t *ev)
 {
 	int rval = Mlsas_OK;
 	Mlsas_virt_t *vt = ev->ev_virt;
-	Mlsas_virt_slot_t *slot;
 	
 	VERIFY(ev->ev_type == Mlsas_EV_New_Virt);
 
-	if ((rval = Mlsas_Reg_phys_virt(NULL, ev->ev_path, 0,
+	fprintf(stdout, "RECV async NEW VIRT event[path=%s]\n", vt->vt_path);
+
+/*	if ((rval = Mlsas_Reg_phys_virt(NULL, ev->ev_path, 0,
 			__func__)) != Mlsas_OK) {
 		ev->ev_error = rval;
-		slot = &gMlsas_Srv->MS_one_phase_vslt[vt->vt_hash];
-		mutex_enter(&slot->slt_mtx);
-		if (!ev->ev_waiting && 
-			list_link_active(&vt->vt_one_phase_node)) 
-			Mlsas_Remove_virt_locked(slot, vt);
-		mutex_exit(&slot->slt_mtx);
-	}
+		if (!ev->ev_waiting)
+			Mlsas_Remove_virt(
+				&gMlsas_Srv->MS_one_phase_vtree, vt);
+	} */
 
 	if (!ev->ev_error && !rval)
 		VERIFY(Mlsas_Ins_new_virt(
-			&gMlsas_Srv->MS_vslt[vt->vt_hash], 
-			vt) == Mlsas_OK);
+			&gMlsas_Srv->MS_vtree, vt) == Mlsas_OK); 
+}
+
+static void Mlsas_HDL_async_event_DEL_VIRT(Mlsas_async_evt_t *ev)
+{
+	int rval = Mlsas_OK;
+	Mlsas_virt_t *vt = ev->ev_virt, *ovt = NULL;
+	
+	VERIFY(ev->ev_type == Mlsas_EV_Del_Virt);
+
+	fprintf(stdout, "RECV async DEL VIRT event[path=%s]\n", vt->vt_path);
+
+	VERIFY((ovt = Mlsas_Remove_virt(&gMlsas_Srv->MS_vtree, vt)) != NULL);
+	VERIFY(ovt == vt);
+	
+	Mlsas_Free_virt(vt);
 }
 
 static void Mlsas_HDL_async_event(Mlsas_async_evt_t *ev)
@@ -483,13 +526,16 @@ static void Mlsas_HDL_async_event(Mlsas_async_evt_t *ev)
 	case Mlsas_EV_New_Virt:
 		Mlsas_HDL_async_event_NEW_VIRT(ev);
 		break;
+	case Mlsas_EV_Del_Virt:
+		Mlsas_HDL_async_event_DEL_VIRT(ev);
+		break;
 	default: 
 		fprintf(stdout, "WRONG Async Event(%u)\n", ev->ev_type);
 		VERIFY(0);
 	}
 
 	if (!ev->ev_waiting)
-		free(ev)
+		Mlsas_Free_async_event(ev);
 	else {
 		mutex_enter(ev->ev_mtx);
 		ev->ev_waiting = 0;
@@ -509,6 +555,10 @@ static void Mlsas_Loop_event(void *priv)
 loop:
 	while (!Mlsas_EVENT_is_exit) {
 		if (list_is_empty(&gMlsas_Srv->MS_event_list)) {
+			mutex_enter(&gMlsas_Srv->MS_lpc_mtx);
+			Mlsas_WAKE_lpc_locked;
+			mutex_exit(&gMlsas_Srv->MS_lpc_mtx);
+
 			gMlsas_Srv->MS_event_wait = 1;
 			cv_wait(&gMlsas_Srv->MS_event_cv, 
 				&gMlsas_Srv->MS_event_mtx);
@@ -539,55 +589,119 @@ loop:
 
 static int Mlsas_Link_every_virt(void *priv, char *line, int llen)
 {
-	list_t *vtlist = priv;
+	avl_tree_t *vtlist = priv;
 
-	list_insert_tail(vtlist, Mlsas_New_virt(line));
+	avl_add(vtlist, Mlsas_New_virt(line));
 }
 
-static void Mlsas_Itemize_lpc_virt(list_t *nwall, list_t *toins,
-		list_t *todel, list_t *toreclaim)
+static void Mlsas_Itemize_lpc_virt(avl_tree_t *nwall, avl_tree_t *toins,
+		avl_tree_t *todel, avl_tree_t *toreclaim)
 {
 	Mlsas_virt_t *vt, *next, *tmp;
-	Mlsas_virt_slot_t *slot = NULL;
-	int i = 0;
+	avl_index_t index;
 
-	VERIFY(list_is_empty(toins) && list_is_empty(todel) &&
-		list_is_empty(toreclaim));
+	VERIFY(avl_is_empty(toins) && avl_is_empty(todel) &&
+		avl_is_empty(toreclaim));
+
+	VERIFY(MUTEX_HELD(&gMlsas_Srv->MS_mtx));
 	
 	/* merge to insert or reclaim */
-	while (vt = list_remove_head(nwall)) {
-		slot = &gMlsas_Srv->MS_one_phase_vslt[vt->vt_hash];
-		mutex_enter(&slot->slt_mtx);
-		if ((tmp = Mlsas_Lookup_virt_locked(slot, 
-				vt->vt_path)) != NULL)
-			list_insert_tail(toreclaim, vt);
+	for (tmp = avl_first(nwall); tmp; tmp = next) {
+		next = AVL_NEXT(nwall, tmp);
+		avl_remove(nwall, tmp);
+
+		if (Mlsas_Lookup_virt_locked(&gMlsas_Srv->MS_one_phase_vtree,
+				tmp->vt_hash) != NULL)
+			avl_add(toreclaim, tmp);
 		else
-			list_insert_tail(toins, vt);
-		mutex_exit(&slot->slt_mtx);
+			avl_add(toins, tmp);
 	}
 
 	/* merge to delete */
-	for ( ; i < Mlsas_n_Slot; i++) {
-		slot = &gMlsas_Srv->MS_one_phase_vslt[i];
-		mutex_enter(&slot->slt_mtx);
-		if ()
+	tmp = avl_first(&gMlsas_Srv->MS_one_phase_vtree);
+	for ( ; tmp; tmp = next) {
+		next = AVL_NEXT(&gMlsas_Srv->MS_one_phase_vtree, tmp);
+
+		if (Mlsas_Lookup_virt_locked(toreclaim, tmp->vt_hash) == NULL) {
+			avl_remove(&gMlsas_Srv->MS_one_phase_vtree, tmp);
+			avl_add(todel, tmp);
+		}
+	}
+}
+
+static void Mlsas_Post_virt_async_event(Mlsas_virt_t *vt,
+		Mlsas_async_event_e event)
+{
+	Mlsas_async_evt_t *ev = NULL;
+
+	ev = Mlsas_New_async_event(vt->vt_path, 
+		event, 0, NULL, NULL);
+	ev->ev_virt = vt;
+	Mlsas_Post_async_event(ev);
+}
+
+static void Mlsas_TOins_virt(avl_tree_t *tree)
+{
+	Mlsas_virt_t *vt = NULL, *next;
+
+	VERIFY(MUTEX_HELD(&gMlsas_Srv->MS_mtx));
+
+	vt = avl_first(tree);
+	for ( ; vt; vt = next) {
+		next = AVL_NEXT(tree, vt);
+		avl_remove(tree, vt);
+
+		VERIFY(Mlsas_Ins_new_virt_locked(
+			&gMlsas_Srv->MS_one_phase_vtree, 
+			vt) == Mlsas_OK);
+		Mlsas_Post_virt_async_event(vt, Mlsas_EV_New_Virt);
+	}
+}
+
+static void Mlsas_TOdel_virt(avl_tree_t *tree)
+{
+	Mlsas_virt_t *vt = NULL, *next;
+
+	VERIFY(MUTEX_HELD(&gMlsas_Srv->MS_mtx));
+
+	vt = avl_first(tree);
+	for ( ; vt; vt = next) {
+		next = AVL_NEXT(tree, vt);
+		avl_remove(tree, vt);
+		
+		Mlsas_Post_virt_async_event(vt, Mlsas_EV_Del_Virt);
+	}
+}
+
+
+static void Mlsas_TOreclaim_virt(avl_tree_t *tree)
+{
+	Mlsas_virt_t *vt = NULL, *next;
+
+	vt = avl_first(tree);
+	for ( ; vt; vt = next) {
+		next = AVL_NEXT(tree, vt);
+		avl_remove(tree, vt);
+
+		Mlsas_Free_virt(vt);
 	}
 }
 
 static void Mlsas_Loop_lpc_impl(void)
 {
-	list_t now_virt_list;
-	list_t toins_virt_list;
-	list_t todel_virt_list;
-	list_t toreclaim_virt_list;
+	avl_tree_t now_virt_list;
+	avl_tree_t toins_virt_list;
+	avl_tree_t todel_virt_list;
+	avl_tree_t toreclaim_virt_list;
+	Mlsas_virt_t *vt = NULL;
 	
-	list_create(&now_virt_list, sizeof(Mlsas_virt_t),
-		offsetof(Mlsas_virt_t, vt_node));
-	list_create(&toins_virt_list, sizeof(Mlsas_virt_t),
+	avl_create(&now_virt_list, Mlsas_Virt_comp, sizeof(Mlsas_virt_t),
 		offsetof(Mlsas_virt_t, vt_one_phase_node));
-	list_create(&todel_virt_list, sizeof(Mlsas_virt_t),
+	avl_create(&toins_virt_list, Mlsas_Virt_comp, sizeof(Mlsas_virt_t),
 		offsetof(Mlsas_virt_t, vt_one_phase_node));
-	list_create(&toreclaim_virt_list, sizeof(Mlsas_virt_t),
+	avl_create(&todel_virt_list, Mlsas_Virt_comp, sizeof(Mlsas_virt_t),
+		offsetof(Mlsas_virt_t, vt_one_phase_node));
+	avl_create(&toreclaim_virt_list, Mlsas_Virt_comp, sizeof(Mlsas_virt_t),
 		offsetof(Mlsas_virt_t, vt_one_phase_node));
 	
 	Mlsas_Exec_for_iter_line(Mlsas_Link_every_virt, 
@@ -599,6 +713,11 @@ static void Mlsas_Loop_lpc_impl(void)
 		&todel_virt_list,
 		&toreclaim_virt_list);
 
+	VERIFY(avl_is_empty(&now_virt_list));
+
+	Mlsas_TOdel_virt(&todel_virt_list);
+	Mlsas_TOins_virt(&toins_virt_list);
+	Mlsas_TOreclaim_virt(&toreclaim_virt_list);
 
 	mutex_exit(&gMlsas_Srv->MS_mtx);
 }
@@ -610,6 +729,11 @@ static void Mlsas_Loop_lpc(void *priv)
 	gMlsas_Srv->MS_lpc_exit = 0;
 
 	while (!Mlsas_LPC_is_exit) {
+		while (!Mlsas_Last_TXG_complete()) {
+			gMlsas_Srv->MS_lpc_wait = 1;
+			cv_wait(&gMlsas_Srv->MS_lpc_cv, 
+				&gMlsas_Srv->MS_lpc_mtx);
+		}
 		mutex_exit(&gMlsas_Srv->MS_lpc_mtx);
 
 		Mlsas_Loop_lpc_impl();
@@ -618,7 +742,8 @@ static void Mlsas_Loop_lpc(void *priv)
 		if (!Mlsas_LPC_is_exit) {
 			gMlsas_Srv->MS_lpc_wait = 1;
 			cv_timedwait(&gMlsas_Srv->MS_lpc_cv, &gMlsas_Srv->MS_lpc_mtx,
-				ddi_get_lbolt() + NSEC_TO_TICK(HUNDRED_MS_NANOSLEEP))
+				ddi_get_lbolt() + NSEC_TO_TICK(HUNDRED_MS_NANOSLEEP));
+			gMlsas_Srv->MS_lpc_wait = 0;
 		}
 	}
 
@@ -631,7 +756,7 @@ static void Mlsas_Start_event_daemon(void)
 	(void) fprintf(stdout, "STARTING Event Daemon\n");
 	
 	mutex_init(&gMlsas_Srv->MS_event_mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&gMlsas_Srv->MS_event_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&gMlsas_Srv->MS_event_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&gMlsas_Srv->MS_event_list, sizeof(Mlsas_async_evt_t),
 		offsetof(Mlsas_async_evt_t, ev_node));
 	gMlsas_Srv->MS_n_event = 0;
@@ -656,7 +781,7 @@ static void Mlsas_Start_lpc_daemon(void)
 	(void) fprintf(stdout, "STARTING LPC Daemon\n");
 	
 	mutex_init(&gMlsas_Srv->MS_lpc_mtx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&gMlsas_Srv->MS_lpc_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&gMlsas_Srv->MS_lpc_cv, NULL, CV_DEFAULT, NULL);
 	gMlsas_Srv->MS_lpc_wait = 1;
 	gMlsas_Srv->MS_lpc_exit = 1;
 	
@@ -680,24 +805,12 @@ static void Mlsas_init_globals(Mlsas_Srv_t *gs)
 	
 	bzero(gs, sizeof(Mlsas_Srv_t));
 	mutex_init(&gs->MS_mtx, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&gs->MS_virt_one_phase_list, sizeof(Mlsas_virt_t),
+	avl_create(&gs->MS_one_phase_vtree, Mlsas_Virt_comp, 
+		sizeof(Mlsas_virt_t), 
 		offsetof(Mlsas_virt_t, vt_one_phase_node));
-
-	for ( ; i < Mlsas_n_Slot; i++) {
-		slot = &gs->MS_vslt[i];
-		slot->slt_hash = i;
-		mutex_init(&slot->slt_mtx, NULL, MUTEX_DEFAULT, NULL);
-		list_create(&slot->slt_virt_list, sizeof(Mlsas_virt_t),
-			offsetof(Mlsas_virt_t, vt_node));
-	}
-
-	for ( ; i < Mlsas_n_Slot; i++) {
-		slot = &gs->MS_one_phase_vslt[i];
-		slot->slt_hash = i;
-		mutex_init(&slot->slt_mtx, NULL, MUTEX_DEFAULT, NULL);
-		list_create(&slot->slt_virt_list, sizeof(Mlsas_virt_t),
-			offsetof(Mlsas_virt_t, vt_one_phase_node));
-	}
+	avl_create(&gs->MS_vtree, Mlsas_Virt_comp, 
+		sizeof(Mlsas_virt_t), 
+		offsetof(Mlsas_virt_t, vt_node));
 }	
 
 static int Mlsas_enable(int operandLen, char *operands[], 
@@ -775,6 +888,9 @@ Mlsas_MAIN_FUNC(int argc, char *argv[])
 	if (ret != 0) {
 		return (ret);
 	}
+
+	while (1)
+		sleep(5);
 
 	return (funcRet);
 } /* end main */
