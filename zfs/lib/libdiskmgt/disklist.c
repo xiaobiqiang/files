@@ -1379,7 +1379,6 @@ void slot_map_find_value_guid(slot_map_t *sm, disk_info_t *di)
 	return;
 }
 
-/*dt->next = args[0]*/
 void disk_table_insert(disk_table_t *dt, disk_info_t *di)
 {
 	int slot = di->dk_slot;
@@ -1575,6 +1574,8 @@ int disk_get_gsize(disk_info_t *di)
 			break;
 		}
 	}
+
+	pclose(fd);
 }
 
 int disk_get_slotid(disk_info_t *di)
