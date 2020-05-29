@@ -561,7 +561,6 @@ static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey,
 {
 	Mlsas_blkdev_t *vt = NULL;
 	struct block_device *bdev = NULL;
-	uint64_t hash_key = 0;
 	struct task_struct *ts = NULL;
 	Mlsas_getblock_arg_t *arg = NULL;
 	int rval = 0;
@@ -600,14 +599,14 @@ static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey,
 	bdev = arg->backing;
 	kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
 
-	__Mlsas_New_Virt(hash_key, &vt);
+	__Mlsas_New_Virt(hashkey, &vt);
 
 	__Mlsas_Attach_Local_Phys(bdev, path, vt);
 
 	*vtptr = vt;
 
 	cmn_err(CE_NOTE, "%s New Minor Device(%s 0x%llx) Complete.",
-		__func__, path, hash_key); 
+		__func__, path, hashkey); 
 
 	return (0);
 }
