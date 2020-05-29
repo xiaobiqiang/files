@@ -51,8 +51,8 @@
 
 #include "make_vdev.h"
 
-#define	DISK_LED_CMD	"/sbin/disk led -d %s -o fault &"
-#define	DISK_LED_NORMAL_CMD	"/sbin/disk led -d %s -o normal &"
+#define	DISK_LED_CMD	"disk led -d %s -o fault"
+#define	DISK_LED_NORMAL_CMD	"disk led -d %s -o active &"
 #define ZPOOL_SCRUB_POOL	"/sbin/zpool scrub %s &"
 #define	DISK_LED_LPATH	"/dev/disk/by-id/%s"
 #define	MAXDEVPATHLEN		128
