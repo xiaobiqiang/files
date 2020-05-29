@@ -81,13 +81,14 @@
 
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
 	((Mlb)->Mlb_st >= (__minSt))
+#define __Mlsas_Get_ldev_if_state_between(Mlb, __minSt, __maxSt)	\
+	(((Mlb)->Mlb_st >= (__minSt)) && ((Mlb)->Mlb_st <= (__maxSt)))
 #define __Mlsas_Get_ldev(Mlb)		\
 	__Mlsas_Get_ldev_if_state((Mlb), Mlsas_Devst_Degraded)
 
 #define __Mlsas_Get_PR_if_state(pr, __minSt)	\
 	((pr)->Mlpd_st >= (__minSt))
 
-typedef enum Mlsas_devst Mlsas_devst_e;
 typedef enum Mlsas_tst Mlsas_tst_e;
 typedef enum Mlsas_ttype Mlsas_ttype_e;
 typedef struct Mlsas_backdev_info Mlsas_backdev_info_t;
@@ -104,15 +105,6 @@ typedef struct Mlsas_rtx_wq Mlsas_rtx_wq_t;
 typedef struct Mlsas_thread Mlsas_thread_t;
 typedef struct Mlsas_cs_rx_data Mlsas_cs_rx_data_t;
 typedef struct Mlsas Mlsas_t;
-
-enum Mlsas_devst {
-	Mlsas_Devst_Standalone,
-	Mlsas_Devst_Failed,
-	Mlsas_Devst_Degraded,
-	Mlsas_Devst_Attached,
-	Mlsas_Devst_Healthy,
-	Mlsas_Devst_Last
-};
 
 enum Mlsas_tst {
 	Mt_None,

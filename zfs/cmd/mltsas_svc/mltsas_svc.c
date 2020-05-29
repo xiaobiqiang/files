@@ -38,6 +38,7 @@ static int Mlsas_enable(int, char **, cmdOptions_t *, void *);
 #define Mlsas_CMD_nDisk		Mlsas_CMD_disk" | wc -l"
 
 #define	TEN_MS_NANOSLEEP  		10000000
+#define TWENTY_MS_NANOSLEEP		20000000
 #define	HUNDRED_MS_NANOSLEEP  	100000000
 
 #define Mlsas_Maybe_sleep_on(cond, nano, try)	\
@@ -742,7 +743,7 @@ static void Mlsas_Loop_lpc(void *priv)
 		if (!Mlsas_LPC_is_exit) {
 			gMlsas_Srv->MS_lpc_wait = 1;
 			cv_timedwait(&gMlsas_Srv->MS_lpc_cv, &gMlsas_Srv->MS_lpc_mtx,
-				ddi_get_lbolt() + NSEC_TO_TICK(HUNDRED_MS_NANOSLEEP));
+				ddi_get_lbolt() + NSEC_TO_TICK(TWENTY_MS_NANOSLEEP));
 			gMlsas_Srv->MS_lpc_wait = 0;
 		}
 	}

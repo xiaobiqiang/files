@@ -19,8 +19,18 @@ typedef enum Mlsas_ioc {
 	Mlsas_Ioc_Newminor,
 	Mlsas_Ioc_Attach,
 	Mlsas_Ioc_Failoc,
+	Mlsas_Ioc_Virtinfo,
 	Mlsas_Ioc_Last
 } Mlsas_ioc_e;
+
+typedef enum Mlsas_devst {
+	Mlsas_Devst_Standalone,
+	Mlsas_Devst_Failed,
+	Mlsas_Devst_Degraded,
+	Mlsas_Devst_Attached,
+	Mlsas_Devst_Healthy,
+	Mlsas_Devst_Last
+} Mlsas_devst_e;
 
 typedef struct Mlsas_iocdt {
 	uint32_t Mlioc_magic;
@@ -30,5 +40,15 @@ typedef struct Mlsas_iocdt {
 	uint64_t Mlioc_ibufptr;
 	uint64_t Mlioc_obufptr;
 } Mlsas_iocdt_t;
+
+typedef struct Mlsas_virtinfo_return {
+	uint64_t 		vti_hashkey;
+	char 			vti_scsi_protocol[32];
+	Mlsas_devst_e	vti_devst;
+	uint32_t 		vti_switch;
+	uint32_t		vti_error_cnt;
+	uint32_t 		vti_io_npending;
+	uint32_t		vti_pad;
+} Mlsas_virtinfo_return_t;
 
 #endif

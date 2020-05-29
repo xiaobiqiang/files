@@ -55,6 +55,12 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
 static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
 static int Mlsas_Do_EnableSvc(void);
 static int Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip);
+static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt);
+static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt, 
+		Mlsas_virtinfo_return_t *vti);
+static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt);
+static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
+		Mlsas_blkdev_t **vtptr)
 static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 		const char *path, 
 		struct block_device *phys_dev);
@@ -305,6 +311,9 @@ static int Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 	case Mlsas_Ioc_Failoc:
 		rval = Mlsas_Do_Failoc(&ioc);
 		break;
+	case Mlsas_Ioc_Virtinfo:
+		rval = Mlsas_Do_Virtinfo(&ioc);
+		break;
 	}
 
 	if (rval == 0) {
@@ -345,8 +354,8 @@ static int Mlsas_Do_EnableSvc(void)
 		256, gMlsas_ptr->Ml_prr_skc);
 	
 	gMlsas_ptr->Ml_minor = 0;
-	gMlsas_ptr->Ml_async_tq = taskq_create("Mlsas_async_tq", 16, 
-		minclsyspri, 8, 256, TASKQ_PREPOPULATE);
+	gMlsas_ptr->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
+		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
 
 	spin_lock_init(&retry->Mlt_lock);
 	list_create(&retry->Mlt_writes, sizeof(Mlsas_Delayed_obj_t),
@@ -368,7 +377,7 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 	int rval = 0;
 	nvlist_t *invlp = NULL;
 	char *path = NULL;
-	Mlsas_blkdev_t *Mlb = NULL;
+	Mlsas_blkdev_t *vt = NULL;
 	uint64_t hash_key = 0;
 	struct block_device *bdev = NULL;
 	
@@ -377,47 +386,25 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 		((rval = nvlist_lookup_string(invlp, 
 			"path", &path)) != 0) ||
 		((rval = Mlsas_Path_to_Hashkey(path, 
-			&hash_key)) != 0) ||
-		(IS_ERR(bdev = blkdev_get_by_path(path, 
-			FMODE_READ | FMODE_WRITE, path)))) {
+			&hash_key)) != 0)) {
 		cmn_err(CE_NOTE, "%s New Minor FAIL By Unpack(%p) or"
-			" None Nvl Path(%p) Nvpair or Invalid Path(%s) or "
-			"Get Block Device(%d), Error(%d)", 
-			__func__, invlp, path, path, PTR_ERR(bdev), rval);
-		if (IS_ERR(bdev))
-			rval = PTR_ERR(bdev);
+			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)", 
+			__func__, invlp, path, path, rval);
 		goto failed_out;
 	}
 
-	__Mlsas_New_Virt(hash_key, &Mlb);
-
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
-	if ((rval = mod_hash_insert(gMlsas_ptr->Ml_devices, 
-			hash_key, Mlb)) == MH_ERR_DUPLICATE) {
-		mutex_exit(&gMlsas_ptr->Ml_mtx);
-		cmn_err(CE_NOTE, "%s Duplicate Create Virt Disk(%s)",
-			__func__, path);
-		goto failed_destroy;
+	if (((rval = mod_hash_find(gMlsas_ptr->Ml_devices, 
+			hash_key, &vt)) == 0))
+		rval = __Mlsas_Resume_failoc_virt(vt);
+	else {
+		rval = __Mlsas_New_minor_impl(path, hash_key, &vt);
+		if (vt && !rval)
+			VERIFY(mod_hash_insert(gMlsas_ptr->Ml_devices, 
+				hash_key, vt) == 0);
 	}
-	kref_get(&Mlb->Mlb_ref);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
-
-	__Mlsas_Attach_Local_Phys(bdev, path, Mlb);
-
-	cmn_err(CE_NOTE, "%s New Minor Device(%s 0x%llx) Complete.",
-		__func__, path, hash_key);
-
-	nvlist_free(invlp);
-	return (0);
 	
-remove_hash:
-	mod_hash_remove(gMlsas_ptr->Ml_devices,
-		hash_key, &Mlb);
-	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
-failed_destroy:
-	__Mlsas_Rele_Virt(&Mlb->Mlb_ref);
-	blkdev_put(bdev, FMODE_READ | FMODE_WRITE);
-failed_out:
 	if (invlp)
 		nvlist_free(invlp);
 	return rval;
@@ -500,6 +487,159 @@ failed_out:
 	if (invlp)
 		nvlist_free(invlp);
 	return rval;
+}
+
+static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
+{
+	int rval = 0;
+	nvlist_t *invlp = NULL;
+	uint64_t hash_key = 0;
+	Mlsas_blkdev_t *Mlb = NULL;
+	Mlsas_virtinfo_return_t vti;
+
+	if (((rval = nvlist_unpack(dt->Mlioc_ibufptr, dt->Mlioc_nibuf,
+			&invlp, KM_SLEEP)) != 0) ||
+		((rval = nvlist_lookup_string(invlp, 
+			"path", &path)) != 0) ||
+		((rval = Mlsas_Path_to_Hashkey(path, 
+			&hash_key)) != 0)) {
+		cmn_err(CE_NOTE, "%s Virtinfo FAIL by Unpack(%p) or"
+			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)",
+			__func__, invlp, path, path, rval);
+		goto failed_out;
+	}
+
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
+	VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, hash_key, &Mlb) == 0);
+	kref_get(&Mlb->Mlb_ref);
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
+	bzero(&vti, sizeof(Mlsas_virtinfo_return_t));
+	__Mlsas_Do_Virtinfo_impl(Mlb, &vti);
+	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+
+	bcopy(&vti, dt->Mlioc_obufptr, sizeof(Mlsas_virtinfo_return_t));
+	dt->Mlioc_nofill = sizeof(Mlsas_virtinfo_return_t);
+failed_out:
+	if (invlp)
+		nvlist_free(invlp);
+	return rval;
+}
+
+typedef struct Mlsas_getblock_arg {
+	char path[64];
+	struct block_device *backing;
+	struct completion notify;
+	int error;
+	uint32_t waiting;
+} Mlsas_getblock_arg_t;
+
+static void __Mlsas_Get_backing_device(Mlsas_getblock_arg_t *getblk)
+{
+	struct block_device *bdev = NULL;
+	
+	if (IS_ERR_OR_NULL(bdev = blkdev_get_by_path(path, 
+			FMODE_READ | FMODE_WRITE, path)))
+		getblk->error = PTR_ERR(bdev);
+
+	if (!getblk->error)
+		getblk->backing = bdev;
+
+	if (getblk->waiting)
+		complete(&getblk->notify);
+	else {
+		if (!getblk->error)
+			blkdev_put(bdev, FMODE_READ | FMODE_WRITE);
+		kmem_free(getblk, sizeof(*getblk));
+	}
+}
+
+static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
+		Mlsas_blkdev_t **vtptr)
+{
+	Mlsas_blkdev_t *vt = NULL;
+	struct block_device *bdev = NULL;
+	uint64_t hash_key = 0;
+	struct task_struct *ts = NULL;
+	Mlsas_getblock_arg_t *arg = NULL;
+	int rval = 0;
+
+	arg = kmem_zalloc(sizeof(Mlsas_getblock_arg_t), KM_SLEEP);
+	arg->backing = NULL;
+	arg->error = 0;
+	arg->waiting = 1;
+	strncpy(arg->path, path, sizeof(arg->path));
+	init_completion(&arg->notify);
+
+	cmn_err(CE_NOTE, "Requesting to NEW MINOR(%s)", path);
+
+	if (IS_ERR_OR_NULL(ts = kthread_run(__Mlsas_Get_backing_device, arg,
+			"Mlsas_get_backing_%s", arg->path))) {
+		cmn_err(CE_NOTE, "%s CREATE GET_BACKING(%s) thread FAIL,"
+			" DIRECTLY!", __func__, arg->path);
+		__Mlsas_Get_backing_device(arg);
+	}
+
+	if ((rval = wait_for_completion_timeout(&arg->notify, 
+			MSEC_TO_TICK(500))) == 0) {
+		cmn_err(CE_NOTE, "%s GET_BACKING(%s) TIMEOUT, "
+			"maybe a noresp disk", __func__, arg->path);
+		arg->waiting = 0;
+		return -ETIMEDOUT;
+	}
+
+	if ((rval = arg->error) != 0) {
+		cmn_err(CE_NOTE, "%s NEW MINOR(%s) FAIL by GET BACKING, "
+			"ERROR(%d)", __func__, path, rval);
+		kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
+		return rval;
+	}
+
+	bdev = arg->backing;
+	kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
+
+	__Mlsas_New_Virt(hash_key, &vt);
+
+	__Mlsas_Attach_Local_Phys(bdev, path, vt);
+
+	*vtptr = vt;
+
+	cmn_err(CE_NOTE, "%s New Minor Device(%s 0x%llx) Complete.",
+		__func__, path, hash_key); 
+
+	return (0);
+}
+
+static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
+{
+	int rval = 0;
+	
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	if (!__Mlsas_Get_ldev_if_state_between(vt, 
+			Mlsas_Devst_Standalone,
+			Mlsas_Devst_Degraded))
+		rval = -EINVAL;
+	if (rval == 0) {
+		VERIFY(list_is_empty(&vt->Mlb_local_rqs));
+		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK);
+	}
+	spin_lock_irq(&vt->Mlb_rq_spin);
+
+	return rval;
+}
+
+static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt, 
+		Mlsas_virtinfo_return_t *vti)
+{
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	vti->vti_devst = vt->Mlb_st;
+	vti->vti_error_cnt = vt->Mlb_error_cnt;
+	vti->vti_hashkey = vt->Mlb_hashkey;
+	vti->vti_io_npending = vt->Mlb_npending;
+	vti->vti_switch = vt->Mlb_switch;
+	strncpy(vti->vti_scsi_protocol, vt->Mlb_scsi,
+		sizeof(vti->vti_scsi_protocol));
+	spin_unlock_irq(&vt->Mlb_rq_spin);
 }
 
 static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
@@ -699,7 +839,6 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 		mms->Mms_len, NULL, 0, B_FALSE);
 
 	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
-	return (0);
 }
 
 static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
@@ -1405,10 +1544,12 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 
 	__Mlsas_End_Ioacct(Mlb, rq);
 
-	ok = rq->Mlrq_flags & (Mlsas_RQ_Local_OK |
+	ok = flags & (Mlsas_RQ_Local_OK |
 		Mlsas_RQ_Net_OK);
-	error = PTR_ERR(rq->Mlrq_back_bio);
-	rq->Mlrq_back_bio = NULL;
+	if (!(flags & Mlsas_RQ_Local_Aborted)) {
+		error = PTR_ERR(rq->Mlrq_back_bio);
+		rq->Mlrq_back_bio = NULL;
+	}
 
 	if (!ok) {
 		/*
@@ -1645,6 +1786,8 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 			__Mlsas_PR_Read_Rsp_copy(rq->Mlrq_master_bio, 
 				xd->data, xd->data_len);
 	}
+
+	rq->Mlrq_back_bio = rsp->rsp_error;
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	__Mlsas_Req_Stmt(rq, what, &m);
