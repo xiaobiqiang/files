@@ -440,6 +440,52 @@ static int Mlsas_Reg_phys_virt(void *priv, char *line, int llen, void *tag)
 	return rval;	
 }
 
+static int Mlsas_Del_phys_virt(char *path, void *tag)
+{
+	nvlist_t *nvl = NULL;
+	char path[64] = Disk_directory;
+	Mlsas_iocdt_t xd;
+	char *packed = NULL;
+	int packed_len = 0, rval = 0;
+	
+	fprintf(stdout, "%s Del_phys_virt[disk=%s]\n", 
+		(char *)tag, path);
+
+	VERIFY(strncmp(path, Disk_prefix, strlen(Disk_prefix)) == 0);
+
+	(void) strncat(path, path, 64 - strlen(path));
+	
+	VERIFY(nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_string(nvl, "path", path) == 0);
+	VERIFY(nvlist_pack(nvl, &packed, &packed_len, 
+		NV_ENCODE_NATIVE, KM_SLEEP) == 0);
+	
+	bzero(&xd, sizeof(Mlsas_iocdt_t));
+	xd.Mlioc_magic = Mlsas_Ioc_Magic;
+	xd.Mlioc_ibufptr = packed;
+	xd.Mlioc_nibuf = packed_len;
+
+	errno = 0;
+	if ((rval = ioctl(gMlsas_Srv->MS_fd, 
+			Mlsas_Ioc_Failoc, &xd)) != 0) {
+		rval = errno;
+		fprintf(stdout, 
+			"Del_phys_virt[path=%s] ioctl[errno=%d]\n", 
+			path, errno);
+	}
+	else
+		fprintf(stdout, 
+			"Del_phys_virt[path=%s] succeed\n", path);
+
+	if (packed && packed_len)
+		kmem_free(packed, packed_len);
+	if (nvl)
+		nvlist_free(nvl);
+	
+	return rval;	
+}
+
+
 static int Mlsas_Ena_reg_virt(void *priv, char *line, int llen)
 {
 	int rval = Mlsas_OK;
@@ -489,13 +535,13 @@ static void Mlsas_HDL_async_event_NEW_VIRT(Mlsas_async_evt_t *ev)
 
 	fprintf(stdout, "RECV async NEW VIRT event[path=%s]\n", vt->vt_path);
 
-/*	if ((rval = Mlsas_Reg_phys_virt(NULL, ev->ev_path, 0,
+	if ((rval = Mlsas_Reg_phys_virt(NULL, ev->ev_path, 0,
 			__func__)) != Mlsas_OK) {
 		ev->ev_error = rval;
 		if (!ev->ev_waiting)
 			Mlsas_Remove_virt(
 				&gMlsas_Srv->MS_one_phase_vtree, vt);
-	} */
+	} 
 
 	if (!ev->ev_error && !rval)
 		VERIFY(Mlsas_Ins_new_virt(
@@ -511,10 +557,19 @@ static void Mlsas_HDL_async_event_DEL_VIRT(Mlsas_async_evt_t *ev)
 
 	fprintf(stdout, "RECV async DEL VIRT event[path=%s]\n", vt->vt_path);
 
-	VERIFY((ovt = Mlsas_Remove_virt(&gMlsas_Srv->MS_vtree, vt)) != NULL);
-	VERIFY(ovt == vt);
-	
-	Mlsas_Free_virt(vt);
+	if ((rval = Mlsas_Del_phys_virt(ev->ev_path, 
+			__func__)) == Mlsas_OK) {
+		ev->ev_error = rval;
+		if (!ev->ev_waiting)
+			Mlsas_Ins_new_virt(
+				&gMlsas_Srv->MS_one_phase_vtree, vt);
+	}
+
+	if (!ev->ev_error && !rval) {
+		VERIFY((ovt = Mlsas_Remove_virt(&gMlsas_Srv->MS_vtree, vt)) != NULL);
+		VERIFY(ovt == vt);
+		Mlsas_Free_virt(vt);
+	}
 }
 
 static void Mlsas_HDL_async_event(Mlsas_async_evt_t *ev)
