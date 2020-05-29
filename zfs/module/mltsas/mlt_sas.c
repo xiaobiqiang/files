@@ -60,7 +60,7 @@ static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt,
 		Mlsas_virtinfo_return_t *vti);
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt);
 static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
-		Mlsas_blkdev_t **vtptr)
+		Mlsas_blkdev_t **vtptr);
 static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 		const char *path, 
 		struct block_device *phys_dev);
@@ -404,7 +404,8 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 				hash_key, vt) == 0);
 	}
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
-	
+
+failed_out:	
 	if (invlp)
 		nvlist_free(invlp);
 	return rval;
@@ -494,6 +495,7 @@ static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
 	int rval = 0;
 	nvlist_t *invlp = NULL;
 	uint64_t hash_key = 0;
+	const char *path = NULL;
 	Mlsas_blkdev_t *Mlb = NULL;
 	Mlsas_virtinfo_return_t vti;
 
@@ -538,8 +540,8 @@ static void __Mlsas_Get_backing_device(Mlsas_getblock_arg_t *getblk)
 {
 	struct block_device *bdev = NULL;
 	
-	if (IS_ERR_OR_NULL(bdev = blkdev_get_by_path(path, 
-			FMODE_READ | FMODE_WRITE, path)))
+	if (IS_ERR_OR_NULL(bdev = blkdev_get_by_path(getblk->path, 
+			FMODE_READ | FMODE_WRITE, getblk->path)))
 		getblk->error = PTR_ERR(bdev);
 
 	if (!getblk->error)
