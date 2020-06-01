@@ -91,7 +91,9 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 		cs_rx_data_t *xd);
 static void __Mlsas_Abort_virt_local_RQ(Mlsas_blkdev_t *vt);
 static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt);
-static void __Mlsas_Notify_virt_state_change(Mlsas_blkdev_t *vt);
+static void __Mlsas_Notify_virt_state_change(Mlsas_blkdev_t *vt, 
+		Mlsas_devst_e newSt, uint32_t event);
+static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work);
 static Mlsas_rh_t *__Mlsas_Alloc_RH(uint32_t id, void *tran_ss);
 static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb, 
 		Mlsas_pr_device_t *prflt);
@@ -1072,7 +1074,7 @@ static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work)
 {
 	int rval = 0;
 	Mlsas_Msh_t *mms = container_of(work,
-			Mlsas_Msh_t, mms_wk);
+			Mlsas_Msh_t, Mms_wk);
 	Mlsas_rh_t *rh = mms->Mms_rh;
 	void *sess = Mlsas_Noma_Session;
 
