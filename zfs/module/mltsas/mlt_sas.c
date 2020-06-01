@@ -32,7 +32,7 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		Mlsas_bio_and_error_t *Mlbi, 
 		uint32_t clear, uint32_t set);
 static void __Mlsas_Request_endio(struct bio *bio);
-static void Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put);
+static void __Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put);
 static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb, 
 		struct bio *bio, uint64_t start_jif);
 static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb, struct bio *bio, 
@@ -46,16 +46,15 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req);
 static void __Mlsas_Make_Request_impl(Mlsas_blkdev_t *Mlb, 
 		struct bio *bio, uint64_t start_jif);
 static blk_qc_t __Mlsas_Make_Request_fn(struct request_queue *rq, struct bio *bio);
-static int Mlsas_Path_to_Hashkey(const char *path, uint64_t *hash_key);
-static void Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp);
+static int __Mlsas_Path_to_Hashkey(const char *path, uint64_t *hash_key);
+static void __Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp);
 static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp);
-static void __Mlsas_Rele_Virt(struct kref *ref);
 static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp);
-static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
-static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
-static int Mlsas_Do_EnableSvc(void);
-static int Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip);
-static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt);
+static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
+static int __Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
+static int __Mlsas_Do_EnableSvc(void);
+static int __Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip);
+static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt);
 static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt, 
 		Mlsas_virtinfo_return_t *vti);
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt);
@@ -67,7 +66,8 @@ static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 static void __Mlsas_Attach_Virt_Queue(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb, 
 		Mlsas_devst_e newst, uint32_t what);
-static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what);
+static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
+		Mlsas_pr_device_t *pr);
 int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
 		struct block_device **new_bdev);
 static void __Mlsas_Free_Mms(Mlsas_Msh_t *mms);
@@ -91,13 +91,10 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 		cs_rx_data_t *xd);
 static void __Mlsas_Abort_virt_local_RQ(Mlsas_blkdev_t *vt);
 static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt);
-static void __Mlsas_Notify_virt_state_change(Mlsas_blkdev_t *vt, 
-		Mlsas_devst_e newSt, uint32_t event);
 static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work);
-static Mlsas_rh_t *__Mlsas_Alloc_RH(uint32_t id, void *tran_ss);
+static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss);
 static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb, 
 		Mlsas_pr_device_t *prflt);
-static void __Mlsas_Release_RH(struct kref *ref);
 static void __Mlsas_PR_RQ_Read_endio(Mlsas_pr_req_t *prr);
 static void __Mlsas_PR_RQ_Write_endio(Mlsas_pr_req_t *prr);
 static void __Mlsas_Complete_PR_RQ(Mlsas_pr_req_t *prr);
@@ -175,6 +172,61 @@ static void Mlsas_Disk_Release(struct gendisk *vdisk, fmode_t mode)
 	Mlsas_blkdev_t *Mlb = vdisk->private_data;
 
 	atomic_dec_64(&Mlb->Mlb_nopen);
+}
+
+static void __Mlsas_Release_virt(struct kref *ref)
+{
+	Mlsas_blkdev_t *vt = container_of(ref, 
+		Mlsas_blkdev_t, Mlb_ref);
+
+	/* TODO: */
+}
+
+static inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt)
+{
+	kref_get(&vt->Mlb_ref);
+}
+
+static inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt)
+{
+	kref_put(&vt->Mlb_ref, __Mlsas_Release_virt);
+}
+
+static void __Mlsas_Release_rhost(struct kref *ref)
+{
+	Mlsas_rh_t *rh = container_of(ref, 
+		Mlsas_rh_t, Mh_ref);
+
+	/* TODO: */
+}
+
+static inline void __Mlsas_get_rhost(Mlsas_rh_t *rh)
+{
+	kref_get(&rh->Mh_ref);
+}
+
+static inline void __Mlsas_put_rhost(Mlsas_rh_t *rh)
+{
+	kref_put(&rh->Mh_ref, __Mlsas_Release_rhost);
+}
+
+static void __Mlsas_Release_PR(struct kref *ref)
+{
+	Mlsas_pr_device_t *pr = container_of(ref, 
+		Mlsas_pr_device_t, Mlpd_ref);
+
+	/* TODO: */
+	__Mlsas_put_rhost(pr->Mlpd_rh);
+}
+
+static inline void __Mlsas_get_PR(Mlsas_pr_device_t *pr)
+{
+	kref_get(&pr->Mlpd_ref);
+}
+
+static inline void __Mlsas_put_PR(Mlsas_pr_device_t *pr)
+{
+	kref_put(&pr->Mlpd_ref, __Mlsas_Release_PR);
 }
 
 static inline void __Mlsas_Make_Backing_Bio(Mlsas_request_t *rq, struct bio *bio_src)
@@ -308,19 +360,19 @@ static int Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 	switch (cmd) {
 	case Mlsas_Ioc_Ensvc:
 		VERIFY(!ioc.Mlioc_nibuf && !ioc.Mlioc_nobuf);
-		rval = Mlsas_Do_EnableSvc();
+		rval = __Mlsas_Do_EnableSvc();
 		break;
 	case Mlsas_Ioc_Newminor:
-		rval = Mlsas_Do_NewMinor(&ioc);
+		rval = __Mlsas_Do_NewMinor(&ioc);
 		break;
 	case Mlsas_Ioc_Attach:
-		rval = Mlsas_Do_Attach(&ioc);
+		rval = __Mlsas_Do_Attach(&ioc);
 		break;
 	case Mlsas_Ioc_Failoc:
-		rval = Mlsas_Do_Failoc(&ioc);
+		rval = __Mlsas_Do_Failoc(&ioc);
 		break;
 	case Mlsas_Ioc_Virtinfo:
-		rval = Mlsas_Do_Virtinfo(&ioc);
+		rval = __Mlsas_Do_Virtinfo(&ioc);
 		break;
 	}
 
@@ -341,7 +393,7 @@ out:
 	return rval;
 }
 
-static int Mlsas_Do_EnableSvc(void)
+static int __Mlsas_Do_EnableSvc(void)
 {
 	Mlsas_retry_t *retry = &gMlsas_ptr->Ml_retry;
 	
@@ -380,7 +432,7 @@ static int Mlsas_Do_EnableSvc(void)
 	return 0;
 }
 
-static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
+static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 {
 	int rval = 0;
 	nvlist_t *invlp = NULL;
@@ -393,7 +445,7 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 			Mlip->Mlioc_nibuf, &invlp, KM_SLEEP)) != 0) || 
 		((rval = nvlist_lookup_string(invlp, 
 			"path", &path)) != 0) ||
-		((rval = Mlsas_Path_to_Hashkey(path, 
+		((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0)) {
 		cmn_err(CE_NOTE, "%s New Minor FAIL By Unpack(%p) or"
 			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)", 
@@ -407,9 +459,11 @@ static int Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 		rval = __Mlsas_Resume_failoc_virt(vt);
 	else {
 		rval = __Mlsas_New_minor_impl(path, hash_key, &vt);
-		if (vt && !rval)
+		if (vt && !rval) {
 			VERIFY(mod_hash_insert(gMlsas_ptr->Ml_devices, 
 				hash_key, vt) == 0);
+			__Mlsas_get_virt(vt);
+		}
 	}
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
@@ -419,7 +473,7 @@ failed_out:
 	return rval;
 }
 
-static int Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip)
+static int __Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip)
 {
 	int rval = -EINVAL;
 	nvlist_t *invlp = NULL;
@@ -465,7 +519,7 @@ out:
 	return rval;
 }
 
-static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip)
+static int __Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip)
 {
 	int rval = 0;
 	nvlist_t *invlp = NULL;
@@ -477,7 +531,7 @@ static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip)
 			Mlip->Mlioc_nibuf, &invlp, KM_SLEEP)) != 0) || 
 		((rval = nvlist_lookup_string(invlp, 
 			"path", &path)) != 0) ||
-		((rval = Mlsas_Path_to_Hashkey(path, 
+		((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0)) {
 		cmn_err(CE_NOTE, "%s Failoc FAIL By Unpack(%p) or"
 			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)", 
@@ -487,18 +541,19 @@ static int Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip)
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, hash_key, &Mlb) == 0);
-	kref_get(&Mlb->Mlb_ref);
+	__Mlsas_get_virt(Mlb);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
 	__Mlsas_Do_Failoc_impl(Mlb);
-	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+	
+	__Mlsas_put_virt(Mlb);
 failed_out:
 	if (invlp)
 		nvlist_free(invlp);
 	return rval;
 }
 
-static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
+static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
 {
 	int rval = 0;
 	nvlist_t *invlp = NULL;
@@ -511,7 +566,7 @@ static int Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
 			&invlp, KM_SLEEP)) != 0) ||
 		((rval = nvlist_lookup_string(invlp, 
 			"path", &path)) != 0) ||
-		((rval = Mlsas_Path_to_Hashkey(path, 
+		((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0)) {
 		cmn_err(CE_NOTE, "%s Virtinfo FAIL by Unpack(%p) or"
 			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)",
@@ -628,11 +683,9 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 			Mlsas_Devst_Standalone,
 			Mlsas_Devst_Degraded))
 		rval = -EINVAL;
-	if (rval == 0) {
-		VERIFY(list_is_empty(&vt->Mlb_local_rqs));
-		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK);
-	}
-	spin_lock_irq(&vt->Mlb_rq_spin);
+	if (rval == 0) 
+		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK);	
+	spin_unlock_irq(&vt->Mlb_rq_spin);
 
 	return rval;
 }
@@ -663,15 +716,11 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 	}
 	
 	/* no more local request */
-	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch);
+	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 	__Mlsas_Abort_virt_local_RQ(Mlb);
 	__Mlsas_Abort_virt_PR_RQ(Mlb);
-
-	newSt = Mlb->Mlb_st;
+	
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
-
-	__Mlsas_Notify_virt_state_change(Mlb, newSt, 
-		Mlsas_Devevt_Error_Switch);
 }
 
 static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
@@ -723,11 +772,6 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 	*Mlbpp = Mlbp;
 }
 
-static void __Mlsas_Rele_Virt(struct kref *ref)
-{
-	
-}
-
 static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 {
 	int rval = -ENOMEM;
@@ -768,12 +812,12 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	add_disk(disk);
 }
 
-static void Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp)
+static void __Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp)
 {
 	
 }
 
-static int Mlsas_Path_to_Hashkey(const char *path, uint64_t *hash_key)
+static int __Mlsas_Path_to_Hashkey(const char *path, uint64_t *hash_key)
 {
 	const char *delim1 = "scsi-3";
 	const char *delim2 = "-part";
@@ -818,7 +862,7 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	Mlsas_Attach_msg_t *Atm = NULL;
 	Mlsas_devst_e st;
 	
-	kref_get(&Mlb->Mlb_ref);
+	__Mlsas_get_virt(Mlb);
 
 	__Mlsas_Attach_BDI(&Mlb->Mlb_bdi, path, phys);
 	__Mlsas_Attach_Virt_Queue(Mlb);
@@ -829,7 +873,7 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	__Mlsas_Thread_Start(&Mlb->Mlb_sender);
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
-	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Attach_OK);
+	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Attach_OK, NULL);
 	st = Mlb->Mlb_st;
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
@@ -839,17 +883,7 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	__Mlsas_Attach_Phys_size(Mlb);
 	set_disk_ro(Mlb->Mlb_gdisk, 0);
 
-	mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t),
-		Mlsas_Mms_Attach, Mlb->Mlb_hashkey, &Atm);
-	mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
-	mms->Mms_rh = NULL;
-	Atm->Atm_st = st;
-	Atm->Atm_rsp = 0;
-	__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &mms->Mms_wk);
-/*	(void)Mlsas_TX(Mlsas_Noma_Session, mms, 
-		mms->Mms_len, NULL, 0, B_FALSE); */
-
-	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+	__Mlsas_put_virt(Mlb);
 }
 
 static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
@@ -978,7 +1012,7 @@ int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
 	uint64_t hash_key = 0;
 	Mlsas_blkdev_t *Mlb = NULL;
 	
-	if (((rval = Mlsas_Path_to_Hashkey(path, 
+	if (((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0) ||
 		((rval = mod_hash_find(gMlsas_ptr->Ml_devices,
 			hash_key, &Mlb)) != 0)) {
@@ -1090,7 +1124,7 @@ static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work)
 		break;
 	}
 
-	return (0);
+	goto out;
 
 error_HDL:
 	switch (mms->Mms_type) {
@@ -1107,6 +1141,9 @@ error_HDL:
 		break;
 	}
 
+out:
+	if (sess != Mlsas_Noma_Session)
+		__Mlsas_put_rhost(rh);
 	return (0);
 }
 
@@ -1149,35 +1186,6 @@ static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt)
 		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net);
 		__Mlsas_PR_RQ_stmt(prr, what);
 		prr = next;
-	}
-}
-
-static void __Mlsas_Notify_virt_state_change(Mlsas_blkdev_t *vt, 
-		Mlsas_devst_e newSt, uint32_t event)
-{
-	int index = 0, i = 0;
-	Mlsas_rh_t *rh[64] = {NULL};
-	Mlsas_Msh_t *mms = NULL;
-	Mlsas_State_Change_msg_t *scm = NULL;
-	Mlsas_pr_device_t *pr = NULL, *next;
-	
-	spin_lock_irq(&vt->Mlb_rq_spin);
-	for (pr = list_head(&vt->Mlb_pr_devices); pr != NULL; 
-		next = list_next(&vt->Mlb_pr_devices, pr), 
-			pr = next, index++) {
-		rh[index] = pr->Mlpd_rh;
-		kref_get(&pr->Mlpd_rh->Mh_ref);
-	}
-	spin_unlock_irq(&vt->Mlb_rq_spin);
-
-	for (i = 0; i < index; i++) {
-		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_State_Change_msg_t),
-			Mlsas_Mms_State_Change, vt->Mlb_hashkey, &scm);
-		mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
-		mms->Mms_rh = rh[i];
-		scm->scm_state = newSt;
-		scm->scm_event = event;
-		__Mlsas_Queue_RTX(&vt->Mlb_tx_wq, &mms->Mms_wk);
 	}
 }
 
@@ -1365,7 +1373,7 @@ static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb,
 	return ;
 	
 free_rq:
-	Mlsas_RQ_put(Mlr, 1);
+	__Mlsas_RQ_put(Mlr, 1);
 failed:
 	atomic_dec_32(&Mlsas_npending);
 	atomic_dec_32(&Mlb->Mlb_npending);
@@ -1412,7 +1420,7 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 	mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
 }
 
-static void Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put)
+static void __Mlsas_RQ_put(Mlsas_request_t *rq, uint32_t k_put)
 {
 	kref_sub(&rq->Mlrq_ref, k_put, __Mlsas_Release_RQ);
 }
@@ -1449,7 +1457,8 @@ static void __Mlsas_Request_endio(struct bio *bio)
 		__Mlsas_Complete_Master_Bio(rq, &Mlbi);
 }
 
-static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what)
+static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
+		Mlsas_pr_device_t *pr)
 {
 	Mlsas_devst_e next = Mlsas_Devst_Last;
 	
@@ -1485,17 +1494,51 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what)
 	}
 
 	if (next < Mlsas_Devst_Last)
-		__Mlsas_Devst_St(Mlb, next, what);
+		__Mlsas_Devst_St(Mlb, next, what, pr);
 }
 
 static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb, 
-		Mlsas_devst_e newst, uint32_t what)
+		Mlsas_devst_e newst, uint32_t what, 
+		Mlsas_pr_device_t *pr)
 {
+	Mlsas_Msh_t *mms = NULL;
+	Mlsas_Attach_msg_t *atm = NULL;
+	Mlsas_State_Change_msg_t *scm = NULL;
+	
 	cmn_err(CE_NOTE, "Mlsas Device(%s) Devst(%s --> %s), event(%s)",
 		Mlb->Mlb_bdi.Mlbd_path, Mlsas_devst_name[Mlb->Mlb_st],
 		Mlsas_devst_name[newst], Mlsas_devevt_name[what]);
 
-	Mlb->Mlb_st = newst;
+	if (Mlb->Mlb_st != newst)
+		Mlb->Mlb_st = newst;
+
+	if (pr)
+		__Mlsas_get_rhost(pr->Mlpd_rh);
+
+	switch (what) {
+	case Mlsas_Devevt_Attach_OK:
+		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
+			Mlsas_Mms_Attach, Mlb->Mlb_hashkey, &atm);
+		mms->Mms_rh = pr ? pr->Mlpd_rh : NULL;
+		mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
+		atm->Atm_pr = pr;
+		atm->Atm_st = Mlb->Mlb_st;
+		atm->Atm_rsp = 1;
+		break;
+	case Mlsas_Devevt_Attach_PR:
+	case Mlsas_Devevt_PR_Error_Sw:
+	case Mlsas_Devevt_Error_Switch:
+		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_State_Change_msg_t), 
+			Mlsas_Mms_State_Change, Mlb->Mlb_hashkey, &scm);
+		mms->Mms_rh = pr ? pr->Mlpd_rh : NULL;
+		mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
+		scm->scm_event = what;
+		scm->scm_pr = pr ? pr->Mlpd_pr : NULL;
+		scm->scm_state = Mlb->Mlb_st;
+		break;
+	}
+
+	__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &mms->Mms_wk);
 }
 
 void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
@@ -1736,7 +1779,7 @@ static void __Mlsas_Retry(struct work_struct *w)
 			__Mlsas_Make_Request_impl(rq->Mlrq_bdev, 
 				rq->Mlrq_master_bio, 
 				rq->Mlrq_start_jif);
-			Mlsas_RQ_put(rq, 1);
+			__Mlsas_RQ_put(rq, 1);
 			break;
 		case Mlsas_Delayed_PR_RQ:
 			prr = (Mlsas_pr_req_t *)obj;
@@ -1770,7 +1813,7 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 		goto failed;
 	}
 
-	kref_get(&Mlb->Mlb_ref);
+	__Mlsas_get_virt(Mlb);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
 	Atm->Atm_ext = (uint64_t)Mlb;
@@ -1792,78 +1835,56 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	Mlsas_Attach_msg_t *Atm = mms + 1;
 	Mlsas_blkdev_t *Mlb = Atm->Atm_ext;
 	cluster_san_hostinfo_t *cshi = xd->cs_private;
-	Mlsas_pr_device_t *pr = NULL, *exist = NULL;
+	Mlsas_pr_device_t *pr, *exist = NULL, *pr_tofree = NULL;
 	Mlsas_rh_t *rh = NULL;
-	Mlsas_devst_e newst, devst;
 	boolean_t new_rh = B_FALSE;
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if ((rval = mod_hash_find(gMlsas_ptr->Ml_rhs, 
 			cshi->hostid, &rh)) != 0) {
-		VERIFY(rh = __Mlsas_Alloc_RH(cshi->hostid, cshi));
+		VERIFY(rh = __Mlsas_Alloc_rhost(cshi->hostid, cshi));
 		VERIFY(mod_hash_insert(gMlsas_ptr->Ml_rhs, 
 			cshi->hostid, rh) == 0);
+		__Mlsas_get_rhost(rh);
 		new_rh = B_TRUE;
 	}
 
-	pr = __Mlsas_Alloc_PR(cshi->hostid, Atm->Atm_st, Mlb, rh);
-	if (Atm->Atm_rsp)
-		pr->Mlpd_pr = Atm->Atm_pr;
-	kref_get(&rh->Mh_ref);
+	pr = __Mlsas_Alloc_PR(cshi->hostid, Mlsas_Devst_Standalone, Mlb, rh);
 	
 	mutex_enter(&rh->Mh_mtx);
 	spin_lock(&Mlb->Mlb_rq_spin);
-	if (!__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) 
-		goto failed;
 
 	if ((exist = __Mlsas_Lookup_PR_locked(Mlb, 
 			cshi->hostid)) != NULL) {
-		newst = exist->Mlpd_st;
-		devst = Mlb->Mlb_st;
-		if (Atm->Atm_rsp)
-			exist->Mlpd_pr = Atm->Atm_pr;
-		__Mlsas_Update_PR_st(exist, Atm->Atm_st);
-		goto failed;
+		if (new_rh)
+			cmn_err(CE_PANIC, "exist PR(%llx) contains non-exist RHOST(%u)",
+				exist->Mlpd_mlb->Mlb_hashkey, rh->Mh_hostid);
+		pr_tofree = pr;
+		pr = exist;
+	} else {
+		__Mlsas_get_PR(pr);
+		list_insert_tail(&rh->Mh_devices, pr);
+		list_insert_tail(&Mlb->Mlb_pr_devices, pr);
+		/* FOR remote hold */
+		__Mlsas_get_PR(pr);
 	}
 
-	list_insert_tail(&rh->Mh_devices, pr);
-	list_insert_tail(&Mlb->Mlb_pr_devices, pr);
-	if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
-		__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Attach_PR);
-	newst = Mlb->Mlb_st;
-	spin_unlock(&Mlb->Mlb_rq_spin);
-	mutex_exit(&rh->Mh_mtx);
-	mutex_exit(&gMlsas_ptr->Ml_mtx);
+	if (Atm->Atm_rsp)
+		pr->Mlpd_pr = Atm->Atm_pr;
+
+	__Mlsas_Update_PR_st(pr, Atm->Atm_st);
 	
-	Atm->Atm_st = newst;
-	Atm->Atm_rsp = 1;
-	Atm->Atm_pr = pr;
-
-	mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
-	mms->Mms_rh = rh;
-	__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &mms->Mms_wk);
-/*	(void) Mlsas_TX(cshi, mms, mms->Mms_len, 
-		NULL, 0, B_FALSE); */
-
-	cmn_err(CE_NOTE, "%s New PR(0x%llx St(%s)) of "
-		"Mlsas_blkdev(St(%s))", __func__, 
-		mms->Mms_hashkey, Mlsas_devst_name[Atm->Atm_st], 
-		Mlsas_devst_name[newst]);
-	csh_rx_data_free(xd, B_FALSE);
-	return ;
-
-failed:
 	spin_unlock(&Mlb->Mlb_rq_spin);
 	mutex_exit(&rh->Mh_mtx);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
 	if (exist)
-		cmn_err(CE_NOTE, "%s Update exist PR(oSt(%s) --> nSt(%s)),"
-			"Virt Device St(%s)", __func__, Mlsas_devst_name[newst], 
-			Mlsas_devst_name[exist->Mlpd_st], Mlsas_devst_name[devst]);
-	kfree(pr);
-	if (new_rh)
-		__Mlsas_Release_RH(&rh->Mh_ref);
-	csh_rx_data_free_ext(xd);
+		csh_rx_data_free_ext(xd);
+	else if (new_rh) 
+		csh_rx_data_free(xd, B_FALSE);
+
+	if (pr_tofree)
+		__Mlsas_put_PR(pr);
 }
 
 static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, 
@@ -1959,11 +1980,16 @@ failed:
 
 static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
 {
-	Mlsas_State_Change_msg_t *scm = ((Mlsas_Msh_t *)xd->ex_head) + 1;
+	Mlsas_Msh_t *mms = (Mlsas_Msh_t *)xd->ex_head;
+	Mlsas_State_Change_msg_t *scm = mms + 1;
 	Mlsas_blkdev_t *vt = (Mlsas_blkdev_t *)scm->scm_ext;
 	Mlsas_pr_device_t *pr = (Mlsas_pr_device_t *)scm->scm_pr;
+	cluster_san_hostinfo_t *cshi = xd->cs_private;
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
+	if (pr == NULL)
+		pr = __Mlsas_Lookup_PR_locked(vt, cshi->hostid);
+	
 	switch (scm->scm_event) {
 		case Mlsas_Devevt_Error_Switch:
 			__Mlsas_Update_PR_st(pr, scm->scm_state);
@@ -2343,7 +2369,7 @@ static void __Mlsas_PR_RQ_Read_endio(Mlsas_pr_req_t *prr)
 	__Mlsas_Queue_RTX(&Mlb->Mlb_sender_wq, &prr->prr_wk);
 }
 
-static Mlsas_rh_t *__Mlsas_Alloc_RH(uint32_t id, void *tran_ss)
+static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss)
 {
 	Mlsas_rh_t *rh = NULL;
 	
@@ -2362,9 +2388,10 @@ static Mlsas_rh_t *__Mlsas_Alloc_RH(uint32_t id, void *tran_ss)
 	return rh;
 }
 
-static void __Mlsas_Release_RH(struct kref *ref)
+static void __Mlsas_Free_rhost(Mlsas_rh_t *rh)
 {
-	
+	VERIFY(list_is_empty(&rh->Mh_devices));
+	kfree(rh);
 }
 
 static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
@@ -2381,6 +2408,8 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 		offsetof(Mlsas_request_t, Mlrq_pr_node));
 	list_create(&pr->Mlpd_pr_rqs, sizeof(Mlsas_pr_req_t),
 		offsetof(Mlsas_pr_req_t, prr_node));
+
+	__Mlsas_get_rhost(rh);
 	
 	pr->Mlpd_st = st;
 	pr->Mlpd_hostid = id;
@@ -2437,11 +2466,17 @@ static Mlsas_pr_device_t *__Mlsas_Lookup_PR_locked(
 static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr, 
 		Mlsas_devst_e st)
 {
+	if (pr->Mlpd_st == st)
+		return ;
+
+	cmn_err(CE_NOTE, "%s Update PR(oSt(%s) --> nSt(%s))", __func__, 
+		Mlsas_devst_name[pr->Mlpd_st], Mlsas_devst_name[st]);
+	
 	pr->Mlpd_st = st;
 	if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
-		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_Attach_PR);
+		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_Attach_PR, pr);
 	if (__Mlsas_Get_PR_if_not_state(pr, Mlsas_Devst_Degraded))
-		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Error_Sw);
+		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Error_Sw, pr);
 }
 
 void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
