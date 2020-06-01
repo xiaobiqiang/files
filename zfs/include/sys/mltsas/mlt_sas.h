@@ -37,18 +37,18 @@
 #define Mlsas_St_Busy		0x04
 
 #define Mlsas_RQ_Write			0x00000001
-#define Mlsas_RQ_Local_Pending		0x00000002
-#define Mlsas_RQ_Net_Pending		0x00000004
+#define Mlsas_RQ_Local_Pending	0x00000002
+#define Mlsas_RQ_Net_Pending	0x00000004
 #define Mlsas_RQ_Net_Queued		0x00000008
 #define Mlsas_RQ_Net_Sent		0x00000010
 #define Mlsas_RQ_Local_Done		0x00000020
 #define Mlsas_RQ_Local_OK		0x00000040
-#define Mlsas_RQ_Local_Aborted		0x00000080
+#define Mlsas_RQ_Local_Aborted	0x00000080
 #define Mlsas_RQ_Net_Done		0x00000100
 #define Mlsas_RQ_Net_OK			0x00000200
 #define Mlsas_RQ_Delayed		0x80000000
 
-#define Mlsas_Rst_New			0x00
+#define Mlsas_Rst_New				0x00
 #define Mlsas_Rst_Submit_Local		0x01
 #define Mlsas_Rst_Submit_Net		0x02
 #define Mlsas_Rst_Queue_Net_Write	0x03
@@ -57,7 +57,7 @@
 #define Mlsas_Rst_Net_Send_OK		0x06
 #define Mlsas_Rst_Net_Submitted		0x07
 #define Mlsas_Rst_Net_Inflight		0x08
-#define Mlsas_Rst_Net_Ack		0x09
+#define Mlsas_Rst_Net_Ack			0x09
 #define Mlsas_Rst_Complete_OK		0x0A
 #define Mlsas_Rst_Read_Error		0x0B
 #define Mlsas_Rst_ReadA_Error		0x0C
@@ -67,8 +67,37 @@
 #define Mlsas_Rst_PR_Read_Error		0x10
 #define Mlsas_Rst_PR_ReadA_Error	0x11
 #define Mlsas_Rst_PR_Complete_OK	0x12
-#define Mlsas_Rst_Done			0x13
-#define Mlsas_Rst_Abort_Diskio			0x14
+#define Mlsas_Rst_Done				0x13
+#define Mlsas_Rst_Abort_Diskio		0x14
+
+#define Mlsas_PRRst_Submit_Local 	0x01
+#define Mlsas_PRRst_Discard_Error	0x02
+#define Mlsas_PRRst_Write_Error		0x03
+#define Mlsas_PRRst_Read_Error		0x04
+#define Mlsas_PRRst_ReadA_Error		0x05
+#define Mlsas_PRRst_Complete_OK		0x06
+#define Mlsas_PRRst_Subimit_Net		0x07
+#define Mlsas_PRRst_Queue_Net_Wrsp	0x08
+#define Mlsas_PRRst_Queue_Net_Rrsp	0x09
+#define Mlsas_PRRst_Send_Error		0x0A
+#define Mlsas_PRRst_Send_OK			0x0B
+#define Mlsas_PRRst_Abort_Local		0x0C
+
+#define Mlsas_PRRfl_Addl_Kmem 		0x0001
+#define Mlsas_PRRfl_Ee_Error 		0x0002
+#define Mlsas_PRRfl_Zero_Out		0x0004
+#define Mlsas_PRRfl_Write			0x0008
+#define Mlsas_PRRfl_Local_Pending	0x0010
+#define Mlsas_PRRfl_Net_Pending		0x0020
+#define Mlsas_PRRfl_Net_Queued		0x0040
+#define Mlsas_PRRfl_Net_Sent		0x0080
+#define Mlsas_PRRfl_Local_Done		0x0100
+#define Mlsas_PRRfl_Local_OK		0x0200
+#define Mlsas_PRRfl_Net_OK			0x0400
+#define Mlsas_PRRfl_Local_Aborted	0x0800
+#define Mlsas_PRRfl_Continue		0x40000000
+#define Mlsas_PRRfl_Delayed			0x80000000
+
 
 #define Mlsas_Devevt_To_Attach		0x01
 #define Mlsas_Devevt_Attach_Error	0x02
@@ -77,7 +106,7 @@
 #define Mlsas_Devevt_Attach_PR		0x05
 #define Mlsas_Devevt_Error_Switch	0x06
 #define Mlsas_Devevt_PR_Error_Sw	0x07
-#define Mlsas_Devevt_Last		0x10
+#define Mlsas_Devevt_Last			0x10
 
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
 	((Mlb)->Mlb_st >= (__minSt))
@@ -88,6 +117,9 @@
 
 #define __Mlsas_Get_PR_if_state(pr, __minSt)	\
 	((pr)->Mlpd_st >= (__minSt))
+#define __Mlsas_Get_PR_if_not_state(pr, __maxSt)	\
+		((pr)->Mlpd_st <= (__maxSt))
+
 
 typedef enum Mlsas_tst Mlsas_tst_e;
 typedef enum Mlsas_ttype Mlsas_ttype_e;
@@ -268,30 +300,6 @@ struct Mlsas_request {
 	sector_t Mlrq_sector;
 };
 
-#define Mlsas_PRRst_Tobe_Submit 	0x01
-#define Mlsas_PRRst_Discard_Error	0x02
-#define Mlsas_PRRst_Write_Error		0x03
-#define Mlsas_PRRst_Read_Error		0x04
-#define Mlsas_PRRst_ReadA_Error		0x05
-#define Mlsas_PRRst_Complete_OK		0x06
-#define Mlsas_PRRst_Queue_Net_Wrsp	0x07
-#define Mlsas_PRRst_Queue_Net_Rrsp	0x08
-#define Mlsas_PRRst_Send_Error		0x09
-#define Mlsas_PRRst_Send_OK			0x0A
-
-#define Mlsas_PRRfl_Addl_Kmem 	0x001
-#define Mlsas_PRRfl_Ee_Error 	0x002
-#define Mlsas_PRRfl_Zero_Out	0x004
-#define Mlsas_PRRfl_Write		0x008
-#define Mlsas_PRRfl_Pending		0x010
-#define Mlsas_PRRfl_Netpending	0x020
-#define Mlsas_PRRfl_IO_Done		0x040
-#define Mlsas_PRRfl_IO_OK		0x080
-#define Mlsas_PRRfl_Net_Done	0x100
-#define Mlsas_PRRfl_OK			0x200
-#define Mlsas_PRRfl_Continue	0x40000000
-#define Mlsas_PRRfl_Delayed		0x80000000
-
 struct Mlsas_pr_req {
 	uint32_t prr_delayed_magic;
 	list_node_t prr_node;
@@ -382,6 +390,7 @@ struct Mlsas {
 #define Mlsas_Mms_Attach		0x01
 #define Mlsas_Mms_Bio_RW		0x02
 #define Mlsas_Mms_Brw_Rsp		0x03
+#define Mlsas_Mms_State_Change	0x04
 #define Mlsas_Mms_Last			0x10
 
 #define Mlsas_RXfl_Sync			0x01
@@ -394,6 +403,8 @@ typedef struct Mlsas_Msh Mlsas_Msh_t;
 typedef void (*Mlsas_RX_pfn_t)(Mlsas_Msh_t *, cs_rx_data_t *);
 
 struct Mlsas_Msh {
+	Mlsas_rtx_wk_t Mms_wk;
+	Mlsas_rh_t	*Mms_rh;
 	uint16_t 	Mms_ck;
 	uint8_t 	Mms_type;
 	uint8_t 	Mms_rsvd[1];
@@ -441,6 +452,13 @@ typedef struct Mlsas_RWrsp_msg {
 	uint64_t rsp_rqid;
 	int 	 rsp_error;
 } Mlsas_RWrsp_msg_t;
+
+typedef struct Mlsas_State_Change_msg {
+	uint32_t scm_state;
+	uint32_t scm_event;
+	uint64_t scm_pr;
+	uint64_t scm_ext;
+} Mlsas_State_Change_msg_t;
 
 extern void __Mlsas_Thread_Init(Mlsas_thread_t *thi,
 		int (*fn) (Mlsas_thread_t *), 

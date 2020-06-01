@@ -273,7 +273,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);
 	}
-	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
+	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Submit_Local);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, Wm->rw_flags, prr);
@@ -305,7 +305,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 //		__Mlsas_Tx_Drain_RQ(prr);
 		return (0);
 	}
-	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Tobe_Submit);
+	__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Submit_Local);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	
 	__Mlsas_Submit_PR_request(Mlb, Rm->rw_flags, prr);

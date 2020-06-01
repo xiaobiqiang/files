@@ -2734,7 +2734,7 @@ static cs_rx_data_t *cluster_san_host_rxfragment_handle(
 		ctsfs->cs_data = cts_rx_data_alloc(total_len);
 		if (total_len && ctsfs->cs_data->data == NULL) {
 			mutex_exit(&w->fragment_lock);
-			cts_rx_data_free(cs_data, B_TRUE);
+			csh_rx_data_free(cs_data, B_TRUE);
 			return NULL;
 		}
 		ctsfs->cs_data->data_index = data_index;
