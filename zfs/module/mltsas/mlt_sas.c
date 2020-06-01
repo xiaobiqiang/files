@@ -65,7 +65,8 @@ static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 		struct block_device *phys_dev);
 static void __Mlsas_Attach_Virt_Queue(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb, 
-		Mlsas_devst_e newst, uint32_t what);
+		Mlsas_devst_e newst, uint32_t what, 
+		Mlsas_pr_device_t *pr);
 static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		Mlsas_pr_device_t *pr);
 int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
@@ -576,12 +577,13 @@ static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, hash_key, &Mlb) == 0);
-	kref_get(&Mlb->Mlb_ref);
+	__Mlsas_get_virt(Mlb);
+	
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
 	bzero(&vti, sizeof(Mlsas_virtinfo_return_t));
 	__Mlsas_Do_Virtinfo_impl(Mlb, &vti);
-	kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+	__Mlsas_put_virt(Mlb);
 
 	bcopy(&vti, dt->Mlioc_obufptr, sizeof(Mlsas_virtinfo_return_t));
 	dt->Mlioc_nofill = sizeof(Mlsas_virtinfo_return_t);
@@ -684,7 +686,7 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 			Mlsas_Devst_Degraded))
 		rval = -EINVAL;
 	if (rval == 0) 
-		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK);	
+		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK, NULL);	
 	spin_unlock_irq(&vt->Mlb_rq_spin);
 
 	return rval;
@@ -983,7 +985,7 @@ static int __Mlsas_Attach_Phys_impl(Mlsas_blkdev_t *Mlb,
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 		return -EALREADY;
 	}
-	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_To_Attach);
+	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_To_Attach, NULL);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
 	if ((rval = __Mlsas_Attach_BDI(&Mlb->Mlb_bdi, 
@@ -1001,7 +1003,7 @@ static int __Mlsas_Attach_Phys_impl(Mlsas_blkdev_t *Mlb,
 	what = Mlsas_Devevt_Attach_OK;
 
 out:
-	__Mlsas_Devst_Stmt(Mlb, what);
+	__Mlsas_Devst_Stmt(Mlb, what, NULL);
 	return rval;
 }
 
@@ -1022,15 +1024,14 @@ int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
 		return rval;
 	}
 
-	if (!kref_get_unless_zero(&Mlb->Mlb_ref))
-		return -EFAULT;
+	__Mlsas_get_virt(Mlb);
 
 	if ((rval = __Mlsas_Attach_Phys_impl(Mlb, path, 
 			bdev, new_bdev)) != 0) {
 		cmn_err(CE_NOTE, "%s Attach Phys Disk fail, "
 			"Maybe Already or Blkdev_get Fail, Error(%d)",
 			__func__, rval);
-		kref_put(&Mlb->Mlb_ref, __Mlsas_Rele_Virt);
+		__Mlsas_put_virt(Mlb);
 		return rval;
 	}
 
@@ -1413,8 +1414,7 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 	if (rq->Mlrq_back_bio)
 		bio_put(rq->Mlrq_back_bio);
 	if (rq->Mlrq_bdev)
-		kref_put(&rq->Mlrq_bdev->Mlb_ref, 
-			__Mlsas_Rele_Virt);
+		__Mlsas_put_virt(rq->Mlrq_bdev);
 	rq->Mlrq_back_bio = NULL;
 	rq->Mlrq_bdev = NULL;
 	mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
@@ -1727,7 +1727,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 			__Mlsas_Update_PR_st(pr, Mlsas_Devst_Degraded);
 		} else if (!(rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)){
 			if (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch)
-				__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch);
+				__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 		}
 
 		if (__Mlsas_Get_ldev(Mlb))
@@ -2317,7 +2317,7 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 	 */
 	if (!(prr->prr_flags & Mlsas_PRRfl_Net_Sent)) {
 		if (!iook && (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch))
-			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch);
+			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 		else if (iook)
 			Mlb->Mlb_error_cnt = 0;
 		prr->prr_flags |= Mlsas_PRRfl_Continue;
@@ -2338,7 +2338,7 @@ static void __Mlsas_Complete_PR_RQ(Mlsas_pr_req_t *prr)
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	if (prr->prr_flags & Mlsas_PRRfl_Ee_Error) {
 		if (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch)
-			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch);
+			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 	} else
 		Mlb->Mlb_error_cnt = 0;
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
