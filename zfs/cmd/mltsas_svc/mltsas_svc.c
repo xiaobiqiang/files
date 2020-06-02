@@ -443,7 +443,7 @@ static int Mlsas_Reg_phys_virt(void *priv, char *line, int llen, void *tag)
 static int Mlsas_Del_phys_virt(char *path, void *tag)
 {
 	nvlist_t *nvl = NULL;
-	char path[64] = Disk_directory;
+	char abspath[64] = Disk_directory;
 	Mlsas_iocdt_t xd;
 	char *packed = NULL;
 	int packed_len = 0, rval = 0;
@@ -453,10 +453,10 @@ static int Mlsas_Del_phys_virt(char *path, void *tag)
 
 	VERIFY(strncmp(path, Disk_prefix, strlen(Disk_prefix)) == 0);
 
-	(void) strncat(path, path, 64 - strlen(path));
+	(void) strncat(abspath, path, 64 - strlen(path));
 	
 	VERIFY(nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	VERIFY(nvlist_add_string(nvl, "path", path) == 0);
+	VERIFY(nvlist_add_string(nvl, "path", abspath) == 0);
 	VERIFY(nvlist_pack(nvl, &packed, &packed_len, 
 		NV_ENCODE_NATIVE, KM_SLEEP) == 0);
 	
