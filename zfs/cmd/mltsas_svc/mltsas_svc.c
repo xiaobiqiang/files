@@ -648,6 +648,8 @@ static int Mlsas_Link_every_virt(void *priv, char *line, int llen)
 	avl_tree_t *vtlist = priv;
 
 	avl_add(vtlist, Mlsas_New_virt(line));
+
+	return Mlsas_OK;
 }
 
 static void Mlsas_Itemize_lpc_virt(avl_tree_t *nwall, avl_tree_t *toins,
