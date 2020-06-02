@@ -1112,8 +1112,8 @@ static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work)
 	Mlsas_rh_t *rh = mms->Mms_rh;
 	void *sess = Mlsas_Noma_Session;
 
-	if (rh == NULL)
-		sess = Mlsas_Noma_Session;
+	if (rh != NULL)
+		sess = rh->Mh_session;
 
 	switch (mms->Mms_type) {
 	case Mlsas_Mms_Attach:
