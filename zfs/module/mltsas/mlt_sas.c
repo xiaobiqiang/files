@@ -1531,6 +1531,7 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 
 	switch (what) {
 	case Mlsas_Devevt_Attach_OK:
+	case Mlsas_Devevt_Attach_PR:
 		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
 			Mlsas_Mms_Attach, Mlb->Mlb_hashkey, &atm);
 		mms->Mms_rh = pr ? pr->Mlpd_rh : NULL;
@@ -1539,7 +1540,6 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		atm->Atm_st = Mlb->Mlb_st;
 		atm->Atm_rsp = 1;
 		break;
-	case Mlsas_Devevt_Attach_PR:
 	case Mlsas_Devevt_PR_Error_Sw:
 	case Mlsas_Devevt_Error_Switch:
 		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_State_Change_msg_t), 
