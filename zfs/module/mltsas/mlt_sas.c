@@ -94,6 +94,7 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 static void __Mlsas_Abort_virt_local_RQ(Mlsas_blkdev_t *vt);
 static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt);
 static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work);
+static inline void __Mlsas_get_RQ(Mlsas_request_t *rq);
 static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss);
 static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb, 
 		Mlsas_pr_device_t *prflt);
