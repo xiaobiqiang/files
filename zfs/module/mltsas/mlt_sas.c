@@ -85,12 +85,15 @@ static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr,
 		Mlsas_devst_e st);
 static Mlsas_pr_device_t *__Mlsas_Lookup_PR_locked(
 		Mlsas_blkdev_t *Mlb, uint32_t hostid);
+static Mlsas_rh_t *__Mlsas_Lookup_rhost_locked(uint32_t hostid);
+static void __Mlsas_remove_rhost_locked(Mlsas_rh_t *rh);
 static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 		Mlsas_blkdev_t *Mlb, Mlsas_rh_t *rh);
 static void __Mlsas_Free_PR(Mlsas_pr_device_t *pr);
 static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd);
 static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 		cs_rx_data_t *xd);
+static void __Mlsas_Virt_wait_list_empty(Mlsas_blkdev_t *vt, list_t *list);
 static void __Mlsas_Abort_virt_local_RQ(Mlsas_blkdev_t *vt);
 static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt);
 static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work);
@@ -218,7 +221,8 @@ static void __Mlsas_Release_PR(struct kref *ref)
 		Mlsas_pr_device_t, Mlpd_ref);
 
 	/* TODO: */
-	__Mlsas_put_rhost(pr->Mlpd_rh);
+	if (pr->Mlpd_rh)
+		__Mlsas_put_rhost(pr->Mlpd_rh);
 }
 
 static inline void __Mlsas_get_PR(Mlsas_pr_device_t *pr)
@@ -720,8 +724,13 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 	
 	/* no more local request */
 	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
+	
 	__Mlsas_Abort_virt_local_RQ(Mlb);
+	
 	__Mlsas_Abort_virt_PR_RQ(Mlb);
+
+	__Mlsas_Virt_wait_list_empty(Mlb, &Mlb->Mlb_local_rqs);
+	__Mlsas_Virt_wait_list_empty(Mlb, &Mlb->Mlb_peer_rqs);
 	
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 }
@@ -737,8 +746,12 @@ static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
 		offsetof(Mlsas_pr_req_t, prr_mlb_node));
 	list_create(&Mlb->Mlb_topr_rqs, sizeof(Mlsas_request_t),
 		offsetof(Mlsas_request_t, Mlrq_node));
+	list_create(&Mlb->Mlb_net_pr_rqs, sizeof(Mlsas_pr_req_t), 
+		offsetof(Mlsas_pr_req_t, prr_mlb_net_node));
 	list_create(&Mlb->Mlb_pr_devices, sizeof(Mlsas_pr_device_t),
 		offsetof(Mlsas_pr_device_t, Mlpd_node));
+
+	init_waitqueue_head(&Mlb->Mlb_wait);
 
 	Mlb->Mlb_txbuf 		= kmem_zalloc(Mlb->Mlb_txbuf_len, 	KM_SLEEP);
 	Mlb->Mlb_astx_buf 	= kmem_zalloc(Mlb->Mlb_astxbuf_len, KM_SLEEP);
@@ -869,9 +882,16 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	__Mlsas_Attach_BDI(&Mlb->Mlb_bdi, path, phys);
 	__Mlsas_Attach_Virt_Queue(Mlb);
 
+	__Mlsas_get_virt(Mlb);
 	__Mlsas_Thread_Start(&Mlb->Mlb_tx);
+
+	__Mlsas_get_virt(Mlb);
 	__Mlsas_Thread_Start(&Mlb->Mlb_rx);
+
+	__Mlsas_get_virt(Mlb);
 	__Mlsas_Thread_Start(&Mlb->Mlb_asender);
+
+	__Mlsas_get_virt(Mlb);
 	__Mlsas_Thread_Start(&Mlb->Mlb_sender);
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
@@ -1091,16 +1111,128 @@ int Mlsas_TX(void *session, void *header, uint32_t hdlen,
 	return rval;
 }
 
+static void __Mlsas_PR_wait_list_empty(Mlsas_pr_device_t *pr, list_t *list)
+{
+	DEFINE_WAIT(wait);
+
+	while (!list_empty(list)) {
+		prepare_to_wait(&pr->Mlpd_wait, &wait, TASK_UNINTERRUPTIBLE);
+		spin_unlock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
+		
+		io_schedule();
+		
+		finish_wait(&pr->Mlpd_wait, &wait);
+		spin_lock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
+	}
+}
+
+static void __Mlsas_PR_abort_sent_RQ(Mlsas_pr_device_t *pr)
+{
+	Mlsas_bio_and_error_t m;
+	Mlsas_request_t *rq, *next;
+
+	for (rq = list_head(&pr->Mlpd_rqs); rq; rq = next) {
+		next = list_next(&pr->Mlpd_rqs, pr);
+
+		if (!(rq->Mlrq_flags & Mlsas_RQ_Net_Sent))
+			continue;
+
+		VERIFY(!(rq->Mlrq_flags & Mlsas_RQ_Net_Done) &&
+			!(rq->Mlrq_flags & Mlsas_RQ_Net_OK));
+
+		rq->Mlrq_back_bio = ERR_PTR(-ECONNRESET);
+		__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_Netio, &m);
+
+		if (m.Mlbi_bio)
+			__Mlsas_Complete_Master_Bio(rq, m.Mlbi_bio);
+	}
+}
+
+static void __Mlsas_PR_disconnect(Mlsas_pr_device_t *pr)
+{
+	Mlsas_blkdev_t *vt = pr->Mlpd_mlb;
+
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	/* avoid tx mms */
+	__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_PR_Disconnect, pr);
+	__Mlsas_Update_PR_st(pr, Mlsas_Devst_Failed);
+
+	__Mlsas_PR_abort_sent_RQ(pr);
+
+	__Mlsas_PR_wait_list_empty(pr, &pr->Mlpd_rqs);
+	
+	__Mlsas_PR_wait_list_empty(pr, &pr->Mlpd_pr_rqs);
+
+	__Mlsas_PR_wait_list_empty(pr, &pr->Mlpd_net_pr_rqs);
+	
+	spin_unlock_irq(&vt->Mlb_rq_spin);
+}
+
+static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
+{
+	Mlsas_pr_device_t *pr = NULL, *next;
+
+	mutex_enter(&rh->Mh_mtx);
+	rh->Mh_state = Mlsas_RHS_Corrupt;
+	
+	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
+		next = list_next(&rh->Mh_devices, pr);
+		__Mlsas_PR_disconnect(pr);
+	}
+
+	cluster_san_hostinfo_rele(rh->Mh_session);
+	
+	mutex_exit(&rh->Mh_mtx);
+
+	__Mlsas_remove_rhost_locked(rh);
+}
+
+static void __Mlsas_HDL_rhost_down2up(Mlsas_rh_t *rh)
+{
+	mutex_enter(&rh->Mh_mtx);
+
+	mutex_exit(&rh->Mh_mtx);
+}
+
 static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi, 
 		cts_link_evt_t link_evt, void *arg)
 {
+	Mlsas_rh_t *rh = NULL;
+	
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
+	
 	switch (link_evt) {
 	case LINK_EVT_UP_TO_DOWN:
+		if ((rh = __Mlsas_Lookup_rhost_locked(
+				cshi->hostid)) != NULL)
+			__Mlsas_HDL_rhost_up2down(rh);
+		else
+			cmn_err(CE_NOTE, "%s None RHOST(hostid(%u))", 
+				__func__, cshi->hostid);
 		break;
 	case LINK_EVT_DOWN_TO_UP:
+		__Mlsas_HDL_rhost_down2up(rh);
 		break;
 	default:
 		VERIFY(0);
+	}
+
+out:
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
+}
+
+static void __Mlsas_Virt_wait_list_empty(Mlsas_blkdev_t *vt, list_t *list)
+{
+	DEFINE_WAIT(wait);
+
+	while (!list_empty(list)) {
+		prepare_to_wait(&vt->Mlb_wait, &wait, TASK_UNINTERRUPTIBLE);
+		spin_unlock_irq(&vt->Mlb_rq_spin);
+		
+		io_schedule();
+		
+		finish_wait(&vt->Mlb_wait, &wait);
+		spin_lock_irq(&vt->Mlb_rq_spin);
 	}
 }
 
@@ -1170,6 +1302,7 @@ static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt)
 {
 	uint32_t what;
 	Mlsas_pr_req_t *prr, *next;
+	Mlsas_pr_req_free_t fr;
 	
 	prr = list_head(&vt->Mlb_peer_rqs);
 	while (prr) {
@@ -1179,12 +1312,18 @@ static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt)
 		if (prr->prr_pr->Mlpd_mlb != vt)
 			continue;
 
-		what = prr->prr_flags & Mlsas_PRRfl_Write ?
-			Mlsas_PRRst_Queue_Net_Wrsp : 
-			Mlsas_PRRst_Queue_Net_Rrsp;
-		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Abort_Local);
-		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net);
-		__Mlsas_PR_RQ_stmt(prr, what);
+		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Abort_Local, &fr);
+		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
+			what = prr->prr_flags & Mlsas_PRRfl_Write ?
+				Mlsas_PRRst_Queue_Net_Wrsp : 
+				Mlsas_PRRst_Queue_Net_Rrsp;
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+			__Mlsas_PR_RQ_stmt(prr, what, NULL);
+		}
+
+		if (fr.k_put)
+			__Mlsas_sub_PR_RQ(prr, fr.k_put);
+		
 		prr = next;
 	}
 }
@@ -1235,7 +1374,8 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 	case 0x1:
 		__Mlsas_Submit_Net_Prepare(req);
 		what = bio_data_dir(req->Mlrq_master_bio) == WRITE ?
-			Mlsas_Rst_Queue_Net_Write : Mlsas_Rst_Queue_Net_Read;
+			Mlsas_Rst_Queue_Net_Write : 
+			Mlsas_Rst_Queue_Net_Read;
 		__Mlsas_Req_Stmt(req, Mlsas_Rst_Submit_Net, NULL);
 		__Mlsas_Req_Stmt(req, what, NULL);
 		break;
@@ -1419,6 +1559,9 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 		bio_put(rq->Mlrq_back_bio);
 	if (rq->Mlrq_bdev)
 		__Mlsas_put_virt(rq->Mlrq_bdev);
+	if (rq->Mlrq_pr)
+		__Mlsas_put_PR(rq->Mlrq_pr);
+	
 	rq->Mlrq_back_bio = NULL;
 	rq->Mlrq_bdev = NULL;
 	mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
@@ -1447,9 +1590,6 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_bio_and_error_t Mlbi;
 
-	if (unlikely(rq->Mlrq_flags & Mlsas_RQ_Local_Aborted))
-		bio->bi_error = bio->bi_error ?: -EIO;
-	
 	if (unlikely(bio->bi_error)) {
 		if (unlikely(bio->bi_rw & REQ_DISCARD))
 			what = Mlsas_Rst_Discard_Error;
@@ -1461,9 +1601,12 @@ static void __Mlsas_Request_endio(struct bio *bio)
 		what = Mlsas_Rst_Complete_OK;
 
 	bio_put(rq->Mlrq_back_bio);
-	rq->Mlrq_back_bio = ERR_PTR(bio->bi_error);
 
 	spin_lock_irqsave(&Mlb->Mlb_rq_spin, flags);
+	if (rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)
+		rq->Mlrq_back_bio = NULL;
+	else
+		rq->Mlrq_back_bio = ERR_PTR(bio->bi_error);
 	__Mlsas_Req_Stmt(rq, what, &Mlbi);
 	spin_unlock_irqrestore(&Mlb->Mlb_rq_spin, flags);
 
@@ -1487,23 +1630,29 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 	case Mlsas_Devst_Degraded:
 		if (what == Mlsas_Devevt_Attach_OK)
 			next = Mlsas_Devst_Healthy;
-		if (what == Mlsas_Devevt_PR_Error_Sw)
+		else if (what == Mlsas_Devevt_PR_Error_Sw)
+			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
+				Mlsas_Devst_Last : Mlsas_Devst_Failed;
+		else if (what == Mlsas_Devevt_PR_Disconnect)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Last : Mlsas_Devst_Failed;
 		break;
 	case Mlsas_Devst_Attached:
 		if (what == Mlsas_Devevt_Attach_PR)
 			next = Mlsas_Devst_Healthy;
-		if (what == Mlsas_Devevt_Error_Switch)
+		else if (what == Mlsas_Devevt_Error_Switch)
 			next = Mlsas_Devst_Failed;
 		break;
 	case Mlsas_Devst_Healthy:
 		if (what == Mlsas_Devevt_Error_Switch)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Degraded : Mlsas_Devst_Failed;
-		if (what == Mlsas_Devevt_PR_Error_Sw)
+		else if (what == Mlsas_Devevt_PR_Error_Sw)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Healthy : Mlsas_Devst_Attached;
+		else if (what == Mlsas_Devevt_PR_Disconnect)
+			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
+				Mlsas_Devst_Last : Mlsas_Devst_Attached;
 		break;
 	}
 
@@ -1526,7 +1675,7 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 	if (Mlb->Mlb_st != newst)
 		Mlb->Mlb_st = newst;
 
-	if (pr)
+	if (pr && (what != Mlsas_Devevt_PR_Disconnect))
 		__Mlsas_get_rhost(pr->Mlpd_rh);
 
 	switch (what) {
@@ -1550,9 +1699,12 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		scm->scm_pr = pr ? pr->Mlpd_pr : NULL;
 		scm->scm_state = Mlb->Mlb_st;
 		break;
+	case Mlsas_Devevt_PR_Disconnect:
+		break;
 	}
 
-	__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &mms->Mms_wk);
+	if (mms != NULL)
+		__Mlsas_Queue_RTX(&Mlb->Mlb_tx_wq, &mms->Mms_wk);
 }
 
 void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
@@ -1615,6 +1767,9 @@ void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
 	case Mlsas_Rst_Abort_Diskio:
 		__Mlsas_Req_St(rq, Mlbi, 0, Mlsas_RQ_Local_Aborted);
 		break;
+	case Mlsas_Rst_Abort_Netio:
+		__Mlsas_Req_St(rq, Mlbi, 0, Mlsas_RQ_Net_Aborted);
+		break;
 	}
 }
 
@@ -1646,6 +1801,11 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		__Mlsas_get_RQ(rq);
 	}
 
+	if (!(oflg & Mlsas_RQ_Net_Aborted) && (set & Mlsas_RQ_Net_Aborted)) {
+		c_put++;
+		__Mlsas_get_RQ(rq);
+	}
+
 	if ((oflg & Mlsas_RQ_Local_Pending) &&
 		(clear & Mlsas_RQ_Local_Pending)) {
 		if (!(rq->Mlrq_flags & Mlsas_RQ_Local_Aborted))
@@ -1654,14 +1814,23 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 			k_put++;
 		k_put++;
 		list_remove(&Mlb->Mlb_local_rqs, rq);
+		if (list_is_empty(&Mlb->Mlb_local_rqs))
+			wake_up(&Mlb->Mlb_wait);
 	}
 
 	if ((oflg & Mlsas_RQ_Net_Pending) &&
 		(clear & Mlsas_RQ_Net_Pending)) {
-		c_put++;
+		if (!(rq->Mlrq_flags & Mlsas_RQ_Net_Aborted))
+			c_put++;
+		else {
+			k_put++;
+			(void) untimeout(rq->Mlrq_tm);
+		}
 		k_put++;
 		list_remove(&Mlb->Mlb_topr_rqs, rq);
 		list_remove(&rq->Mlrq_pr->Mlpd_rqs, rq);
+		if (list_is_empty(&rq->Mlrq_pr->Mlpd_rqs))
+			wake_up(&rq->Mlrq_pr->Mlpd_wait);
 	}
 
 	if ((oflg & Mlsas_RQ_Net_Queued) &&
@@ -1706,6 +1875,21 @@ static void __Mlsas_Restart_DelayedRQ(Mlsas_Delayed_obj_t *obj)
 	queue_work(retry->Mlt_workq, &retry->Mlt_work);
 }
 
+static void __Mlsas_RQ_net_abort_timeout_clean(Mlsas_request_t *rq)
+{
+	uint32_t what;
+	Mlsas_blkdev_t *vt = rq->Mlrq_bdev;
+	
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	rq->Mlrq_back_bio = NULL;
+	what = (rq->Mlrq_flags & Mlsas_RQ_Write) ? Mlsas_Rst_PR_Write_Error :
+			(bio_rw(rq->Mlrq_master_bio) == READ ? 
+				Mlsas_Rst_PR_Read_Error :
+				Mlsas_Rst_PR_ReadA_Error);
+	__Mlsas_Req_Stmt(rq, what, NULL);
+	spin_unlock_irq(&vt->Mlb_rq_spin);
+}
+
 static void __Mlsas_Complete_RQ(Mlsas_request_t *rq, 
 		Mlsas_bio_and_error_t *Mlbi)
 {
@@ -1717,9 +1901,12 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 	VERIFY(rq->Mlrq_master_bio != NULL);
 	
 	if (((flags & Mlsas_RQ_Local_Pending) && 
-		!(flags & Mlsas_RQ_Local_Aborted))) {
-		cmn_err(CE_PANIC, "%s Mlsas_RQ_Local_Pending && "
-			"!Mlsas_RQ_Local_Aborted", __func__);
+			!(flags & Mlsas_RQ_Local_Aborted)) ||
+		((flags & Mlsas_RQ_Net_Pending) &&
+			!(flags & Mlsas_RQ_Net_Aborted))) {
+		cmn_err(CE_PANIC, "Mlsas_RQ_Local_Pending && "
+			"!Mlsas_RQ_Local_Aborted or Mlsas_RQ_Net_Pending && "
+			"!Mlsas_RQ_Net_Aborted, flags(0x%llx)", flags);
 	}
 
 	__Mlsas_End_Ioacct(Mlb, rq);
@@ -1729,7 +1916,11 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 	if (!(flags & Mlsas_RQ_Local_Aborted)) {
 		error = PTR_ERR(rq->Mlrq_back_bio);
 		rq->Mlrq_back_bio = NULL;
-	}
+		if (flags & Mlsas_RQ_Net_Aborted)
+			rq->Mlrq_tm = timeout(__Mlsas_RQ_net_abort_timeout_clean, 
+				rq, drv_usectohz(50000));
+	} else 
+		error = -ENODEV;
 
 	if (!ok) {
 		/*
@@ -1773,8 +1964,9 @@ static void __Mlsas_Retry(struct work_struct *w)
 	Mlsas_Delayed_obj_t *obj;
 	Mlsas_request_t *rq;
 	Mlsas_pr_req_t *prr;
-	Mlsas_retry_t *retry = 
-		container_of(w, Mlsas_retry_t, Mlt_work);
+	Mlsas_retry_t *retry = container_of(w, Mlsas_retry_t, Mlt_work);
+	Mlsas_pr_req_free_t fr = {.k_put = 0};
+	uint32_t what;
 	
 	list_create(&writes, sizeof(Mlsas_Delayed_obj_t),
 		offsetof(Mlsas_Delayed_obj_t, dlo_node));
@@ -1801,10 +1993,19 @@ static void __Mlsas_Retry(struct work_struct *w)
 			if (prr->prr_flags & Mlsas_PRRfl_Write)
 				prr->prr_flags &= ~Mlsas_PRRfl_Addl_Kmem;
 			
-			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net);
-			__Mlsas_PR_RQ_stmt(prr, prr->prr_flags & Mlsas_PRRfl_Write ?
-				Mlsas_PRRst_Queue_Net_Wrsp : Mlsas_PRRst_Queue_Net_Rrsp);
+			if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_Corrupt)
+				fr.k_put = 1;
+			else {
+				what = prr->prr_flags & Mlsas_PRRfl_Write ?
+					Mlsas_PRRst_Queue_Net_Wrsp : 
+					Mlsas_PRRst_Queue_Net_Rrsp;
+				__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+				__Mlsas_PR_RQ_stmt(prr, what, NULL);
+			}
 			spin_unlock_irq(&prr->prr_pr->Mlpd_mlb->Mlb_rq_spin);
+
+			if (fr.k_put)
+				__Mlsas_sub_PR_RQ(prr, fr.k_put);
 			break;
 		}
 	}
@@ -1909,6 +2110,8 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	Mlsas_pr_device_t *pr = RWm->rw_mlbpr;
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
+	__Mlsas_get_PR(pr);
+
 	if (RWm->rw_flags & REQ_WRITE)
 		w->rtw_fn = __Mlsas_Rx_biow;
 	else 
@@ -1937,6 +2140,7 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	Mlsas_bio_and_error_t m;
 	boolean_t is_write = rq->Mlrq_flags & Mlsas_RQ_Write;
 	uint32_t what;
+	int error = rsp->rsp_error;
 	
 	if (unlikely(rsp->rsp_error))
 		what = is_write ? Mlsas_Rst_PR_Write_Error :
@@ -1950,11 +2154,13 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 				xd->data, xd->data_len);
 	}
 
-	rq->Mlrq_back_bio = rsp->rsp_error;
-
 	csh_rx_data_free_ext(xd);
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
+	rq->Mlrq_back_bio= NULL;
+	if (rq->Mlrq_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
+		rq->Mlrq_back_bio = ERR_PTR(error);
+	
 	__Mlsas_Req_Stmt(rq, what, &m);
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
@@ -2045,8 +2251,6 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 	if ((prr = mempool_alloc(gMlsas_ptr->Ml_prr_mempool,
 			GFP_NOIO | __GFP_ZERO)) == NULL)
 		return NULL;
-
-	__Mlsas_get_PR(pr);
 
 	prr->prr_bsector = sec;
 	prr->prr_bsize = len;
@@ -2185,6 +2389,7 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 	Mlsas_pr_req_t *prr = bio->bi_private;
 	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
 	uint32_t what;
+	Mlsas_pr_req_free_t fr;
 
 	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted)
 		bio->bi_error = -ENXIO;
@@ -2205,11 +2410,18 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 
 	if (!atomic_dec_32_nv(&prr->prr_pending_bios)) {
 		spin_lock_irq(&Mlb->Mlb_rq_spin);
-		__Mlsas_PR_RQ_stmt(prr, what);
-		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net);
-		__Mlsas_PR_RQ_stmt(prr, prr->prr_flags & Mlsas_PRRfl_Write ?
-			Mlsas_PRRst_Queue_Net_Wrsp : Mlsas_PRRst_Queue_Net_Rrsp);
+		__Mlsas_PR_RQ_stmt(prr, what, &fr);
+		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
+			what = prr->prr_flags & Mlsas_PRRfl_Write ?
+				Mlsas_PRRst_Queue_Net_Wrsp : 
+				Mlsas_PRRst_Queue_Net_Rrsp
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+			__Mlsas_PR_RQ_stmt(prr, what, NULL);
+		}
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
+
+		if (fr.k_put)
+			__Mlsas_sub_PR_RQ(prr, fr.k_put);
 	}
 
 //	__Mlsas_Complete_PR_RQ(prr);
@@ -2222,50 +2434,63 @@ static void __Mlsas_PR_RQ_submit_local_prepare(Mlsas_pr_req_t *prr)
 	list_insert_tail(&prr->prr_pr->Mlpd_pr_rqs, prr);
 }
 
-void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what)
+static void __Mlsas_PR_RQ_submit_net_prepare(Mlsas_pr_req_t *prr)
 {
+	__Mlsas_get_PR_RQ(prr);
+	list_insert_tail(&prr->prr_pr->Mlpd_net_pr_rqs, prr);
+	list_insert_tail(&prr->prr_pr->Mlpd_mlb->Mlb_net_pr_rqs, prr);
+}
+
+void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
+		Mlsas_pr_req_free_t *fr)
+{
+	if (fr)
+		fr.k_put = 0;
+
 	switch (what) {
 	case Mlsas_PRRst_Submit_Local:
 		__Mlsas_PR_RQ_submit_local_prepare(prr);
-		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Local_Pending);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Local_Pending, fr);
 		break;
 	case Mlsas_PRRst_Discard_Error:
 	case Mlsas_PRRst_Write_Error:
 	case Mlsas_PRRst_Read_Error:
 	case Mlsas_PRRst_ReadA_Error:
 		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Local_Pending, 
-			Mlsas_PRRfl_Local_Done);
+			Mlsas_PRRfl_Local_Done, fr);
 		break;
 	case Mlsas_PRRst_Complete_OK:
 		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Local_Pending, 
-			Mlsas_PRRfl_Local_Done | Mlsas_PRRfl_Local_OK);
+			Mlsas_PRRfl_Local_Done | Mlsas_PRRfl_Local_OK, fr);
 		break;
 	case Mlsas_PRRst_Subimit_Net:
-		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Pending);
+		__Mlsas_PR_RQ_submit_net_prepare(prr);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Pending, fr);
 		break;
 	case Mlsas_PRRst_Queue_Net_Wrsp:
-		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Queued);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Queued, fr);
 		__Mlsas_PR_RQ_Write_endio(prr);
 		break;
 	case Mlsas_PRRst_Queue_Net_Rrsp:
-		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Queued);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Net_Queued, fr);
 		__Mlsas_PR_RQ_Read_endio(prr);
 		break;
 	case Mlsas_PRRst_Send_Error:
 		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Net_Pending | Mlsas_PRRfl_Net_Queued, 
-			Mlsas_PRRfl_Net_Sent);
+			Mlsas_PRRfl_Net_Sent, fr);
 		break;
 	case Mlsas_PRRst_Send_OK:
 		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Net_Pending | Mlsas_PRRfl_Net_Queued, 
-			Mlsas_PRRfl_Net_Sent | Mlsas_PRRfl_Net_OK);
+			Mlsas_PRRfl_Net_Sent | Mlsas_PRRfl_Net_OK, fr);
 		break;
 	case Mlsas_PRRst_Abort_Local:
-		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Local_Aborted);
+		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Local_Aborted, fr);
 		break;
 	}
 }
 
-static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s)
+static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, 
+		uint32_t s, Mlsas_pr_req_free_t *fr)
 {
 	uint32_t ofl = prr->prr_flags;
 	uint32_t c_put = 0;
@@ -2297,21 +2522,34 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s)
 			k_put++;
 		else
 			c_put++;
+		k_put++;
 		list_remove(&pr->Mlpd_pr_rqs, prr);
 		list_remove(&pr->Mlpd_mlb->Mlb_peer_rqs, prr);
-		k_put++;
+		if (list_is_empty(&pr->Mlpd_pr_rqs))
+			wake_up(&pr->Mlpd_wait);
+		if (list_is_empty(&pr->Mlpd_mlb->Mlb_peer_rqs))
+			wake_up(&pr->Mlpd_mlb->Mlb_wait);
 	}
 
-	if ((ofl & Mlsas_PRRfl_Net_Pending) && (c & Mlsas_PRRfl_Net_Pending))
+	if ((ofl & Mlsas_PRRfl_Net_Pending) && (c & Mlsas_PRRfl_Net_Pending)) {
 		c_put++;
+		k_put++;
+		list_remove(&pr->Mlpd_net_pr_rqs, prr);
+		list_remove(&pr->Mlpd_mlb->Mlb_net_pr_rqs, prr);
+		if (list_is_empty(&pr->Mlpd_net_pr_rqs))
+			wake_up(&pr->Mlpd_wait);
+	}
 
 	if ((ofl & Mlsas_PRRfl_Net_Queued) && (c & Mlsas_PRRfl_Net_Queued))
 		c_put++;
 
 	if (c_put)
 		k_put += __Mlsas_PR_RQ_Put_Completion_ref(prr, c_put);
-	if (k_put)
-		__Mlsas_sub_PR_RQ(&prr->prr_ref, k_put);
+	
+	if (fr && k_put)
+		fr->k_put = k_put;
+	else if (k_put)
+		__Mlsas_sub_PR_RQ(prr, k_put);
 	
 }
 
@@ -2360,7 +2598,9 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 		else if (iook)
 			Mlb->Mlb_error_cnt = 0;
-		prr->prr_flags |= Mlsas_PRRfl_Continue;
+		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
+			prr->prr_flags |= Mlsas_PRRfl_Continue;
+		return ;
 	} 
 
 	if (!(prr->prr_flags & Mlsas_PRRfl_Continue)) {
@@ -2426,6 +2666,10 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 		offsetof(Mlsas_request_t, Mlrq_pr_node));
 	list_create(&pr->Mlpd_pr_rqs, sizeof(Mlsas_pr_req_t),
 		offsetof(Mlsas_pr_req_t, prr_node));
+	list_create(&pr->Mlpd_net_pr_rqs, sizeof(Mlsas_pr_req_t),
+		offsetof(Mlsas_pr_req_t, prr_net_node));
+
+	init_waitqueue_head(&pr->Mlpd_wait);
 
 	__Mlsas_get_rhost(rh);
 	
@@ -2492,6 +2736,36 @@ static Mlsas_pr_device_t *__Mlsas_Lookup_PR_locked(
 	return pr;
 }
 
+static Mlsas_rh_t *__Mlsas_Lookup_rhost_locked(uint32_t hostid)
+{
+	int rval = 0;
+	Mlsas_rh_t *rh = NULL;
+
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
+
+	if ((rval = mod_hash_find(gMlsas_ptr->Ml_rhs, hostid, 
+			&rh)) == MH_ERR_NOTFOUND)
+		/* TODO: */
+		return NULL;
+
+	VERIFY(rh != NULL);
+
+	return rh;
+}
+
+/* don't use rh anymore. */
+static void __Mlsas_remove_rhost_locked(Mlsas_rh_t *rh)
+{
+	Mlsas_rh_t *find = NULL;
+	
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
+	VERIFY(mod_hash_remove(gMlsas_ptr->Ml_rhs, 
+		rh->Mh_hostid, &find) == 0);
+	VERIFY(rh == find);
+
+	__Mlsas_put_rhost(rh);
+}
+
 static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr, 
 		Mlsas_devst_e st)
 {
@@ -2513,9 +2787,11 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 {
 	int rval = 0;
 	struct bio *bio = NULL, *bt = NULL;
-
+	Mlsas_pr_req_free_t fr;
+	
 	if (prr->prr_flags & Mlsas_PRRfl_Zero_Out) {
 		uint32_t what = Mlsas_PRRst_Complete_OK;
+		
 		atomic_inc_32(&prr->prr_pending_bios);
 		if ((rval = blkdev_issue_zeroout(Mlb->Mlb_bdi.Mlbd_bdev,
 				prr->prr_bsector, prr->prr_bsize >> 9, 
@@ -2524,10 +2800,17 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 			prr->prr_error = rval;
 			what = Mlsas_PRRst_Discard_Error;
 		}
+		
 		spin_lock_irq(&Mlb->Mlb_rq_spin);
-		__Mlsas_PR_RQ_stmt(prr, what);
-		__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Queue_Net_Wrsp);
+		__Mlsas_PR_RQ_stmt(prr, what, &fr);
+		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Queue_Net_Wrsp, NULL);
+		}
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
+
+		if (fr.k_put)
+			__Mlsas_sub_PR_RQ(prr, fr.k_put);
 		return ;
 	}
 

@@ -46,6 +46,7 @@
 #define Mlsas_RQ_Local_Aborted	0x00000080
 #define Mlsas_RQ_Net_Done		0x00000100
 #define Mlsas_RQ_Net_OK			0x00000200
+#define Mlsas_RQ_Net_Aborted	0x00000400
 #define Mlsas_RQ_Delayed		0x80000000
 
 #define Mlsas_Rst_New				0x00
@@ -69,6 +70,7 @@
 #define Mlsas_Rst_PR_Complete_OK	0x12
 #define Mlsas_Rst_Done				0x13
 #define Mlsas_Rst_Abort_Diskio		0x14
+#define Mlsas_Rst_Abort_Netio		0x15
 
 #define Mlsas_PRRst_Submit_Local 	0x01
 #define Mlsas_PRRst_Discard_Error	0x02
@@ -82,6 +84,7 @@
 #define Mlsas_PRRst_Send_Error		0x0A
 #define Mlsas_PRRst_Send_OK			0x0B
 #define Mlsas_PRRst_Abort_Local		0x0C
+#define Mlsas_PRRst_Abort_Net		0x0D
 
 #define Mlsas_PRRfl_Addl_Kmem 		0x0001
 #define Mlsas_PRRfl_Ee_Error 		0x0002
@@ -95,6 +98,8 @@
 #define Mlsas_PRRfl_Local_OK		0x0200
 #define Mlsas_PRRfl_Net_OK			0x0400
 #define Mlsas_PRRfl_Local_Aborted	0x0800
+#define Mlsas_PRRfl_Capa_Abort		0x1000
+#define Mlsas_PRRfl_Net_Aborted		0x2000
 #define Mlsas_PRRfl_Continue		0x40000000
 #define Mlsas_PRRfl_Delayed			0x80000000
 
@@ -106,6 +111,7 @@
 #define Mlsas_Devevt_Attach_PR		0x05
 #define Mlsas_Devevt_Error_Switch	0x06
 #define Mlsas_Devevt_PR_Error_Sw	0x07
+#define Mlsas_Devevt_PR_Disconnect	0x08
 #define Mlsas_Devevt_Last			0x10
 
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
@@ -129,6 +135,7 @@ typedef struct Mlsas_pr_device Mlsas_pr_device_t;
 typedef struct Mlsas_delayed_obj Mlsas_Delayed_obj_t;
 typedef struct Mlsas_request Mlsas_request_t;
 typedef struct Mlsas_pr_req Mlsas_pr_req_t;
+typedef struct Mlsas_pr_req_free Mlsas_pr_req_free_t;
 typedef struct Mlsas_bio_and_error Mlsas_bio_and_error_t;
 typedef struct Mlsas_rh Mlsas_rh_t;
 typedef struct Mlsas_retry Mlsas_retry_t;
@@ -184,6 +191,9 @@ struct Mlsas_pr_device {
 
 	list_t Mlpd_rqs;
 	list_t Mlpd_pr_rqs;
+	list_t Mlpd_net_pr_rqs;
+
+	wait_queue_head_t Mlpd_wait;
 	
 	Mlsas_blkdev_t *Mlpd_mlb;
 	Mlsas_rh_t *Mlpd_rh;
@@ -233,6 +243,9 @@ struct Mlsas_blkdev {
 	list_t Mlb_local_rqs;
 	list_t Mlb_peer_rqs;
 	list_t Mlb_topr_rqs;
+	list_t Mlb_net_pr_rqs;
+
+	wait_queue_head_t Mlb_wait;
 
 	struct sg_table *Mlb_w_sgl;
 	void *Mlb_txbuf;
@@ -298,12 +311,17 @@ struct Mlsas_request {
 	uint32_t Mlrq_bsize;
 	uint32_t Mlrq_bflags;
 	sector_t Mlrq_sector;
+
+	timeout_id_t Mlrq_tm;
 };
 
 struct Mlsas_pr_req {
 	uint32_t prr_delayed_magic;
+	list_node_t prr_delayed_node;
 	list_node_t prr_node;
 	list_node_t prr_mlb_node;
+	list_node_t prr_net_node;
+	list_node_t prr_mlb_net_node;
 	struct kref prr_ref;
 	Mlsas_rtx_wk_t prr_wk;
 	Mlsas_pr_device_t *prr_pr;
@@ -347,6 +365,11 @@ struct Mlsas_bio_and_error {
 	struct bio *Mlbi_bio;
 	int Mlbi_error;
 	uint32_t k_put;
+};
+
+struct Mlsas_pr_req_free {
+	uint32_t k_put;
+	uint32_t can_free;
 };
 
 struct Mlsas_retry {
@@ -487,5 +510,6 @@ extern void __Mlsas_Complete_Master_Bio(Mlsas_request_t *rq,
 extern void __Mlsas_Free_PR_RQ(Mlsas_pr_req_t *prr);
 extern Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
                 uint64_t reqid, sector_t sec, size_t len);
-extern void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what);
+extern void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
+		Mlsas_pr_req_free_t *fr);
 #endif
