@@ -377,7 +377,7 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 	spin_unlock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
 
 	if (fr.k_put)
-		__Mlsas_sub_PR_RQ(prr);
+		__Mlsas_sub_PR_RQ(prr, fr.k_put);
 	
 	return (0);
 }
