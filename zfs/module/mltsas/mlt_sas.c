@@ -119,7 +119,8 @@ static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Release_PR_RQ(struct kref *);
 static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
 		cts_link_evt_t link_evt, void *arg);
-static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s);
+static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s,
+		Mlsas_pr_req_free_t *fr);
 static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr, uint32_t c_put);
 static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 
@@ -187,12 +188,12 @@ static void __Mlsas_Release_virt(struct kref *ref)
 	/* TODO: */
 }
 
-static inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt)
+inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt)
 {
 	kref_get(&vt->Mlb_ref);
 }
 
-static inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt)
+inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt)
 {
 	kref_put(&vt->Mlb_ref, __Mlsas_Release_virt);
 }
@@ -2282,17 +2283,17 @@ static void __Mlsas_Release_PR_RQ(struct kref *ref)
 	__Mlsas_Free_PR_RQ(prr);
 }
 
-static inline void __Mlsas_get_PR_RQ(Mlsas_pr_req_t *prr)
+inline void __Mlsas_get_PR_RQ(Mlsas_pr_req_t *prr)
 {
 	kref_get(&prr->prr_ref);
 }
 
-static inline void __Mlsas_put_PR_RQ(Mlsas_pr_req_t *prr)
+inline void __Mlsas_put_PR_RQ(Mlsas_pr_req_t *prr)
 {
 	kref_put(&prr->prr_ref, __Mlsas_Release_PR_RQ);
 }
 
-static inline void __Mlsas_sub_PR_RQ(Mlsas_pr_req_t *prr, uint32_t put)
+inline void __Mlsas_sub_PR_RQ(Mlsas_pr_req_t *prr, uint32_t put)
 {
 	kref_sub(&prr->prr_ref, put, __Mlsas_Release_PR_RQ);
 }
@@ -2414,7 +2415,7 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
 			what = prr->prr_flags & Mlsas_PRRfl_Write ?
 				Mlsas_PRRst_Queue_Net_Wrsp : 
-				Mlsas_PRRst_Queue_Net_Rrsp
+				Mlsas_PRRst_Queue_Net_Rrsp;
 			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
 			__Mlsas_PR_RQ_stmt(prr, what, NULL);
 		}
@@ -2445,7 +2446,7 @@ void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
 		Mlsas_pr_req_free_t *fr)
 {
 	if (fr)
-		fr.k_put = 0;
+		fr->k_put = 0;
 
 	switch (what) {
 	case Mlsas_PRRst_Submit_Local:

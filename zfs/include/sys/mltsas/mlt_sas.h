@@ -15,6 +15,7 @@
 #include <linux/blkdev.h>
 #include <sys/cluster_san.h>
 #include <sys/modhash.h>
+#include <sys/callout.h>
 #include <mltsas_comm.h>
 
 #define Mlsas_MAJOR			299
@@ -512,4 +513,9 @@ extern Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
                 uint64_t reqid, sector_t sec, size_t len);
 extern void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
 		Mlsas_pr_req_free_t *fr);
+extern inline void __Mlsas_sub_PR_RQ(Mlsas_pr_req_t *prr, uint32_t put);
+extern inline void __Mlsas_put_PR_RQ(Mlsas_pr_req_t *prr);
+extern inline void __Mlsas_get_PR_RQ(Mlsas_pr_req_t *prr);
+extern inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt);
+extern inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt);
 #endif
