@@ -2167,6 +2167,8 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 
 	if (m.Mlbi_bio)
 		__Mlsas_Complete_Master_Bio(rq, &m);
+
+	return (0);
 }
 
 static void __Mlsas_RX_State_Change(Mlsas_Msh_t *mms, 
