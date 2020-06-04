@@ -46,7 +46,7 @@ typedef struct
     uint64 step;
     uint32 obj_id;
     uint32 data_len;
-    uint8 is_delete;
+    uint64 is_delete;
     uint8 data[];
 }cm_sync_obj_info_t;
 
@@ -55,7 +55,7 @@ typedef struct
     uint64 data_id;
     uint64 step;
     uint32 obj_id;
-    uint8 is_delete;
+    uint64 is_delete;
 }cm_sync_db_record_t;
 
 
