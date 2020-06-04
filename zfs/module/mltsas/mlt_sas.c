@@ -799,6 +799,7 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 			GFP_KERNEL)) != NULL);
 
 	__Mlsas_Bump(virt_alloc);
+	__Mlsas_Bump(virt_kref);
 	
 	Mlbp->Mlb_st		 	= Mlsas_Devst_Standalone;
 	Mlbp->Mlb_hashkey 		= hash_key;
@@ -1302,6 +1303,7 @@ error_HDL:
 out:
 	if (sess != Mlsas_Noma_Session)
 		__Mlsas_put_rhost(rh);
+	__Mlsas_Free_Mms(mms);
 	return (0);
 }
 
@@ -1562,6 +1564,7 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 		return NULL;
 
 	__Mlsas_Bump(req_alloc);
+	__Mlsas_Bump(req_kref);
 
 	__Mlsas_get_virt(Mlb);
 
@@ -1875,7 +1878,7 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 	if (Mlbi && Mlbi->Mlbi_bio)
 		Mlbi->k_put = k_put;
 	else if (k_put)
-		__Mlsas_put_RQ(rq);
+		__Mlsas_sub_RQ(rq, k_put);
 }
 
 static uint32_t __Mlsas_Put_RQcomplete_Ref(Mlsas_request_t *rq,
@@ -2288,6 +2291,7 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 		return NULL;
 
 	__Mlsas_Bump(pr_rq_alloc);
+	__Mlsas_Bump(pr_rq_kref);
 
 	prr->prr_bsector = sec;
 	prr->prr_bsize = len;
@@ -2678,6 +2682,7 @@ static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss)
 		return NULL;
 
 	__Mlsas_Bump(rhost_alloc);
+	__Mlsas_Bump(rhost_kref);
 	
 	rh->Mh_session = tran_ss;
 	rh->Mh_hostid = id;
@@ -2708,6 +2713,7 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 		return NULL;
 
 	__Mlsas_Bump(pr_alloc);
+	__Mlsas_Bump(pr_kref);
 
 	kref_init(&pr->Mlpd_ref);
 	list_create(&pr->Mlpd_rqs, sizeof(Mlsas_request_t),
