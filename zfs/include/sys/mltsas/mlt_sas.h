@@ -394,16 +394,16 @@ struct Mlsas_rh {
 };
 
 typedef struct Mlsas_stat {
-	kstat_named_t Mlst_virt_alloc;
-	kstat_named_t Mlst_rhost_alloc;
-	kstat_named_t Mlst_pr_alloc;
-	kstat_named_t Mlst_req_alloc;
-	kstat_named_t Mlst_pr_rq_alloc;
-	kstat_named_t Mlst_virt_kref;
-	kstat_named_t Mlst_rhost_kref;
-	kstat_named_t Mlst_pr_kref;
-	kstat_named_t Mlst_req_kref;
-	kstat_named_t Mlst_pr_rq_kref;
+	kstat_named_t Mlst_virt_alloc_m;
+	kstat_named_t Mlst_rhost_alloc_m;
+	kstat_named_t Mlst_pr_alloc_m;
+	kstat_named_t Mlst_req_alloc_m;
+	kstat_named_t Mlst_pr_rq_alloc_m;
+	kstat_named_t Mlst_virt_kref_m;
+	kstat_named_t Mlst_rhost_kref_m;
+	kstat_named_t Mlst_pr_kref_m;
+	kstat_named_t Mlst_req_kref_m;
+	kstat_named_t Mlst_pr_rq_kref_m;
 } Mlsas_stat_t;
 
 struct Mlsas {
@@ -424,9 +424,9 @@ struct Mlsas {
 
 extern Mlsas_stat_t Mlsas_stat;
 
-#define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
-#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64);
-#define __Mlsas_Sub(stat, n)	atomic_sub_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
+#define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##_m.value.ui64, 1);
+#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##_m.value.ui64);
+#define __Mlsas_Sub(stat, n)	atomic_sub_64(&Mlsas_stat.Mlst_##stat##_m.value.ui64, n);
 
 
 /* =====================Define Message Type Struct=========================== */
