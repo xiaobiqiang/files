@@ -132,7 +132,7 @@ function install_centos_rely()
     fi
     
     cd centosrely
-    rpm -ivh ./* --nodeps --force
+    rpm -ivh *rpm --nodeps --force
     cd -
     
     install_java $rely_rpm/jdk8.tar

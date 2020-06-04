@@ -101,6 +101,7 @@ static sint32 cm_pmm_cluster_node_each(
     cm_node_info_t *pNode, cm_pmm_cluster_data_sum_t *pSum)
 {
     sint32 iRet = CM_FAIL;
+    cm_pmm_node_data_t data;
     cm_pmm_node_data_t *pdata = NULL;
     cm_pmm_cluster_data_t *pSumData = &pSum->data;
     uint32 len = 0;
@@ -119,6 +120,9 @@ static sint32 cm_pmm_cluster_node_each(
         CM_FREE(pdata);
         return CM_FAIL;
     }
+    CM_MEM_CPY(&data,sizeof(cm_pmm_node_data_t),pdata,sizeof(cm_pmm_node_data_t));
+    CM_FREE(pdata);
+    pdata = &data;
     pSumData->cpu_max = CM_MAX(pSumData->cpu_max,pdata->cpu);
     pSumData->cpu_avg += pdata->cpu;
     pSumData->mem_max = CM_MAX(pSumData->mem_max,pdata->mem);
@@ -131,7 +135,6 @@ static sint32 cm_pmm_cluster_node_each(
     pSumData->iops_total += pdata->iops_total;
     pSum->cnt += 1;
     
-    CM_FREE(pdata);
     return CM_OK;    
 }
 
@@ -139,6 +142,7 @@ static sint32 cm_pmm_cluster_subdomain_each(
     cm_subdomain_info_t *pinfo, cm_pmm_cluster_data_sum_t *pSum)
 {
     sint32 iRet = CM_FAIL;
+    cm_pmm_cluster_data_sum_t data;
     cm_pmm_cluster_data_sum_t *ptmp = NULL;
     cm_pmm_cluster_data_t *pSumData = &pSum->data;
     cm_pmm_cluster_data_t *pdata = NULL;
@@ -158,6 +162,9 @@ static sint32 cm_pmm_cluster_subdomain_each(
         CM_FREE(ptmp);
         return CM_FAIL;
     }
+    CM_MEM_CPY(&data,sizeof(cm_pmm_cluster_data_sum_t),ptmp,sizeof(cm_pmm_cluster_data_sum_t));
+    CM_FREE(ptmp);
+    ptmp = &data;
     pdata = &ptmp->data;
     pSumData->cpu_max = CM_MAX(pSumData->cpu_max,pdata->cpu_max);
     pSumData->cpu_avg += pdata->cpu_avg;
@@ -172,7 +179,6 @@ static sint32 cm_pmm_cluster_subdomain_each(
     
     pSum->cnt += ptmp->cnt;
     
-    CM_FREE(ptmp);
     return CM_OK;    
 }
 
