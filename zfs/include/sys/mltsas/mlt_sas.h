@@ -16,6 +16,7 @@
 #include <sys/cluster_san.h>
 #include <sys/modhash.h>
 #include <sys/callout.h>
+#include <sys/kstat.h>
 #include <mltsas_comm.h>
 
 #define Mlsas_MAJOR			299
@@ -132,8 +133,8 @@
 extern Mlsas_stat_t Mlsas_stat;
 
 #define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
-#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
-#define __Mlsas_Sub(stat, n)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
+#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64);
+#define __Mlsas_Sub(stat, n)	atomic_sub_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
 
 typedef enum Mlsas_tst Mlsas_tst_e;
 typedef enum Mlsas_ttype Mlsas_ttype_e;
