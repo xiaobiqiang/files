@@ -2133,7 +2133,7 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 		csh_rx_data_free(xd, B_FALSE);
 
 	if (pr_tofree)
-		__Mlsas_put_PR(pr);
+		__Mlsas_put_PR(pr_tofree);
 }
 
 static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, 
