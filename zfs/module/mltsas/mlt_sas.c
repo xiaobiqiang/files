@@ -126,7 +126,18 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16; 
-static Mlsas_stat_t Mlsas_stat;
+Mlsas_stat_t Mlsas_stat = {
+	{"virt_alloc", 			KSTAT_DATA_UINT64},
+	{"rhost_alloc",			KSTAT_DATA_UINT64},
+	{"pr_alloc",			KSTAT_DATA_UINT64},
+	{"req_alloc",			KSTAT_DATA_UINT64},
+	{"pr_rq_alloc",			KSTAT_DATA_UINT64},
+	{"virt_kref_remain",	KSTAT_DATA_UINT64},
+	{"rhost_kref_remain",	KSTAT_DATA_UINT64},
+	{"pr_kref_remain",		KSTAT_DATA_UINT64},
+	{"req_kref_remain",		KSTAT_DATA_UINT64},
+	{"pr_req_kref_remain",	KSTAT_DATA_UINT64},
+};
 static Mlsas_t Mlsas;
 static Mlsas_t *gMlsas_ptr = &Mlsas;
 
@@ -191,11 +202,13 @@ static void __Mlsas_Release_virt(struct kref *ref)
 
 inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt)
 {
+	__Mlsas_Bump(virt_kref);
 	kref_get(&vt->Mlb_ref);
 }
 
 inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt)
 {
+	__Mlsas_Down(virt_kref);
 	kref_put(&vt->Mlb_ref, __Mlsas_Release_virt);
 }
 
@@ -205,15 +218,18 @@ static void __Mlsas_Release_rhost(struct kref *ref)
 		Mlsas_rh_t, Mh_ref);
 
 	/* TODO: */
+	__Mlsas_Free_rhost(rh);
 }
 
 static inline void __Mlsas_get_rhost(Mlsas_rh_t *rh)
 {
+	__Mlsas_Bump(rhost_kref);
 	kref_get(&rh->Mh_ref);
 }
 
 static inline void __Mlsas_put_rhost(Mlsas_rh_t *rh)
 {
+	__Mlsas_Down(rhost_kref);
 	kref_put(&rh->Mh_ref, __Mlsas_Release_rhost);
 }
 
@@ -225,15 +241,19 @@ static void __Mlsas_Release_PR(struct kref *ref)
 	/* TODO: */
 	if (pr->Mlpd_rh)
 		__Mlsas_put_rhost(pr->Mlpd_rh);
+
+	__Mlsas_Free_PR(pr);
 }
 
 static inline void __Mlsas_get_PR(Mlsas_pr_device_t *pr)
 {
+	__Mlsas_Bump(pr_kref);
 	kref_get(&pr->Mlpd_ref);
 }
 
 static inline void __Mlsas_put_PR(Mlsas_pr_device_t *pr)
 {
+	__Mlsas_Down(pr_kref);
 	kref_put(&pr->Mlpd_ref, __Mlsas_Release_PR);
 }
 
@@ -776,6 +796,9 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 	
 	VERIFY((Mlbp = kzalloc(sizeof(Mlsas_blkdev_t), 
 			GFP_KERNEL)) != NULL);
+
+	__Mlsas_Bump(virt_alloc);
+	
 	Mlbp->Mlb_st		 	= Mlsas_Devst_Standalone;
 	Mlbp->Mlb_hashkey 		= hash_key;
 	Mlbp->Mlb_astxbuf_len 	= 32 << 10;
@@ -1537,6 +1560,8 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 			GFP_NOIO | __GFP_ZERO)) == NULL)
 		return NULL;
 
+	__Mlsas_Bump(req_alloc);
+
 	__Mlsas_get_virt(Mlb);
 
 	kref_init(&rq->Mlrq_ref);
@@ -1563,6 +1588,8 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 		__Mlsas_put_virt(rq->Mlrq_bdev);
 	if (rq->Mlrq_pr)
 		__Mlsas_put_PR(rq->Mlrq_pr);
+
+	__Mlsas_Down(req_alloc);
 	
 	rq->Mlrq_back_bio = NULL;
 	rq->Mlrq_bdev = NULL;
@@ -1571,16 +1598,19 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 
 static inline void __Mlsas_get_RQ(Mlsas_request_t *rq)
 {
+	__Mlsas_Bump(req_kref);
 	kref_get(&rq->Mlrq_ref);
 }
 
 static inline void __Mlsas_put_RQ(Mlsas_request_t *rq)
 {
+	__Mlsas_Down(req_kref);
 	kref_put(&rq->Mlrq_ref, __Mlsas_Release_RQ);
 }
 
 static inline void __Mlsas_sub_RQ(Mlsas_request_t *rq, uint32_t put)
 {
+	__Mlsas_Sub(req_kref, put);
 	kref_sub(&rq->Mlrq_ref, put, __Mlsas_Release_RQ);
 }
 
@@ -2256,6 +2286,8 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 			GFP_NOIO | __GFP_ZERO)) == NULL)
 		return NULL;
 
+	__Mlsas_Bump(pr_rq_alloc);
+
 	prr->prr_bsector = sec;
 	prr->prr_bsize = len;
 	prr->prr_pr_rq = reqid;
@@ -2268,8 +2300,7 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 
 void __Mlsas_Free_PR_RQ(Mlsas_pr_req_t *prr)
 {
-	if (prr->prr_pr)
-		__Mlsas_put_PR(prr->prr_pr);
+	__Mlsas_Down(pr_rq_alloc);
 	
 	mempool_free(prr, gMlsas_ptr->Ml_prr_mempool);
 }
@@ -2282,22 +2313,28 @@ static void __Mlsas_Release_PR_RQ(struct kref *ref)
 	if (!(prr->prr_flags & Mlsas_PRRfl_Write) &&
 		(prr->prr_flags & Mlsas_PRRfl_Addl_Kmem))
 		kmem_free(prr->prr_dt, prr->prr_dtlen);
+
+	if (prr->prr_pr)
+		__Mlsas_put_PR(prr->prr_pr);
 	
 	__Mlsas_Free_PR_RQ(prr);
 }
 
 inline void __Mlsas_get_PR_RQ(Mlsas_pr_req_t *prr)
 {
+	__Mlsas_Bump(pr_rq_kref);
 	kref_get(&prr->prr_ref);
 }
 
 inline void __Mlsas_put_PR_RQ(Mlsas_pr_req_t *prr)
 {
+	__Mlsas_Down(pr_rq_kref);
 	kref_put(&prr->prr_ref, __Mlsas_Release_PR_RQ);
 }
 
 inline void __Mlsas_sub_PR_RQ(Mlsas_pr_req_t *prr, uint32_t put)
 {
+	__Mlsas_Sub(pr_rq_kref, put);
 	kref_sub(&prr->prr_ref, put, __Mlsas_Release_PR_RQ);
 }
 
@@ -2638,6 +2675,8 @@ static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss)
 	if ((rh = kzalloc(sizeof(Mlsas_rh_t), 
 			GFP_KERNEL)) == NULL)
 		return NULL;
+
+	__Mlsas_Bump(rhost_alloc);
 	
 	rh->Mh_session = tran_ss;
 	rh->Mh_hostid = id;
@@ -2653,6 +2692,8 @@ static Mlsas_rh_t *__Mlsas_Alloc_rhost(uint32_t id, void *tran_ss)
 static void __Mlsas_Free_rhost(Mlsas_rh_t *rh)
 {
 	VERIFY(list_is_empty(&rh->Mh_devices));
+	
+	__Mlsas_Down(rhost_alloc);
 	kfree(rh);
 }
 
@@ -2664,6 +2705,8 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 	if ((pr = kzalloc(sizeof(Mlsas_pr_device_t),
 			GFP_KERNEL)) == NULL)
 		return NULL;
+
+	__Mlsas_Bump(pr_alloc);
 
 	kref_init(&pr->Mlpd_ref);
 	list_create(&pr->Mlpd_rqs, sizeof(Mlsas_request_t),
@@ -2690,8 +2733,7 @@ static void __Mlsas_Free_PR(Mlsas_pr_device_t *pr)
 	VERIFY(list_is_empty(&pr->Mlpd_rqs));
 	VERIFY(list_is_empty(&pr->Mlpd_pr_rqs));
 
-	if (pr->Mlpd_rh)
-		__Mlsas_put_rhost(pr->Mlpd_rh);
+	__Mlsas_Down(pr_alloc);
 
 	kfree(pr);
 }
@@ -2866,7 +2908,10 @@ static void Mlsas_install_stat(Mlsas_t *Mlsp)
 		KSTAT_FLAG_VIRTUAL);
 	if (Mlsp->Ml_kstat == NULL)
 		cmn_err(CE_NOTE, "Mlsas kstat create FAIL.");
-	else 
+	else {
+		Mlsp->Ml_kstat->ks_data = &Mlsas_stat;
+		kstat_install(Mlsp->Ml_kstat);
+	}
 }
 
 static struct file_operations Mlsas_drv_fops = {

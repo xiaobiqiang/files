@@ -129,6 +129,11 @@
 #define __Mlsas_Get_PR_if_not_state(pr, __maxSt)	\
 		((pr)->Mlpd_st <= (__maxSt))
 
+extern Mlsas_stat_t Mlsas_stat;
+
+#define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
+#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
+#define __Mlsas_Sub(stat, n)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
 
 typedef enum Mlsas_tst Mlsas_tst_e;
 typedef enum Mlsas_ttype Mlsas_ttype_e;
@@ -394,16 +399,16 @@ struct Mlsas_rh {
 };
 
 typedef struct Mlsas_stat {
-	kstat_named_t Mlst_virt;
-	kstat_named_t Mlst_rhost;
-	kstat_named_t Mlst_pr;
-	kstat_named_t Mlst_req;
-	kstat_named_t Mlst_pr_rqs;
+	kstat_named_t Mlst_virt_alloc;
+	kstat_named_t Mlst_rhost_alloc;
+	kstat_named_t Mlst_pr_alloc;
+	kstat_named_t Mlst_req_alloc;
+	kstat_named_t Mlst_pr_rq_alloc;
 	kstat_named_t Mlst_virt_kref;
 	kstat_named_t Mlst_rhost_kref;
 	kstat_named_t Mlst_pr_kref;
 	kstat_named_t Mlst_req_kref;
-	kstat_named_t Mlst_pr_rqs_kref;
+	kstat_named_t Mlst_pr_rq_kref;
 } Mlsas_stat_t;
 
 struct Mlsas {
