@@ -126,6 +126,7 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16; 
+static Mlsas_stat_t Mlsas_stat;
 static Mlsas_t Mlsas;
 static Mlsas_t *gMlsas_ptr = &Mlsas;
 
@@ -2857,6 +2858,17 @@ static void Mlsas_Init(Mlsas_t *Mlsp)
 	mutex_init(&Mlsp->Ml_mtx, NULL, MUTEX_DEFAULT, NULL);
 }
 
+static void Mlsas_install_stat(Mlsas_t *Mlsp)
+{
+	Mlsp->Ml_kstat = kstat_create(Mlsas_Module_Name, 0,
+		"Mlsas_stat", "misc", KSTAT_TYPE_NAMED, 
+		sizeof(Mlsas_stat)/sizeof(kstat_named_t), 
+		KSTAT_FLAG_VIRTUAL);
+	if (Mlsp->Ml_kstat == NULL)
+		cmn_err(CE_NOTE, "Mlsas kstat create FAIL.");
+	else 
+}
+
 static struct file_operations Mlsas_drv_fops = {
 	.owner = THIS_MODULE,
 	.open = Mlsas_Open,
@@ -2879,6 +2891,8 @@ static int __init __Mlsas_Init(void)
 	}
 
 	Mlsas_Init(gMlsas_ptr);
+
+	Mlsas_install_stat(gMlsas_ptr);
 out:
 	return iRet;
 }

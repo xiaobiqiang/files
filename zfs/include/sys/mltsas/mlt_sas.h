@@ -27,6 +27,8 @@
 #define Mlsas_Delayed_RQ	0x01
 #define Mlsas_Delayed_PR_RQ	0x02
 
+#define Mlsas_Module_Name	"Mlsas"
+
 /*
  * use clustersan
  */
@@ -391,6 +393,19 @@ struct Mlsas_rh {
 	void *Mh_session;
 };
 
+typedef struct Mlsas_stat {
+	kstat_named_t Mlst_virt;
+	kstat_named_t Mlst_rhost;
+	kstat_named_t Mlst_pr;
+	kstat_named_t Mlst_req;
+	kstat_named_t Mlst_pr_rqs;
+	kstat_named_t Mlst_virt_kref;
+	kstat_named_t Mlst_rhost_kref;
+	kstat_named_t Mlst_pr_kref;
+	kstat_named_t Mlst_req_kref;
+	kstat_named_t Mlst_pr_rqs_kref;
+} Mlsas_stat_t;
+
 struct Mlsas {
 	uint32_t Ml_state;
 	uint32_t Ml_minor;
@@ -403,6 +418,8 @@ struct Mlsas {
 	mempool_t *Ml_prr_mempool;
 	Mlsas_retry_t Ml_retry;
 	taskq_t *Ml_async_tq;
+
+	kstat_t *Ml_kstat;
 };
 
 /* =====================Define Message Type Struct=========================== */
