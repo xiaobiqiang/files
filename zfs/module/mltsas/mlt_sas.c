@@ -123,6 +123,7 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s,
 		Mlsas_pr_req_free_t *fr);
 static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr, uint32_t c_put);
 static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
+static void __Mlsas_Free_rhost(Mlsas_rh_t *rh);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16; 

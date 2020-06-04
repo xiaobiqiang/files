@@ -130,12 +130,6 @@
 #define __Mlsas_Get_PR_if_not_state(pr, __maxSt)	\
 		((pr)->Mlpd_st <= (__maxSt))
 
-extern Mlsas_stat_t Mlsas_stat;
-
-#define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
-#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64);
-#define __Mlsas_Sub(stat, n)	atomic_sub_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
-
 typedef enum Mlsas_tst Mlsas_tst_e;
 typedef enum Mlsas_ttype Mlsas_ttype_e;
 typedef struct Mlsas_backdev_info Mlsas_backdev_info_t;
@@ -427,6 +421,13 @@ struct Mlsas {
 
 	kstat_t *Ml_kstat;
 };
+
+extern Mlsas_stat_t Mlsas_stat;
+
+#define __Mlsas_Bump(stat)	atomic_add_64(&Mlsas_stat.Mlst_##stat##.value.ui64, 1);
+#define __Mlsas_Down(stat)	atomic_dec_64(&Mlsas_stat.Mlst_##stat##.value.ui64);
+#define __Mlsas_Sub(stat, n)	atomic_sub_64(&Mlsas_stat.Mlst_##stat##.value.ui64, n);
+
 
 /* =====================Define Message Type Struct=========================== */
 
