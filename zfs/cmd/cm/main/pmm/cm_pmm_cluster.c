@@ -123,6 +123,7 @@ static sint32 cm_pmm_cluster_node_each(
     CM_MEM_CPY(&data,sizeof(cm_pmm_node_data_t),pdata,sizeof(cm_pmm_node_data_t));
     CM_FREE(pdata);
     pdata = &data;
+    CM_LOG_ERR(CM_MOD_PMM,"pSumData=%p pdata=%p",pSumData,pdata);
     pSumData->cpu_max = CM_MAX(pSumData->cpu_max,pdata->cpu);
     pSumData->cpu_avg += pdata->cpu;
     pSumData->mem_max = CM_MAX(pSumData->mem_max,pdata->mem);
@@ -166,6 +167,7 @@ static sint32 cm_pmm_cluster_subdomain_each(
     CM_FREE(ptmp);
     ptmp = &data;
     pdata = &ptmp->data;
+    CM_LOG_ERR(CM_MOD_PMM,"pSumData=%p pdata=%p",pSumData,pdata);
     pSumData->cpu_max = CM_MAX(pSumData->cpu_max,pdata->cpu_max);
     pSumData->cpu_avg += pdata->cpu_avg;
     pSumData->mem_max = CM_MAX(pSumData->mem_max,pdata->mem_max);
