@@ -2150,9 +2150,6 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	Mlsas_pr_device_t *pr = RWm->rw_mlbpr;
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
-	csh_rx_data_free_ext(xd);
-	return ;
-
 	__Mlsas_get_PR(pr);
 
 	if (RWm->rw_flags & REQ_WRITE)
@@ -2219,8 +2216,6 @@ static void __Mlsas_RX_State_Change(Mlsas_Msh_t *mms,
 	int rval = 0;
 	Mlsas_State_Change_msg_t *scm = mms + 1;
 	Mlsas_blkdev_t *Mlb = NULL;
-
-	cmn_err(CE_NOTE, "RX STATE CHANGE");
 	
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if (((rval = mod_hash_find(gMlsas_ptr->Ml_devices, 
@@ -2902,6 +2897,8 @@ static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb,
 			&& (pr != prflt)  && 
 			(!prflt || (pr->Mlpd_hostid != prflt->Mlpd_hostid)))
 			rval = B_TRUE;
+		if (rval != B_TRUE)
+			pr = list_next(&Mlb->Mlb_pr_devices, pr);
 	}
 
 	return rval;
