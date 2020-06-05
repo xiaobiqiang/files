@@ -453,7 +453,7 @@ static int __Mlsas_Do_EnableSvc(void)
 	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
 
 	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
-	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
+//	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
 		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
 	
@@ -1142,7 +1142,7 @@ static void __Mlsas_PR_wait_list_empty(Mlsas_pr_device_t *pr, list_t *list)
 {
 	DEFINE_WAIT(wait);
 
-	while (!list_empty(list)) {
+	while (!list_is_empty(list)) {
 		prepare_to_wait(&pr->Mlpd_wait, &wait, TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(&pr->Mlpd_mlb->Mlb_rq_spin);
 		
@@ -1252,7 +1252,7 @@ static void __Mlsas_Virt_wait_list_empty(Mlsas_blkdev_t *vt, list_t *list)
 {
 	DEFINE_WAIT(wait);
 
-	while (!list_empty(list)) {
+	while (!list_is_empty(list)) {
 		prepare_to_wait(&vt->Mlb_wait, &wait, TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(&vt->Mlb_rq_spin);
 		
