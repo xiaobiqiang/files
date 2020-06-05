@@ -1570,6 +1570,7 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 	__Mlsas_get_virt(Mlb);
 
 	kref_init(&rq->Mlrq_ref);
+	rq->Mlrq_delayed_magic = Mlsas_Delayed_RQ;
 	rq->Mlrq_master_bio = bio;
 	rq->Mlrq_flags = (rw == WRITE ? Mlsas_RQ_Write : 0);
 	rq->Mlrq_bdev = Mlb;
@@ -2755,9 +2756,7 @@ static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz,
 	Mlsas_Msh_t *mms = NULL;
 	
 	extsz = (extsz + 7) & ~7;
-	if ((mms = kzalloc(Mms_sz + extsz, 
-			GFP_ATOMIC)) == NULL) 
-		return NULL;
+	VERIFY((mms = kzalloc(Mms_sz + extsz, GFP_ATOMIC) != NULL));
 
 	mms->Mms_ck = Mlsas_Mms_Magic;
 	mms->Mms_len = Mms_sz + extsz;

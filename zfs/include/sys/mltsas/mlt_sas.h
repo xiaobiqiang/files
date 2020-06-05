@@ -290,6 +290,7 @@ struct Mlsas_delayed_obj {
 
 struct Mlsas_request {
 	uint32_t Mlrq_delayed_magic;
+	list_node_t Mlrq_delayed_node;
 	list_node_t Mlrq_node;
 	list_node_t Mlrq_pr_node;
 	struct kref Mlrq_ref;
