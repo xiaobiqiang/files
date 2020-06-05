@@ -2257,6 +2257,7 @@ static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
 	
 	switch (scm->scm_event) {
 		case Mlsas_Devevt_Error_Switch:
+		case Mlsas_Devevt_PR_Error_Sw:
 			__Mlsas_Update_PR_st(pr, scm->scm_state);
 			break;
 	}
