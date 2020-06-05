@@ -1705,13 +1705,15 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 	Mlsas_Msh_t *mms = NULL;
 	Mlsas_Attach_msg_t *atm = NULL;
 	Mlsas_State_Change_msg_t *scm = NULL;
-	
+
+	if (Mlb->Mlb_st == newst)
+		return ;
+
 	cmn_err(CE_NOTE, "Mlsas Device(%s) Devst(%s --> %s), event(%s)",
 		Mlb->Mlb_bdi.Mlbd_path, Mlsas_devst_name[Mlb->Mlb_st],
 		Mlsas_devst_name[newst], Mlsas_devevt_name[what]);
 
-	if (Mlb->Mlb_st != newst)
-		Mlb->Mlb_st = newst;
+	Mlb->Mlb_st = newst;
 
 	if (pr && (what != Mlsas_Devevt_PR_Disconnect))
 		__Mlsas_get_rhost(pr->Mlpd_rh);
@@ -2148,6 +2150,9 @@ static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms,
 	Mlsas_pr_device_t *pr = RWm->rw_mlbpr;
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
+	csh_rx_data_free_ext(xd);
+	return ;
+
 	__Mlsas_get_PR(pr);
 
 	if (RWm->rw_flags & REQ_WRITE)
@@ -2214,6 +2219,8 @@ static void __Mlsas_RX_State_Change(Mlsas_Msh_t *mms,
 	int rval = 0;
 	Mlsas_State_Change_msg_t *scm = mms + 1;
 	Mlsas_blkdev_t *Mlb = NULL;
+
+	cmn_err(CE_NOTE, "RX STATE CHANGE");
 	
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if (((rval = mod_hash_find(gMlsas_ptr->Ml_devices, 
@@ -2756,7 +2763,7 @@ static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz,
 	Mlsas_Msh_t *mms = NULL;
 	
 	extsz = (extsz + 7) & ~7;
-	VERIFY((mms = kzalloc(Mms_sz + extsz, GFP_ATOMIC) != NULL));
+	VERIFY((mms = kzalloc(Mms_sz + extsz, GFP_ATOMIC)) != NULL);
 
 	mms->Mms_ck = Mlsas_Mms_Magic;
 	mms->Mms_len = Mms_sz + extsz;
