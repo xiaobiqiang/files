@@ -157,7 +157,8 @@ static const char *Mlsas_devevt_name[Mlsas_Devevt_Last] = {
 	[Mlsas_Devevt_Attach_Local]		=	"Local_Attach",
 	[Mlsas_Devevt_Attach_PR]		=	"Peer_Attach",
 	[Mlsas_Devevt_Error_Switch]		=	"Error_Switch",
-	[Mlsas_Devevt_PR_Error_Sw]		=	"Peer_Error_Switch"
+	[Mlsas_Devevt_PR_Error_Sw]		=	"Peer_Error_Switch",
+	[Mlsas_Devevt_PR_Disconnect]	=	"Peer_Disconnect"
 };
 
 static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
@@ -2755,7 +2756,7 @@ static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz,
 	
 	extsz = (extsz + 7) & ~7;
 	if ((mms = kzalloc(Mms_sz + extsz, 
-			GFP_NOIO)) == NULL) 
+			GFP_ATOMIC)) == NULL) 
 		return NULL;
 
 	mms->Mms_ck = Mlsas_Mms_Magic;
