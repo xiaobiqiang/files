@@ -244,5 +244,14 @@ function unload()
     rm -rf /lib/systemd/system/ceres_cm.service
 }
 
+function help()
+{   
+    echo "usage:"
+    echo ""
+    echo "  unload:           ./installrpm.sh unload"
+    echo "  install:          ./installrpm.sh install"
+    echo "  install rely:     ./installrpm.sh install_deepin_rely"
+}
+
 
 $*
