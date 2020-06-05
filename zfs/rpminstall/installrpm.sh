@@ -132,7 +132,7 @@ function install_centos_rely()
     fi
     
     cd centosrely
-    rpm -ivh ./* --nodeps --force
+    rpm -ivh *rpm --nodeps --force
     cd -
     
     install_java $rely_rpm/jdk8.tar
@@ -184,6 +184,19 @@ function install_drbd()
     rpm -ivh $drbddir/drbd-utils-rpm/*
 }
 
+function install_vmlinux1()
+{
+    if [ ! -f vmlinux1 ];
+        return
+    fi
+    cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
+    mv /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko.bak
+    cd /lib/modules/4.4.15-deepin-wutip
+    rm modules.dep
+    cd -
+    depmod -a
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
@@ -220,6 +233,7 @@ function install()
     install_gui
     install_scsi
     install_version
+    install_vmlinux1
     
     rm -rf rpm
     rm -rf scsi
@@ -242,6 +256,15 @@ function unload()
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
     rm -rf /lib/systemd/system/ceres_cm.service
+}
+
+function help()
+{   
+    echo "usage:"
+    echo ""
+    echo "  unload:           ./installrpm.sh unload"
+    echo "  install:          ./installrpm.sh install"
+    echo "  install rely:     ./installrpm.sh install_deepin_rely"
 }
 
 

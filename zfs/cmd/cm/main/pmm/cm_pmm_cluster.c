@@ -223,8 +223,14 @@ void cm_pmm_cluster_main(struct tm *tin)
 
 sint32 cm_pmm_cbk_sync_request(uint64 data_id, void *pdata, uint32 len)
 {
-    cm_pmm_cluster_data_sum_t *pSum = pdata;
-    cm_pmm_cluster_update(pSum);
+    cm_pmm_cluster_data_sum_t Sum;    
+    CM_MEM_ZERO(&Sum,sizeof(Sum));    
+    if(len > sizeof(Sum))    
+    {        
+        len = sizeof(Sum);    
+    }    
+    CM_MEM_CPY(&Sum,len,pdata,len);        
+    cm_pmm_cluster_update(&Sum);        
     return CM_OK;
 }
 
