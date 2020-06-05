@@ -184,6 +184,19 @@ function install_drbd()
     rpm -ivh $drbddir/drbd-utils-rpm/*
 }
 
+function install_vmlinux1()
+{
+    if [ ! -f vmlinux1 ];
+        return
+    fi
+    cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
+    mv /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko.bak
+    cd /lib/modules/4.4.15-deepin-wutip
+    rm modules.dep
+    cd -
+    depmod -a
+}
+
 function install()
 {
     if [  ! -f zfsonlinuxrpm.tar.gz ]; then
@@ -220,6 +233,7 @@ function install()
     install_gui
     install_scsi
     install_version
+    install_vmlinux1
     
     rm -rf rpm
     rm -rf scsi
