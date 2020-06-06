@@ -454,7 +454,7 @@ static int __Mlsas_Do_EnableSvc(void)
 	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
 
 	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
-//	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
+	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
 		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
 	
@@ -1168,6 +1168,8 @@ static void __Mlsas_PR_abort_sent_RQ(Mlsas_pr_device_t *pr)
 		VERIFY(!(rq->Mlrq_flags & Mlsas_RQ_Net_Done) &&
 			!(rq->Mlrq_flags & Mlsas_RQ_Net_OK));
 
+		VERIFY(rq->Mlrq_flags & Mlsas_RQ_Net_Pending);
+
 		rq->Mlrq_back_bio = ERR_PTR(-ECONNRESET);
 		__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_Netio, &m);
 
@@ -1192,8 +1194,17 @@ static void __Mlsas_PR_disconnect(Mlsas_pr_device_t *pr)
 	__Mlsas_PR_wait_list_empty(pr, &pr->Mlpd_pr_rqs);
 
 	__Mlsas_PR_wait_list_empty(pr, &pr->Mlpd_net_pr_rqs);
+
+	/* release remote hold */
+	__Mlsas_put_PR(pr);
+
+	list_remove(&vt->Mlb_pr_devices, pr);
 	
 	spin_unlock_irq(&vt->Mlb_rq_spin);
+
+	VERIFY(MUTEX_HELD(&pr->Mlpd_rh->Mh_mtx));
+	list_remove(&pr->Mlpd_rh->Mh_devices, pr);
+	__Mlsas_put_PR(pr);
 }
 
 static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
@@ -2442,11 +2453,9 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 	uint32_t what;
 	Mlsas_pr_req_free_t fr;
 
-	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted)
-		bio->bi_error = -ENXIO;
-	
 	if (unlikely(bio->bi_error)) {
 		/* TODO */
+		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
 		prr->prr_error = bio->bi_error;
 		if (unlikely(bio->bi_rw & REQ_DISCARD))
 			what = Mlsas_PRRst_Discard_Error;
@@ -2636,8 +2645,10 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 			"But !& Mlsas_PRRfl_Local_Aborted, flags(%x)", 
 			__func__, prr, prr->prr_flags);
 
-	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted)
+	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted) {
+		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
 		prr->prr_error = -ENXIO;
+	}
 	
 	iook = prr->prr_flags & Mlsas_PRRfl_Local_OK;
 	ok = prr->prr_flags & Mlsas_PRRfl_Net_OK;

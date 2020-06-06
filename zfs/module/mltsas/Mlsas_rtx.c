@@ -181,7 +181,7 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 			Mlsas_Rst_Net_Send_OK;
 	else
 		what = Mlsas_Rst_Net_Send_Error;
-	rq->Mlrq_back_bio = (what == Mlsas_Rst_Net_Send_OK) ?
+	rq->Mlrq_back_bio = (what == Mlsas_Rst_Net_Send_Error) ?
 		ERR_PTR(-ECONNRESET) : NULL;
 	__Mlsas_Req_Stmt(rq, what, &m);
 	spin_unlock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
