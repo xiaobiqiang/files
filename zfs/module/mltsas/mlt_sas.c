@@ -1233,7 +1233,7 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	Mlsas_Attach_msg_t *atm = NULL;
 	cluster_san_hostinfo_t *cshi = priv;
 
-	cluster_san_hostinfo_hold(cshi)
+	cluster_san_hostinfo_hold(cshi);
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (!__Mlsas_Get_ldev_if_state(vt, Mlsas_Devst_Attached)) {
