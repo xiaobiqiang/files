@@ -1789,9 +1789,6 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 	Mlsas_Attach_msg_t *atm = NULL;
 	Mlsas_State_Change_msg_t *scm = NULL;
 
-	if (Mlb->Mlb_st == newst)
-		return ;
-
 	cmn_err(CE_NOTE, "Mlsas Device(%s) Devst(%s --> %s), event(%s)",
 		Mlb->Mlb_bdi.Mlbd_path, Mlsas_devst_name[Mlb->Mlb_st],
 		Mlsas_devst_name[newst], Mlsas_devevt_name[what]);
