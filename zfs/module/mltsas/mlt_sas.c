@@ -1234,12 +1234,19 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	cluster_san_hostinfo_t *cshi = priv;
 
 	cluster_san_hostinfo_hold(cshi);
-	
+
+/*	
+ * 	we can find this virt, which represents that there was 
+ *	a physical disk ago, so we need to post attach message 
+ *	to establish mlb_pr key word.
+ */
+/* 
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (!__Mlsas_Get_ldev_if_state(vt, Mlsas_Devst_Attached)) {
 		spin_unlock_irq(&vt->Mlb_rq_spin);
 		return (0);
 	}
+*/
 
 	mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
 		Mlsas_Mms_Attach, vt->Mlb_hashkey, &atm);
