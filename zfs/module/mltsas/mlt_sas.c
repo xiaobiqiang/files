@@ -1290,8 +1290,11 @@ static void __Mlsas_HDL_rhost_down2up(cluster_san_hostinfo_t *cshi)
 	Mlsas_rh_t *rh = NULL;
 	
 	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
-	VERIFY(mod_hash_find(gMlsas_ptr->Ml_rhs, cshi->hostid, 
-		&rh) == MH_ERR_NOTFOUND);
+	/*
+	 * we can't do this check due to clustersan time sequence.
+	 */
+/*	VERIFY(mod_hash_find(gMlsas_ptr->Ml_rhs, cshi->hostid, 
+		&rh) == MH_ERR_NOTFOUND); */
 	
 	__Mlsas_walk_virt(cshi, __Mlsas_Virt_walk_cb_down2up);
 }
