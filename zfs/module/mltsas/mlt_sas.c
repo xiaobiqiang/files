@@ -219,6 +219,8 @@ static void __Mlsas_Release_rhost(struct kref *ref)
 	Mlsas_rh_t *rh = container_of(ref, 
 		Mlsas_rh_t, Mh_ref);
 
+	cluster_san_hostinfo_rele(rh->Mh_session);
+
 	/* TODO: */
 	__Mlsas_Free_rhost(rh);
 }
@@ -1220,8 +1222,6 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 		/* release pr */
 		__Mlsas_put_PR(pr);
 	}
-
-	cluster_san_hostinfo_rele(rh->Mh_session);
 	
 	mutex_exit(&rh->Mh_mtx);
 
