@@ -1174,7 +1174,7 @@ static void __Mlsas_PR_abort_sent_RQ(Mlsas_pr_device_t *pr)
 		__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_Netio, &m);
 
 		if (m.Mlbi_bio)
-			__Mlsas_Complete_Master_Bio(rq, m.Mlbi_bio);
+			__Mlsas_Complete_Master_Bio(rq, &m);
 	}
 }
 
@@ -1278,8 +1278,7 @@ static void __Mlsas_Virt_wait_list_empty(Mlsas_blkdev_t *vt, list_t *list)
 static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work)
 {
 	int rval = 0;
-	Mlsas_Msh_t *mms = container_of(work,
-			Mlsas_Msh_t, Mms_wk);
+	Mlsas_Msh_t *mms = container_of(work, Mlsas_Msh_t, Mms_wk);
 	Mlsas_rh_t *rh = mms->Mms_rh;
 	void *sess = Mlsas_Noma_Session;
 
@@ -1302,13 +1301,14 @@ error_HDL:
 	case Mlsas_Mms_Attach: 
 		cmn_err(CE_NOTE, "Tx async event(ATTACH) FAIL, hashkey(%llx), "
 			"state(%02x), rsp(%02x), ERROR(%d)", mms->Mms_hashkey,
-			((Mlsas_Attach_msg_t *)(mms + 1))->Atm_st,
+			Mlsas_devst_name[((Mlsas_Attach_msg_t *)(mms + 1))->Atm_st],
 			((Mlsas_Attach_msg_t *)(mms + 1))->Atm_rsp, rval);
 		break;
 	case Mlsas_Mms_State_Change:
 		cmn_err(CE_NOTE, "Tx async event(STATE_CHANGE) FAIL, hashkey(%llx), "
 			"state(%02x), ERROR(%d)", mms->Mms_hashkey,
-			((Mlsas_State_Change_msg_t *)(mms + 1))->scm_state, rval);
+			Mlsas_devst_name[((Mlsas_State_Change_msg_t *)(mms + 1))->scm_state], 
+			rval);
 		break;
 	}
 
