@@ -1162,7 +1162,7 @@ static void __Mlsas_PR_abort_sent_RQ(Mlsas_pr_device_t *pr)
 	Mlsas_request_t *rq, *next;
 
 	for (rq = list_head(&pr->Mlpd_rqs); rq; rq = next) {
-		next = list_next(&pr->Mlpd_rqs, pr);
+		next = list_next(&pr->Mlpd_rqs, rq);
 
 		if (!(rq->Mlrq_flags & Mlsas_RQ_Net_Sent))
 			continue;
