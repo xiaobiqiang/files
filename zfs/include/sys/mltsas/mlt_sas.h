@@ -435,12 +435,13 @@ extern Mlsas_stat_t Mlsas_stat;
 #define Mlsas_Mms_Magic			0x2020
 
 /* Message Type Define */
-#define Mlsas_Mms_None			0x00
-#define Mlsas_Mms_Attach		0x01
-#define Mlsas_Mms_Bio_RW		0x02
-#define Mlsas_Mms_Brw_Rsp		0x03
-#define Mlsas_Mms_State_Change	0x04
-#define Mlsas_Mms_Last			0x10
+#define Mlsas_Mms_None				0x00
+#define Mlsas_Mms_Attach			0x01
+#define Mlsas_Mms_Down2Up_Attach	0x02
+#define Mlsas_Mms_Bio_RW			0x03
+#define Mlsas_Mms_Brw_Rsp			0x04
+#define Mlsas_Mms_State_Change		0x05
+#define Mlsas_Mms_Last				0x10
 
 #define Mlsas_RXfl_Sync			0x01
 #define Mlsas_RXfl_Fua			0x02
@@ -543,4 +544,7 @@ extern inline void __Mlsas_put_PR_RQ(Mlsas_pr_req_t *prr);
 extern inline void __Mlsas_get_PR_RQ(Mlsas_pr_req_t *prr);
 extern inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt);
 extern inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt);
+extern inline void __Mlsas_walk_virt(void *priv,
+		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *));
+
 #endif

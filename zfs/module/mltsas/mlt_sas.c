@@ -1209,6 +1209,53 @@ static void __Mlsas_PR_disconnect(Mlsas_pr_device_t *pr)
 	__Mlsas_put_PR(pr);
 }
 
+static int __Mlsas_Tx_virt_down2up_attach(Mlsas_rtx_wk_t *w)
+{
+	int rval = 0;
+	Mlsas_Msh_t *mms = container_of(w, Mlsas_Msh_t, Mms_wk);
+	cluster_san_hostinfo_t *cshi = (cluster_san_hostinfo_t *)mms->Mms_rh;
+	
+	if ((rval = Mlsas_TX(cshi, mms, mms->Mms_len, 
+			NULL, 0, B_FALSE)) != 0)
+		cmn_err(CE_NOTE, "TX VIRT(0x%llx) attach_message FAIL,"
+			"ERROR(%d) when UP2DOWN", mms->Mms_hashkey, rval);
+
+	cluster_san_hostinfo_rele(cshi);
+
+	return (0);
+}
+
+static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key, 
+		mod_hash_val_t *val, void *priv)
+{
+	Mlsas_blkdev_t *vt = (Mlsas_blkdev_t *)val;
+	Mlsas_Msh_t *mms = NULL;
+	Mlsas_Attach_msg_t *atm = NULL;
+	cluster_san_hostinfo_t *cshi = priv;
+
+	cluster_san_hostinfo_hold(cshi)
+	
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	if (!__Mlsas_Get_ldev_if_state(vt, Mlsas_Devst_Attached)) {
+		spin_unlock_irq(&vt->Mlb_rq_spin);
+		return (0);
+	}
+
+	mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
+		Mlsas_Mms_Attach, vt->Mlb_hashkey, &atm);
+	mms->Mms_rh = (Mlsas_rh_t *)cshi;
+	mms->Mms_wk.rtw_fn = __Mlsas_Tx_virt_down2up_attach;
+	atm->Atm_rsp = 1;
+	atm->Atm_st = vt->Mlb_st;
+	atm->Atm_pr = 0;
+	
+	__Mlsas_Queue_RTX(&vt->Mlb_tx_wq, &mms->Mms_wk);
+
+	spin_unlock_irq(&vt->Mlb_rq_spin);
+	
+	return (0);
+}
+
 static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 {
 	Mlsas_pr_device_t *pr = NULL, *next;
@@ -1231,11 +1278,15 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 	__Mlsas_put_rhost(rh);
 }
 
-static void __Mlsas_HDL_rhost_down2up(Mlsas_rh_t *rh)
+static void __Mlsas_HDL_rhost_down2up(cluster_san_hostinfo_t *cshi)
 {
-	mutex_enter(&rh->Mh_mtx);
-
-	mutex_exit(&rh->Mh_mtx);
+	Mlsas_rh_t *rh = NULL;
+	
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
+	VERIFY(mod_hash_find(gMlsas_ptr->Ml_rhs, cshi->hostid, 
+		&rh) == MH_ERR_NOTFOUND);
+	
+	__Mlsas_walk_virt(cshi, __Mlsas_Virt_walk_cb_down2up);
 }
 
 static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi, 
@@ -1255,7 +1306,7 @@ static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
 				__func__, cshi->hostid);
 		break;
 	case LINK_EVT_DOWN_TO_UP:
-//		__Mlsas_HDL_rhost_down2up(rh);
+		__Mlsas_HDL_rhost_down2up(cshi);
 		break;
 	default:
 		VERIFY(0);
@@ -1371,6 +1422,12 @@ static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt)
 		
 		prr = next;
 	}
+}
+
+inline void __Mlsas_walk_virt(void *priv,
+		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *))
+{
+	mod_hash_walk(gMlsas_ptr->Ml_devices, cb, priv);
 }
 
 static blk_qc_t __Mlsas_Make_Request_fn(struct request_queue *rq, struct bio *bio)
