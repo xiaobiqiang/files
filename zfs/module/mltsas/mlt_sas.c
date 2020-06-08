@@ -1217,6 +1217,8 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
 		next = list_next(&rh->Mh_devices, pr);
 		__Mlsas_PR_disconnect(pr);
+		/* release pr */
+		__Mlsas_put_PR(pr);
 	}
 
 	cluster_san_hostinfo_rele(rh->Mh_session);
@@ -1224,6 +1226,9 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 	mutex_exit(&rh->Mh_mtx);
 
 	__Mlsas_remove_rhost_locked(rh);
+
+	/* release rhost */
+	__Mlsas_put_rhost(rh);
 }
 
 static void __Mlsas_HDL_rhost_down2up(Mlsas_rh_t *rh)
