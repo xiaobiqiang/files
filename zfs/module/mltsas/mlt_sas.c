@@ -1250,7 +1250,7 @@ static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
 				__func__, cshi->hostid);
 		break;
 	case LINK_EVT_DOWN_TO_UP:
-		__Mlsas_HDL_rhost_down2up(rh);
+//		__Mlsas_HDL_rhost_down2up(rh);
 		break;
 	default:
 		VERIFY(0);
@@ -1300,13 +1300,13 @@ error_HDL:
 	switch (mms->Mms_type) {
 	case Mlsas_Mms_Attach: 
 		cmn_err(CE_NOTE, "Tx async event(ATTACH) FAIL, hashkey(%llx), "
-			"state(%02x), rsp(%02x), ERROR(%d)", mms->Mms_hashkey,
+			"state(%s), rsp(%02x), ERROR(%d)", mms->Mms_hashkey,
 			Mlsas_devst_name[((Mlsas_Attach_msg_t *)(mms + 1))->Atm_st],
 			((Mlsas_Attach_msg_t *)(mms + 1))->Atm_rsp, rval);
 		break;
 	case Mlsas_Mms_State_Change:
 		cmn_err(CE_NOTE, "Tx async event(STATE_CHANGE) FAIL, hashkey(%llx), "
-			"state(%02x), ERROR(%d)", mms->Mms_hashkey,
+			"state(%s), ERROR(%d)", mms->Mms_hashkey,
 			Mlsas_devst_name[((Mlsas_State_Change_msg_t *)(mms + 1))->scm_state], 
 			rval);
 		break;
