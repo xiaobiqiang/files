@@ -1260,7 +1260,7 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 		Mlsas_Mms_Attach, vt->Mlb_hashkey, &atm);
 	mms->Mms_rh = (Mlsas_rh_t *)cshi;
 	mms->Mms_wk.rtw_fn = __Mlsas_Tx_virt_down2up_attach;
-	atm->Atm_rsp = 1;
+	atm->Atm_rsp = 0;
 	atm->Atm_st = vt->Mlb_st;
 	atm->Atm_pr = 0;
 	atm->Atm_down2up_attach = 1;
