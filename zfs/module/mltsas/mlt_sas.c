@@ -1977,6 +1977,8 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		list_remove(&rq->Mlrq_pr->Mlpd_rqs, rq);
 		if (list_is_empty(&rq->Mlrq_pr->Mlpd_rqs))
 			wake_up(&rq->Mlrq_pr->Mlpd_wait);
+		if (list_is_empty(&Mlb->Mlb_topr_rqs))
+			wake_up(&Mlb->Mlb_wait);
 	}
 
 	if ((oflg & Mlsas_RQ_Net_Queued) &&
