@@ -2356,6 +2356,7 @@ static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
 	switch (scm->scm_event) {
 		case Mlsas_Devevt_Error_Switch:
 			what = Mlsas_PRevt_Error_Sw;
+			break;
 		case Mlsas_Devevt_Hard_Stchg:
 			what = Mlsas_PRevt_Hardly_Update;
 			break;
@@ -2930,7 +2931,7 @@ static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr,
 	if (pr->Mlpd_st == st)
 		return ;
 
-	cmn_err(CE_NOTE, "%s Update PR(%0xllx)(oSt(%s) --> nSt(%s)), what(%s)", 
+	cmn_err(CE_NOTE, "%s Update PR(0x%llx)(oSt(%s) --> nSt(%s)), what(%s)", 
 		__func__, pr->Mlpd_mlb->Mlb_hashkey, Mlsas_devst_name[pr->Mlpd_st], 
 		Mlsas_devst_name[st], Mlsas_PRevt_name[what]);
 
