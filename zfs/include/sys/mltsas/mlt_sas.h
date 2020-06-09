@@ -112,11 +112,20 @@
 #define Mlsas_Devevt_Attach_Error	0x02
 #define Mlsas_Devevt_Attach_OK		0x03
 #define Mlsas_Devevt_Attach_Local	0x04
-#define Mlsas_Devevt_Attach_PR		0x05
+#define Mlsas_Devevt_PR_Attach		0x05
 #define Mlsas_Devevt_Error_Switch	0x06
 #define Mlsas_Devevt_PR_Error_Sw	0x07
 #define Mlsas_Devevt_PR_Disconnect	0x08
+#define Mlsas_Devevt_PR_Down2up		0x09
+#define Mlsas_Devevt_Hard_Stchg		0x0A
 #define Mlsas_Devevt_Last			0x10
+
+#define Mlsas_PRevt_Attach_OK		0x01
+#define Mlsas_PRevt_Error_Sw		0x02
+#define	Mlsas_PRevt_Disconnect		0x03
+#define Mlsas_PRevt_PR_Down2up		0x04
+#define Mlsas_PRevt_Hardly_Update	0x05
+#define Mlsas_PRevt_Last			0x10
 
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
 	((Mlb)->Mlb_st >= (__minSt))
@@ -471,7 +480,8 @@ struct Mlsas_Msh {
 typedef struct Mlsas_Attach_msg {
 	uint32_t Atm_st;
 	uint32_t Atm_rsp:1,
-			 Atm_rsvd:31;
+			 Atm_down2up_attach:1,
+			 Atm_rsvd:30;
 	uint64_t Atm_pr;
 	uint64_t Atm_ext;
 } Mlsas_Attach_msg_t;

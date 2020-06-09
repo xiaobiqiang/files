@@ -82,7 +82,7 @@ static int __Mlsas_Do_Aggregate_Virt_impl(const char *path,
 static void __Mlsas_Attach_Local_Phys(struct block_device *phys, 
 		const char *path, Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr, 
-		Mlsas_devst_e st);
+		Mlsas_devst_e st, uint32_t what);
 static Mlsas_pr_device_t *__Mlsas_Lookup_PR_locked(
 		Mlsas_blkdev_t *Mlb, uint32_t hostid);
 static Mlsas_rh_t *__Mlsas_Lookup_rhost_locked(uint32_t hostid);
@@ -155,10 +155,20 @@ static const char *Mlsas_devevt_name[Mlsas_Devevt_Last] = {
 	[Mlsas_Devevt_Attach_Error]		= 	"Attach_Error",
 	[Mlsas_Devevt_Attach_OK]		=	"Attach_OK",
 	[Mlsas_Devevt_Attach_Local]		=	"Local_Attach",
-	[Mlsas_Devevt_Attach_PR]		=	"Peer_Attach",
+	[Mlsas_Devevt_PR_Attach]		=	"Peer_Attach",
 	[Mlsas_Devevt_Error_Switch]		=	"Error_Switch",
 	[Mlsas_Devevt_PR_Error_Sw]		=	"Peer_Error_Switch",
-	[Mlsas_Devevt_PR_Disconnect]	=	"Peer_Disconnect"
+	[Mlsas_Devevt_PR_Disconnect]	=	"Peer_Disconnect",
+	[Mlsas_Devevt_PR_Down2up]		=	"Peer_Down2up",
+	[Mlsas_Devevt_Hard_Stchg]		=	"Hardly_Stchg"
+};
+
+static const char *Mlsas_PRevt_name[Mlsas_PRevt_Last] = {
+	[Mlsas_PRevt_Attach_OK]			=	"PR_Attach_OK",
+	[Mlsas_PRevt_Error_Sw]			=	"PR_Error_Switch",
+	[Mlsas_PRevt_Disconnect]		=	"PR_Disconnect",
+	[Mlsas_PRevt_PR_Down2up]		=	"PR_Down2up",
+	[Mlsas_PRevt_Hardly_Update]		=	"PR_Hardly_Update"
 };
 
 static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
@@ -1185,9 +1195,7 @@ static void __Mlsas_PR_disconnect(Mlsas_pr_device_t *pr)
 	Mlsas_blkdev_t *vt = pr->Mlpd_mlb;
 
 	spin_lock_irq(&vt->Mlb_rq_spin);
-	/* avoid tx mms */
-	__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_PR_Disconnect, pr);
-	__Mlsas_Update_PR_st(pr, Mlsas_Devst_Failed);
+	__Mlsas_Update_PR_st(pr, Mlsas_Devst_Failed, Mlsas_PRevt_Disconnect);
 
 	__Mlsas_PR_abort_sent_RQ(pr);
 
@@ -1255,6 +1263,7 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	atm->Atm_rsp = 1;
 	atm->Atm_st = vt->Mlb_st;
 	atm->Atm_pr = 0;
+	atm->Atm_down2up_attach = 1;
 	
 	__Mlsas_Queue_RTX(&vt->Mlb_tx_wq, &mms->Mms_wk);
 
@@ -1739,13 +1748,16 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		Mlsas_pr_device_t *pr)
 {
 	Mlsas_devst_e next = Mlsas_Devst_Last;
+
+	if (what == Mlsas_Devevt_PR_Down2up)
+		next = Mlb->Mlb_st;
 	
 	switch (Mlb->Mlb_st) {
 	case Mlsas_Devst_Standalone:
 	case Mlsas_Devst_Failed:
 		if (what == Mlsas_Devevt_Attach_OK)
 			next = Mlsas_Devst_Attached;
-		else if (what == Mlsas_Devevt_Attach_PR)
+		else if (what == Mlsas_Devevt_PR_Attach)
 			next = Mlsas_Devst_Degraded;
 		break;
 	case Mlsas_Devst_Degraded:
@@ -1759,7 +1771,7 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 				Mlsas_Devst_Last : Mlsas_Devst_Failed;
 		break;
 	case Mlsas_Devst_Attached:
-		if (what == Mlsas_Devevt_Attach_PR)
+		if (what == Mlsas_Devevt_PR_Attach)
 			next = Mlsas_Devst_Healthy;
 		else if (what == Mlsas_Devevt_Error_Switch)
 			next = Mlsas_Devst_Failed;
@@ -1770,7 +1782,7 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 				Mlsas_Devst_Degraded : Mlsas_Devst_Failed;
 		else if (what == Mlsas_Devevt_PR_Error_Sw)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
-				Mlsas_Devst_Healthy : Mlsas_Devst_Attached;
+				Mlsas_Devst_Last : Mlsas_Devst_Attached;
 		else if (what == Mlsas_Devevt_PR_Disconnect)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Last : Mlsas_Devst_Attached;
@@ -1799,8 +1811,9 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		__Mlsas_get_rhost(pr->Mlpd_rh);
 
 	switch (what) {
+	case Mlsas_Devevt_PR_Down2up:
 	case Mlsas_Devevt_Attach_OK:
-	case Mlsas_Devevt_Attach_PR:
+	case Mlsas_Devevt_PR_Attach:
 		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
 			Mlsas_Mms_Attach, Mlb->Mlb_hashkey, &atm);
 		mms->Mms_rh = pr ? pr->Mlpd_rh : NULL;
@@ -1810,6 +1823,7 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		atm->Atm_rsp = 1;
 		break;
 	case Mlsas_Devevt_PR_Error_Sw:
+		what = Mlsas_Devevt_Hard_Stchg;
 	case Mlsas_Devevt_Error_Switch:
 		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_State_Change_msg_t), 
 			Mlsas_Mms_State_Change, Mlb->Mlb_hashkey, &scm);
@@ -2049,7 +2063,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 		 * set to Mlsas_Devst_Degraded now.
 		 */
 		if (pr && (++pr->Mlpd_error_now >= pr->Mlpd_switch)) {
-			__Mlsas_Update_PR_st(pr, Mlsas_Devst_Degraded);
+			__Mlsas_Update_PR_st(pr, Mlsas_Devst_Degraded, Mlsas_PRevt_Error_Sw);
 		} else if (!(rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)){
 			if (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch)
 				__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
@@ -2172,6 +2186,7 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	Mlsas_pr_device_t *pr, *exist = NULL, *pr_tofree = NULL;
 	Mlsas_rh_t *rh = NULL;
 	boolean_t new_rh = B_FALSE;
+	uint32_t what = Mlsas_PRevt_Attach_OK;
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if ((rval = mod_hash_find(gMlsas_ptr->Ml_rhs, 
@@ -2206,7 +2221,9 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	if (Atm->Atm_rsp)
 		pr->Mlpd_pr = Atm->Atm_pr;
 
-	__Mlsas_Update_PR_st(pr, Atm->Atm_st);
+	if (Atm->Atm_down2up_attach)
+		what = Mlsas_PRevt_PR_Down2up;
+	__Mlsas_Update_PR_st(pr, Atm->Atm_st, what);
 	
 	spin_unlock(&Mlb->Mlb_rq_spin);
 	mutex_exit(&rh->Mh_mtx);
@@ -2328,6 +2345,7 @@ static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
 	Mlsas_blkdev_t *vt = (Mlsas_blkdev_t *)scm->scm_ext;
 	Mlsas_pr_device_t *pr = (Mlsas_pr_device_t *)scm->scm_pr;
 	cluster_san_hostinfo_t *cshi = xd->cs_private;
+	uint32_t what;
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (pr == NULL)
@@ -2337,10 +2355,14 @@ static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
 	
 	switch (scm->scm_event) {
 		case Mlsas_Devevt_Error_Switch:
-		case Mlsas_Devevt_PR_Error_Sw:
-			__Mlsas_Update_PR_st(pr, scm->scm_state);
+			what = Mlsas_PRevt_Error_Sw;
+		case Mlsas_Devevt_Hard_Stchg:
+			what = Mlsas_PRevt_Hardly_Update;
 			break;
 	}
+
+	if (what < Mlsas_PRevt_Last)
+		__Mlsas_Update_PR_st(pr, scm->scm_state, what);
 out:
 	spin_unlock_irq(&vt->Mlb_rq_spin);
 
@@ -2903,19 +2925,39 @@ static void __Mlsas_remove_rhost_locked(Mlsas_rh_t *rh)
 }
 
 static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr, 
-		Mlsas_devst_e st)
+		Mlsas_devst_e st, uint32_t what)
 {
 	if (pr->Mlpd_st == st)
 		return ;
 
-	cmn_err(CE_NOTE, "%s Update PR(oSt(%s) --> nSt(%s))", __func__, 
-		Mlsas_devst_name[pr->Mlpd_st], Mlsas_devst_name[st]);
-	
+	cmn_err(CE_NOTE, "%s Update PR(%0xllx)(oSt(%s) --> nSt(%s)), what(%s)", 
+		__func__, pr->Mlpd_mlb->Mlb_hashkey, Mlsas_devst_name[pr->Mlpd_st], 
+		Mlsas_devst_name[st], Mlsas_PRevt_name[what]);
+
 	pr->Mlpd_st = st;
-	if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
-		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_Attach_PR, pr);
-	if (__Mlsas_Get_PR_if_not_state(pr, Mlsas_Devst_Degraded))
-		__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Error_Sw, pr);
+	
+	switch (what) {
+	case Mlsas_PRevt_Attach_OK:
+		if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Attach, pr);
+		break;
+	case Mlsas_PRevt_Error_Sw:
+		if (__Mlsas_Get_PR_if_not_state(pr, Mlsas_Devst_Degraded))
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Error_Sw, pr);
+		break;
+	case Mlsas_PRevt_Disconnect:
+		if (__Mlsas_Get_PR_if_not_state(pr, Mlsas_Devst_Degraded))
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Disconnect, pr);
+		break;
+	case Mlsas_PRevt_PR_Down2up:
+		if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Attach, pr);
+		else
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Down2up, pr);
+		break;
+	case Mlsas_PRevt_Hardly_Update:
+		break;
+	}
 }
 
 void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
