@@ -290,6 +290,8 @@ struct Mlsas_blkdev {
 
 	uint32_t Mlb_switch;
 	uint32_t Mlb_error_cnt;
+
+	boolean_t Mlb_in_resume_virt;
 };
 
 struct Mlsas_delayed_obj {

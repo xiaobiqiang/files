@@ -723,11 +723,18 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (!__Mlsas_Get_ldev_if_state_between(vt, 
-			Mlsas_Devst_Standalone,
+			Mlsas_Devst_Failed,
 			Mlsas_Devst_Degraded))
 		rval = -EINVAL;
-	if (rval == 0) 
-		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK, NULL);	
+	else if (vt->Mlb_in_resume_virt)
+		rval = -EALREADY;
+	if (rval == 0) {
+		vt->Mlb_in_resume_virt = B_TRUE;
+		/* HDL write conflicts */
+		__Mlsas_Virt_wait_list_empty(vt, &vt->Mlb_topr_rqs);
+		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK, NULL);
+		vt->Mlb_in_resume_virt = B_FALSE;
+	}
 	spin_unlock_irq(&vt->Mlb_rq_spin);
 
 	return rval;
@@ -1526,6 +1533,11 @@ static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb,
 
 	if (*do_local)
 		return ;
+
+	if (Mlb->Mlb_in_resume_virt) {
+		__Mlsas_Restart_DelayedRQ(rq);
+		return ;
+	}
 
 	pr = list_head(&Mlb->Mlb_pr_devices);
 	while (pr != NULL) {
