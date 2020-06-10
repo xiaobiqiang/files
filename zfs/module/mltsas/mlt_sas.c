@@ -187,6 +187,10 @@ static int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uin
 static int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
 static void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
+static void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
+static void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
+static void (*__Mlsas_clustersan_rx_data_free)(cs_rx_data_t *, boolean_t );
+static void (*__Mlsas_clustersan_rx_data_free_ext)(cs_rx_data_t *);
 
 static int Mlsas_Disk_Open(struct block_device *, fmode_t);
 static void Mlsas_Disk_Release(struct gendisk *, fmode_t);
@@ -238,7 +242,7 @@ static void __Mlsas_Release_rhost(struct kref *ref)
 	Mlsas_rh_t *rh = container_of(ref, 
 		Mlsas_rh_t, Mh_ref);
 
-	cluster_san_hostinfo_rele(rh->Mh_session);
+	__Mlsas_clustersan_hostinfo_rele(rh->Mh_session);
 
 	/* TODO: */
 	__Mlsas_Free_rhost(rh);
@@ -1181,7 +1185,7 @@ static void Mlsas_RX(cs_rx_data_t *xd, void *priv)
 	return ;
 	
 free_xd:
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 }
 
 int Mlsas_TX(void *session, void *header, uint32_t hdlen,
@@ -1194,14 +1198,14 @@ int Mlsas_TX(void *session, void *header, uint32_t hdlen,
 		session = Mlsas_Noma_Session;
 	
 	if (session == Mlsas_Noma_Session)
-		cluster_san_broadcast_send(dt, dtlen, 
+		__Mlsas_clustersan_broadcast_send(dt, dtlen, 
 			header, hdlen, msg_type, 0);
 	else if (likely(io))
-		rval = cluster_san_host_send_bio(session, 
+		rval = __Mlsas_clustersan_host_send_bio(session, 
 			dt, dtlen, header, hdlen, 
 			msg_type,  0, B_TRUE, 3);
 	else 
-		rval = cluster_san_host_send(session, 
+		rval = __Mlsas_clustersan_host_send(session, 
 			dt, dtlen, header, hdlen, 
 			msg_type, 0, B_TRUE, 3);
 
@@ -1285,7 +1289,7 @@ static int __Mlsas_Tx_virt_down2up_attach(Mlsas_rtx_wk_t *w)
 		cmn_err(CE_NOTE, "TX VIRT(0x%llx) attach_message FAIL,"
 			"ERROR(%d) when UP2DOWN", mms->Mms_hashkey, rval);
 
-	cluster_san_hostinfo_rele(cshi);
+	__Mlsas_clustersan_hostinfo_rele(cshi);
 
 	return (0);
 }
@@ -1298,7 +1302,7 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	Mlsas_Attach_msg_t *atm = NULL;
 	cluster_san_hostinfo_t *cshi = priv;
 
-	cluster_san_hostinfo_hold(cshi);
+	__Mlsas_clustersan_hostinfo_hold(cshi);
 
 /*	
  * 	we can find this virt, which represents that there was 
@@ -2237,7 +2241,7 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 	return ;
 
 failed:
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 }
 
 static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
@@ -2296,9 +2300,9 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	__Mlsas_put_virt(Mlb);
 
 	if (exist || !new_rh)
-		csh_rx_data_free_ext(xd);
+		__Mlsas_clustersan_rx_data_free_ext(xd);
 	else if (new_rh) 
-		csh_rx_data_free(xd, B_FALSE);
+		__Mlsas_clustersan_rx_data_free(xd, B_FALSE);
 
 	if (pr_tofree)
 		__Mlsas_put_PR(pr_tofree);
@@ -2355,7 +2359,7 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 				xd->data, xd->data_len);
 	}
 
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	rq->Mlrq_back_bio= NULL;
@@ -2399,7 +2403,7 @@ static void __Mlsas_RX_State_Change(Mlsas_Msh_t *mms,
 	return ;
 
 failed:
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 }	
 
 static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd)
@@ -2433,7 +2437,7 @@ out:
 
 	__Mlsas_put_virt(vt);
 
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 }
 
 static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
@@ -3126,34 +3130,34 @@ static void __Mlsas_create_retry(Mlsas_retry_t *retry)
 
 static void __Mlsas_clustersan_modload(nvlist_t *nvl)
 {
-	uint64_t cluster_san_host_send_ptr = 0;
-	uint64_t cluster_san_host_send_bio_ptr = 0;
-	uint64_t cluster_san_broadcast_send_ptr = 0;
-	uint64_t cluster_san_rx_hook_add_ptr = 0;
-	uint64_t cluster_san_link_evt_add_ptr = 0;
-
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_rx_hook_add", 
-		&cluster_san_rx_hook_add_ptr) == 0);
+		&__Mlsas_clustersan_rx_hook_add) == 0);
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_link_evt_hook_add", 
-		&cluster_san_link_evt_add_ptr) == 0);
+		&__Mlsas_clustersan_link_evt_hook_add) == 0);
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_host_send", 
-		&cluster_san_host_send_ptr) == 0);
+		&__Mlsas_clustersan_host_send) == 0);
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_host_send_bio", 
-		&cluster_san_host_send_bio_ptr) == 0);
+		&__Mlsas_clustersan_host_send_bio) == 0);
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_broadcast_send", 
-		&cluster_san_broadcast_send_ptr) == 0);
+		&__Mlsas_clustersan_broadcast_send) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_hostinfo_hold", 
+		&__Mlsas_clustersan_hostinfo_hold) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_hostinfo_rele", 
+		&__Mlsas_clustersan_hostinfo_rele) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_rx_data_free", 
+		&__Mlsas_clustersan_rx_data_free) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_rx_data_free_ext", 
+		&__Mlsas_clustersan_rx_data_free_ext) == 0);
 
-	VERIFY(!IS_ERR_OR_NULL(cluster_san_rx_hook_add_ptr) &&
-		!IS_ERR_OR_NULL(cluster_san_link_evt_add_ptr) &&
-		!IS_ERR_OR_NULL(cluster_san_host_send_ptr) &&
-		!IS_ERR_OR_NULL(cluster_san_host_send_bio_ptr) &&
-		!IS_ERR_OR_NULL(cluster_san_broadcast_send_ptr));
-
-	__Mlsas_clustersan_rx_hook_add 			= (intptr_t)cluster_san_rx_hook_add_ptr;
-	__Mlsas_clustersan_link_evt_hook_add 	= (intptr_t)cluster_san_link_evt_add_ptr;
-	__Mlsas_clustersan_host_send 			= (intptr_t)cluster_san_host_send_ptr;
-	__Mlsas_clustersan_host_send_bio 		= (intptr_t)cluster_san_host_send_bio_ptr;
-	__Mlsas_clustersan_broadcast_send 		= (intptr_t)cluster_san_broadcast_send_ptr;
+	VERIFY(!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_hook_add) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_link_evt_hook_add) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_host_send) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_host_send_bio) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_broadcast_send) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_hostinfo_hold) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_hostinfo_rele) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_data_free) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_data_free_ext));
 }
 
 static void Mlsas_Init(Mlsas_t *Mlsp)

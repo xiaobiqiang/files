@@ -148,6 +148,11 @@ uint64_t Mlsas_clustersan_link_evt_hook_add = 0;
 uint64_t Mlsas_clustersan_host_send = 0;
 uint64_t Mlsas_clustersan_host_send_bio = 0;
 uint64_t Mlsas_clustersan_broadcast_send = 0;
+uint64_t Mlsas_clustersan_hostinfo_hold = 0;
+uint64_t Mlsas_clustersan_hostinfo_rele = 0;
+uint64_t Mlsas_clustersan_rx_data_free = 0;
+uint64_t Mlsas_clustersan_rx_data_free_ext = 0;
+
 
 static char * Mlsas_Exec_for_newline(char *buf, int len, char *fmt, ...)
 {
@@ -410,12 +415,40 @@ static void Mlsas_Ena_clustersan_modload(void)
 	Mlsas_clustersan_rx_hook_add = strtoull(Mlsas_Exec_for_newline(buf, 32, 
 			Mlsas_CMD_clustersan, "csh_rx_hook_add"),
 		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_hostinfo_hold = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "cluster_san_hostinfo_hold"),
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_hostinfo_rele = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "cluster_san_hostinfo_rele"),
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_rx_data_free = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "csh_rx_data_free"),
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_rx_data_free_ext = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "csh_rx_data_free_ext"),
+		&endptr, 0x10);
 
 	if (!Mlsas_clustersan_broadcast_send || 
 		!Mlsas_clustersan_host_send_bio ||
 		!Mlsas_clustersan_host_send ||
 		!Mlsas_clustersan_link_evt_hook_add ||
-		!Mlsas_clustersan_rx_hook_add)
+		!Mlsas_clustersan_rx_hook_add ||
+		!Mlsas_clustersan_hostinfo_hold ||
+		!Mlsas_clustersan_hostinfo_rele ||
+		!Mlsas_clustersan_rx_data_free||
+		!Mlsas_clustersan_rx_data_free_ext)
 		VERIFY(0);
 
 	fprintf(stdout, "cluster_san_broadcast_send=%p\n", 		Mlsas_clustersan_broadcast_send);
@@ -423,6 +456,10 @@ static void Mlsas_Ena_clustersan_modload(void)
 	fprintf(stdout, "cluster_san_host_send=%p\n", 			Mlsas_clustersan_host_send);
 	fprintf(stdout, "csh_link_evt_hook_add=%p\n", 			Mlsas_clustersan_link_evt_hook_add);
 	fprintf(stdout, "csh_rx_hook_add=%p\n", 				Mlsas_clustersan_rx_hook_add);
+	fprintf(stdout, "cluster_san_hostinfo_hold=%p\n", 		Mlsas_clustersan_hostinfo_hold);
+	fprintf(stdout, "cluster_san_hostinfo_rele=%p\n", 		Mlsas_clustersan_hostinfo_rele);
+	fprintf(stdout, "csh_rx_data_free=%p\n", 				Mlsas_clustersan_rx_data_free);
+	fprintf(stdout, "csh_rx_data_free_ext=%p\n", 			Mlsas_clustersan_rx_data_free_ext);
 }
 
 static int Mlsas_Ena_ioctl(int fd)
@@ -448,6 +485,14 @@ static int Mlsas_Ena_ioctl(int fd)
 		Mlsas_clustersan_host_send_bio) == Mlsas_OK);
 	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_broadcast_send", 
 		Mlsas_clustersan_broadcast_send) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_hostinfo_hold", 
+		Mlsas_clustersan_hostinfo_hold) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_hostinfo_rele", 
+		Mlsas_clustersan_hostinfo_rele) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_rx_data_free", 
+		Mlsas_clustersan_rx_data_free) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_rx_data_free_ext", 
+		Mlsas_clustersan_rx_data_free_ext) == Mlsas_OK);
 	
 	VERIFY(nvlist_pack(nvl, &packed, &packed_len, NV_ENCODE_NATIVE, 
 		KM_SLEEP) == Mlsas_OK);
