@@ -407,7 +407,7 @@ function cm_node_power_on
     local rem_hid=$(sqlite3 /var/cm/data/cm_node.db "SELECT idx FROM record_t WHERE id=$1")
     [ -z $rem_hid ]&&return $CM_FAIL
     # 根据hostid查找到对应的ipmi_ip
-    local ipmi_ip=$(cat $CM_IPMI_IP|grep -w $rem_hid|awk '{print $1}')
+    local ipmi_ip=$(cat $CM_IPMI_IP|awk '$2=="'$rem_hid'"{print $1}')
     is_ipv4_dot_notation "$ipmi_ip"
     [ $? -ne 0 ]&&return $CM_FAIL
     ping $ipmi_ip -i 1 -c 1 >/dev/null
