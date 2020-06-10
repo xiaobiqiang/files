@@ -416,7 +416,6 @@ static int Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 
 	switch (cmd) {
 	case Mlsas_Ioc_Ensvc:
-		VERIFY(!ioc.Mlioc_nibuf && !ioc.Mlioc_nobuf);
 		rval = __Mlsas_Do_EnableSvc(&ioc);
 		break;
 	case Mlsas_Ioc_Newminor:
