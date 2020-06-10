@@ -52,7 +52,7 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp);
 static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp);
 static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
-static int __Mlsas_Do_EnableSvc(void);
+static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt);
 static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt, 
@@ -122,6 +122,9 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s,
 static int __Mlsas_PR_RQ_Put_Completion_ref(Mlsas_pr_req_t *prr, uint32_t c_put);
 static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 static void __Mlsas_Free_rhost(Mlsas_rh_t *rh);
+static void __Mlsas_create_slab_modhash(Mlsas_t *ml);
+static void __Mlsas_create_retry(Mlsas_retry_t *retry);
+static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16; 
@@ -176,6 +179,14 @@ static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
 	[Mlsas_Mms_Brw_Rsp]		=	__Mlsas_RX_Brw_Rsp,
 	[Mlsas_Mms_State_Change]=	__Mlsas_RX_State_Change,
 };
+
+static int (*__Mlsas_clustersan_rx_hook_add)(uint32_t, cs_rx_cb_t, void *);
+static int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
+static int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
+static int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
+static void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
 
 static int Mlsas_Disk_Open(struct block_device *, fmode_t);
 static void Mlsas_Disk_Release(struct gendisk *, fmode_t);
@@ -400,7 +411,7 @@ static int Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 	switch (cmd) {
 	case Mlsas_Ioc_Ensvc:
 		VERIFY(!ioc.Mlioc_nibuf && !ioc.Mlioc_nobuf);
-		rval = __Mlsas_Do_EnableSvc();
+		rval = __Mlsas_Do_EnableSvc(&ioc);
 		break;
 	case Mlsas_Ioc_Newminor:
 		rval = __Mlsas_Do_NewMinor(&ioc);
@@ -433,42 +444,25 @@ out:
 	return rval;
 }
 
-static int __Mlsas_Do_EnableSvc(void)
+static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip)
 {
-	Mlsas_retry_t *retry = &gMlsas_ptr->Ml_retry;
-	
-	gMlsas_ptr->Ml_devices = mod_hash_create_idhash(
-		"Mlsas_devices", 1024, NULL);
-	gMlsas_ptr->Ml_rhs = mod_hash_create_idhash("Mlsas_rhs", 64, NULL);
-	
-	gMlsas_ptr->Ml_skc = kmem_cache_create("Mlsas_req_skc",
-		sizeof(Mlsas_request_t), 0, 
-		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
-	gMlsas_ptr->Ml_request_mempool = mempool_create_slab_pool(
-		256, gMlsas_ptr->Ml_skc);
-	
-	gMlsas_ptr->Ml_prr_skc = kmem_cache_create("Mlsas_prr_skc",
-		sizeof(Mlsas_pr_req_t), 0, 
-		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
-	gMlsas_ptr->Ml_prr_mempool = mempool_create_slab_pool(
-		256, gMlsas_ptr->Ml_prr_skc);
-	
-	gMlsas_ptr->Ml_minor = 0;
-	gMlsas_ptr->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
-		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
+	nvlist_t *nvl = NULL;
 
-	spin_lock_init(&retry->Mlt_lock);
-	list_create(&retry->Mlt_writes, sizeof(Mlsas_Delayed_obj_t),
-		offsetof(Mlsas_Delayed_obj_t, dlo_node));
-	retry->Mlt_workq = create_singlethread_workqueue("Mlsas_retry");
-	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
+	VERIFY(nvlist_unpack(Mlip->Mlioc_ibufptr, Mlip->Mlioc_nibuf,
+		&nvl, KM_SLEEP) == 0);
 
-	(void) csh_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
-	(void) csh_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
+	__Mlsas_clustersan_modload(nvl);
+	__Mlsas_create_slab_modhash(gMlsas_ptr);
+	__Mlsas_create_retry(&gMlsas_ptr->Ml_retry);
+
+	(void) __Mlsas_clustersan_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
+	(void) __Mlsas_clustersan_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
 		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
 	
-	cmn_err(CE_NOTE, "Mltsas Enable Complete.");
+	cmn_err(CE_NOTE, "Mltsas Module Enable Complete.");
+
+	nvlist_free(nvl);
 	return 0;
 }
 
@@ -3096,6 +3090,70 @@ static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb,
 	}
 
 	return rval;
+}
+
+static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
+{
+	ml->Ml_devices = mod_hash_create_idhash(
+		"Mlsas_devices", 1024, NULL);
+	ml->Ml_rhs = mod_hash_create_idhash("Mlsas_rhs", 64, NULL);
+	
+	ml->Ml_skc = kmem_cache_create("Mlsas_req_skc",
+		sizeof(Mlsas_request_t), 0, 
+		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
+	ml->Ml_request_mempool = mempool_create_slab_pool(
+		256, ml->Ml_skc);
+	
+	ml->Ml_prr_skc = kmem_cache_create("Mlsas_prr_skc",
+		sizeof(Mlsas_pr_req_t), 0, 
+		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
+	ml->Ml_prr_mempool = mempool_create_slab_pool(
+		256, ml->Ml_prr_skc);
+	
+	ml->Ml_minor = 0;
+	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
+		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
+}
+
+static void __Mlsas_create_retry(Mlsas_retry_t *retry)
+{
+	spin_lock_init(&retry->Mlt_lock);
+	list_create(&retry->Mlt_writes, sizeof(Mlsas_Delayed_obj_t),
+		offsetof(Mlsas_Delayed_obj_t, dlo_node));
+	retry->Mlt_workq = create_singlethread_workqueue("Mlsas_retry");
+	INIT_WORK(&retry->Mlt_work, __Mlsas_Retry);
+}
+
+static void __Mlsas_clustersan_modload(nvlist_t *nvl)
+{
+	uint64_t cluster_san_host_send_ptr = 0;
+	uint64_t cluster_san_host_send_bio_ptr = 0;
+	uint64_t cluster_san_broadcast_send_ptr = 0;
+	uint64_t cluster_san_rx_hook_add_ptr = 0;
+	uint64_t cluster_san_link_evt_add_ptr = 0;
+
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_rx_hook_add", 
+		&cluster_san_rx_hook_add_ptr) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_link_evt_hook_add", 
+		&cluster_san_link_evt_add_ptr) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_host_send", 
+		&cluster_san_host_send_ptr) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_host_send_bio", 
+		&cluster_san_host_send_bio_ptr) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_broadcast_send", 
+		&cluster_san_broadcast_send_ptr) == 0);
+
+	VERIFY(!IS_ERR_OR_NULL(cluster_san_rx_hook_add_ptr) &&
+		!IS_ERR_OR_NULL(cluster_san_link_evt_add_ptr) &&
+		!IS_ERR_OR_NULL(cluster_san_host_send_ptr) &&
+		!IS_ERR_OR_NULL(cluster_san_host_send_bio_ptr) &&
+		!IS_ERR_OR_NULL(cluster_san_broadcast_send_ptr));
+
+	__Mlsas_clustersan_rx_hook_add 			= (intptr_t)cluster_san_rx_hook_add_ptr;
+	__Mlsas_clustersan_link_evt_hook_add 	= (intptr_t)cluster_san_link_evt_add_ptr;
+	__Mlsas_clustersan_host_send 			= (intptr_t)cluster_san_host_send_ptr;
+	__Mlsas_clustersan_host_send_bio 		= (intptr_t)cluster_san_host_send_bio_ptr;
+	__Mlsas_clustersan_broadcast_send 		= (intptr_t)cluster_san_broadcast_send_ptr;
 }
 
 static void Mlsas_Init(Mlsas_t *Mlsp)

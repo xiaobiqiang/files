@@ -30,12 +30,14 @@ static int Mlsas_enable(int, char **, cmdOptions_t *, void *);
 #define Mlsas_Hash_Bits				8
 #define Mlsas_n_Slot				(1 << Mlsas_Hash_Bits)
 
-#define Mltsas_Node			"/dev/Mlsas_dev"
-#define Disk_directory		"/dev/disk/by-id/"
-#define Disk_prefix			"scsi-3"
+#define Mltsas_Node					"/dev/Mlsas_dev"
+#define Disk_directory				"/dev/disk/by-id/"
+#define Disk_prefix					"scsi-3"
 
-#define Mlsas_CMD_disk		"ls "Disk_directory" | grep "Disk_prefix" | grep -v part"
-#define Mlsas_CMD_nDisk		Mlsas_CMD_disk" | wc -l"
+#define Mlsas_CMD_disk				"ls "Disk_directory" | grep "Disk_prefix" | grep -v part"
+#define Mlsas_CMD_nDisk				Mlsas_CMD_disk" | wc -l"
+#define Mlsas_CMD_clustersan		"grep -w %s /proc/kallsyms | cut -d ' ' -f 1"
+#define Mlsas_CMD_n_clustersan		"grep -w %s /proc/kallsyms | wc -l"
 
 #define	TEN_MS_NANOSLEEP  		10000000
 #define TWENTY_MS_NANOSLEEP		20000000
@@ -139,6 +141,13 @@ subCommandProps_t subcommands[] = {
 char *cmdName;
 Mlsas_Srv_t Mlsas_Srv;
 Mlsas_Srv_t *gMlsas_Srv = &Mlsas_Srv;
+
+/* enable nvpairs */
+uint64_t Mlsas_clustersan_rx_hook_add = 0;
+uint64_t Mlsas_clustersan_link_evt_hook_add = 0;
+uint64_t Mlsas_clustersan_host_send = 0;
+uint64_t Mlsas_clustersan_host_send_bio = 0;
+uint64_t Mlsas_clustersan_broadcast_send = 0;
 
 static char * Mlsas_Exec_for_newline(char *buf, int len, char *fmt, ...)
 {
@@ -361,15 +370,92 @@ static Mlsas_virt_t *Mlsas_Remove_virt(avl_tree_t *tree, Mlsas_virt_t *vt)
 	return old;
 }
 
+static void Mlsas_Ena_clustersan_modload(void)
+{
+	char buf[32] = {0};
+	char *endptr = NULL;
+	
+	Mlsas_Maybe_sleep_on(
+		(atoi(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_n_clustersan, 
+			"cluster_san_host_send")) == 1), 
+		TEN_MS_NANOSLEEP, -1ULL);
+
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_broadcast_send = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "cluster_san_broadcast_send"), 
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_host_send_bio = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "cluster_san_host_send_bio"), 
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_host_send = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "cluster_san_host_send"),
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_link_evt_hook_add = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "csh_link_evt_hook_add"),
+		&endptr, 0x10);
+	
+	buf[0] = '\0';
+	endptr = NULL;
+	Mlsas_clustersan_rx_hook_add = strtoull(Mlsas_Exec_for_newline(buf, 32, 
+			Mlsas_CMD_clustersan, "csh_rx_hook_add"),
+		&endptr, 0x10);
+
+	if (!Mlsas_clustersan_broadcast_send || 
+		!Mlsas_clustersan_host_send_bio ||
+		!Mlsas_clustersan_host_send ||
+		!Mlsas_clustersan_link_evt_hook_add ||
+		!Mlsas_clustersan_rx_hook_add)
+		VERIFY(0);
+
+	fprintf(stdout, "cluster_san_broadcast_send=%p\n", 		Mlsas_clustersan_broadcast_send);
+	fprintf(stdout, "cluster_san_host_send_bio=%p\n", 		Mlsas_clustersan_host_send_bio);
+	fprintf(stdout, "cluster_san_host_send=%p\n", 			Mlsas_clustersan_host_send);
+	fprintf(stdout, "csh_link_evt_hook_add=%p\n", 			Mlsas_clustersan_link_evt_hook_add);
+	fprintf(stdout, "csh_rx_hook_add=%p\n", 				Mlsas_clustersan_rx_hook_add);
+}
+
 static int Mlsas_Ena_ioctl(int fd)
 {
 	int rval = 0;
     Mlsas_iocdt_t ioc;
 	nvlist_t *nvl = NULL;
 	struct timespec ts;
+	char *packed = NULL;
+	size_t packed_len = 0;
+	
+	Mlsas_Ena_clustersan_modload();
+
+	VERIFY(nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == Mlsas_OK);
+	
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_rx_hook_add", 
+		Mlsas_clustersan_rx_hook_add) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_link_evt_hook_add", 
+		Mlsas_clustersan_link_evt_hook_add) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_host_send", 
+		Mlsas_clustersan_host_send) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_host_send_bio", 
+		Mlsas_clustersan_host_send_bio) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_broadcast_send", 
+		Mlsas_clustersan_broadcast_send) == Mlsas_OK);
+	
+	VERIFY(nvlist_pack(nvl, &packed, &packed_len, NV_ENCODE_NATIVE, 
+		KM_SLEEP) == Mlsas_OK);
 	
 	bzero(&ioc, sizeof(Mlsas_iocdt_t));
 	ioc.Mlioc_magic = 0xdeafdeaf;
+	ioc.Mlioc_ibufptr = packed;
+	ioc.Mlioc_nibuf = packed_len;
 
 again:
 	errno = Mlsas_OK;
@@ -392,6 +478,11 @@ again:
 		fprintf(stdout, "Ena_ioctl Fail, rval(%d), Errno(%d)\n", 
 			rval, errno);
 
+	if (packed && packed_len)
+		kmem_free(packed, packed_len);
+	if (nvl)
+		nvlist_free(nvl);
+	
     return rval;
 }
 
