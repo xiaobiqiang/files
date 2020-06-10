@@ -482,7 +482,7 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 		vd->vd_phys = NULL;
 		cmn_err(CE_NOTE, "SPA(%s) attach Virt(%s) FAIL, ERROR(%d), "
 			"Use physical Disk instead",
-			v->vdev_spa->spa_name, v->vdev_path, rval);
+			spa_name(v->vdev_spa), v->vdev_path, rval);
 	}
 
 	v->vdev_tsd = vd;
