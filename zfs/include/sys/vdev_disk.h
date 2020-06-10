@@ -30,7 +30,7 @@
 
 #ifdef _KERNEL
 #include <sys/vdev.h>
-#include <sys/mltsas.h>
+#include <sys/mltsas/mltsas.h>
 
 typedef struct vdev_disk {
 	ddi_devid_t		vd_devid;
