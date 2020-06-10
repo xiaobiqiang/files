@@ -180,19 +180,19 @@ static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
 	[Mlsas_Mms_State_Change]=	__Mlsas_RX_State_Change,
 };
 
-static int (*__Mlsas_clustersan_rx_hook_add)(uint32_t, cs_rx_cb_t, void *);
-static int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
-static int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uint64_t, 
+int (*__Mlsas_clustersan_rx_hook_add)(uint32_t, cs_rx_cb_t, void *);
+int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
+int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
-static int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
+int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
-static void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
-static void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
-static void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
-static void (*__Mlsas_clustersan_rx_data_free)(cs_rx_data_t *, boolean_t );
-static void (*__Mlsas_clustersan_rx_data_free_ext)(cs_rx_data_t *);
-static void *(*__Mlsas_clustersan_kmem_alloc)(size_t);
-static void (*__Mlsas_clustersan_kmem_free)(void *, size_t);
+void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
+void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
+void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
+void (*__Mlsas_clustersan_rx_data_free)(cs_rx_data_t *, boolean_t );
+void (*__Mlsas_clustersan_rx_data_free_ext)(cs_rx_data_t *);
+void *(*__Mlsas_clustersan_kmem_alloc)(size_t);
+void (*__Mlsas_clustersan_kmem_free)(void *, size_t);
 	
 static int Mlsas_Disk_Open(struct block_device *, fmode_t);
 static void Mlsas_Disk_Release(struct gendisk *, fmode_t);

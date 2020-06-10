@@ -522,6 +522,20 @@ typedef struct Mlsas_State_Change_msg {
 	uint64_t scm_ext;
 } Mlsas_State_Change_msg_t;
 
+extern int (*__Mlsas_clustersan_rx_hook_add)(uint32_t, cs_rx_cb_t, void *);
+extern int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
+extern int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
+extern int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
+extern void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
+extern void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
+extern void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
+extern void (*__Mlsas_clustersan_rx_data_free)(cs_rx_data_t *, boolean_t );
+extern void (*__Mlsas_clustersan_rx_data_free_ext)(cs_rx_data_t *);
+extern void *(*__Mlsas_clustersan_kmem_alloc)(size_t);
+extern void (*__Mlsas_clustersan_kmem_free)(void *, size_t);
+
 extern void __Mlsas_Thread_Init(Mlsas_thread_t *thi,
 		int (*fn) (Mlsas_thread_t *), 
 		Mlsas_ttype_e tt, const char *name);
