@@ -191,7 +191,9 @@ static void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
 static void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
 static void (*__Mlsas_clustersan_rx_data_free)(cs_rx_data_t *, boolean_t );
 static void (*__Mlsas_clustersan_rx_data_free_ext)(cs_rx_data_t *);
-
+static void *(*__Mlsas_clustersan_kmem_alloc)(size_t);
+static void (*__Mlsas_clustersan_kmem_free)(void *, size_t);
+	
 static int Mlsas_Disk_Open(struct block_device *, fmode_t);
 static void Mlsas_Disk_Release(struct gendisk *, fmode_t);
 
@@ -2493,7 +2495,7 @@ static void __Mlsas_Release_PR_RQ(struct kref *ref)
 
 	if (!(prr->prr_flags & Mlsas_PRRfl_Write) &&
 		(prr->prr_flags & Mlsas_PRRfl_Addl_Kmem))
-		kmem_free(prr->prr_dt, prr->prr_dtlen);
+		__Mlsas_clustersan_kmem_free(prr->prr_dt, prr->prr_dtlen);
 
 	if (prr->prr_pr)
 		__Mlsas_put_PR(prr->prr_pr);
@@ -3148,6 +3150,10 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl)
 		&__Mlsas_clustersan_rx_data_free) == 0);
 	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_rx_data_free_ext", 
 		&__Mlsas_clustersan_rx_data_free_ext) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_kmem_alloc", 
+		&__Mlsas_clustersan_kmem_alloc) == 0);
+	VERIFY(nvlist_lookup_uint64(nvl, "__Mlsas_clustersan_kmem_free", 
+		&__Mlsas_clustersan_kmem_free) == 0);
 
 	VERIFY(!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_hook_add) &&
 		!IS_ERR_OR_NULL(__Mlsas_clustersan_link_evt_hook_add) &&
@@ -3157,7 +3163,9 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl)
 		!IS_ERR_OR_NULL(__Mlsas_clustersan_hostinfo_hold) &&
 		!IS_ERR_OR_NULL(__Mlsas_clustersan_hostinfo_rele) &&
 		!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_data_free) &&
-		!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_data_free_ext));
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_rx_data_free_ext) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_kmem_alloc) &&
+		!IS_ERR_OR_NULL(__Mlsas_clustersan_kmem_free));
 }
 
 static void Mlsas_Init(Mlsas_t *Mlsp)

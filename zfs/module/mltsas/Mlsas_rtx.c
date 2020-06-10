@@ -287,7 +287,7 @@ int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w)
 	
 	__Mlsas_Submit_PR_request(Mlb, Wm->rw_flags, prr);
 
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 	return (0);
 }
 
@@ -328,7 +328,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 
 	if (Rm->t_size) {
 		prr->prr_dtlen = Rm->t_size;
-		VERIFY(prr->prr_dt = cs_kmem_alloc(prr->prr_dtlen));
+		VERIFY(prr->prr_dt = __Mlsas_clustersan_kmem_alloc(prr->prr_dtlen));
 	}
 	
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
@@ -342,7 +342,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 	
 	__Mlsas_Submit_PR_request(Mlb, Rm->rw_flags, prr);
 
-	csh_rx_data_free_ext(xd);
+	__Mlsas_clustersan_rx_data_free_ext(xd);
 	return (0);
 }
 
@@ -361,7 +361,7 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 			pr->Mlpd_mlb->Mlb_astxbuf_used,
 			NULL, 0, B_FALSE);
 		if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem)
-			kmem_free(prr->prr_dt, prr->prr_dtlen);
+			__Mlsas_clustersan_kmem_free(prr->prr_dt, prr->prr_dtlen);
 	}
 	else 
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
