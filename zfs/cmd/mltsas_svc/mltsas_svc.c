@@ -510,6 +510,10 @@ static int Mlsas_Ena_ioctl(int fd)
 		Mlsas_clustersan_rx_data_free) == Mlsas_OK);
 	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_rx_data_free_ext", 
 		Mlsas_clustersan_rx_data_free_ext) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_kmem_alloc", 
+		Mlsas_clustersan_kmem_alloc) == Mlsas_OK);
+	VERIFY(nvlist_add_uint64(nvl, "__Mlsas_clustersan_kmem_free", 
+		Mlsas_clustersan_kmem_free) == Mlsas_OK);
 	
 	VERIFY(nvlist_pack(nvl, &packed, &packed_len, NV_ENCODE_NATIVE, 
 		KM_SLEEP) == Mlsas_OK);
