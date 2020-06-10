@@ -274,6 +274,12 @@ vdev_elevator_switch(vdev_t *v, char *elevator)
 	char *device = bdev->bd_disk->disk_name;
 	int error;
 
+	if (vd->vd_phys) {
+		bdev = vd->vd_phys;
+		q = bdev_get_queue(bdev);
+		device = bdev->bd_disk->disk_name;
+	}
+	
 	/*
 	 * Skip devices which are not whole disks (partitions).
 	 * Device-mapper devices are excepted since they may be whole
@@ -398,7 +404,7 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	int count = 0, mode, block_size;
     char bdev_name[BDEVNAME_SIZE];
     int bdev_retry_count = 50;
-    int ms_shift = 0;
+    int ms_shift = 0, rval;
 
 	/* Must have a pathname and it must be absolute. */
 	if (v->vdev_path == NULL || v->vdev_path[0] != '/') {
@@ -468,9 +474,18 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 		kmem_free(vd, sizeof (vdev_disk_t));
 		return (SET_ERROR(-PTR_ERR(bdev)));
 	}
+	
+	vd->vd_phys = bdev;
+	if ((rval = __Mlsas_Virt_export_zfs_attach(v->vdev_path, 
+			bdev, &vd->vd_bdev)) != 0) {
+		vd->vd_bdev = bdev;
+		vd->vd_phys = NULL;
+		cmn_err(CE_NOTE, "SPA(%s) attach Virt(%s) FAIL, ERROR(%d), "
+			"Use physical Disk instead",
+			v->vdev_spa->spa_name, v->vdev_path, rval);
+	}
 
 	v->vdev_tsd = vd;
-	vd->vd_bdev = bdev;
 
 #if 0
     printk(KERN_ERR "%s: [vdev_path:%s]\n",   __func__, v->vdev_path);

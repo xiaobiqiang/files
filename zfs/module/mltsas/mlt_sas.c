@@ -69,8 +69,6 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		Mlsas_pr_device_t *pr);
 static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		Mlsas_pr_device_t *pr);
-int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
-		struct block_device **new_bdev);
 static void __Mlsas_Free_Mms(Mlsas_Msh_t *mms);
 static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz, uint8_t type, 
 		uint64_t hashkey, void **dt_ptr);
@@ -540,10 +538,10 @@ static int __Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip)
 
 	if (IS_ERR_OR_NULL(phys = blkdev_get_by_path(path, 
 			FMODE_READ | FMODE_WRITE, Mlip)) ||
-		((rval = Mlsas_Attach_Phys(path, 
+		((rval = __Mlsas_Virt_export_zfs_attach(path, 
 			phys, &virt)) != 0)) {
 		cmn_err(CE_NOTE, "%s blkdev_get_by_path(%d) or "
-			"Mlsas_Attach_Phys Fail, Error(%d)", 
+			"__Mlsas_Virt_export_zfs_attach Fail, Error(%d)", 
 			__func__, PTR_ERR(phys), rval);
 		if (!IS_ERR_OR_NULL(phys))
 			blkdev_put(phys, FMODE_READ | 
@@ -1073,17 +1071,72 @@ out:
 	return rval;
 }
 
-int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
+static struct block_device *__Mlsas_Virt_rrpart_get_partial(
+		Mlsas_blkdev_t *vt, const char *part)
+{
+	int rval = 0;
+	struct block_device *vt_bdev = vt->Mlb_bdi.Mlbd_bdev;
+	uint32_t count = 0, try_times = 300;
+	struct block_device *part_dev = NULL;
+	
+	if ((rval = ioctl_by_bdev(vt_bdev, 
+			BLKRRPART, 0)) != 0) {
+		cmn_err(CE_NOTE, "%s RRPART %s virt FAIL, ERROR(%d)",
+			__func__, vt->Mlb_bdi.Mlbd_path, rval);
+		return NULL;
+	}
+
+	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
+		if (IS_ERR_OR_NULL(part_dev = vdev_bdev_open(part, 
+				FMODE_WRITE | FMODE_READ, __func__))) {
+			if (PTR_ERR(part_dev) == -ENOENT) {
+				msleep(10);
+				count++;
+			} else if (IS_ERR(part_dev))
+				break;
+		}
+	}
+
+	if (IS_ERR_OR_NULL(part_dev))
+		cmn_err(CE_NOTE, "%s GET partial(%s) bdev FAIL, ERROR(%d)",
+			__func__, part, PTR_ERR(part_dev));
+	
+	return part_dev;
+}
+
+static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial, 
+		uint64_t hash_key)
+{
+	char vt_partial[64] = {0};
+	uint32_t part_no = 0;
+	char *delim_pos = NULL;
+	
+	VERIFY((delim_pos = strstr(zfs_partial, "-part")) != NULL);
+	
+	delim_pos += strlen("-part");
+	part_no = strtoul(delim_pos);
+
+	snprintf(vt_partial, 64, "/dev/Mlsas%llxp%d", hash_key, part_no);
+
+	cmn_err(CE_NOTE, "mltsas partial=%s", vt_partial);
+
+	return strdup(vt_partial);
+}
+
+int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 		struct block_device **new_bdev)
 {
 	int rval = 0;
 	uint64_t hash_key = 0;
 	Mlsas_blkdev_t *Mlb = NULL;
+	struct block_device *vt_partial = NULL;
 	
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if (((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0) ||
 		((rval = mod_hash_find(gMlsas_ptr->Ml_devices,
 			hash_key, &Mlb)) != 0)) {
+		mutex_exit(&gMlsas_ptr->Ml_mtx);
 		cmn_err(CE_WARN, "%s Invalid Path(%s) or "
 			"Mod_hash Find None(%p), Error(%d)", 
 			__func__, path, Mlb, rval);
@@ -1091,19 +1144,22 @@ int Mlsas_Attach_Phys(const char *path, struct block_device *bdev,
 	}
 
 	__Mlsas_get_virt(Mlb);
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
-	if ((rval = __Mlsas_Attach_Phys_impl(Mlb, path, 
-			bdev, new_bdev)) != 0) {
-		cmn_err(CE_NOTE, "%s Attach Phys Disk fail, "
-			"Maybe Already or Blkdev_get Fail, Error(%d)",
-			__func__, rval);
-		__Mlsas_put_virt(Mlb);
-		return rval;
+	
+	if (IS_ERR_OR_NULL(vt_partial = __Mlsas_Virt_rrpart_get_partial(Mlb, 
+			__Mlsas_Virt_zfs_part2mlsas(path, hash_key))) {
+		rval = PTR_ERR(vt_partial);
+		goto put_vt;
 	}
 
+	*new_bdev = vt_partial;
+
+put_vt:
+	__Mlsas_put_virt(Mlb);
 	return rval;
 }
-EXPORT_SYMBOL(Mlsas_Attach_Phys);
+EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_attach);
 
 static void Mlsas_RX(cs_rx_data_t *xd, void *priv)
 {

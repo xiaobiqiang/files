@@ -30,11 +30,13 @@
 
 #ifdef _KERNEL
 #include <sys/vdev.h>
+#include <sys/mltsas.h>
 
 typedef struct vdev_disk {
 	ddi_devid_t		vd_devid;
 	char			*vd_minor;
 	struct block_device	*vd_bdev;
+	struct block_device *vd_phys;
 } vdev_disk_t;
 
 enum {
