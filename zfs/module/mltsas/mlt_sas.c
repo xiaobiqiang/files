@@ -1087,7 +1087,7 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	}
 
 	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
-		if (IS_ERR_OR_NULL(part_dev = vdev_bdev_open(part, 
+		if (IS_ERR_OR_NULL(part_dev = blkdev_get_by_path(part, 
 				FMODE_WRITE | FMODE_READ, __func__))) {
 			if (PTR_ERR(part_dev) == -ENOENT) {
 				msleep(10);
@@ -1109,12 +1109,12 @@ static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial,
 {
 	char vt_partial[64] = {0};
 	uint32_t part_no = 0;
-	char *delim_pos = NULL;
+	char *delim_pos = NULL, *endptr = NULL;
 	
 	VERIFY((delim_pos = strstr(zfs_partial, "-part")) != NULL);
 	
 	delim_pos += strlen("-part");
-	part_no = strtoul(delim_pos);
+	part_no = strtoul(delim_pos, &endptr, 10);
 
 	snprintf(vt_partial, 64, "/dev/Mlsas%llxp%d", hash_key, part_no);
 
@@ -1148,7 +1148,7 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 
 	
 	if (IS_ERR_OR_NULL(vt_partial = __Mlsas_Virt_rrpart_get_partial(Mlb, 
-			__Mlsas_Virt_zfs_part2mlsas(path, hash_key))) {
+			__Mlsas_Virt_zfs_part2mlsas(path, hash_key)))) {
 		rval = PTR_ERR(vt_partial);
 		goto put_vt;
 	}
