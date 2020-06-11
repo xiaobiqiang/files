@@ -1425,7 +1425,6 @@ vdev_open(vdev_t *vd)
 	if (vd->vdev_ops->vdev_op_leaf && !spa->spa_scrub_reopen &&
 	    vdev_resilver_needed(vd, NULL, NULL))
 		spa_async_request(spa, SPA_ASYNC_RESILVER);
-
 	return (0);
 }
 

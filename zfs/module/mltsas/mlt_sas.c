@@ -1070,11 +1070,11 @@ out:
 	return rval;
 }
 
-static struct block_device *__Mlsas_RRPART_virt(const char *path)
+static int __Mlsas_RRPART_virt(const char *path)
 {
-	struct block_device *bdev, *result = ERR_PTR(-ENXIO);
+	struct block_device *bdev;
 	struct gendisk *disk;
-	int error, partno;
+	int error = -ENODEV, partno;
 	int mode = FMODE_WRITE | FMODE_READ;
 
 	bdev = blkdev_get_by_path(path, mode, path);
@@ -1087,40 +1087,31 @@ static struct block_device *__Mlsas_RRPART_virt(const char *path)
 	if (disk) {
 		bdev = bdget(disk_devt(disk));
 		if (bdev) {
-			error = blkdev_get(bdev, mode, bdev);
+			error = blkdev_get(bdev, mode, path);
 			if (error == 0)
 				error = ioctl_by_bdev(bdev, BLKRRPART, 0);
 			blkdev_put(bdev, mode);
 		}
-
-		bdev = bdget_disk(disk, partno);
-		if (bdev) {
-			error = blkdev_get(bdev, mode, bdev);
-			if (error == 0)
-				result = bdev;
-		}
 		put_disk(disk);
 	}
 
-	return (result);
+	return (error);
 }
 
 static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 		Mlsas_blkdev_t *vt, const char *part)
 {
 	int rval = 0;
-	struct block_device *vt_bdev = vt->Mlb_bdi.Mlbd_bdev;
 	uint32_t count = 0, try_times = 300;
 	struct block_device *part_dev = NULL;
 	char path[32] = {0};
 	
 	snprintf(path, 32, "/dev/Mlsas%llx", vt->Mlb_hashkey);
-	if (IS_ERR_OR_NULL(vt_bdev = __Mlsas_RRPART_virt(path))) {
-		cmn_err(CE_NOTE, "RRPART virt(%llx) FAIL", vt->Mlb_hashkey);
-		return vt_bdev;
+	if ((rval = __Mlsas_RRPART_virt(path)) != 0) {
+		cmn_err(CE_NOTE, "RRPART virt(%llx) FAIL, ERROR(%d)", 
+			vt->Mlb_hashkey, rval);
+		return ERR_PTR(rval);
 	}
-
-	vt->Mlb_bdi.Mlbd_bdev = vt_bdev;
 
 	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
 		if (IS_ERR_OR_NULL(part_dev = blkdev_get_by_path(part, 
@@ -1152,7 +1143,10 @@ static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial,
 	delim_pos += strlen("-part");
 	part_no = strtoul(delim_pos, &endptr, 10);
 
-	snprintf(vt_partial, 64, "/dev/Mlsas%llx%d", hash_key, part_no);
+	if ((hash_key & 0x0F) > 0x9)
+		snprintf(vt_partial, 64, "/dev/Mlsas%llx%d", hash_key, part_no);
+	else 
+		snprintf(vt_partial, 64, "/dev/Mlsas%llxp%d", hash_key, part_no);
 
 	cmn_err(CE_NOTE, "mltsas partial=%s", vt_partial);
 
@@ -1193,6 +1187,8 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 			rval = PTR_ERR(vt_partial);
 		goto put_vt;
 	}
+
+	cmn_err(CE_NOTE, "%s Mltsas Attach zfs(%s) Succeed", __func__, path);
 
 	*new_bdev = vt_partial;
 
