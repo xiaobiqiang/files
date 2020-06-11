@@ -2487,7 +2487,9 @@ static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio,
 	struct bvec_iter iter;
 	uint32_t offset = 0;
 	
-	VERIFY(rblen == bio->bi_iter.bi_size);
+	if (rblen != bio->bi_iter.bi_size)
+		cmn_err(CE_PANIC, "rblen(%u) bi_size(%u)",
+			rblen, bio->bi_iter.bi_size);
 
 	bio_for_each_segment(bvec, bio, iter) {
 		void *mapped = kmap(bvec.bv_page) + bvec.bv_offset;
