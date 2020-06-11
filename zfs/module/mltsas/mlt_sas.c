@@ -1078,6 +1078,9 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	uint32_t count = 0, try_times = 300;
 	struct block_device *part_dev = NULL;
 	
+	cmn_err(CE_NOTE, "bd_part_count(%d), bd_super(%p)", 
+		vt_bdev->bd_part_count, vt_bdev->bd_super);
+		
 	if ((rval = ioctl_by_bdev(vt_bdev, 
 			BLKRRPART, 0)) != 0) {
 		cmn_err(CE_NOTE, "%s RRPART %s virt FAIL, ERROR(%d)",
@@ -1148,7 +1151,9 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 	
 	if (IS_ERR_OR_NULL(vt_partial = __Mlsas_Virt_rrpart_get_partial(Mlb, 
 			__Mlsas_Virt_zfs_part2mlsas(path, hash_key)))) {
-		rval = PTR_ERR(vt_partial);
+		rval = -EFAULT;
+		if (IS_ERR(vt_partial))
+			rval = PTR_ERR(vt_partial);
 		goto put_vt;
 	}
 
