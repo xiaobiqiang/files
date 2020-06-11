@@ -868,8 +868,6 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	Mlbp->Mlb_this->bd_contains = Mlbp->Mlb_this;
 	Mlbp->Mlb_rq = rq;
 	Mlbp->Mlb_gdisk = disk;
-	
-	add_disk(disk);
 }
 
 static void __Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp)
@@ -946,6 +944,8 @@ static void __Mlsas_Attach_Local_Phys(struct block_device *phys,
 	 * start aync page read
 	 */
 	__Mlsas_Attach_Phys_size(Mlb);
+	add_disk(Mlb->Mlb_gdisk);
+	
 	set_disk_ro(Mlb->Mlb_gdisk, 0);
 
 	__Mlsas_put_virt(Mlb);
@@ -1070,6 +1070,7 @@ out:
 	return rval;
 }
 
+
 static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 		Mlsas_blkdev_t *vt, const char *part)
 {
@@ -1080,16 +1081,13 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	int partno = 0;
 	struct gendisk *disk;
 	
-	disk = get_gendisk(vt_bdev->bd_dev, &partno);
 	
-	cmn_err(CE_NOTE, "bd_part_count(%d), bd_super(%p), partno(%d)", 
-		vt_bdev->bd_part_count, vt_bdev->bd_super, partno);
 		
 	if ((rval = ioctl_by_bdev(vt_bdev, 
 			BLKRRPART, 0)) != 0) {
 		cmn_err(CE_NOTE, "%s RRPART %s virt FAIL, ERROR(%d)",
 			__func__, vt->Mlb_bdi.Mlbd_path, rval);
-		return NULL;
+		return ERR_PTR(rval);
 	} 
 
 	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
