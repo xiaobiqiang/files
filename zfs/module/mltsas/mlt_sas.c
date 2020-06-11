@@ -1081,12 +1081,12 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	cmn_err(CE_NOTE, "bd_part_count(%d), bd_super(%p)", 
 		vt_bdev->bd_part_count, vt_bdev->bd_super);
 		
-	if ((rval = ioctl_by_bdev(vt_bdev, 
+/*	if ((rval = ioctl_by_bdev(vt_bdev, 
 			BLKRRPART, 0)) != 0) {
 		cmn_err(CE_NOTE, "%s RRPART %s virt FAIL, ERROR(%d)",
 			__func__, vt->Mlb_bdi.Mlbd_path, rval);
 		return NULL;
-	}
+	} */
 
 	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
 		if (IS_ERR_OR_NULL(part_dev = blkdev_get_by_path(part, 
