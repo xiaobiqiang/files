@@ -1114,7 +1114,7 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	struct block_device *part_dev = NULL;
 	char path[32] = {0};
 	
-	blkdev_put(vt_bdev);
+	blkdev_put(vt_bdev, FMODE_WRITE | FMODE_READ);
 
 	snprintf(path, "/dev/Mlsas%llx", vt->Mlb_hashkey);
 	if (IS_ERR_OR_NULL(vt_bdev = __Mlsas_RRPART_virt(path))) {
