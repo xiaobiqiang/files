@@ -1136,15 +1136,18 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 	struct block_device *vt_partial = NULL;
 	
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
-	if (((rval = __Mlsas_Path_to_Hashkey(path, 
+	if ((gMlsas_ptr->Ml_state <= Mlsas_St_Enabling) ||
+		((rval = __Mlsas_Path_to_Hashkey(path, 
 			&hash_key)) != 0) ||
 		((rval = mod_hash_find(gMlsas_ptr->Ml_devices,
 			hash_key, &Mlb)) != 0)) {
+		if (gMlsas_ptr->Ml_state <= Mlsas_St_Enabling)
+			rval = -EAGAIN;
+		cmn_err(CE_WARN, "%s Wrong State(%u) or Invalid Path(%s) "
+			"or Mod_hash Find None(%p), Error(%d)", 
+			__func__, gMlsas_ptr->Ml_state, path, Mlb, rval);
 		mutex_exit(&gMlsas_ptr->Ml_mtx);
-		cmn_err(CE_WARN, "%s Invalid Path(%s) or "
-			"Mod_hash Find None(%p), Error(%d)", 
-			__func__, path, Mlb, rval);
-		return rval;
+		goto put_vt;
 	}
 
 	__Mlsas_get_virt(Mlb);
@@ -1162,7 +1165,8 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 	*new_bdev = vt_partial;
 
 put_vt:
-	__Mlsas_put_virt(Mlb);
+	if (Mlb)
+		__Mlsas_put_virt(Mlb);
 	return rval;
 }
 EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_attach);
