@@ -1070,6 +1070,40 @@ out:
 	return rval;
 }
 
+static struct block_device *__Mlsas_RRPART_virt(const char *path)
+{
+	struct block_device *bdev, *result = ERR_PTR(-ENXIO);
+	struct gendisk *disk;
+	int error, partno;
+	int mode = FMODE_WRITE | FMODE_READ;
+
+	bdev = blkdev_get_by_path(path, mode, path);
+	if (IS_ERR(bdev))
+		return (bdev);
+
+	disk = get_gendisk(bdev->bd_dev, &partno);
+	blkdev_put(bdev, mode);
+
+	if (disk) {
+		bdev = bdget(disk_devt(disk));
+		if (bdev) {
+			error = blkdev_get(bdev, mode, bdev);
+			if (error == 0)
+				error = ioctl_by_bdev(bdev, BLKRRPART, 0);
+			blkdev_put(bdev, mode);
+		}
+
+		bdev = bdget_disk(disk, partno);
+		if (bdev) {
+			error = blkdev_get(bdev, mode, bdev);
+			if (error == 0)
+				result = bdev;
+		}
+		put_disk(disk);
+	}
+
+	return (result);
+}
 
 static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 		Mlsas_blkdev_t *vt, const char *part)
@@ -1078,17 +1112,17 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	struct block_device *vt_bdev = vt->Mlb_bdi.Mlbd_bdev;
 	uint32_t count = 0, try_times = 300;
 	struct block_device *part_dev = NULL;
-	int partno = 0;
-	struct gendisk *disk;
+	char path[32] = {0};
 	
-	
-		
-	if ((rval = ioctl_by_bdev(vt_bdev, 
-			BLKRRPART, 0)) != 0) {
-		cmn_err(CE_NOTE, "%s RRPART %s virt FAIL, ERROR(%d)",
-			__func__, vt->Mlb_bdi.Mlbd_path, rval);
-		return ERR_PTR(rval);
-	} 
+	blkdev_put(vt_bdev);
+
+	snprintf(path, "/dev/Mlsas%llx", vt->Mlb_hashkey);
+	if (IS_ERR_OR_NULL(vt_bdev = __Mlsas_RRPART_virt(path))) {
+		cmn_err(CE_NOTE, "RRPART virt(%llx) FAIL", vt->Mlb_hashkey);
+		return vt_bdev;
+	}
+
+	vt->Mlb_bdi.Mlbd_bdev = vt_bdev;
 
 	while (IS_ERR_OR_NULL(part_dev) && count < try_times) {
 		if (IS_ERR_OR_NULL(part_dev = blkdev_get_by_path(part, 
@@ -1120,7 +1154,7 @@ static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial,
 	delim_pos += strlen("-part");
 	part_no = strtoul(delim_pos, &endptr, 10);
 
-	snprintf(vt_partial, 64, "/dev/Mlsas%llxp%d", hash_key, part_no);
+	snprintf(vt_partial, 64, "/dev/Mlsas%llx%d", hash_key, part_no);
 
 	cmn_err(CE_NOTE, "mltsas partial=%s", vt_partial);
 
