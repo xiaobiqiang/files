@@ -2429,6 +2429,11 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 
 	__Mlsas_clustersan_rx_data_free_ext(xd);
 
+	if (Mlb == NULL)
+		cmn_err(CE_NOTE, "rq(%p), %llu rq->Mlrq_bdev(%p) flags(%x)", 
+			rq, rq->Mlrq_start_jif, rq->Mlrq_bdev, 
+			rq->Mlrq_flags);
+
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	rq->Mlrq_back_bio= NULL;
 	if (rq->Mlrq_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
