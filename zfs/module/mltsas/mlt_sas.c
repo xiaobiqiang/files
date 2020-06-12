@@ -723,6 +723,8 @@ static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey,
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 {
 	int rval = 0;
+
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (!__Mlsas_Get_ldev_if_state_between(vt, 
@@ -739,6 +741,8 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 		vt->Mlb_in_resume_virt = B_FALSE;
 	}
 	spin_unlock_irq(&vt->Mlb_rq_spin);
+
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
 
 	return rval;
 }
