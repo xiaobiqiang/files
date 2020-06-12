@@ -1222,7 +1222,7 @@ void __Mlsas_Virt_export_zfs_detach(const char *partial,
 	__Mlsas_put_virt(vt);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
-	cmn_err(CE_NOTE, "%s Mltsas Detach zfs(%s) Succeed", __func__, path);
+	cmn_err(CE_NOTE, "%s Mltsas Detach zfs(%s) Succeed", __func__, partial);
 }
 EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_detach);
 
