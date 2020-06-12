@@ -1296,6 +1296,8 @@ static void __Mlsas_PR_disconnect(Mlsas_pr_device_t *pr)
 	Mlsas_blkdev_t *vt = pr->Mlpd_mlb;
 
 	spin_lock_irq(&vt->Mlb_rq_spin);
+	pr->Mlpd_rh->Mh_state = Mlsas_RHS_Corrupt;
+	
 	__Mlsas_Update_PR_st(pr, Mlsas_Devst_Failed, Mlsas_PRevt_Disconnect);
 
 	__Mlsas_PR_abort_sent_RQ(pr);
@@ -1378,7 +1380,6 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 	Mlsas_pr_device_t *pr = NULL, *next;
 
 	mutex_enter(&rh->Mh_mtx);
-	rh->Mh_state = Mlsas_RHS_Corrupt;
 	
 	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
 		next = list_next(&rh->Mh_devices, pr);
