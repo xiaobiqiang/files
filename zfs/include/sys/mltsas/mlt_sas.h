@@ -41,16 +41,17 @@
 #define Mlsas_St_Busy		0x04
 
 #define Mlsas_RQ_Write			0x00000001
-#define Mlsas_RQ_Local_Pending	0x00000002
-#define Mlsas_RQ_Net_Pending	0x00000004
-#define Mlsas_RQ_Net_Queued		0x00000008
-#define Mlsas_RQ_Net_Sent		0x00000010
-#define Mlsas_RQ_Local_Done		0x00000020
-#define Mlsas_RQ_Local_OK		0x00000040
-#define Mlsas_RQ_Local_Aborted	0x00000080
-#define Mlsas_RQ_Net_Done		0x00000100
-#define Mlsas_RQ_Net_OK			0x00000200
-#define Mlsas_RQ_Net_Aborted	0x00000400
+#define Mlsas_RQ_ReadA			0x00000002
+#define Mlsas_RQ_Local_Pending	0x00000004
+#define Mlsas_RQ_Net_Pending	0x00000008
+#define Mlsas_RQ_Net_Queued		0x00000010
+#define Mlsas_RQ_Net_Sent		0x00000020
+#define Mlsas_RQ_Local_Done		0x00000040
+#define Mlsas_RQ_Local_OK		0x00000080
+#define Mlsas_RQ_Local_Aborted	0x00000100
+#define Mlsas_RQ_Net_Done		0x00000200
+#define Mlsas_RQ_Net_OK			0x00000400
+#define Mlsas_RQ_Net_Aborted	0x00000800
 #define Mlsas_RQ_Delayed		0x80000000
 
 #define Mlsas_Rst_New				0x00

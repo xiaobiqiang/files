@@ -1770,7 +1770,8 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 	kref_init(&rq->Mlrq_ref);
 	rq->Mlrq_delayed_magic = Mlsas_Delayed_RQ;
 	rq->Mlrq_master_bio = bio;
-	rq->Mlrq_flags = (rw == WRITE ? Mlsas_RQ_Write : 0);
+	rq->Mlrq_flags = (rw == WRITE ? Mlsas_RQ_Write : 
+		((bio_rw(bio) == READ) ? 0 : Mlsas_RQ_ReadA));
 	rq->Mlrq_bdev = Mlb;
 	rq->Mlrq_start_jif = start_jif;
 	rq->Mlrq_sector = bio->bi_iter.bi_sector;
@@ -1831,8 +1832,8 @@ static void __Mlsas_Request_endio(struct bio *bio)
 			what = Mlsas_Rst_Discard_Error;
 		else
 			what = (rq->Mlrq_flags & Mlsas_RQ_Write) ? 
-				Mlsas_Rst_Write_Error : (bio_rw(bio) == READ) ? 
-					Mlsas_Rst_Read_Error : Mlsas_Rst_ReadA_Error;
+				Mlsas_Rst_Write_Error : ((rq->Mlrq_flags & Mlsas_RQ_ReadA) ? 
+					Mlsas_Rst_ReadA_Error : Mlsas_Rst_Read_Error);
 	} else
 		what = Mlsas_Rst_Complete_OK;
 
@@ -2124,10 +2125,10 @@ static void __Mlsas_RQ_net_abort_timeout_clean(Mlsas_request_t *rq)
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	rq->Mlrq_back_bio = NULL;
-	what = (rq->Mlrq_flags & Mlsas_RQ_Write) ? Mlsas_Rst_PR_Write_Error :
-			(bio_rw(rq->Mlrq_master_bio) == READ ? 
-				Mlsas_Rst_PR_Read_Error :
-				Mlsas_Rst_PR_ReadA_Error);
+	/* rq->master_bio maybe release already */
+	what = (rq->Mlrq_flags & Mlsas_RQ_Write) ? 
+			Mlsas_Rst_PR_Write_Error : ((rq->Mlrq_flags & Mlsas_RQ_ReadA) ?
+			Mlsas_Rst_PR_ReadA_Error : Mlsas_Rst_PR_Read_Error);
 	__Mlsas_Req_Stmt(rq, what, NULL);
 	spin_unlock_irq(&vt->Mlb_rq_spin);
 }
@@ -2160,7 +2161,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 		rq->Mlrq_back_bio = NULL;
 		if (flags & Mlsas_RQ_Net_Aborted)
 			rq->Mlrq_tm = timeout(__Mlsas_RQ_net_abort_timeout_clean, 
-				rq, drv_usectohz(50000));
+				rq, drv_usectohz(1000000));
 	} else 
 		error = -ENODEV;
 
@@ -2387,14 +2388,13 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	uint32_t what;
 	int error = rsp->rsp_error;
 	
-	if (unlikely(rsp->rsp_error))
+	if (unlikely(error))
 		what = is_write ? Mlsas_Rst_PR_Write_Error :
-			(bio_rw(rq->Mlrq_master_bio) == READ ? 
-				Mlsas_Rst_PR_Read_Error :
-				Mlsas_Rst_PR_ReadA_Error);
+			((rq->Mlrq_flags & Mlsas_RQ_ReadA) ?
+				Mlsas_Rst_PR_ReadA_Error : Mlsas_Rst_PR_Read_Error);
 	else {
 		what = Mlsas_Rst_PR_Complete_OK;
-		if (!is_write)
+		if (!is_write && !(rq->Mlrq_flags & Mlsas_RQ_Net_Aborted))
 			__Mlsas_PR_Read_Rsp_copy(rq->Mlrq_master_bio, 
 				xd->data, xd->data_len);
 	}
