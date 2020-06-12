@@ -239,6 +239,12 @@ inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt)
 	kref_put(&vt->Mlb_ref, __Mlsas_Release_virt);
 }
 
+inline void __Mlsas_sub_virt(Mlsas_blkdev_t *vt, uint32_t put)
+{
+	__Mlsas_Sub(virt_kref, put);
+	kref_sub(&vt->Mlb_ref, put, __Mlsas_Release_virt);
+}
+
 static void __Mlsas_Release_rhost(struct kref *ref)
 {
 	Mlsas_rh_t *rh = container_of(ref, 
@@ -1190,6 +1196,7 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 
 	cmn_err(CE_NOTE, "%s Mltsas Attach zfs(%s) Succeed", __func__, path);
 
+	__Mlsas_get_virt(Mlb);
 	*new_bdev = vt_partial;
 
 put_vt:
@@ -1198,6 +1205,26 @@ put_vt:
 	return rval;
 }
 EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_attach);
+
+void __Mlsas_Virt_export_zfs_detach(const char *partial, 
+		struct block_device *vt_partial)
+{
+	uint64_t hash_key = 0;
+	Mlsas_blkdev_t *vt = NULL;
+	uint32_t k_put = 1;
+	
+	VERIFY(__Mlsas_Path_to_Hashkey(partial, &hash_key) == 0);
+
+	blkdev_put(vt_partial, FMODE_WRITE | FMODE_READ);
+
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
+	VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, hash_key, &vt) == 0);
+	__Mlsas_put_virt(vt);
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
+	cmn_err(CE_NOTE, "%s Mltsas Detach zfs(%s) Succeed", __func__, path);
+}
+EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_detach);
 
 static void Mlsas_RX(cs_rx_data_t *xd, void *priv)
 {
@@ -2988,6 +3015,23 @@ static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz,
 static void __Mlsas_Free_Mms(Mlsas_Msh_t *mms)
 {
 	kfree(mms);
+}
+
+static boolean_t __Mlsas_Virt_can_release_locked(Mlsas_blkdev_t *vt)
+{
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
+
+	/*
+	 * kref_init		1
+	 * mod_hash_insert	2
+	 * asender			3
+	 * sender			4
+	 * tx				5
+	 * rx				6
+	 */
+	return ((atomic_sub_return(&vt->Mlb_ref.refcount, 0) <= 6) &&
+		__Mlsas_Get_ldev_if_state_between(vt, Mlsas_Devst_Failed, 
+			Mlsas_Devst_Degraded));
 }
 
 static Mlsas_pr_device_t *__Mlsas_Lookup_PR_locked(

@@ -524,14 +524,25 @@ static void
 vdev_disk_close(vdev_t *v)
 {
 	vdev_disk_t *vd = v->vdev_tsd;
-
+	struct block_device *phys = vd->vd_phys;
+	struct block_device *virt = vd->vd_bdev;
+	
 	if (v->vdev_reopening || vd == NULL)
 		return;
 
-	if (vd->vd_bdev != NULL)
-		vdev_bdev_close(vd->vd_bdev,
-		    vdev_bdev_mode(spa_mode(v->vdev_spa)));
+	if (phys == NULL) {
+		phys = virt;
+		virt = NULL;
+	}
 
+	VERIFY(phys || virt);
+
+	if (phys)
+		vdev_bdev_close(vd->vd_phys,
+		    vdev_bdev_mode(spa_mode(v->vdev_spa)));
+	if (virt)
+		__Mlsas_Virt_export_zfs_detach(v->vdev_path, virt);
+	
 	kmem_free(vd, sizeof (vdev_disk_t));
 	v->vdev_tsd = NULL;
     vdev_ev_mgt_unregister(v);  /* NOTICE: We need to check whether it should be unregistered. */

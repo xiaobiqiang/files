@@ -575,4 +575,6 @@ extern inline void __Mlsas_walk_virt(void *priv,
 		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *));
 extern int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 		struct block_device **new_bdev);
+extern void __Mlsas_Virt_export_zfs_detach(const char *partial, struct block_device *vt_partial);
+
 #endif
