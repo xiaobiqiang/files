@@ -41,7 +41,7 @@ static void __Mlsas_Submit_Local_Prepare(Mlsas_request_t *rq);
 static void __Mlsas_Submit_Net_Prepare(Mlsas_request_t *rq);
 static void __Mlsas_Submit_Backing_Bio(Mlsas_request_t *rq);
 static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb, Mlsas_request_t *rq,
-		boolean_t *do_local, boolean_t *do_remote);
+		boolean_t *do_local, boolean_t *do_remote, boolean_t *do_restart);
 static void __Mlsas_Submit_or_Send(Mlsas_request_t *req);
 static void __Mlsas_Make_Request_impl(Mlsas_blkdev_t *Mlb, 
 		struct bio *bio, uint64_t start_jif);
@@ -1314,7 +1314,7 @@ static void __Mlsas_PR_abort_sent_RQ(Mlsas_pr_device_t *pr)
 
 		VERIFY(rq->Mlrq_flags & Mlsas_RQ_Net_Pending);
 
-		rq->Mlrq_back_bio = ERR_PTR(-ECONNRESET);
+		rq->Mlrq_back_bio = ERR_PTR(-EIO);
 		__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_Netio, &m);
 
 		if (m.Mlbi_bio)
@@ -1614,16 +1614,22 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 {
 	Mlsas_blkdev_t *Mlb = req->Mlrq_bdev;
 	boolean_t do_local = B_FALSE, do_remote = B_FALSE;
-	boolean_t submit_backing = B_FALSE;
+	boolean_t submit_backing = B_FALSE, do_restart = B_FALSE;
 	uint32_t what;
-
+	Mlsas_bio_and_error_t m = {NULL, 0, 0};
+	
 	__Mlsas_Partion_Map_toTtl(req);
 	
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
-	__Mlsas_Do_Policy(Mlb, req, &do_local, &do_remote);
+	__Mlsas_Do_Policy(Mlb, req, &do_local, &do_remote, &do_restart);
 
 	switch ((do_local << 1) | do_remote) {
 	case 0x0:
+		if (do_restart)
+			break;
+		m.k_put = 1;
+		m.Mlbi_bio = req->Mlrq_master_bio;
+		m.Mlbi_error = -EIO;
 		break;
 	case 0x1:
 		__Mlsas_Submit_Net_Prepare(req);
@@ -1646,11 +1652,13 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 
 	if (submit_backing)
 		__Mlsas_Submit_Backing_Bio(req);
+	else if (m.Mlbi_bio)
+		__Mlsas_Complete_Master_Bio(req, &m);
 }
 
 static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb, 
 		Mlsas_request_t *rq, boolean_t *do_local, 
-		boolean_t *do_remote)
+		boolean_t *do_remote, boolean_t *do_restart)
 {
 	Mlsas_pr_device_t *pr;
 	
@@ -1661,6 +1669,7 @@ static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb,
 		return ;
 
 	if (Mlb->Mlb_in_resume_virt) {
+		*do_restart = B_TRUE;
 		__Mlsas_Restart_DelayedRQ(rq);
 		return ;
 	}
@@ -1766,7 +1775,7 @@ static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb,
 			bio, start_jif)))
 		goto failed;
 
-	bi_error = -ENODEV;
+	bi_error = -EIO;
 	if (!__Mlsas_Get_ldev(Mlb)) 
 		goto free_rq;
 
@@ -2195,7 +2204,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 			rq->Mlrq_tm = timeout(__Mlsas_RQ_net_abort_timeout_clean, 
 				rq, drv_usectohz(1000000));
 	} else 
-		error = -ENODEV;
+		error = -EIO;
 
 	if (!ok) {
 		/*
@@ -2886,7 +2895,7 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 
 	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted) {
 		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
-		prr->prr_error = -ENXIO;
+		prr->prr_error = -EIO;
 	}
 	
 	iook = prr->prr_flags & Mlsas_PRRfl_Local_OK;

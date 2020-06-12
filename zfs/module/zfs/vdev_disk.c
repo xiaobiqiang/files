@@ -538,8 +538,7 @@ vdev_disk_close(vdev_t *v)
 	VERIFY(phys || virt);
 
 	if (phys)
-		vdev_bdev_close(vd->vd_phys,
-		    vdev_bdev_mode(spa_mode(v->vdev_spa)));
+		vdev_bdev_close(phys, vdev_bdev_mode(spa_mode(v->vdev_spa)));
 	if (virt)
 		__Mlsas_Virt_export_zfs_detach(v->vdev_path, virt);
 	
@@ -945,9 +944,13 @@ vdev_disk_io_done(zio_t *zio)
 	if (zio->io_error == EIO) {
 		vdev_t *v = zio->io_vd;
 		vdev_disk_t *vd = v->vdev_tsd;
+		struct block_device *phys = vd->vd_phys;
 
-		if (check_disk_change(vd->vd_bdev)) {
-			vdev_bdev_invalidate(vd->vd_bdev);
+		if (phys == NULL)
+			phys = vd->vd_bdev;
+
+		if (check_disk_change(phys)) {
+			vdev_bdev_invalidate(phys);
 			v->vdev_remove_wanted = B_TRUE;
 			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
 		}
