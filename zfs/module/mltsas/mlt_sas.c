@@ -858,7 +858,7 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	disk->major = Mlsas_MAJOR;
 	disk->first_minor = minor;
 	disk->fops = &Mlsas_disk_ops;
-	sprintf(disk->disk_name, "Mlsas%llx", Mlbp->Mlb_hashkey);
+	sprintf(disk->disk_name, "Mlsas%llxs", Mlbp->Mlb_hashkey);
 	disk->private_data = Mlbp;
 
 	blk_queue_make_request(rq, __Mlsas_Make_Request_fn);
