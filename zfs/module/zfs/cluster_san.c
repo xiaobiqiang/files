@@ -61,9 +61,9 @@ cluster_san_t *clustersan = NULL;
 uint32_t cluster_target_tran_work_ndefault = 0;
 uint64_t cluster_target_broadcast_index = 0;
 
-unsigned int cluster_target_session_ntranwork = 16;
+unsigned int cluster_target_session_ntranwork = 1;
 uint32_t cluster_target_session_count = 0;
-unsigned int cluster_target_session_nrxworker = 16;
+unsigned int cluster_target_session_nrxworker = 1;
 unsigned int cluster_san_host_nrxworker = 16;
 
 int cluster_san_debug = 0;
@@ -2445,8 +2445,7 @@ static void cts_rx_data_check_link(cluster_target_session_t *cts)
 
 	if (DOWN2UP) {
 		if (cluster_target_session_hold(cts, "down2up evt") == 0) {
-			taskq_dispatch(clustersan->cs_async_taskq,
-				cts_link_down_to_up_handle, (void *)cts, TQ_SLEEP);
+			cts_link_down_to_up_handle(cts);
 		}
 	}
 }
@@ -3438,8 +3437,7 @@ static int cts_hb_check_timeout(cluster_target_session_t *cts)
 			is_timeout = 1;
 			if (cluster_target_session_hold(cts, "up2down evt") == 0) {
 				cts->sess_linkstate = CTS_LINK_DOWN;
-				taskq_dispatch(clustersan->cs_async_taskq,
-					cts_link_up_to_down_handle, (void *)cts, TQ_SLEEP);
+				cts_link_up_to_down_handle(cts);
 			}
 		}
 		atomic_swap_32(&cts->sess_hb_timeout_cnt, 0);
