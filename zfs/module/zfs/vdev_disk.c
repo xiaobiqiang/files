@@ -524,11 +524,14 @@ static void
 vdev_disk_close(vdev_t *v)
 {
 	vdev_disk_t *vd = v->vdev_tsd;
-	struct block_device *phys = vd->vd_phys;
-	struct block_device *virt = vd->vd_bdev;
+	struct block_device *phys = NULL; 
+	struct block_device *virt = NULL; 
 	
 	if (v->vdev_reopening || vd == NULL)
 		return;
+
+	phys = vd->vd_phys;
+	virt = vd->vd_bdev;
 
 	if (phys == NULL) {
 		phys = virt;
