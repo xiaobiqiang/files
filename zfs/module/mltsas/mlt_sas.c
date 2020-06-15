@@ -1156,10 +1156,7 @@ static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial,
 	delim_pos += strlen("-part");
 	part_no = strtoul(delim_pos, &endptr, 10);
 
-	if ((hash_key & 0x0F) > 0x9)
-		snprintf(vt_partial, 64, "/dev/Mlsas%llx%d", hash_key, part_no);
-	else 
-		snprintf(vt_partial, 64, "/dev/Mlsas%llxp%d", hash_key, part_no);
+	snprintf(vt_partial, 64, "/dev/Mlsas%llxs%d", hash_key, part_no);
 
 	cmn_err(CE_NOTE, "mltsas partial=%s", vt_partial);
 
