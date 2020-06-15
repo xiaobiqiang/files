@@ -1545,7 +1545,7 @@ int cluster_proto_register(void)
 	register_netdevice_notifier_rh(&cluster_netdev_notifier);
 
 	mblk_cache = kmem_cache_create("mblk_cache",
-		sizeof (mblk_t), SLAB_HWCACHE_ALIGN, NULL, NULL, 
+		sizeof (mblk_t), 0, NULL, NULL, 
 		NULL, NULL, NULL, KMC_SLAB);
 	return (0);
 }
