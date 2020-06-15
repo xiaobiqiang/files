@@ -847,7 +847,10 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	int rval = -ENOMEM;
 	struct gendisk *disk = NULL;
 	struct request_queue *rq = NULL;
-	uint32_t minor = atomic_inc_32_nv(&gMlsas_ptr->Ml_minor);
+	uint32_t minor = gMlsas_ptr->Ml_minor;
+
+	/* partion, fix create dup sysfs block dir */
+	gMlsas_ptr->Ml_minor += 16;
 	
 	VERIFY(((disk = alloc_disk(1)) != NULL) &&
 		((rq = blk_alloc_queue(GFP_KERNEL)) != NULL));
