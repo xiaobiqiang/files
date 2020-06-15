@@ -1119,7 +1119,7 @@ static struct block_device *__Mlsas_Virt_rrpart_get_partial(
 	struct block_device *part_dev = NULL;
 	char path[32] = {0};
 	
-	snprintf(path, 32, "/dev/Mlsas%llx", vt->Mlb_hashkey);
+	snprintf(path, 32, "/dev/Mlsas%llxs", vt->Mlb_hashkey);
 	if ((rval = __Mlsas_RRPART_virt(path)) != 0) {
 		cmn_err(CE_NOTE, "RRPART virt(%llx) FAIL, ERROR(%d)", 
 			vt->Mlb_hashkey, rval);
