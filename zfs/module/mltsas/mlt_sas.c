@@ -2428,6 +2428,15 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	boolean_t is_write = rq->Mlrq_flags & Mlsas_RQ_Write;
 	uint32_t what;
 	int error = rsp->rsp_error;
+
+	/* cluster san duplicate packet */
+	if (unlikely(rq->Mlrq_flags & Mlsas_RQ_Net_Done)) {
+		__Mlsas_clustersan_rx_data_free_ext(xd);
+		cmn_err(CE_NOTE, "rq(%p), %llu rq->Mlrq_bdev(%p) flags(%x)", 
+			rq, rq->Mlrq_start_jif, rq->Mlrq_bdev, 
+			rq->Mlrq_flags);
+		return ;
+	}
 	
 	if (unlikely(error))
 		what = is_write ? Mlsas_Rst_PR_Write_Error :
@@ -2441,14 +2450,6 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	}
 
 	__Mlsas_clustersan_rx_data_free_ext(xd);
-
-	/* cluster san duplicate packet */
-	if ((Mlb == NULL) || (rq->Mlrq_flags & Mlsas_RQ_Net_Done)) {
-		cmn_err(CE_NOTE, "rq(%p), %llu rq->Mlrq_bdev(%p) flags(%x)", 
-			rq, rq->Mlrq_start_jif, rq->Mlrq_bdev, 
-			rq->Mlrq_flags);
-		return ;
-	}
 
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	rq->Mlrq_back_bio= NULL;
