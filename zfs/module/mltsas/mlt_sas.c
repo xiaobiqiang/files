@@ -3309,7 +3309,7 @@ static void __Mlsas_Async_watch_dog(Mlsas_t *Ml)
 	/* TODO: */
 
 	if (!Mlsas_wd_gap || mod_timer(&Ml->Ml_watchdog, 
-			round_jiffies(jiffies + MSEC_TO_TICK(Mlsas_wd_gap))))
+			jiffies + MSEC_TO_TICK(Mlsas_wd_gap)))
 		cmn_err(CE_NOTE, "modify watchdog timer FAIL, Gap(%u)"
 			"Watchdog stopped...", Mlsas_wd_gap);
 	
@@ -3343,7 +3343,7 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
 	
 	setup_timer(&ml->Ml_watchdog, __Mlsas_Async_watch_dog, ml);
-	add_timer(&ml->Ml_watchdog);
+	mod_timer(&ml->Ml_watchdog, jiffies + MSEC_TO_TICK(1));
 }
 
 static void __Mlsas_create_retry(Mlsas_retry_t *retry)
