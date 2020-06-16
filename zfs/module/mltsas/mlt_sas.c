@@ -2254,6 +2254,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 			rq->Mlrq_flags |= Mlsas_RQ_Delayed; 
 		
 	}
+	
 	if (!(rq->Mlrq_flags & Mlsas_RQ_Delayed)) {
 		Mlbi->Mlbi_bio = rq->Mlrq_master_bio;
 		Mlbi->Mlbi_error = ok ? 0 :
@@ -2463,9 +2464,11 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	/* cluster san duplicate packet */
 	if (unlikely(rq->Mlrq_flags & Mlsas_RQ_Net_Done)) {
 		__Mlsas_clustersan_rx_data_free_ext(xd);
-		cmn_err(CE_NOTE, "rq(%p), %llu rq->Mlrq_bdev(%p) flags(%x)", 
-			rq, rq->Mlrq_start_jif, rq->Mlrq_bdev, 
-			rq->Mlrq_flags);
+		cmn_err(CE_NOTE, "rq(%p), %llu rq->Mlrq_bdev(%p) flags(%x) "
+			"Mlrq_completion_ref(%u) last_what(%u) master_bio(%p) "
+			"refcount(%u)", rq, rq->Mlrq_start_jif, rq->Mlrq_bdev, 
+			rq->Mlrq_flags, atomic_add_32_nv(&rq->Mlrq_completion_ref, 0),
+			rq->Mlrq_state, rq->Mlrq_master_bio, rq->Mlrq_ref.refcount);
 		return ;
 	}
 	
