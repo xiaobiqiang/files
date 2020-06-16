@@ -90,6 +90,7 @@
 #define Mlsas_PRRst_Send_OK			0x0B
 #define Mlsas_PRRst_Abort_Local		0x0C
 #define Mlsas_PRRst_Abort_Net		0x0D
+#define Mlsas_PRRst_Non_Responce	0x0E
 
 #define Mlsas_PRRfl_Addl_Kmem 		0x0001
 #define Mlsas_PRRfl_Ee_Error 		0x0002
@@ -103,8 +104,7 @@
 #define Mlsas_PRRfl_Local_OK		0x0200
 #define Mlsas_PRRfl_Net_OK			0x0400
 #define Mlsas_PRRfl_Local_Aborted	0x0800
-#define Mlsas_PRRfl_Capa_Abort		0x1000
-#define Mlsas_PRRfl_Net_Aborted		0x2000
+#define Mlsas_PRRfl_Local_Nonresp	0x1000
 #define Mlsas_PRRfl_Continue		0x40000000
 #define Mlsas_PRRfl_Delayed			0x80000000
 
@@ -434,7 +434,7 @@ struct Mlsas {
 	Mlsas_retry_t Ml_retry;
 	taskq_t *Ml_async_tq;
 
-	Mlsas_thread_t Ml_watchdog;
+	struct timer_list Ml_watchdog;
 	kstat_t *Ml_kstat;
 };
 

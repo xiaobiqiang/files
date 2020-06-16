@@ -130,6 +130,7 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16;
 static uint32_t Mlsas_pr_req_tm = 200;	/* ms */
+static uint32_t Mlsas_wd_gap = 20;		/* ms */
 
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
@@ -1414,6 +1415,8 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 {
 	Mlsas_pr_device_t *pr = NULL, *next;
 
+	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
 	mutex_enter(&rh->Mh_mtx);
 	
 	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
@@ -1424,6 +1427,8 @@ static void __Mlsas_HDL_rhost_up2down(Mlsas_rh_t *rh)
 	}
 	
 	mutex_exit(&rh->Mh_mtx);
+
+	mutex_enter(&gMlsas_ptr->Ml_mtx);
 
 	__Mlsas_remove_rhost_locked(rh);
 
@@ -2730,7 +2735,7 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 	Mlsas_pr_req_t *prr = bio->bi_private;
 	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
 	uint32_t what;
-	Mlsas_pr_req_free_t fr;
+	Mlsas_pr_req_free_t fr = {0};
 
 	if (unlikely(bio->bi_error)) {
 		/* TODO */
@@ -2749,13 +2754,17 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio)
 
 	if (!atomic_dec_32_nv(&prr->prr_pending_bios)) {
 		spin_lock_irq(&Mlb->Mlb_rq_spin);
-		__Mlsas_PR_RQ_stmt(prr, what, &fr);
-		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
-			what = prr->prr_flags & Mlsas_PRRfl_Write ?
-				Mlsas_PRRst_Queue_Net_Wrsp : 
-				Mlsas_PRRst_Queue_Net_Rrsp;
-			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
-			__Mlsas_PR_RQ_stmt(prr, what, NULL);
+		if (prr->prr_flags & Mlsas_PRRfl_Local_Nonresp)
+			fr.k_put = 1;
+		else {
+			__Mlsas_PR_RQ_stmt(prr, what, &fr);
+			if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
+				what = prr->prr_flags & Mlsas_PRRfl_Write ?
+					Mlsas_PRRst_Queue_Net_Wrsp : 
+					Mlsas_PRRst_Queue_Net_Rrsp;
+				__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+				__Mlsas_PR_RQ_stmt(prr, what, NULL);
+			}
 		}
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
@@ -2825,6 +2834,10 @@ void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
 	case Mlsas_PRRst_Abort_Local:
 		__Mlsas_PR_RQ_st(prr, 0, Mlsas_PRRfl_Local_Aborted, fr);
 		break;
+	case Mlsas_PRRst_Non_Responce:
+		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Local_Pending, 
+			Mlsas_PRRfl_Local_Nonresp, fr);
+		break;
 	}
 }
 
@@ -2855,6 +2868,9 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c,
 		c_put++;
 		__Mlsas_get_PR_RQ(prr);
 	}
+
+	if (!(ofl & Mlsas_PRRfl_Local_Nonresp) && (s & Mlsas_PRRfl_Local_Nonresp))
+		__Mlsas_get_PR_RQ(prr);
 
 	if ((ofl & Mlsas_PRRfl_Local_Pending) && (c & Mlsas_PRRfl_Local_Pending)) {
 		if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted)
@@ -2927,6 +2943,9 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 	if (prr->prr_flags & Mlsas_PRRfl_Local_Aborted) {
 		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
 		prr->prr_error = -EIO;
+	} else if (prr->prr_flags & Mlsas_PRRfl_Local_Nonresp) {
+		prr->prr_flags |= Mlsas_PRRfl_Ee_Error;
+		prr->prr_error = -ETIMEDOUT;
 	}
 	
 	iook = prr->prr_flags & Mlsas_PRRfl_Local_OK;
@@ -3246,7 +3265,11 @@ static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 
 		if ((jiffies - prr->prr_start_jif) > 
 				MSEC_TO_TICK(Mlsas_pr_req_tm)) {
-			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Abort_Local, &fr);
+			cmn_err(CE_NOTE, "PR_RQ(sector(%llu) size(%u) flags(0x%x) "
+				"start_jiffies(%llu)) timeout, to ABORT...", 
+				prr->prr_bsector, prr->prr_bsize, prr->prr_flags,
+				prr->prr_start_jif);
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Non_Responce, &fr);
 			if (pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
 				what = (prr->prr_flags & Mlsas_PRRfl_Write) ? 
 					Mlsas_PRRst_Queue_Net_Wrsp :
@@ -3274,20 +3297,20 @@ static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key,
 	mutex_exit(&rh->Mh_mtx);
 }
 
-static int __Mlsas_Async_watch_dog(Mlsas_thread_t *thi)
+static void __Mlsas_Async_watch_dog(Mlsas_t *Ml)
 {
-	Mlsas_t *Ml = container_of(thi, Mlsas_t, Ml_watchdog);
+	mutex_enter(&Ml->Ml_mtx);
 
-	while (__Mlsas_Thread_State(thi) == Mt_Run) {
-		mutex_enter(&Ml->Ml_mtx);
-		__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
-		
-		/* TODO: */
-		
-		mutex_exit(&Ml->Ml_mtx);
-	}
+	__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
 	
-	return (0);
+	/* TODO: */
+
+	if (!Mlsas_wd_gap || mod_timer(&Ml->Ml_watchdog, 
+			round_jiffies(jiffies + MSEC_TO_TICK(Mlsas_wd_gap))))
+		cmn_err(CE_NOTE, "modify watchdog timer FAIL, Gap(%u)"
+			"Watchdog stopped...", Mlsas_wd_gap);
+	
+	mutex_exit(&Ml->Ml_mtx);
 }
 
 static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
@@ -3316,10 +3339,7 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
 	
-	__Mlsas_Thread_Init(&ml->Ml_watchdog, 
-		__Mlsas_Async_watch_dog, Mtt_WatchDog,
-		"__Mlsas_WatchDog");
-	__Mlsas_Thread_Start(&ml->Ml_watchdog);
+	setup_timer(&ml->Ml_watchdog, __Mlsas_Async_watch_dog, ml);
 }
 
 static void __Mlsas_create_retry(Mlsas_retry_t *retry)
