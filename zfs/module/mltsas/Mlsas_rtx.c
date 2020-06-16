@@ -124,7 +124,7 @@ again:
 	return rval;
 }
 
-static Mlsas_tst_e __Mlsas_Thread_State(Mlsas_thread_t *thi)
+Mlsas_tst_e __Mlsas_Thread_State(Mlsas_thread_t *thi)
 {
 	smp_rmb();
 	return thi->Mt_state;

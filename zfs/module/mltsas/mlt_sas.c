@@ -3267,7 +3267,7 @@ static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key,
 {
 	Mlsas_rh_t *rh = (Mlsas_rh_t *)val;
 
-	VERIFY(MUTEX_HELD(gMlsas_ptr->Ml_mtx));
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
 
 	mutex_enter(&rh->Mh_mtx);
 	__Mlsas_RHost_walk_PR(rh, NULL, __Mlsas_PR_walk_cb_watchdog);

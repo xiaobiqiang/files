@@ -555,6 +555,7 @@ extern int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w);
 extern int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w);
 extern int __Mlsas_Rx_biow(Mlsas_rtx_wk_t *w);
 extern Mlsas_RW_msg_t *__Mlsas_Setup_RWmsg(Mlsas_request_t *rq);
+extern Mlsas_tst_e __Mlsas_Thread_State(Mlsas_thread_t *thi);
 
 extern void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 		unsigned long rw, Mlsas_pr_req_t *prr);
