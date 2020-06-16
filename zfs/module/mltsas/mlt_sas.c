@@ -124,10 +124,13 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr);
 static void __Mlsas_Free_rhost(Mlsas_rh_t *rh);
 static void __Mlsas_create_slab_modhash(Mlsas_t *ml);
 static void __Mlsas_create_retry(Mlsas_retry_t *retry);
+static void __Mlsas_create_async_thread(Mlsas_t *ml);
 static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 
 static uint32_t Mlsas_npending = 0;
-static uint32_t Mlsas_minors = 16; 
+static uint32_t Mlsas_minors = 16;
+static uint32_t Mlsas_pr_req_tm = 200;	/* ms */
+
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
 	{"rhost_alloc",			KSTAT_DATA_UINT64},
@@ -464,6 +467,7 @@ static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip)
 
 	__Mlsas_clustersan_modload(nvl);
 	__Mlsas_create_slab_modhash(gMlsas_ptr);
+	__Mlsas_create_async_thread(gMlsas_ptr);
 	__Mlsas_create_retry(&gMlsas_ptr->Ml_retry);
 
 	(void) __Mlsas_clustersan_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
@@ -1582,6 +1586,28 @@ inline void __Mlsas_walk_virt(void *priv,
 	mod_hash_walk(gMlsas_ptr->Ml_devices, cb, priv);
 }
 
+inline void __Mlsas_walk_rhost(void *priv,
+		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *))
+{
+	mod_hash_walk(gMlsas_ptr->Ml_rhs, cb, priv);
+}
+
+void __Mlsas_RHost_walk_PR(Mlsas_rh_t *rh, void *priv, 
+		int (*cb)(void *, Mlsas_pr_device_t *))
+{
+	int rval = 0;
+	Mlsas_pr_device_t *pr = NULL, *next;
+	
+	VERIFY(&rh->Mh_mtx);
+
+	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
+		next = list_next(&rh->Mh_devices, pr);
+
+		if ((rval = cb(priv, pr)) != 0)
+			break;
+	}
+}
+
 static blk_qc_t __Mlsas_Make_Request_fn(struct request_queue *rq, struct bio *bio)
 {
 	uint64_t start_jif = 0;
@@ -2566,6 +2592,7 @@ Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr,
 	prr->prr_pr_rq = reqid;
 	prr->prr_pr = pr;
 	prr->prr_delayed_magic = Mlsas_Delayed_PR_RQ;
+	prr->prr_start_jif = jiffies;
 
 	kref_init(&prr->prr_ref);
 	return prr;
@@ -3205,6 +3232,64 @@ static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb,
 	return rval;
 }
 
+static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
+{
+	Mlsas_blkdev_t *vt = pr->Mlpd_mlb;
+	Mlsas_pr_req_t *prr = NULL, *next;
+	Mlsas_pr_req_free_t fr = {0};
+	uint32_t what;
+	
+	spin_lock_irq(&vt->Mlb_rq_spin);
+	for (prr = list_head(&pr->Mlpd_pr_rqs); 
+			prr; prr = next) {
+		next = list_next(&pr->Mlpd_pr_rqs, prr);
+
+		if ((jiffies - prr->prr_start_jif) > 
+				MSEC_TO_TICK(Mlsas_pr_req_tm)) {
+			__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Abort_Local, &fr);
+			if (pr->Mlpd_rh->Mh_state == Mlsas_RHS_New) {
+				what = (prr->prr_flags & Mlsas_PRRfl_Write) ? 
+					Mlsas_PRRst_Queue_Net_Wrsp :
+					Mlsas_PRRst_Queue_Net_Rrsp;
+				__Mlsas_PR_RQ_stmt(prr, Mlsas_PRRst_Subimit_Net, NULL);
+				__Mlsas_PR_RQ_stmt(prr, what, NULL);
+			}
+
+			if (fr.k_put)
+				__Mlsas_sub_PR_RQ(prr, fr.k_put);
+		}
+	}
+	spin_unlock_irq(&vt->Mlb_rq_spin);
+}
+
+static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key, 
+		mod_hash_val_t *val, void *private)
+{
+	Mlsas_rh_t *rh = (Mlsas_rh_t *)val;
+
+	VERIFY(MUTEX_HELD(gMlsas_ptr->Ml_mtx));
+
+	mutex_enter(&rh->Mh_mtx);
+	__Mlsas_RHost_walk_PR(rh, NULL, __Mlsas_PR_walk_cb_watchdog);
+	mutex_exit(&rh->Mh_mtx);
+}
+
+static int __Mlsas_Async_watch_dog(Mlsas_thread_t *thi)
+{
+	Mlsas_t *Ml = container_of(thi, Mlsas_t, Ml_watchdog);
+
+	while (__Mlsas_Thread_State(thi) == Mt_Run) {
+		mutex_enter(&Ml->Ml_mtx);
+		__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
+		
+		/* TODO: */
+		
+		mutex_exit(&Ml->Ml_mtx);
+	}
+	
+	return (0);
+}
+
 static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
 {
 	ml->Ml_devices = mod_hash_create_idhash(
@@ -3222,10 +3307,19 @@ static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
 		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
 	ml->Ml_prr_mempool = mempool_create_slab_pool(
 		256, ml->Ml_prr_skc);
-	
+}
+
+static void __Mlsas_create_async_thread(Mlsas_t *ml)
+{
 	ml->Ml_minor = 0;
+	
 	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
+	
+	__Mlsas_Thread_Init(&ml->Ml_watchdog, 
+		__Mlsas_Async_watch_dog, Mtt_WatchDog,
+		"__Mlsas_WatchDog");
+	__Mlsas_Thread_Start(&ml->Ml_watchdog);
 }
 
 static void __Mlsas_create_retry(Mlsas_retry_t *retry)

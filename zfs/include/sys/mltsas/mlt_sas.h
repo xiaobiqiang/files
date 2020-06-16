@@ -171,6 +171,7 @@ enum Mlsas_ttype {
 	Mtt_Rx,
 	Mtt_Asender,
 	Mtt_Sender,
+	Mtt_WatchDog,
 	Mtt_Last
 };
 
@@ -236,7 +237,7 @@ struct Mlsas_thread {
 	struct completion Ml_stop;
 	Mlsas_tst_e Mt_state;
 	int (*Mt_fn) (Mlsas_thread_t *);
-//	int reset_cpu_mask;
+//	int Mt_cpu_mask;
 	const char *Mt_name;
 	Mlsas_ttype_e Mt_type;
 };
@@ -351,6 +352,7 @@ struct Mlsas_pr_req {
 	uint32_t prr_dtlen;
 	
 	uint32_t prr_pending_bios;
+	uint64_t prr_start_jif;
 	int prr_error;
 };
 
@@ -432,6 +434,7 @@ struct Mlsas {
 	Mlsas_retry_t Ml_retry;
 	taskq_t *Ml_async_tq;
 
+	Mlsas_thread_t Ml_watchdog;
 	kstat_t *Ml_kstat;
 };
 
@@ -573,6 +576,10 @@ extern inline void __Mlsas_put_virt(Mlsas_blkdev_t *vt);
 extern inline void __Mlsas_get_virt(Mlsas_blkdev_t *vt);
 extern inline void __Mlsas_walk_virt(void *priv,
 		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *));
+extern inline void __Mlsas_walk_rhost(void *priv,
+		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *));
+extern void __Mlsas_RHost_walk_PR(Mlsas_rh_t *rh, void *priv, 
+		int (*cb)(void *, Mlsas_pr_device_t *));
 extern int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 		struct block_device **new_bdev);
 extern void __Mlsas_Virt_export_zfs_detach(const char *partial, struct block_device *vt_partial);
