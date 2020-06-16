@@ -2128,7 +2128,7 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		k_put++;
 		list_remove(&Mlb->Mlb_local_rqs, rq);
 		if (list_is_empty(&Mlb->Mlb_local_rqs))
-			wake_up(&Mlb->Mlb_wait);
+			wake_up_all(&Mlb->Mlb_wait);
 	}
 
 	if ((oflg & Mlsas_RQ_Net_Pending) &&
@@ -2143,9 +2143,9 @@ static void __Mlsas_Req_St(Mlsas_request_t *rq,
 		list_remove(&Mlb->Mlb_topr_rqs, rq);
 		list_remove(&rq->Mlrq_pr->Mlpd_rqs, rq);
 		if (list_is_empty(&rq->Mlrq_pr->Mlpd_rqs))
-			wake_up(&rq->Mlrq_pr->Mlpd_wait);
+			wake_up_all(&rq->Mlrq_pr->Mlpd_wait);
 		if (list_is_empty(&Mlb->Mlb_topr_rqs))
-			wake_up(&Mlb->Mlb_wait);
+			wake_up_all(&Mlb->Mlb_wait);
 	}
 
 	if ((oflg & Mlsas_RQ_Net_Queued) &&
@@ -2884,9 +2884,9 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c,
 		list_remove(&pr->Mlpd_pr_rqs, prr);
 		list_remove(&pr->Mlpd_mlb->Mlb_peer_rqs, prr);
 		if (list_is_empty(&pr->Mlpd_pr_rqs))
-			wake_up(&pr->Mlpd_wait);
+			wake_up_all(&pr->Mlpd_wait);
 		if (list_is_empty(&pr->Mlpd_mlb->Mlb_peer_rqs))
-			wake_up(&pr->Mlpd_mlb->Mlb_wait);
+			wake_up_all(&pr->Mlpd_mlb->Mlb_wait);
 	}
 
 	if ((ofl & Mlsas_PRRfl_Net_Pending) && (c & Mlsas_PRRfl_Net_Pending)) {
@@ -2895,7 +2895,7 @@ static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c,
 		list_remove(&pr->Mlpd_net_pr_rqs, prr);
 		list_remove(&pr->Mlpd_mlb->Mlb_net_pr_rqs, prr);
 		if (list_is_empty(&pr->Mlpd_net_pr_rqs))
-			wake_up(&pr->Mlpd_wait);
+			wake_up_all(&pr->Mlpd_wait);
 	}
 
 	if ((ofl & Mlsas_PRRfl_Net_Queued) && (c & Mlsas_PRRfl_Net_Queued))
@@ -3343,6 +3343,7 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
 	
 	setup_timer(&ml->Ml_watchdog, __Mlsas_Async_watch_dog, ml);
+	add_timer(&ml->Ml_watchdog);
 }
 
 static void __Mlsas_create_retry(Mlsas_retry_t *retry)
