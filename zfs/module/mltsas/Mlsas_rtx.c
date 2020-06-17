@@ -450,7 +450,7 @@ int __Mlsas_RTx(Mlsas_thread_t *thi)
 		break;
 	}
 
-	if (!Mlb || !Ml || !wq)
+	if ((!Mlb && !Ml) || !wq)
 		return -EINVAL;
 	
 	while (__Mlsas_Thread_State(thi) == Mt_Run) {
