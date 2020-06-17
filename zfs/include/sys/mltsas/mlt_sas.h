@@ -202,7 +202,8 @@ struct Mlsas_pr_device {
 	list_node_t Mlpd_node;
 	list_node_t Mlpd_rh_node;
 	struct kref Mlpd_ref;
-
+	uint32_t Mlpd_pad;
+	
 	list_t Mlpd_rqs;
 	list_t Mlpd_pr_rqs;
 	list_t Mlpd_net_pr_rqs;
@@ -227,19 +228,20 @@ struct Mlsas_rtx_wk {
 
 struct Mlsas_rtx_wq {
 	spinlock_t rtq_lock;
-	list_t rtq_list;
 	wait_queue_head_t rtq_wake;
+	list_t rtq_list;
 };
 
 struct Mlsas_thread {
 	spinlock_t Mt_lock;
+	uint32_t Mt_pad;
 	struct task_struct *Mt_w;
 	struct completion Ml_stop;
 	Mlsas_tst_e Mt_state;
+	Mlsas_ttype_e Mt_type;
 	int (*Mt_fn) (Mlsas_thread_t *);
 //	int Mt_cpu_mask;
 	const char *Mt_name;
-	Mlsas_ttype_e Mt_type;
 };
 
 struct Mlsas_blkdev {
@@ -252,12 +254,13 @@ struct Mlsas_blkdev {
 	struct block_device *Mlb_this;
 	struct gendisk *Mlb_gdisk;
 	Mlsas_backdev_info_t Mlb_bdi;
-	Mlsas_devst_e	Mlb_st;
 	list_t Mlb_pr_devices;
 	list_t Mlb_local_rqs;
 	list_t Mlb_peer_rqs;
 	list_t Mlb_topr_rqs;
 	list_t Mlb_net_pr_rqs;
+	
+	Mlsas_devst_e	Mlb_st;
 
 	wait_queue_head_t Mlb_wait;
 
@@ -298,15 +301,18 @@ struct Mlsas_blkdev {
 
 struct Mlsas_delayed_obj {
 	uint32_t dlo_magic;
+	uint32_t dlo_pad;
 	list_node_t dlo_node;
 };
 
 struct Mlsas_request {
 	uint32_t Mlrq_delayed_magic;
+	uint32_t Mlrq_delayed_pad;
 	list_node_t Mlrq_delayed_node;
 	list_node_t Mlrq_node;
 	list_node_t Mlrq_pr_node;
 	struct kref Mlrq_ref;
+	uint32_t Mlrq_completion_ref;
 	Mlsas_blkdev_t *Mlrq_bdev;
 	uint32_t Mlrq_flags;
 	uint32_t Mlrq_state;
@@ -314,7 +320,6 @@ struct Mlsas_request {
 	uint64_t Mlrq_submit_jif;
 	struct bio *Mlrq_master_bio;
 	struct bio *Mlrq_back_bio;
-	uint32_t Mlrq_completion_ref;
 
 	Mlsas_pr_device_t *Mlrq_pr;
 	Mlsas_rtx_wk_t Mlrq_wk;
@@ -334,15 +339,16 @@ struct Mlsas_request {
 
 struct Mlsas_pr_req {
 	uint32_t prr_delayed_magic;
+	uint32_t prr_delayed_pad;
 	list_node_t prr_delayed_node;
 	list_node_t prr_node;
 	list_node_t prr_mlb_node;
 	list_node_t prr_net_node;
 	list_node_t prr_mlb_net_node;
 	struct kref prr_ref;
+	uint32_t prr_completion_ref;
 	Mlsas_rtx_wk_t prr_wk;
 	Mlsas_pr_device_t *prr_pr;
-	uint32_t prr_completion_ref;
 	uint32_t prr_flags;
 	uint32_t prr_bsize;
 	uint64_t prr_bsector;
@@ -354,6 +360,7 @@ struct Mlsas_pr_req {
 	uint32_t prr_pending_bios;
 	uint64_t prr_start_jif;
 	int prr_error;
+	int prr_pad;
 };
 
 struct Mlsas_cs_rx_data {
@@ -394,6 +401,7 @@ struct Mlsas_retry {
 	struct workqueue_struct *Mlt_workq;
 	struct work_struct Mlt_work;
 	spinlock_t Mlt_lock;
+	uint32_t Mlt_pad;
 	list_t Mlt_writes;
 };
 
@@ -402,6 +410,7 @@ struct Mlsas_retry {
 struct Mlsas_rh {
 	uint32_t Mh_hostid;
 	uint32_t Mh_state;
+	uint32_t Mh_pad;
 	struct kref Mh_ref;
 	kmutex_t Mh_mtx;
 	list_t Mh_devices;
@@ -424,7 +433,6 @@ typedef struct Mlsas_stat {
 struct Mlsas {
 	uint32_t Ml_state;
 	uint32_t Ml_minor;
-	kmutex_t Ml_mtx;
 	mod_hash_t *Ml_devices;
 	mod_hash_t *Ml_rhs;
 	struct kmem_cache *Ml_skc;
@@ -436,6 +444,7 @@ struct Mlsas {
 
 	struct timer_list Ml_watchdog;
 	kstat_t *Ml_kstat;
+	kmutex_t Ml_mtx;
 };
 
 extern Mlsas_stat_t Mlsas_stat;
