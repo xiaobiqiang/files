@@ -419,7 +419,8 @@ int __Mlsas_RTx(Mlsas_thread_t *thi)
 	Mlsas_blkdev_t *Mlb = NULL;
 	Mlsas_rtx_wq_t *wq = NULL;
 	Mlsas_rtx_wk_t *w = NULL;
-
+	Mlsas_t *Ml = NULL;
+	
 	list_create(&wl, sizeof(Mlsas_rtx_wk_t),
 		offsetof(Mlsas_rtx_wk_t, rtw_node));
 
@@ -440,13 +441,16 @@ int __Mlsas_RTx(Mlsas_thread_t *thi)
 		Mlb = container_of(thi, Mlsas_blkdev_t, Mlb_sender);
 		wq = &Mlb->Mlb_sender_wq;
 		break;
+	case Mtt_WatchDog:
+		Ml = container_of(thi, Mlsas_t, Ml_wd);
+		wq = &Ml->Ml_wd_wq;
 	default:
 		cmn_err(CE_NOTE, "%s Wrong Mlsas Thread Type(%02x)",
 			__func__, thi->Mt_type);
 		break;
 	}
 
-	if (!Mlb || !wq)
+	if (!Mlb || !Ml || !wq)
 		return -EINVAL;
 	
 	while (__Mlsas_Thread_State(thi) == Mt_Run) {

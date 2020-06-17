@@ -130,7 +130,7 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16;
 static uint32_t Mlsas_pr_req_tm = 200;	/* ms */
-static uint32_t Mlsas_wd_gap = 20;		/* ms */
+static uint32_t Mlsas_wd_gap = 50;		/* ms */
 
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
@@ -1603,7 +1603,7 @@ void __Mlsas_RHost_walk_PR(Mlsas_rh_t *rh, void *priv,
 	int rval = 0;
 	Mlsas_pr_device_t *pr = NULL, *next;
 	
-	VERIFY(&rh->Mh_mtx);
+	VERIFY(MUTEX_HELD(&rh->Mh_mtx));
 
 	for (pr = list_head(&rh->Mh_devices); pr; pr = next) {
 		next = list_next(&rh->Mh_devices, pr);
@@ -3286,6 +3286,8 @@ static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 		}
 	}
 	spin_unlock_irq(&vt->Mlb_rq_spin);
+
+	return (0);
 }
 
 static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key, 
@@ -3298,22 +3300,36 @@ static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key,
 	mutex_enter(&rh->Mh_mtx);
 	__Mlsas_RHost_walk_PR(rh, NULL, __Mlsas_PR_walk_cb_watchdog);
 	mutex_exit(&rh->Mh_mtx);
+
+	return (0);
+}
+
+static int __Mlsas_Async_watch_dog_impl(Mlsas_rtx_wk_t *w)
+{
+	Mlsas_t *Ml = container_of(w, Mlsas_t, Ml_wd_wk);
+	
+	mutex_enter(&Ml->Ml_mtx);
+
+	__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
+
+	mutex_exit(&Ml->Ml_mtx);
+
+	return (0);
 }
 
 static void __Mlsas_Async_watch_dog(Mlsas_t *Ml)
 {
-	mutex_enter(&Ml->Ml_mtx);
+	Mlsas_rtx_wk_t *w = &Ml->Ml_wd_wk;
 
-	__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
-	
-	/* TODO: */
+	if (!list_link_active(&w->rtw_node)) {
+		w->rtw_fn = __Mlsas_Async_watch_dog_impl;
+		__Mlsas_Queue_RTX(&Ml->Ml_wd_wq, w);
+	}
 
-	if (!Mlsas_wd_gap || mod_timer(&Ml->Ml_watchdog, 
+	if (!Mlsas_wd_gap || mod_timer(&Ml->Ml_wd_timer,
 			jiffies + MSEC_TO_TICK(Mlsas_wd_gap)))
-		cmn_err(CE_NOTE, "modify watchdog timer FAIL, Gap(%u)"
-			"Watchdog stopped...", Mlsas_wd_gap);
-	
-	mutex_exit(&Ml->Ml_mtx);
+		cmn_err(CE_NOTE, "%s ZERO GAP(%u) OR MOD_TIMER FAIL", 
+			__func__, Mlsas_wd_gap);
 }
 
 static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
@@ -3341,9 +3357,13 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 	
 	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
+
+	__Mlsas_RTx_Init_WQ(&ml->Ml_wd_wq);
+	__Mlsas_Thread_Init(&ml->Ml_wd, __Mlsas_RTx, Mtt_WatchDog, "__Mlsas_Watchdog");
+	__Mlsas_Thread_Start(&ml->Ml_wd);
 	
-	setup_timer(&ml->Ml_watchdog, __Mlsas_Async_watch_dog, ml);
-	mod_timer(&ml->Ml_watchdog, jiffies + MSEC_TO_TICK(1));
+	setup_timer(&ml->Ml_wd_timer, __Mlsas_Async_watch_dog, ml);
+	mod_timer(&ml->Ml_wd_timer, jiffies + 1);
 }
 
 static void __Mlsas_create_retry(Mlsas_retry_t *retry)

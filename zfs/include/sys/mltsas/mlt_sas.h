@@ -442,7 +442,11 @@ struct Mlsas {
 	Mlsas_retry_t Ml_retry;
 	taskq_t *Ml_async_tq;
 
-	struct timer_list Ml_watchdog;
+	struct timer_list Ml_wd_timer;
+	Mlsas_thread_t Ml_wd;
+	Mlsas_rtx_wq_t Ml_wd_wq;
+	Mlsas_rtx_wk_t Ml_wd_wk;
+	
 	kstat_t *Ml_kstat;
 	kmutex_t Ml_mtx;
 };
