@@ -356,13 +356,22 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 	
 	__Mlsas_Setup_RWrsp_msg(prr);
 
+	if (!prr->prr_dt || !prr->prr_dtlen)
+		cmn_err(CE_NOTE, "Zero_PRR_DATA, sector(%llu) size(%u) "
+			"flags(%x) prr_pr_rq(%p) error(%d)", prr->prr_bsector,
+			prr->prr_bsize, prr->prr_flags, prr->prr_pr_rq,
+			prr->prr_error);
+
 	if (prr->prr_flags & Mlsas_PRRfl_Write) {
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
 			pr->Mlpd_mlb->Mlb_astx_buf,
 			pr->Mlpd_mlb->Mlb_astxbuf_used,
 			NULL, 0, B_FALSE);
-		if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem)
+		if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem) {
 			__Mlsas_clustersan_kmem_free(prr->prr_dt, prr->prr_dtlen);
+			prr->prr_dt = NULL;
+			prr->prr_dtlen = 0;
+		}
 	}
 	else 
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
@@ -445,6 +454,7 @@ int __Mlsas_RTx(Mlsas_thread_t *thi)
 	case Mtt_WatchDog:
 		Ml = container_of(thi, Mlsas_t, Ml_wd);
 		wq = &Ml->Ml_wd_wq;
+		break;
 	default:
 		cmn_err(CE_NOTE, "%s Wrong Mlsas Thread Type(%02x)",
 			__func__, thi->Mt_type);

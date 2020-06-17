@@ -517,6 +517,7 @@ typedef struct Mlsas_RW_msg {
 	uint64_t rw_rqid;
 	uint64_t rw_mlbpr;
 	uint32_t rw_flags;
+	uint32_t rw_pad;
 } Mlsas_RW_msg_t;
 
 typedef struct Mlsas_Disc_msg {

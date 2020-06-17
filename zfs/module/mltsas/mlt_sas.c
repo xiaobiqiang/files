@@ -105,7 +105,7 @@ static void __Mlsas_PR_RQ_endio(struct bio *bio);
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
 		void *data, uint64_t dlen, uint32_t *bio_cnt);
 static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
-		void *rbuf, uint32_t rblen);
+		void *rbuf, uint32_t rblen, Mlsas_request_t *rq);
 static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w);
 static void __Mlsas_RX_Brw_Rsp(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
 static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
@@ -2480,7 +2480,7 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 		what = Mlsas_Rst_PR_Complete_OK;
 		if (!is_write && !(rq->Mlrq_flags & Mlsas_RQ_Net_Aborted))
 			__Mlsas_PR_Read_Rsp_copy(rq->Mlrq_master_bio, 
-				xd->data, xd->data_len);
+				xd->data, xd->data_len, rq);
 	}
 
 	__Mlsas_clustersan_rx_data_free_ext(xd);
@@ -2565,15 +2565,16 @@ out:
 }
 
 static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
-		void *rbuf, uint32_t rblen)
+		void *rbuf, uint32_t rblen, Mlsas_request_t *rq)
 {
 	struct bio_vec bvec;
 	struct bvec_iter iter;
 	uint32_t offset = 0;
 	
 	if (rblen != bio->bi_iter.bi_size)
-		cmn_err(CE_PANIC, "rblen(%u) bi_size(%u)",
-			rblen, bio->bi_iter.bi_size);
+		cmn_err(CE_PANIC, "request(%p) sector(%llu) rblen(%u) bi_size(%u)",
+			" flags(%x)", rq, rq->Mlrq_sector, rblen, 
+			bio->bi_iter.bi_size, rq->Mlrq_flags);
 
 	bio_for_each_segment(bvec, bio, iter) {
 		void *mapped = kmap(bvec.bv_page) + bvec.bv_offset;
@@ -2619,8 +2620,11 @@ static void __Mlsas_Release_PR_RQ(struct kref *ref)
 		Mlsas_pr_req_t, prr_ref);
 
 	if (!(prr->prr_flags & Mlsas_PRRfl_Write) &&
-		(prr->prr_flags & Mlsas_PRRfl_Addl_Kmem))
+		(prr->prr_flags & Mlsas_PRRfl_Addl_Kmem)) {
 		__Mlsas_clustersan_kmem_free(prr->prr_dt, prr->prr_dtlen);
+		prr->prr_dt = NULL;
+		prr->prr_dtlen = 0;
+	}
 
 	if (prr->prr_pr)
 		__Mlsas_put_PR(prr->prr_pr);
