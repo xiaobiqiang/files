@@ -327,6 +327,7 @@ int __Mlsas_Rx_bior(Mlsas_rtx_wk_t *w)
 			Rm->t_size)) != NULL);	
 
 	if (Rm->t_size) {
+		prr->prr_flags |= Mlsas_PRRfl_Addl_Kmem;
 		prr->prr_dtlen = Rm->t_size;
 		VERIFY(prr->prr_dt = __Mlsas_clustersan_kmem_alloc(prr->prr_dtlen));
 	}

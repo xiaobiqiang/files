@@ -103,7 +103,7 @@ static void __Mlsas_PR_RQ_Read_endio(Mlsas_pr_req_t *prr);
 static void __Mlsas_PR_RQ_Write_endio(Mlsas_pr_req_t *prr);
 static void __Mlsas_PR_RQ_endio(struct bio *bio);
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
-		void *data, uint64_t dlen);
+		void *data, uint64_t dlen, uint32_t *bio_cnt);
 static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
 		void *rbuf, uint32_t rblen);
 static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w);
@@ -2702,7 +2702,7 @@ static struct bio *__Mlsas_PR_RQ_New_bio(uint32_t bv_cnt, sector_t sect,
 }
 
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
-		void *data, uint64_t dlen)
+		void *data, uint64_t dlen, uint32_t *bio_cnt)
 {
 	uint32_t remained;
 	struct bio *bio = NULL, *bios = NULL;
@@ -2712,6 +2712,7 @@ struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw,
 	struct block_device *backing_dev = Mlb->Mlb_bdi.Mlbd_bdev;
 
 new_bio:
+	*bio_cnt += 1;
 	bv_cnt = __Mlsas_Bio_nrpages(data, dlen);
 	bio = __Mlsas_PR_RQ_New_bio(bv_cnt, sector, rw, backing_dev);
 	bio->bi_private = prr;
@@ -3193,6 +3194,7 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 	int rval = 0;
 	struct bio *bio = NULL, *bt = NULL;
 	Mlsas_pr_req_free_t fr;
+	uint32_t bio_cnt = 0;
 	
 	if (prr->prr_flags & Mlsas_PRRfl_Zero_Out) {
 		uint32_t what = Mlsas_PRRst_Complete_OK;
@@ -3220,17 +3222,15 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 	}
 
 	VERIFY(bio = __Mlsas_PR_RQ_bio(prr, rw, 
-		prr->prr_dt, prr->prr_dtlen));
+		prr->prr_dt, prr->prr_dtlen, &bio_cnt));
 
-//	cmn_err(CE_NOTE, "%s rw_flags(0x%llx)", __func__, bio->bi_rw);
+	atomic_inc_32(&prr->prr_pending_bios, bio_cnt);
 	
 	do {
 		bt = bio;
 		bio = bio->bi_next;
 		bt->bi_next = NULL;
 		(void) generic_make_request(bt);
-		
-		atomic_inc_32(&prr->prr_pending_bios);
 	} while (bio);
 
 	return ;
