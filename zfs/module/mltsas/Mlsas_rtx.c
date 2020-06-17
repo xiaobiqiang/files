@@ -356,11 +356,11 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 	
 	__Mlsas_Setup_RWrsp_msg(prr);
 
-	if (!prr->prr_dt || !prr->prr_dtlen)
+/*	if (!prr->prr_dt || !prr->prr_dtlen)
 		cmn_err(CE_NOTE, "Zero_PRR_DATA, sector(%llu) size(%u) "
 			"flags(%x) prr_pr_rq(%p) error(%d)", prr->prr_bsector,
 			prr->prr_bsize, prr->prr_flags, prr->prr_pr_rq,
-			prr->prr_error);
+			prr->prr_error); */
 
 	if (prr->prr_flags & Mlsas_PRRfl_Write) {
 		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 

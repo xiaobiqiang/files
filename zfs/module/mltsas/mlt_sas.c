@@ -104,7 +104,7 @@ static void __Mlsas_PR_RQ_Write_endio(Mlsas_pr_req_t *prr);
 static void __Mlsas_PR_RQ_endio(struct bio *bio);
 struct bio *__Mlsas_PR_RQ_bio(Mlsas_pr_req_t *prr, unsigned long rw, 
 		void *data, uint64_t dlen, uint32_t *bio_cnt);
-static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
+static int __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
 		void *rbuf, uint32_t rblen, Mlsas_request_t *rq);
 static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w);
 static void __Mlsas_RX_Brw_Rsp(Mlsas_Msh_t *mms, cs_rx_data_t *xd);
@@ -2000,6 +2000,8 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		atm->Atm_pr = pr;
 		atm->Atm_st = Mlb->Mlb_st;
 		atm->Atm_rsp = 1;
+		if (what == Mlsas_Devevt_Attach_OK)
+			atm->Atm_rsp = 0;
 		break;
 	case Mlsas_Devevt_PR_Error_Sw:
 		what = Mlsas_Devevt_Hard_Stchg;
@@ -2479,8 +2481,11 @@ static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
 	else {
 		what = Mlsas_Rst_PR_Complete_OK;
 		if (!is_write && !(rq->Mlrq_flags & Mlsas_RQ_Net_Aborted))
-			__Mlsas_PR_Read_Rsp_copy(rq->Mlrq_master_bio, 
+			error = __Mlsas_PR_Read_Rsp_copy(rq->Mlrq_master_bio, 
 				xd->data, xd->data_len, rq);
+		if (error)
+			what = (rq->Mlrq_flags & Mlsas_RQ_ReadA) ?
+				Mlsas_Rst_PR_ReadA_Error : Mlsas_Rst_PR_Read_Error;
 	}
 
 	__Mlsas_clustersan_rx_data_free_ext(xd);
@@ -2564,7 +2569,7 @@ out:
 	__Mlsas_clustersan_rx_data_free_ext(xd);
 }
 
-static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
+static int __Mlsas_PR_Read_Rsp_copy(struct bio *bio, 
 		void *rbuf, uint32_t rblen, Mlsas_request_t *rq)
 {
 	struct bio_vec bvec;
@@ -2572,9 +2577,7 @@ static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio,
 	uint32_t offset = 0;
 	
 	if (rblen != bio->bi_iter.bi_size)
-		cmn_err(CE_PANIC, "rw(%llx) request(%p) sector(%llu) rblen(%u) bi_size(%u)"
-			" flags(%x)", bio->bi_rw, rq, rq->Mlrq_sector, rblen, 
-			bio->bi_iter.bi_size, rq->Mlrq_flags);
+		return -EIO;
 
 	bio_for_each_segment(bvec, bio, iter) {
 		void *mapped = kmap(bvec.bv_page) + bvec.bv_offset;
@@ -2582,6 +2585,8 @@ static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio,
 		offset += bvec.bv_len;
 		kunmap(bvec.bv_page);
 	}
+
+	return (0);
 }
 
 Mlsas_pr_req_t *__Mlsas_Alloc_PR_RQ(Mlsas_pr_device_t *pr, 
