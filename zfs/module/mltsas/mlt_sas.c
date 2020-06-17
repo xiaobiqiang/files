@@ -2572,8 +2572,8 @@ static void __Mlsas_PR_Read_Rsp_copy(struct bio *bio,
 	uint32_t offset = 0;
 	
 	if (rblen != bio->bi_iter.bi_size)
-		cmn_err(CE_PANIC, "request(%p) sector(%llu) rblen(%u) bi_size(%u)",
-			" flags(%x)", rq, rq->Mlrq_sector, rblen, 
+		cmn_err(CE_PANIC, "rw(%llx) request(%p) sector(%llu) rblen(%u) bi_size(%u)"
+			" flags(%x)", bio->bi_rw, rq, rq->Mlrq_sector, rblen, 
 			bio->bi_iter.bi_size, rq->Mlrq_flags);
 
 	bio_for_each_segment(bvec, bio, iter) {
