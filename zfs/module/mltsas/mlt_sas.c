@@ -3224,7 +3224,7 @@ void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 	VERIFY(bio = __Mlsas_PR_RQ_bio(prr, rw, 
 		prr->prr_dt, prr->prr_dtlen, &bio_cnt));
 
-	atomic_inc_32(&prr->prr_pending_bios, bio_cnt);
+	atomic_add_32(&prr->prr_pending_bios, bio_cnt);
 	
 	do {
 		bt = bio;
