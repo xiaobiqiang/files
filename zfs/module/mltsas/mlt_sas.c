@@ -129,8 +129,9 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16;
-static uint32_t Mlsas_pr_req_tm = 200;	/* ms */
-static uint32_t Mlsas_wd_gap = 50;		/* ms */
+static uint32_t Mlsas_pr_req_tm = 200;		/* ms */
+static uint32_t Mlsas_topr_req_tm = 600;	/* ms */
+static uint32_t Mlsas_wd_gap = 50;			/* ms */
 
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
@@ -1928,8 +1929,12 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 {
 	Mlsas_devst_e next = Mlsas_Devst_Last;
 
-	if (what == Mlsas_Devevt_PR_Down2up)
+	switch (what) {
+	case Mlsas_Devevt_PR_Down2up:
+	case Mlsas_Devevt_PR_Commi_PRkey:
 		next = Mlb->Mlb_st;
+		break;
+	}
 	
 	switch (Mlb->Mlb_st) {
 	case Mlsas_Devst_Standalone:
@@ -1991,6 +1996,7 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 
 	switch (what) {
 	case Mlsas_Devevt_PR_Down2up:
+	case Mlsas_Devevt_PR_Commi_PRkey:
 	case Mlsas_Devevt_Attach_OK:
 	case Mlsas_Devevt_PR_Attach:
 		mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
@@ -2084,6 +2090,10 @@ void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
 		break;
 	case Mlsas_Rst_Abort_Netio:
 		__Mlsas_Req_St(rq, Mlbi, 0, Mlsas_RQ_Net_Aborted);
+		break;
+	case Mlsas_Rst_Abort_TM:
+		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Net_Pending, 
+			Mlsas_RQ_TM_Aborted | Mlsas_RQ_Net_Done);
 		break;
 	}
 }
@@ -2849,7 +2859,7 @@ void __Mlsas_PR_RQ_stmt(Mlsas_pr_req_t *prr, uint32_t what,
 		break;
 	case Mlsas_PRRst_Non_Responce:
 		__Mlsas_PR_RQ_st(prr, Mlsas_PRRfl_Local_Pending, 
-			Mlsas_PRRfl_Local_Nonresp, fr);
+			Mlsas_PRRfl_Local_Nonresp | Mlsas_PRRfl_Local_Done, fr);
 		break;
 	}
 }
@@ -3177,6 +3187,8 @@ static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr,
 	case Mlsas_PRevt_Attach_OK:
 		if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
 			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Attach, pr);
+		else if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Degraded))
+			__Mlsas_Devst_Stmt(pr->Mlpd_mlb, Mlsas_Devevt_PR_Commi_PRkey, pr);
 		break;
 	case Mlsas_PRevt_Error_Sw:
 		if (__Mlsas_Get_PR_if_not_state(pr, Mlsas_Devst_Degraded))
@@ -3313,6 +3325,37 @@ static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key,
 	return (0);
 }
 
+static uint_t __Mlsas_Virt_walk_cb_watchdog(mod_hash_t key, 
+		mod_hash_val_t *val, void *private)
+{
+	Mlsas_blkdev_t *vt = (Mlsas_blkdev_t *)val;
+	Mlsas_request_t *rq = NULL, *next;
+	Mlsas_bio_and_error_t m;
+	
+	spin_lock_irq(vt->Mlb_rq_spin);
+	for (rq = list_head(&vt->Mlb_topr_rqs); rq; rq = next) {
+		next = list_next(&vt->Mlb_topr_rqs, rq);
+
+		if ((jiffies - rq->Mlrq_start_jif) >
+				MSEC_TO_TICK(Mlsas_topr_req_tm)) {
+			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
+				"start_jiffies(%llu) last_what(%u)) timeout, to ABORT...",
+				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
+				rq->Mlrq_start_jif, rq->Mlrq_state);
+
+			rq->Mlrq_back_bio = ERR_PTR(-EIO);
+			__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_TM, &m);
+
+			if (m.Mlbi_bio)
+				__Mlsas_Complete_Master_Bio(rq, &m);
+		}
+	}
+
+	spin_unlock_irq(vt->Mlb_rq_spin);
+
+	return (0);
+}
+
 static int __Mlsas_Async_watch_dog_impl(Mlsas_rtx_wk_t *w)
 {
 	Mlsas_t *Ml = container_of(w, Mlsas_t, Ml_wd_wk);
@@ -3320,6 +3363,8 @@ static int __Mlsas_Async_watch_dog_impl(Mlsas_rtx_wk_t *w)
 	mutex_enter(&Ml->Ml_mtx);
 
 	__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
+
+	__Mlsas_walk_virt(NULL, __Mlsas_Virt_walk_cb_watchdog);
 
 	mutex_exit(&Ml->Ml_mtx);
 

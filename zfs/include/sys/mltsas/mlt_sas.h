@@ -52,6 +52,7 @@
 #define Mlsas_RQ_Net_Done		0x00000200
 #define Mlsas_RQ_Net_OK			0x00000400
 #define Mlsas_RQ_Net_Aborted	0x00000800
+#define Mlsas_RQ_TM_Aborted		0x00001000
 #define Mlsas_RQ_Delayed		0x80000000
 
 #define Mlsas_Rst_New				0x00
@@ -76,6 +77,8 @@
 #define Mlsas_Rst_Done				0x13
 #define Mlsas_Rst_Abort_Diskio		0x14
 #define Mlsas_Rst_Abort_Netio		0x15
+#define Mlsas_Rst_Abort_TM			0x16
+
 
 #define Mlsas_PRRst_Submit_Local 	0x01
 #define Mlsas_PRRst_Discard_Error	0x02
@@ -119,6 +122,7 @@
 #define Mlsas_Devevt_PR_Disconnect	0x08
 #define Mlsas_Devevt_PR_Down2up		0x09
 #define Mlsas_Devevt_Hard_Stchg		0x0A
+#define Mlsas_Devevt_PR_Commi_PRkey	0x0B
 #define Mlsas_Devevt_Last			0x10
 
 #define Mlsas_PRevt_Attach_OK		0x01
