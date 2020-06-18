@@ -3332,7 +3332,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(mod_hash_t key,
 	Mlsas_request_t *rq = NULL, *next;
 	Mlsas_bio_and_error_t m;
 	
-	spin_lock_irq(vt->Mlb_rq_spin);
+	spin_lock_irq(&vt->Mlb_rq_spin);
 	for (rq = list_head(&vt->Mlb_topr_rqs); rq; rq = next) {
 		next = list_next(&vt->Mlb_topr_rqs, rq);
 
@@ -3351,7 +3351,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(mod_hash_t key,
 		}
 	}
 
-	spin_unlock_irq(vt->Mlb_rq_spin);
+	spin_unlock_irq(&vt->Mlb_rq_spin);
 
 	return (0);
 }
