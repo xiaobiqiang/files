@@ -153,9 +153,6 @@ function install_mptsas2()
         return
     fi
     
-    if [ -f /boot/initramfs-3.10.0-514.el7.x86_64.img_bak ]; then
-        return
-    fi
     
     if [ `file /boot/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
         cp mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
