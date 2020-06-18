@@ -4010,8 +4010,6 @@ stmf_get_iops_info_ioctl(stmf_iops_info_t *iops_info,
 			iops_info->cur_iops = ilu->ilu_cur_iops;
             if (iops_info->iops_limit == 0)
                 iops_info->cur_iops = 0;
-			cmn_err(CE_NOTE, "%s cur iops %d, iops limit %d", __func__,
-				iops_info->cur_iops, iops_info->iops_limit);
 			found = B_TRUE;
 			break;
 		}
@@ -4084,8 +4082,6 @@ stmf_get_kbps_ioctl(stmf_kbps_t *kbps, uint32_t *err_ret)
             kbps->kbps_limit = ilu->ilu_kbps_limit;
             if (kbps->kbps_limit == 0)
                 kbps->cur_kbps = 0;
-            cmn_err(CE_NOTE, "%s: cur kbps %" PRIx64 "; kbps limit %" PRIx64 "", __func__,
-                    kbps->cur_kbps, kbps->kbps_limit);
             found = B_TRUE;
             break;
         }
