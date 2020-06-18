@@ -153,7 +153,11 @@ function install_mptsas2()
         return
     fi
     
-    if [ `file /root/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
+    if [ -f /boot/initramfs-3.10.0-514.el7.x86_64.img_bak ]; then
+        return
+    fi
+    
+    if [ `file /boot/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
         cp mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
         return 
     fi
@@ -169,6 +173,8 @@ function install_mptsas2()
     find . 2>/dev/null | cpio -c -o | gzip > ../initramfs-3.10.0-514.el7.x86_64.img
     cp ../initramfs-3.10.0-514.el7.x86_64.img /boot
     cd -
+    
+    rm -rf initramfs-3.10.0-514.el7.x86_64.img
 }
 
 function install_drbd()
@@ -182,11 +188,13 @@ function install_drbd()
     tar -xzvf $drbdrpm
     rpm -ivh $drbddir/drbd-rpm/*
     rpm -ivh $drbddir/drbd-utils-rpm/*
+    
+    rm -rf $drbddir
 }
 
 function install_vmlinux1()
 {
-    if [ ! -f vmlinux1 ];
+    if [ ! -f vmlinux1 ]; then
         return
     fi
     cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
