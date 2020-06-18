@@ -1,4 +1,4 @@
-SUBDIRS = fm fs idm iscsit scsi
+SUBDIRS = fm fs idm iscsit scsi mltsas
 
 COMMON_H = \
 	$(top_srcdir)/include/sys/arc.h \
@@ -141,7 +141,7 @@ KERNEL_H = \
 	$(top_srcdir)/include/sys/iscsi_protocol.h \
 	$(top_srcdir)/include/sys/in.h \
 	$(top_srcdir)/include/sys/callout.h \
-	$(top_srcdir)/include/sys/utils_vmem.h
+	$(top_srcdir)/include/sys/utils_vmem.h	
 
 USER_H =	\
 	$(top_srcdir)/include/sys/if_drbdsvc.h

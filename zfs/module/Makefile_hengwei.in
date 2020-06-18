@@ -19,6 +19,7 @@ subdir-m += idm
 subdir-m += iscsit
 subdir-m += ipmi_notify
 subdir-m += mpt3sas
+subdir-m += mltsas
 
 LINUX_SRC_LINK := /lib/modules/$(shell uname -r)/source
 LINUX_SRC_DIR := $(shell readlink -f $(LINUX_SRC_LINK))
