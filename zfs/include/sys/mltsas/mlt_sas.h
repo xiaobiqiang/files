@@ -132,6 +132,26 @@
 #define Mlsas_PRevt_Hardly_Update	0x05
 #define Mlsas_PRevt_Last			0x10
 
+#define Mlsas_Minors				16
+#define Mlsas_Majors				16
+
+#define Mlsas_Disk0_Major			304
+#define Mlsas_Disk1_Major			305
+#define Mlsas_Disk2_Major			306
+#define Mlsas_Disk3_Major			307
+#define Mlsas_Disk4_Major			308
+#define Mlsas_Disk5_Major			309
+#define Mlsas_Disk6_Major			310
+#define Mlsas_Disk7_Major			311
+#define Mlsas_Disk8_Major			312
+#define Mlsas_Disk9_Major			313
+#define Mlsas_Disk10_Major			314
+#define Mlsas_Disk11_Major			315
+#define Mlsas_Disk12_Major			316
+#define Mlsas_Disk13_Major			317
+#define Mlsas_Disk14_Major			318
+#define Mlsas_Disk15_Major			319
+
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
 	((Mlb)->Mlb_st >= (__minSt))
 #define __Mlsas_Get_ldev_if_state_between(Mlb, __minSt, __maxSt)	\
@@ -266,6 +286,7 @@ struct Mlsas_blkdev {
 	list_t Mlb_net_pr_rqs;
 	
 	Mlsas_devst_e	Mlb_st;
+	uint32_t 		Mlb_index;
 
 	wait_queue_head_t Mlb_wait;
 

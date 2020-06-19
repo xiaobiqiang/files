@@ -1,6 +1,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/idr.h>
 #include <sys/cluster_san.h>
 #include <sys/mltsas/mlt_sas.h>
 
@@ -128,7 +129,6 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml);
 static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 
 static uint32_t Mlsas_npending = 0;
-static uint32_t Mlsas_minors = 16;
 static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
 static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
@@ -185,6 +185,9 @@ static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
 	[Mlsas_Mms_Brw_Rsp]		=	__Mlsas_RX_Brw_Rsp,
 	[Mlsas_Mms_State_Change]=	__Mlsas_RX_State_Change,
 };
+
+static DEFINE_IDA(Mlsas_virt_index_ida);
+static DEFINE_SPINLOCK(Mlsas_virt_index_spinlock);
 
 int (*__Mlsas_clustersan_rx_hook_add)(uint32_t, cs_rx_cb_t, void *);
 int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
@@ -382,12 +385,12 @@ static int Mlsas_Copyout_Iocdt(uint64_t caddr, Mlsas_iocdt_t *iocp)
 }
 
 
-static int Mlsas_Open(struct inode *inode, struct file *f)
+static int __Mlsas_Open(struct inode *inode, struct file *f)
 {
 	return (0);
 }
 
-static int Mlsas_Ioctl(struct file *fp, unsigned int cmd, 
+static int __Mlsas_Ioctl(struct file *fp, unsigned int cmd, 
 		unsigned long priv)
 {
 	int rval = 0, old_St;
@@ -795,6 +798,26 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 
 static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
 {
+	int index = 0;
+
+	VERIFY(ida_pre_get(&Mlsas_virt_index_ida, GFP_KERNEL));
+retry:
+	spin_lock(&Mlsas_virt_index_spinlock);
+	switch (ida_get_new(&Mlsas_virt_index_ida, &index)) {
+	case -ENOMEM:
+		cmn_err(CE_PANIC, "memory exhausted when NEW VIRT(%llx)", Mlb->Mlb_hashkey);
+	case -ENOSPC:
+		cmn_err(CE_PANIC, "no ida remained when NEW VIRT(%llx)", Mlb->Mlb_hashkey);
+	case -EAGAIN:
+		spin_unlock(&Mlsas_virt_index_spinlock);
+		goto retry;
+	default:
+		spin_unlock(&Mlsas_virt_index_spinlock);
+		break;
+	}
+
+	Mlb->Mlb_index = index;
+
 	spin_lock_init(&Mlb->Mlb_rq_spin);
 	kref_init(&Mlb->Mlb_ref);
 	
@@ -835,7 +858,7 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 
 	__Mlsas_Bump(virt_alloc);
 	__Mlsas_Bump(virt_kref);
-	
+
 	Mlbp->Mlb_st		 	= Mlsas_Devst_Standalone;
 	Mlbp->Mlb_hashkey 		= hash_key;
 	Mlbp->Mlb_astxbuf_len 	= 32 << 10;
@@ -855,18 +878,18 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	int rval = -ENOMEM;
 	struct gendisk *disk = NULL;
 	struct request_queue *rq = NULL;
-	uint32_t minor = gMlsas_ptr->Ml_minor;
-
+	uint32_t index = Mlbp->Mlb_index;
 	/* partion, fix create dup sysfs block dir */
-	gMlsas_ptr->Ml_minor += 16;
+	uint32_t major = __Mlsas_majors((index & 0xF0) >> 4);
+	uint32_t minor = ((index & 0xf) << 4) | (index & 0xfff00);
 	
-	VERIFY(((disk = alloc_disk(1)) != NULL) &&
+	VERIFY(((disk = alloc_disk(Mlsas_Minors)) != NULL) &&
 		((rq = blk_alloc_queue(GFP_KERNEL)) != NULL));
 
 	set_disk_ro(disk, true);
 	disk->queue = rq;
-	disk->minors = Mlsas_minors;
-	disk->major = Mlsas_MAJOR;
+	disk->minors = Mlsas_Minors;
+	disk->major = major;
 	disk->first_minor = minor;
 	disk->fops = &Mlsas_disk_ops;
 	sprintf(disk->disk_name, "Mlsas%llxs", Mlbp->Mlb_hashkey);
@@ -885,7 +908,7 @@ static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp)
 	rq->queue_lock = &Mlbp->Mlb_rq_spin;
 	rq->queuedata = Mlbp;
 	
-	Mlbp->Mlb_this = bdget(MKDEV(Mlsas_MAJOR, minor));
+	Mlbp->Mlb_this = bdget(MKDEV(major, minor));
 	Mlbp->Mlb_this->bd_contains = Mlbp->Mlb_this;
 	Mlbp->Mlb_rq = rq;
 	Mlbp->Mlb_gdisk = disk;
@@ -3425,8 +3448,6 @@ static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
 
 static void __Mlsas_create_async_thread(Mlsas_t *ml)
 {
-	ml->Ml_minor = 0;
-	
 	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
 
@@ -3492,14 +3513,26 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl)
 		!IS_ERR_OR_NULL(__Mlsas_clustersan_kmem_free));
 }
 
-static void Mlsas_Init(Mlsas_t *Mlsp)
+static uint32_t __Mlsas_majors(uint32_t index)
+{
+	switch (index) {
+	case 0:
+		return Mlsas_Disk0_Major;
+	case 1 ... 15:
+		return Mlsas_Disk1_Major + index - 1;
+	default:
+		VERIFY(0);
+	}
+}
+
+static void __Mlsas_init(Mlsas_t *Mlsp)
 {	
 	bzero(Mlsp, sizeof(Mlsas_t));
 	Mlsp->Ml_state = Mlsas_St_Disabled;
 	mutex_init(&Mlsp->Ml_mtx, NULL, MUTEX_DEFAULT, NULL);
 }
 
-static void Mlsas_install_stat(Mlsas_t *Mlsp)
+static void __Mlsas_install_stat(Mlsas_t *Mlsp)
 {
 	Mlsp->Ml_kstat = kstat_create(Mlsas_Module_Name, 0,
 		"Mlsas_stat", "misc", KSTAT_TYPE_NAMED, 
@@ -3513,10 +3546,19 @@ static void Mlsas_install_stat(Mlsas_t *Mlsp)
 	}
 }
 
+static void __Mlsas_Register_blkdev_majors(void)
+{
+	int i = 0;
+
+	for ( ; i < Mlsas_Majors; i++)
+		VERIFY(register_blkdev(__Mlsas_majors(i), 
+			"Mlsas") == 0);
+}
+
 static struct file_operations Mlsas_drv_fops = {
 	.owner = THIS_MODULE,
-	.open = Mlsas_Open,
-	.unlocked_ioctl = Mlsas_Ioctl,
+	.open = __Mlsas_Open,
+	.unlocked_ioctl = __Mlsas_Ioctl,
 }; 
 
 static struct miscdevice Mlsas_dev = {
@@ -3525,7 +3567,7 @@ static struct miscdevice Mlsas_dev = {
 	.fops   = &Mlsas_drv_fops,
 };
 
-static int __init __Mlsas_Init(void)
+static int __init __Mlsas_module_init(void)
 {
 	int iRet = 0;
 	
@@ -3534,24 +3576,26 @@ static int __init __Mlsas_Init(void)
 		goto out;
 	}
 
-	Mlsas_Init(gMlsas_ptr);
+	__Mlsas_init(gMlsas_ptr);
 
-	Mlsas_install_stat(gMlsas_ptr);
+	__Mlsas_install_stat(gMlsas_ptr);
+
+	__Mlsas_Register_blkdev_majors();
+	
 out:
 	return iRet;
 }
 
-static void __exit __Mlsas_Exit(void)
+static void __exit __Mlsas_module_exit(void)
 {
 	return ;
 }
 
 module_param(Mlsas_npending, int, 0644);
-module_param(Mlsas_minors, int, 0644);
 module_param(Mlsas_pr_req_tm, int, 0644);
 module_param(Mlsas_topr_req_tm, int, 0644);
 module_param(Mlsas_wd_gap, int, 0644);
 
-module_init(__Mlsas_Init);
-module_exit(__Mlsas_Exit);
+module_init(__Mlsas_module_init);
+module_exit(__Mlsas_module_exit);
 MODULE_LICENSE("GPL");
