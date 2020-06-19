@@ -129,8 +129,8 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_minors = 16;
-static uint32_t Mlsas_pr_req_tm = 200;		/* ms */
-static uint32_t Mlsas_topr_req_tm = 600;	/* ms */
+static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
+static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
 
 Mlsas_stat_t Mlsas_stat = {
@@ -166,7 +166,8 @@ static const char *Mlsas_devevt_name[Mlsas_Devevt_Last] = {
 	[Mlsas_Devevt_PR_Error_Sw]		=	"Peer_Error_Switch",
 	[Mlsas_Devevt_PR_Disconnect]	=	"Peer_Disconnect",
 	[Mlsas_Devevt_PR_Down2up]		=	"Peer_Down2up",
-	[Mlsas_Devevt_Hard_Stchg]		=	"Hardly_Stchg"
+	[Mlsas_Devevt_Hard_Stchg]		=	"Hardly_Stchg",
+	[Mlsas_Devevt_PR_Commi_PRkey]	=	"Peer_Commi_PRkey"
 };
 
 static const char *Mlsas_PRevt_name[Mlsas_PRevt_Last] = {
@@ -511,6 +512,7 @@ static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 	else {
 		rval = __Mlsas_New_minor_impl(path, hash_key, &vt);
 		if (vt && !rval) {
+			list_insert_tail(&gMlsas_ptr->Ml_virt_list, vt);
 			VERIFY(mod_hash_insert(gMlsas_ptr->Ml_devices, 
 				hash_key, vt) == 0);
 			__Mlsas_get_virt(vt);
@@ -1396,6 +1398,8 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	}
 */
 
+	cmn_err(CE_NOTE, "Down2Up report Virt(%llx)", vt->Mlb_hashkey);
+
 	mms = __Mlsas_Alloc_Mms(sizeof(Mlsas_Attach_msg_t), 
 		Mlsas_Mms_Attach, vt->Mlb_hashkey, &atm);
 	mms->Mms_rh = (Mlsas_rh_t *)cshi;
@@ -1406,8 +1410,6 @@ static uint_t __Mlsas_Virt_walk_cb_down2up(mod_hash_key_t key,
 	atm->Atm_down2up_attach = 1;
 	
 	__Mlsas_Queue_RTX(&vt->Mlb_tx_wq, &mms->Mms_wk);
-
-	spin_unlock_irq(&vt->Mlb_rq_spin);
 	
 	return (0);
 }
@@ -2264,7 +2266,11 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 
 		if (__Mlsas_Get_ldev(Mlb))
 			rq->Mlrq_flags |= Mlsas_RQ_Delayed; 
-		
+	} else {	/* ok, clear error state */
+		if (pr)
+			pr->Mlpd_error_now = 0;
+		else 
+			Mlb->Mlb_error_cnt = 0;
 	}
 	
 	if (!(rq->Mlrq_flags & Mlsas_RQ_Delayed)) {
@@ -2388,6 +2394,7 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 		VERIFY(rh = __Mlsas_Alloc_rhost(cshi->hostid, cshi));
 		VERIFY(mod_hash_insert(gMlsas_ptr->Ml_rhs, 
 			cshi->hostid, rh) == 0);
+		list_insert_tail(&gMlsas_ptr->Ml_rhs_list, rh);
 		__Mlsas_get_rhost(rh);
 		new_rh = B_TRUE;
 	}
@@ -3166,6 +3173,8 @@ static void __Mlsas_remove_rhost_locked(Mlsas_rh_t *rh)
 	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
 	VERIFY(mod_hash_remove(gMlsas_ptr->Ml_rhs, 
 		rh->Mh_hostid, &find) == 0);
+	list_remove(&gMlsas_ptr->Ml_rhs_list, rh);
+	
 	VERIFY(rh == find);
 
 	__Mlsas_put_rhost(rh);
@@ -3278,16 +3287,19 @@ static boolean_t __Mlsas_Has_Active_PR(Mlsas_blkdev_t *Mlb,
 static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 {
 	Mlsas_blkdev_t *vt = pr->Mlpd_mlb;
-	Mlsas_pr_req_t *prr = NULL, *next;
+	Mlsas_pr_req_t *prr = NULL, *prr_next;
 	Mlsas_pr_req_free_t fr = {0};
 	uint32_t what;
+	uint64_t now_jiffies;
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
+	now_jiffies = jiffies;
+		
 	for (prr = list_head(&pr->Mlpd_pr_rqs); 
-			prr; prr = next) {
-		next = list_next(&pr->Mlpd_pr_rqs, prr);
+			prr; prr = prr_next) {
+		prr_next = list_next(&pr->Mlpd_pr_rqs, prr);
 
-		if ((jiffies - prr->prr_start_jif) > 
+		if ((now_jiffies - prr->prr_start_jif) > 
 				MSEC_TO_TICK(Mlsas_pr_req_tm)) {
 			cmn_err(CE_NOTE, "PR_RQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu)) timeout, to ABORT...", 
@@ -3311,11 +3323,8 @@ static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 	return (0);
 }
 
-static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key, 
-		mod_hash_val_t *val, void *private)
+static void __Mlsas_RHost_walk_cb_watchdog(Mlsas_rh_t *rh)
 {
-	Mlsas_rh_t *rh = (Mlsas_rh_t *)val;
-
 	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
 
 	mutex_enter(&rh->Mh_mtx);
@@ -3325,18 +3334,19 @@ static uint_t __Mlsas_RHost_walk_cb_watchdog(mod_hash_t key,
 	return (0);
 }
 
-static uint_t __Mlsas_Virt_walk_cb_watchdog(mod_hash_t key, 
-		mod_hash_val_t *val, void *private)
+static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 {
-	Mlsas_blkdev_t *vt = (Mlsas_blkdev_t *)val;
 	Mlsas_request_t *rq = NULL, *next;
 	Mlsas_bio_and_error_t m;
+	uint64_t now_jiffies;
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
+	now_jiffies = jiffies;
+		
 	for (rq = list_head(&vt->Mlb_topr_rqs); rq; rq = next) {
 		next = list_next(&vt->Mlb_topr_rqs, rq);
 
-		if ((jiffies - rq->Mlrq_start_jif) >
+		if ((now_jiffies - rq->Mlrq_start_jif) >
 				MSEC_TO_TICK(Mlsas_topr_req_tm)) {
 			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu) last_what(%u)) timeout, to ABORT...",
@@ -3359,13 +3369,21 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(mod_hash_t key,
 static int __Mlsas_Async_watch_dog_impl(Mlsas_rtx_wk_t *w)
 {
 	Mlsas_t *Ml = container_of(w, Mlsas_t, Ml_wd_wk);
+	Mlsas_rh_t *rh = NULL, *rh_next = NULL;
+	Mlsas_blkdev_t *vt, *vt_next;
 	
 	mutex_enter(&Ml->Ml_mtx);
+	for (rh = list_head(&Ml->Ml_rhs_list); rh; rh = rh_next) {
+		rh_next = list_next(&Ml->Ml_rhs_list, rh);
 
-	__Mlsas_walk_rhost(NULL, __Mlsas_RHost_walk_cb_watchdog);
+		__Mlsas_RHost_walk_cb_watchdog(rh);
+	}
 
-	__Mlsas_walk_virt(NULL, __Mlsas_Virt_walk_cb_watchdog);
+	for (vt = list_head(&Ml->Ml_virt_list); vt; vt = vt_next) {
+		vt_next = list_next(&Ml->Ml_virt_list, vt_next);
 
+		__Mlsas_Virt_walk_cb_watchdog(vt);
+	}
 	mutex_exit(&Ml->Ml_mtx);
 
 	return (0);
@@ -3411,6 +3429,13 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 	
 	ml->Ml_async_tq = taskq_create("Mlsas_async_tq", 4, 
 		minclsyspri, 4, 8, TASKQ_PREPOPULATE);
+
+	list_link_init(&ml->Ml_wd_wk.rtw_node);
+	
+	list_create(&ml->Ml_virt_list, sizeof(Mlsas_blkdev_t),
+		offsetof(Mlsas_blkdev_t, Mlb_node));
+	list_create(&ml->Ml_rhs_list, sizeof(Mlsas_rh_t),
+		offsetof(Mlsas_rh_t, Mh_node));
 
 	__Mlsas_RTx_Init_WQ(&ml->Ml_wd_wq);
 	__Mlsas_Thread_Init(&ml->Ml_wd, __Mlsas_RTx, Mtt_WatchDog, "__Mlsas_Watchdog");
@@ -3523,6 +3548,9 @@ static void __exit __Mlsas_Exit(void)
 
 module_param(Mlsas_npending, int, 0644);
 module_param(Mlsas_minors, int, 0644);
+module_param(Mlsas_pr_req_tm, int, 0644);
+module_param(Mlsas_topr_req_tm, int, 0644);
+module_param(Mlsas_wd_gap, int, 0644);
 
 module_init(__Mlsas_Init);
 module_exit(__Mlsas_Exit);

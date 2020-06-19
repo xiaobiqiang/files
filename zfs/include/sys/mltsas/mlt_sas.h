@@ -249,6 +249,7 @@ struct Mlsas_thread {
 };
 
 struct Mlsas_blkdev {
+	list_node_t Mlb_node;
 	uint64_t Mlb_hashkey;	/* const */
 	uint64_t Mlb_nopen;
 	char Mlb_scsi[32];
@@ -412,6 +413,7 @@ struct Mlsas_retry {
 #define Mlsas_RHS_New			0x01
 #define Mlsas_RHS_Corrupt		0x02		
 struct Mlsas_rh {
+	list_node_t Mh_node;
 	uint32_t Mh_hostid;
 	uint32_t Mh_state;
 	uint32_t Mh_pad;
@@ -450,6 +452,9 @@ struct Mlsas {
 	Mlsas_thread_t Ml_wd;
 	Mlsas_rtx_wq_t Ml_wd_wq;
 	Mlsas_rtx_wk_t Ml_wd_wk;
+
+	list_t Ml_virt_list;
+	list_t Ml_rhs_list;
 	
 	kstat_t *Ml_kstat;
 	kmutex_t Ml_mtx;
