@@ -127,6 +127,7 @@ static void __Mlsas_create_slab_modhash(Mlsas_t *ml);
 static void __Mlsas_create_retry(Mlsas_retry_t *retry);
 static void __Mlsas_create_async_thread(Mlsas_t *ml);
 static void __Mlsas_clustersan_modload(nvlist_t *nvl);
+static uint32_t __Mlsas_majors(uint32_t index);
 
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
