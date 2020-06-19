@@ -133,6 +133,8 @@ static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
 static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
+static uint32_t Mlsas_virt_fail_threshold = 16;
+static uint32_t Mlsas_PR_fail_threshold = 16;
 
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
@@ -865,7 +867,7 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 	Mlbp->Mlb_astxbuf_len 	= 32 << 10;
 	Mlbp->Mlb_txbuf_len 	= 32 << 10;
 	Mlbp->Mlb_stxbuf_len 	= 32 << 10;
-	Mlbp->Mlb_switch 		= 16;
+	Mlbp->Mlb_switch 		= Mlsas_virt_fail_threshold;
 	
 	__Mlsas_Init_Virt_MLB(Mlbp);
 
@@ -3099,7 +3101,7 @@ static Mlsas_pr_device_t *__Mlsas_Alloc_PR(uint32_t id, Mlsas_devst_e st,
 	pr->Mlpd_hostid = id;
 	pr->Mlpd_mlb = Mlb;
 	pr->Mlpd_rh = rh;
-	pr->Mlpd_switch = Mlb->Mlb_switch;
+	pr->Mlpd_switch = Mlsas_PR_fail_threshold;
 	return pr;
 }
 
@@ -3596,6 +3598,8 @@ module_param(Mlsas_npending, int, 0644);
 module_param(Mlsas_pr_req_tm, int, 0644);
 module_param(Mlsas_topr_req_tm, int, 0644);
 module_param(Mlsas_wd_gap, int, 0644);
+module_param(Mlsas_virt_fail_threshold, int, 0644);
+module_param(Mlsas_PR_fail_threshold, int, 0644);
 
 module_init(__Mlsas_module_init);
 module_exit(__Mlsas_module_exit);
