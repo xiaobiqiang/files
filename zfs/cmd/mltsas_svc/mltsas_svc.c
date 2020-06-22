@@ -30,7 +30,6 @@ static int Mlsas_enable(int, char **, cmdOptions_t *, void *);
 #define Mlsas_Hash_Bits				8
 #define Mlsas_n_Slot				(1 << Mlsas_Hash_Bits)
 
-#define Mltsas_Node					"/dev/Mlsas_dev"
 #define Disk_directory				"/dev/disk/by-id/"
 #define Disk_prefix					"scsi-3"
 

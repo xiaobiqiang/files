@@ -198,6 +198,7 @@ AC_CONFIG_FILES([
 	cmd/drbdmon/Makefile
 	cmd/drbdctl/Makefile
 	cmd/mltsas_svc/Makefile
+	cmd/mpathadm/Makefile
 	cmd/cm/Makefile
 	cmd/cm/base/Makefile
 	cmd/cm/cli/Makefile

@@ -55,7 +55,7 @@ static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Attach(Mlsas_iocdt_t *Mlip);
-static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt);
+static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt);
 static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt, 
 		Mlsas_virtinfo_return_t *vti);
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt);
@@ -445,8 +445,8 @@ static int __Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 	case Mlsas_Ioc_Failoc:
 		rval = __Mlsas_Do_Failoc(&ioc);
 		break;
-	case Mlsas_Ioc_Virtinfo:
-		rval = __Mlsas_Do_Virtinfo(&ioc);
+	case Mlsas_Ioc_LuInfo:
+		rval = __Mlsas_Do_Get_Luinfo(&ioc);
 		break;
 	}
 
@@ -612,39 +612,51 @@ failed_out:
 	return rval;
 }
 
-static int __Mlsas_Do_Virtinfo(Mlsas_iocdt_t *dt)
+static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt)
 {
 	int rval = 0;
 	nvlist_t *invlp = NULL;
 	uint64_t hash_key = 0;
 	const char *path = NULL;
 	Mlsas_blkdev_t *Mlb = NULL;
-	Mlsas_virtinfo_return_t vti;
+	mpath_adm_lu_info_t *li = ((void *)dt->Mlioc_obufptr) + 8;
+	int ncount = 0;
 
 	if (((rval = nvlist_unpack(dt->Mlioc_ibufptr, dt->Mlioc_nibuf,
 			&invlp, KM_SLEEP)) != 0) ||
 		((rval = nvlist_lookup_string(invlp, 
 			"path", &path)) != 0) ||
-		((rval = __Mlsas_Path_to_Hashkey(path, 
-			&hash_key)) != 0)) {
-		cmn_err(CE_NOTE, "%s Virtinfo FAIL by Unpack(%p) or"
+		(strncmp(path, "ALL", 3) && ((rval = __Mlsas_Path_to_Hashkey(
+			path, &hash_key)) != 0))) {
+		cmn_err(CE_NOTE, "%s Get Luinfo FAIL by Unpack(%p) or"
 			" None Nvl Path(%p) Nvpair or Invalid Path(%s),Error(%d)",
 			__func__, invlp, path, path, rval);
 		goto failed_out;
 	}
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
-	VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, hash_key, &Mlb) == 0);
-	__Mlsas_get_virt(Mlb);
-	
+	if (strncmp(path, "ALL", 3) == 0)
+		rval = __Mlsas_Get_all_lu_info(&ncount, li);
+	else {
+		VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, 
+			hash_key, &Mlb) == 0);
+		__Mlsas_get_virt(Mlb);
+	}
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
-	bzero(&vti, sizeof(Mlsas_virtinfo_return_t));
-	__Mlsas_Do_Virtinfo_impl(Mlb, &vti);
-	__Mlsas_put_virt(Mlb);
+	if (Mlb && !strncmp(path, "ALL", 3)) {
+		spin_lock_irq(&Mlb->Mlb_rq_spin);
+		if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Degraded)) {
+			ncount = 1;
+			__Mlsas_Virt_get_lu_info(Mlb, li);
+		}
+		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
-	bcopy(&vti, dt->Mlioc_obufptr, sizeof(Mlsas_virtinfo_return_t));
-	dt->Mlioc_nofill = sizeof(Mlsas_virtinfo_return_t);
+		__Mlsas_put_virt(Mlb);
+	}
+
+	*((uint32_t *)dt->Mlioc_obufptr) = ncount;
+	dt->Mlioc_nofill = 8 + ncount * sizeof(mpath_adm_lu_info_t);
 failed_out:
 	if (invlp)
 		nvlist_free(invlp);
@@ -1315,6 +1327,67 @@ int Mlsas_TX(void *session, void *header, uint32_t hdlen,
 			msg_type, 0, B_TRUE, 3);
 
 	return rval;
+}
+
+static void __Mlsas_Virt_get_active_path(Mlsas_blkdev_t *vt, 
+		Mlsas_pr_device_t **pr)
+{
+	Mlsas_request_t *rq;
+	boolean_t do_local = B_FALSE, do_remote = B_FALSE;
+	boolean_t do_restart = B_FALSE;
+	
+	VERIFY((rq = kmem_zalloc(sizeof(Mlsas_request_t), KM_SLEEP)) != NULL);
+
+	__Mlsas_Do_Policy(vt, rq, &do_local, &do_remote, &do_restart);
+
+	*pr = rq->Mlrq_pr;
+	
+	if (do_local || do_remote)
+		kmem_free(rq, sizeof(Mlsas_request_t));
+}
+
+static void __Mlsas_Virt_get_lu_info(Mlsas_blkdev_t *vt, 
+		mpath_adm_lu_info_t *li)
+{
+	Mlsas_pr_device_t *pr, *pr_next;
+
+	bzero(li, sizeof(mpath_adm_lu_info_t));
+	
+	strncpy(li->li_name, vt->Mlb_bdi.Mlbd_path, 64);
+	for (pr = list_head(&vt->Mlb_pr_devices); pr; pr = pr_next) {
+		pr_next = list_next(&vt->Mlb_pr_devices, pr);
+
+		li->li_path_count++;
+		if (__Mlsas_Get_PR_if_state(pr, Mlsas_Devst_Attached))
+			li->li_opt_path_count++;
+	}
+	
+	pr = NULL;
+	__Mlsas_Virt_get_active_path(vt, &pr);
+	if (pr) {
+		li->li_active_path = pr->Mlpd_rh->Mh_hostid;
+		__Mlsas_put_PR(pr);
+	}
+}
+
+static void __Mlsas_Get_all_lu_info(uint32_t *count, 
+		mpath_adm_lu_info_t *li)
+{
+	Mlsas_blkdev_t *vt, *vt_next;
+	uint64_t start = (uint64_t)li;
+	
+	VERIFY(MUTEX_HELD(&gMlsas_ptr->Ml_mtx));
+
+	for (vt = list_head(&gMlsas_ptr->Ml_virt_list); vt; vt = vt_next) {
+		vt_next = list_next(&gMlsas_ptr->Ml_virt_list, vt);
+
+		spin_lock_irq(&vt->Mlb_rq_spin);
+		if (__Mlsas_Get_ldev_if_state(vt, Mlsas_Devst_Degraded))
+			__Mlsas_Virt_get_lu_info(vt, li++);
+		spin_unlock_irq(&vt->Mlb_rq_spin);
+	}
+
+	*count = (start - (uint64_t)li)/sizeof(mpath_adm_lu_info_t);
 }
 
 static void __Mlsas_PR_wait_list_empty(Mlsas_pr_device_t *pr, list_t *list)
@@ -2367,6 +2440,9 @@ static void __Mlsas_Retry(struct work_struct *w)
 			if (fr.k_put)
 				__Mlsas_sub_PR_RQ(prr, fr.k_put);
 			break;
+		default:
+			kmem_free(rq, sizeof(Mlsas_request_t));
+			break;
 		}
 	}
 }
@@ -3406,7 +3482,7 @@ static int __Mlsas_Async_watch_dog_impl(Mlsas_rtx_wk_t *w)
 	}
 
 	for (vt = list_head(&Ml->Ml_virt_list); vt; vt = vt_next) {
-		vt_next = list_next(&Ml->Ml_virt_list, vt_next);
+		vt_next = list_next(&Ml->Ml_virt_list, vt);
 
 		__Mlsas_Virt_walk_cb_watchdog(vt);
 	}

@@ -19,8 +19,6 @@
 #include <sys/kstat.h>
 #include <mltsas_comm.h>
 
-#define Mlsas_MAJOR			299
-
 #define Mlsas_Mxbio_Size	(1 << 20)
 #define Mlsas_Mxbio_Segment	128
 #define Mlsas_DMA_Alimask	0x03
@@ -78,7 +76,6 @@
 #define Mlsas_Rst_Abort_Diskio		0x14
 #define Mlsas_Rst_Abort_Netio		0x15
 #define Mlsas_Rst_Abort_TM			0x16
-
 
 #define Mlsas_PRRst_Submit_Local 	0x01
 #define Mlsas_PRRst_Discard_Error	0x02

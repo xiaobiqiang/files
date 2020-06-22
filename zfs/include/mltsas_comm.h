@@ -11,6 +11,7 @@ typedef unsigned long uint64_t;
 
 #define MLSAS_NAME			"Mlsas_dev"
 #define Mlsas_Ioc_Magic		0xdeafdeaf
+#define Mltsas_Node			"/dev/"MLSAS_NAME
 
 typedef enum Mlsas_ioc {
 	Mlsas_Ioc_First,
@@ -19,7 +20,7 @@ typedef enum Mlsas_ioc {
 	Mlsas_Ioc_Newminor,
 	Mlsas_Ioc_Attach,
 	Mlsas_Ioc_Failoc,
-	Mlsas_Ioc_Virtinfo,
+	Mlsas_Ioc_LuInfo,
 	Mlsas_Ioc_Last
 } Mlsas_ioc_e;
 
@@ -50,5 +51,13 @@ typedef struct Mlsas_virtinfo_return {
 	uint32_t 		vti_io_npending;
 	uint32_t		vti_pad;
 } Mlsas_virtinfo_return_t;
+
+typedef struct mpath_adm_lu_info {
+	char li_name[64];
+	uint32_t li_path_count;
+	uint32_t li_opt_path_count;
+	uint32_t li_active_path;
+	uint32_t li_pad;
+} mpath_adm_lu_info_t;
 
 #endif
