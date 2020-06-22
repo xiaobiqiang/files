@@ -656,6 +656,8 @@ static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt)
 		__Mlsas_put_virt(Mlb);
 	}
 
+	cmn_err(CE_NOTE, "ncount(%u) obuflen(%u)", ncount, dt->Mlioc_nobuf);
+
 	*((uint32_t *)dt->Mlioc_obufptr) = ncount;
 	dt->Mlioc_nofill = 8 + ncount * sizeof(mpath_adm_lu_info_t);
 failed_out:
@@ -1353,8 +1355,12 @@ static void __Mlsas_Virt_get_lu_info(Mlsas_blkdev_t *vt,
 	Mlsas_pr_device_t *pr, *pr_next;
 
 	bzero(li, sizeof(mpath_adm_lu_info_t));
-	
+
 	strncpy(li->li_name, vt->Mlb_bdi.Mlbd_path, 64);
+	li->li_path_count++;
+	if (__Mlsas_Get_ldev_if_state(vt, Mlsas_Devst_Attached))
+		li->li_opt_path_count++;
+	
 	for (pr = list_head(&vt->Mlb_pr_devices); pr; pr = pr_next) {
 		pr_next = list_next(&vt->Mlb_pr_devices, pr);
 
