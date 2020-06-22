@@ -656,7 +656,7 @@ static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt)
 		__Mlsas_put_virt(Mlb);
 	}
 
-	cmn_err(CE_NOTE, "ncount(%u) obuflen(%u)", ncount, dt->Mlioc_nobuf);
+//	cmn_err(CE_NOTE, "ncount(%u) obuflen(%u)", ncount, dt->Mlioc_nobuf);
 
 	*((uint32_t *)dt->Mlioc_obufptr) = ncount;
 	dt->Mlioc_nofill = 8 + ncount * sizeof(mpath_adm_lu_info_t);
