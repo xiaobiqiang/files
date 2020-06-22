@@ -453,8 +453,7 @@ static int __Mlsas_Ioctl(struct file *fp, unsigned int cmd,
 	}
 
 	if (rval == 0) {
-		if ((rval = Mlsas_Copyout_Iocdt(
-				priv, &ioc)) != 0)
+		if ((rval = Mlsas_Copyout_Iocdt(priv, &ioc)) != 0)
 			cmn_err(CE_WARN, "%s cmd(%d) copy out error(%d)",
 				__func__, cmd, rval);
 	}
@@ -646,7 +645,7 @@ static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt)
 	}
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
-	if (Mlb && !strncmp(path, "ALL", 3)) {
+	if (Mlb && strncmp(path, "ALL", 3)) {
 		spin_lock_irq(&Mlb->Mlb_rq_spin);
 		if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Degraded)) {
 			ncount = 1;

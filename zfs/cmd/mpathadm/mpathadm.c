@@ -20,8 +20,8 @@
 #define MPATH_ADM_OK			0
 
 #define VERSION_STRING_MAX_LEN	32
-#define VERSION_STRING_MAJOR	1
-#define VERSION_STRING_MINOR	0
+#define VERSION_STRING_MAJOR	"1"
+#define VERSION_STRING_MINOR	"0"
 
 #define	OPTIONSTRING_LUNIT	"logical-unit"
 #define OPTIONSTRING_ALL	"all"
@@ -174,7 +174,7 @@ static int __mpath_adm_list(int operandLen, char *operands[],
 			list_all = B_TRUE; 
 			break;
 		case 'l':
-			LU = options->optval;
+			LU = options->optarg;
 			break;
 		default:
 			(void) fprintf(stderr, "%s: %c: %s\n",
@@ -192,7 +192,7 @@ static int __mpath_adm_list(int operandLen, char *operands[],
 
 	if ((node_fd = __mpath_adm_open_node()) < 0) {
 		(void) fprintf(stderr, "%s: FAIL when open mltsas node,"
-				"ERROR(%d)", cmdName, node_fd);
+				"ERROR(%d)\n", cmdName, node_fd);
 		rval = node_fd;
 		goto out;
 	}
@@ -200,11 +200,14 @@ static int __mpath_adm_list(int operandLen, char *operands[],
 	if ((rval = __mpath_adm_get_lu_list(node_fd, LU, &nLU, 
 			&li)) != MPATH_ADM_OK) {
 		(void) fprintf(stderr, "%s: FAIL when get LU info list,"
-				"ERROR(%d)", cmdName, rval);
+				"ERROR(%d)\n", cmdName, rval);
 		goto close_node;
 	}
 
 	__mpath_adm_print_lu_info_list(nLU, li);
+
+	if (nLU && li)
+		kmem_free(li, sizeof(mpath_adm_lu_info_t) * nLU);
 	
 close_node:
 	__mpath_adm_close_node(node_fd);
