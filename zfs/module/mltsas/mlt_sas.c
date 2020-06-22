@@ -115,6 +115,8 @@ static void __Mlsas_RX_State_Change_impl(cs_rx_data_t *xd);
 static void __Mlsas_Partion_Map_toTtl(Mlsas_request_t *rq);
 static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
+static void __Mlsas_Get_all_lu_info(uint32_t *count, mpath_adm_lu_info_t *li);
+static void __Mlsas_Virt_get_lu_info(Mlsas_blkdev_t *vt, mpath_adm_lu_info_t *li);
 static void __Mlsas_Release_PR_RQ(struct kref *);
 static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
 		cts_link_evt_t link_evt, void *arg);
