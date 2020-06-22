@@ -173,7 +173,7 @@ static int __mpath_adm_list(int operandLen, char *operands[],
 			has_all_opt = B_TRUE;
 			list_all = B_TRUE; 
 			break;
-		case 'l'
+		case 'l':
 			LU = options->optval;
 			break;
 		default:
