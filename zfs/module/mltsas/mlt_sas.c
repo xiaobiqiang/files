@@ -638,7 +638,7 @@ static int __Mlsas_Do_Get_Luinfo(Mlsas_iocdt_t *dt)
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if (strncmp(path, "ALL", 3) == 0)
-		rval = __Mlsas_Get_all_lu_info(&ncount, li);
+		__Mlsas_Get_all_lu_info(&ncount, li);
 	else {
 		VERIFY(mod_hash_find(gMlsas_ptr->Ml_devices, 
 			hash_key, &Mlb) == 0);
