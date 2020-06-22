@@ -1394,7 +1394,7 @@ static void __Mlsas_Get_all_lu_info(uint32_t *count,
 		spin_unlock_irq(&vt->Mlb_rq_spin);
 	}
 
-	*count = (start - (uint64_t)li)/sizeof(mpath_adm_lu_info_t);
+	*count = ((uint64_t)li - start)/sizeof(mpath_adm_lu_info_t);
 }
 
 static void __Mlsas_PR_wait_list_empty(Mlsas_pr_device_t *pr, list_t *list)
