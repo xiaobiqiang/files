@@ -132,7 +132,7 @@ function install_centos_rely()
     fi
     
     cd centosrely
-    rpm -ivh ./* --nodeps --force
+    rpm -ivh *rpm --nodeps --force
     cd -
     
     install_java $rely_rpm/jdk8.tar
@@ -153,7 +153,8 @@ function install_mptsas2()
         return
     fi
     
-    if [ `file /root/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
+    
+    if [ `file /boot/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
         cp mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
         return 
     fi
@@ -169,6 +170,8 @@ function install_mptsas2()
     find . 2>/dev/null | cpio -c -o | gzip > ../initramfs-3.10.0-514.el7.x86_64.img
     cp ../initramfs-3.10.0-514.el7.x86_64.img /boot
     cd -
+    
+    rm -rf initramfs-3.10.0-514.el7.x86_64.img
 }
 
 function install_drbd()
@@ -182,6 +185,21 @@ function install_drbd()
     tar -xzvf $drbdrpm
     rpm -ivh $drbddir/drbd-rpm/*
     rpm -ivh $drbddir/drbd-utils-rpm/*
+    
+    rm -rf $drbddir
+}
+
+function install_vmlinux1()
+{
+    if [ ! -f vmlinux1 ]; then
+        return
+    fi
+    cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
+    mv /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko.bak
+    cd /lib/modules/4.4.15-deepin-wutip
+    rm modules.dep
+    cd -
+    depmod -a
 }
 
 function install()
@@ -220,6 +238,7 @@ function install()
     install_gui
     install_scsi
     install_version
+    install_vmlinux1
     
     rm -rf rpm
     rm -rf scsi
@@ -242,6 +261,15 @@ function unload()
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
     rm -rf /lib/systemd/system/ceres_cm.service
+}
+
+function help()
+{   
+    echo "usage:"
+    echo ""
+    echo "  unload:           ./installrpm.sh unload"
+    echo "  install:          ./installrpm.sh install"
+    echo "  install rely:     ./installrpm.sh install_deepin_rely"
 }
 
 

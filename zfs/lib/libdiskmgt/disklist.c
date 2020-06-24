@@ -1574,6 +1574,8 @@ int disk_get_gsize(disk_info_t *di)
 			break;
 		}
 	}
+
+	pclose(fd);
 }
 
 int disk_get_slotid(disk_info_t *di)

@@ -283,7 +283,9 @@ CONOPT=
 gettext "Enter enclosure number(default:0): "
 read CONOPT
 
-if [ "${CONOPT}" -gt "40" -o -z ${CONOPT} ];then
+[ -z ${CONOPT} ]&&CONOPT=0
+
+if [ "${CONOPT}" -gt "40" ];then
         cat /etc/prodigy.conf |echo 'ENCLOSURE_AMOUNT=0' >> /etc/prodigy.conf
         printf "Use default 0\n"
 else

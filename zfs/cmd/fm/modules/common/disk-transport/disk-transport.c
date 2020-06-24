@@ -700,19 +700,28 @@ dt_update_disk_info(fmd_hdl_t *hdl, topo_hdl_t *thp)
 				current->dk_gsize[len - 1] == 'P'){
 				dnode.dt_dim[0] = current->dk_gsize[len - 1];
 				dnode.dt_dim[1] = '\0';
+				current->dk_gsize[len - 1] = 0;
+				strncpy(dnode.dt_gsize,current->dk_gsize,sizeof(dnode.dt_gsize));
 			}
 			else{
+				strncpy(dnode.dt_dim,"-",sizeof(dnode.dt_dim));
+				strncpy(dnode.dt_gsize,"0",sizeof(dnode.dt_gsize));
 				syslog(LOG_ERR,"gsize %s",current->dk_gsize);
-				continue;
 			}
-			current->dk_gsize[len - 1] = 0;
-			strncpy(dnode.dt_gsize,current->dk_gsize,sizeof(dnode.dt_gsize));
+			
 		}else{
-			continue;
+			strncpy(dnode.dt_dim,"-",sizeof(dnode.dt_dim));
+			strncpy(dnode.dt_gsize,"0",sizeof(dnode.dt_gsize));
 		}
 		dnode.dt_rpm = current->dk_rpm;
 		dnode.dt_serial = current->dk_serial;
 		dnode.dt_mfg = current->dk_vendor;
+		if(dnode.dt_serial == NULL){
+			dnode.dt_serial = "-";
+		}
+		if(dnode.dt_mfg == NULL){
+			dnode.dt_mfg = "-";
+		}
 		dt_insert_disk(hdl, &dnode);
 	}
 	(void) dt_disk_info_free(&dt);

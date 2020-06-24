@@ -51,8 +51,8 @@
 
 #include "make_vdev.h"
 
-#define	DISK_LED_CMD	"/sbin/disk led -d %s -o fault &"
-#define	DISK_LED_NORMAL_CMD	"/sbin/disk led -d %s -o normal &"
+#define	DISK_LED_CMD	"disk led -d %s -o fault"
+#define	DISK_LED_NORMAL_CMD	"disk led -d %s -o active &"
 #define ZPOOL_SCRUB_POOL	"/sbin/zpool scrub %s &"
 #define	DISK_LED_LPATH	"/dev/disk/by-id/%s"
 #define	MAXDEVPATHLEN		128
@@ -901,6 +901,218 @@ scan_disk_node(fmd_hdl_t *hdl, id_t id, void *data)
 	fmd_hdl_topo_rele(hdl, thp);
 }
 
+
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define SCSIHOST_DIR "/sys/class/scsi_host"
+#define MPT3CTL_DEV  "/dev/mpt3ctl"
+#define MPT2CTL_DEV  "/dev/mpt2ctl"
+
+
+typedef enum mpt_type {
+    MPT2SAS,
+    MPT3SAS
+}mpt_type_e;
+
+typedef struct mpt_ioc {
+    int ioc_id;
+    uint32_t ioc_dev_num;
+    mpt_type_e ioc_type;
+    int ioc_enabled;
+}mpt_ioc_t;
+
+/**
+ * struct mpt3_ioctl_header - main header structure
+ * @ioc_number -  IOC unit number
+ * @port_number - IOC port number
+ * @max_data_size - maximum number bytes to transfer on read
+ */
+struct mpt3_ioctl_header {
+	unsigned int ioc_number;
+	unsigned int port_number;
+	unsigned int max_data_size;
+};
+#define MPT3_MAGIC_NUMBER	'L'
+
+struct mpt3_rm_tgt_info {
+    struct mpt3_ioctl_header hdr;
+    unsigned long long wwn;
+};
+
+#define MPT3RMTGTINFO   _IOWR(MPT3_MAGIC_NUMBER, 34, \
+	struct mpt3_rm_tgt_info)
+
+static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
+{
+    DIR *dir;
+    struct dirent *dirent;
+    int fd = -1;
+    ssize_t ret = -1;
+    mpt_ioc_t *ids = NULL;
+    int ids_idx = 0;
+    int ids_sz = 2;
+
+    ids = malloc(sizeof(*ids) * ids_sz);
+    if (!ids)
+        return -1;
+
+    memset(ids, 0, sizeof(*ids) * ids_sz);
+
+    dir = opendir(SCSIHOST_DIR);
+    if (!dir) {
+        free(ids);
+        return -1;
+    }
+
+    while ( (dirent = readdir(dir)) != NULL ) {
+        char filename[512];
+        char procname[8];
+        char dev_num[8] = {0};
+
+        snprintf(filename, sizeof(filename), "%s/%s/proc_name", SCSIHOST_DIR, dirent->d_name);
+
+        fd = open(filename, O_RDONLY);
+        if (fd < 0)
+            continue;
+
+        ret = read(fd, procname, 8);
+        if (ret < 0)
+            continue;
+
+        close(fd);
+
+        procname[7] = '\0';
+
+        if (strncmp("mpt3sas", procname, 7) == 0) {
+            ids[ids_idx].ioc_type = MPT3SAS;
+        } else if (strncmp("mpt2sas", procname, 7) == 0) {
+            ids[ids_idx].ioc_type = MPT2SAS;
+        } else {
+            continue;
+        }
+
+        /* fetch scsi host uniqeu id. */
+        snprintf(filename, sizeof(filename), "%s/%s/unique_id", SCSIHOST_DIR, dirent->d_name);
+
+        fd = open(filename, O_RDONLY);
+        if (fd < 0) {
+            syslog(LOG_ERR, "open file :%s failed", filename);
+            continue;
+        }
+
+        ret = read(fd, procname, 8);
+        if (ret < 0) {
+            syslog(LOG_ERR, "read failed, %s:%d", __FILE__, __LINE__);
+            continue;
+        }
+
+        close(fd);
+
+
+        if (ids_idx == ids_sz)
+        {
+            ids_sz *= 2;
+            ids = realloc(ids, sizeof(*ids) * ids_sz);
+            if (!ids)
+                break;
+
+            ids[ids_idx].ioc_id = atoi(procname);
+            ids[ids_idx].ioc_dev_num = 0;
+            syslog(LOG_INFO, "Found MPT ioc %d type %d",
+                    ids[ids_idx].ioc_id, ids[ids_idx].ioc_type);
+            ids_idx += 1;
+        }
+        else
+        {
+            ids[ids_idx].ioc_id = atoi(procname);
+            ids[ids_idx].ioc_dev_num = atoi(dev_num);
+            syslog(LOG_INFO, "Found MPT ioc %d type %d",
+                    ids[ids_idx].ioc_id, ids[ids_idx].ioc_type);
+            ids_idx += 1;
+        }
+    }
+
+    closedir(dir);
+
+    *ioc_ids = ids;
+    *ioc_ids_nr = ids_idx;
+
+    return 0;
+}
+
+
+static void mpt3ctl_rm_tgt(unsigned long long wwn)
+{
+    int ret;
+    mpt_ioc_t *ids = NULL;
+    int ids_nr = 0;
+    int idx = 0;
+    char *mpt_ctl_dev;
+    
+#ifdef USE_HENGWEI
+    mpt_ctl_dev = MPT3CTL_DEV;
+#else
+    mpt_ctl_dev = MPT2CTL_DEV;
+#endif
+
+
+    int fd = open(mpt_ctl_dev, O_RDWR);
+    if (fd < 0) {
+        syslog(LOG_ERR, "Failed to open mpt device %s: %d (%m)", mpt_ctl_dev, errno);
+        return -1;
+    }
+    
+    ret = find_mpt_host(&ids, &ids_nr);
+    if (ret < 0) {
+        syslog(LOG_WARNING, "no mpt host found");
+        return -1;
+    }
+    if (ids_nr == 0) {
+        free(ids);
+        syslog(LOG_WARNING, "Not found any supported MPT controller");
+        return -1;
+    }
+
+    /* ids_nr usually equls 1.*/
+    for (idx = 0; idx < ids_nr; idx++) 
+    {
+        struct mpt3_rm_tgt_info *cmd;
+        int ret;
+
+        cmd = malloc(sizeof(struct mpt3_rm_tgt_info));
+        if(NULL == cmd) {
+            syslog(LOG_ERR, "malloc failed for mpt device: %d, malloc size:%lu", 
+                    ids[idx].ioc_id, sizeof(struct mpt3_rm_tgt_info));
+            continue;
+        }
+
+        memset(cmd, 0, sizeof(struct mpt3_rm_tgt_info));
+        cmd->hdr.ioc_number = ids[idx].ioc_id;   // we only support mpt3sas.
+        cmd->hdr.port_number = 0;
+        cmd->wwn = wwn;
+
+        ret = ioctl(fd, MPT3RMTGTINFO, cmd);
+        if (ret == 0) {
+            syslog(LOG_ERR, "simulate for disk:%llx on mpt ioc:%d", wwn, cmd->hdr.ioc_number);
+            break;
+        } else {
+            syslog(LOG_ERR, "disk:%llx NOT found on mpt ioc:%d", wwn, cmd->hdr.ioc_number); // NOT reached here.
+        }
+
+        free(cmd);
+        cmd = NULL;
+    }
+
+    free(ids);
+    return ret;
+}
+
+
+
 static void
 zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class)
@@ -946,18 +1158,32 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 			replace_with_spare(hdl, zhp, vdev);
 		/* (void) zpool_vdev_clear(zhp, vdev_guid); */
         
-        if(vdev != NULL)
-            dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
 		zpool_close(zhp);
-
-        if(strcmp(class, "resource.fs.zfs.removed") == 0)
-            goto disk_led;
-
-        if(dev_name != NULL)
-            free(dev_name);
 
 		return;
 	}
+
+    if(strcmp(class, "ereport.fs.zfs.vdev.merr") == 0 || 
+        strcmp(class, "ereport.fs.zfs.vdev.smart_fail") == 0 ||
+        strcmp(class, "ereport.fs.zfs.vdev.noresponse") == 0) {
+        if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
+		    &pool_guid) != 0 ||
+		    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID,
+		    &vdev_guid) != 0)
+			return;
+
+        if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
+		    &vdev)) == NULL)
+			return;
+
+        if(vdev != NULL)
+            dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
+
+        syslog(LOG_ERR,"dev:%s will be lighted", dev_name);
+
+        if(dev_name != NULL) 
+            goto disk_led;
+    }
 
 	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0)
 		return;
@@ -1190,6 +1416,29 @@ disk_led:
 		zfs_recover_diskled(dev_lpath);
 		free(dev_name);
 	}
+
+    /* kick off the disk. */
+    if(strcmp(class, "ereport.fs.zfs.vdev.merr") == 0 || 
+        strcmp(class, "ereport.fs.zfs.vdev.smart_fail") == 0 ||
+        strcmp(class, "ereport.fs.zfs.vdev.noresponse") == 0) {
+        char *wwn_key = "scsi-3";
+        char *wwn_pos = NULL;
+        unsigned long long wwn;
+
+        wwn_pos = strstr(dev_lpath, wwn_key);
+        if(wwn_pos == NULL) {
+            syslog(LOG_ERR, "dev path invalid:%s for light", dev_lpath);
+            return;
+        }
+
+        wwn_pos += strlen(wwn_key);
+        if(sscanf(wwn_pos, "%llx", &wwn) == 0) {
+            syslog(LOG_ERR, "disk wwn invalid:%s", wwn_pos);
+            return;
+        }
+
+        mpt3ctl_rm_tgt(wwn);
+    }
 }
 
 static const fmd_hdl_ops_t fmd_ops = {

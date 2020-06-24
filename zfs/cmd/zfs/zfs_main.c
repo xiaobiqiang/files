@@ -2478,10 +2478,9 @@ us_compare(const void *larg, const void *rarg, void *unused)
 		switch (prop) {
 		case ZFS_PROP_PROP:
 			propname = "prop";
-			(void) nvlist_lookup_uint32(lnvl, propname, &lv32);
-			(void) nvlist_lookup_uint32(rnvl, propname, &rv32);
-			if (rv32 != lv32)
-				rc = (rv32 < lv32) ? 1 : -1;
+			(void) nvlist_lookup_string(lnvl, propname, &lvstr);
+			(void) nvlist_lookup_string(rnvl, propname, &rvstr);
+			rc = strcmp(lvstr, rvstr);
 			break;
 		case ZFS_PROP_NAME:
 			propname = "name";
@@ -2775,27 +2774,20 @@ print_us_node(boolean_t scripted, boolean_t parsable, int *fields, int types,
 			break;
 		case USFIELD_NAME:
 			if (type == DATA_TYPE_UINT64) {
-				(void) sprintf(valstr, "%llu",
-				    (u_longlong_t) val64);
+				(void) snprintf(valstr, sizeof (valstr), "%llu", (u_longlong_t) val64);
 				strval = valstr;
 			}
 			break;
 		case USFIELD_PROP:
-			break;
 		case USFIELD_VALUE:
 			if (type == DATA_TYPE_UINT64) {
 				if (parsable) {
-					(void) sprintf(valstr, "%llu",
-					    (u_longlong_t) val64);
+					(void) snprintf(valstr, sizeof (valstr), "%llu", (u_longlong_t) val64);
 				} else {
 					zfs_nicenum(val64, valstr,
 					    sizeof (valstr));
 				}
-				if (field == USFIELD_VALUE &&
-				    strcmp(valstr, "0") == 0)
-					strval = "none";
-				else
-					strval = valstr;
+				strval = valstr;
 			}
 			break;
 		}

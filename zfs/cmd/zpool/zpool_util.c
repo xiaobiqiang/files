@@ -149,13 +149,12 @@ cprint(const char *format, ...)
 	char buf[512], *cp;
 	char timebuf[32];
 	struct timeval now;
-	struct tm ltime;
 
 	if (gettimeofday(&now, NULL) != 0)
 		return;
 
 	(void) strftime(timebuf, sizeof (timebuf), "%b %e %T",
-	    localtime_r(&now.tv_sec, &ltime));
+		localtime(&now.tv_sec));
 
 	(void) snprintf(buf, sizeof (buf), "%s: ", timebuf);
 	cp = strchr(buf, '\0');

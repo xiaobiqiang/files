@@ -2392,6 +2392,9 @@ disk_get_poolname(const char *dev,char *pool_name,int size)
 			return 0;
 		}
 	}
+	else{
+		return 0;
+	}
 	pclose(fp2);
 
 	fp1 = popen(blkcmd1,"r");

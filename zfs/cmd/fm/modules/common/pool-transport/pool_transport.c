@@ -676,14 +676,13 @@ pt_status_change(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	/*0.5*/
 	if (deleta > 500000000ull) {
 		time = time1;
-		system("zpool status  -x > /dev/null  2> /dev/null");
 		pt_create_fsxml_file();
 		pt_create_luxml_file();
 		pt_walk_zfs_dataset(hdl, ptp);
 		pt_close_fsxml_file();
 		pt_close_luxml_file();
 	}
-
+	system("zpool status  -x > /dev/null  2> /dev/null");
 	if (ptp->pt_status_changed)
 		return;
 

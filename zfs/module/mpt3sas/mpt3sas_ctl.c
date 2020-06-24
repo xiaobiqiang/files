@@ -2282,6 +2282,37 @@ static long _ctl_mpt3_simu(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
     return mpt3_device_simu_handler(ioc, karg.wwn, karg.action, karg.priv_data, karg.subcmd);
 }
 
+static long _ctl_mpt3_rm_tgt(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
+{
+    struct mpt3_rm_tgt_info karg;
+    struct _sas_device *sas_device;
+    unsigned long flags;
+    int found = 0;
+
+    if (copy_from_user(&karg, arg, sizeof(karg))) {
+		pr_err("failure at %s:%d/%s()!\n",
+		    __FILE__, __LINE__, __func__);
+		return -EFAULT;
+	}
+
+    spin_lock_irqsave(&ioc->sas_device_lock, flags);
+	list_for_each_entry(sas_device, &ioc->sas_device_list, list) {
+        if(wwn_match(karg.wwn, sas_device->sas_address)) {
+            found = 1;
+            break;
+        }
+    }
+    spin_unlock_irqrestore(&ioc->sas_device_lock, flags);
+
+    if(found == 1) {
+        mpt3sas_trigger_remove_target_event(ioc, karg.wwn);
+        return 0;
+    }
+
+    return -1;
+}
+
+
 /**
  * _ctl_diag_read_buffer - request for copy of the diag buffer
  * @ioc: per adapter object
@@ -2643,6 +2674,11 @@ _ctl_ioctl_main(struct file *file, unsigned int cmd, void __user *arg,
     case MPT3FAULTSIMU:
 		if (_IOC_SIZE(cmd) == sizeof(struct mpt3_fault_simu_info))
 			ret = _ctl_mpt3_simu(ioc, arg);
+		break;
+
+    case MPT3RMTGTINFO:
+		if (_IOC_SIZE(cmd) == sizeof(struct mpt3_rm_tgt_info))
+			ret = _ctl_mpt3_rm_tgt(ioc, arg);
 		break;
     
 	default:

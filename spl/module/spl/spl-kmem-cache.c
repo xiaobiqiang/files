@@ -1006,7 +1006,7 @@ spl_kmem_cache_create(char *name, size_t size, size_t align,
 #endif
 
 		skc->skc_linux_cache = kmem_cache_create(
-		    skc->skc_name, size, align, slabflags, init_once);
+		    skc->skc_name, size, align, slabflags, NULL);
 		if (skc->skc_linux_cache == NULL) {
 			rc = ENOMEM;
 			goto out;

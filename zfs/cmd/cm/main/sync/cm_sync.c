@@ -46,7 +46,7 @@ typedef struct
     uint64 step;
     uint32 obj_id;
     uint32 data_len;
-    uint8 is_delete;
+    uint64 is_delete;
     uint8 data[];
 }cm_sync_obj_info_t;
 
@@ -55,7 +55,7 @@ typedef struct
     uint64 data_id;
     uint64 step;
     uint32 obj_id;
-    uint8 is_delete;
+    uint64 is_delete;
 }cm_sync_db_record_t;
 
 
@@ -458,18 +458,7 @@ sint32 cm_sync_cbk_cmt_request(void *pMsg, uint32 Len, void **ppAck, uint32 *pAc
     cm_sync_global_info_t *pglobal = &g_cm_sync_global;
     uint32 subdomain = cm_node_get_subdomain_id();
     sint32 iRet = CM_OK;
-    if(cm_node_get_id() != cm_node_get_submaster_current())
-    {
-        CM_MUTEX_LOCK(&pglobal->mutex);
-        iRet = cm_sync_request_local(pglobal, pReq);
-        CM_MUTEX_UNLOCK(&pglobal->mutex);
-        return iRet;
-    }
-
-    if(CM_MASTER_SUBDOMAIN_ID == subdomain)
-    {
-        return CM_OK;
-    }
+    
     pReq = CM_MALLOC(Len);
     if(NULL == pReq)
     {
@@ -477,6 +466,21 @@ sint32 cm_sync_cbk_cmt_request(void *pMsg, uint32 Len, void **ppAck, uint32 *pAc
         return CM_FAIL;
     }
     CM_MEM_CPY(pReq,Len,pMsg,Len);
+    if(cm_node_get_id() != cm_node_get_submaster_current())
+    {
+        CM_MUTEX_LOCK(&pglobal->mutex);
+        iRet = cm_sync_request_local(pglobal, pReq);
+        CM_MUTEX_UNLOCK(&pglobal->mutex);
+        CM_FREE(pReq);
+        return iRet;
+    }
+
+    if(CM_MASTER_SUBDOMAIN_ID == subdomain)
+    {
+        CM_FREE(pReq);
+        return CM_OK;
+    }
+    
     if(CM_OK != cm_queue_add(pglobal->queue,pReq))
     {
         CM_FREE(pReq);

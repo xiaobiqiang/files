@@ -1435,4 +1435,6 @@ mpt3sas_setup_direct_io(struct MPT3SAS_ADAPTER *ioc, struct scsi_cmnd *scmd,
 	struct _raid_device *raid_device, Mpi2SCSIIORequest_t *mpi_request,
 	u16 smid);
 
+void mpt3sas_trigger_remove_target_event(struct MPT3SAS_ADAPTER *ioc, u64 sas_address);
+
 #endif /* MPT3SAS_BASE_H_INCLUDED */
