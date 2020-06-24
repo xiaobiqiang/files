@@ -2203,6 +2203,7 @@ void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
 	case Mlsas_Rst_Abort_TM:
 		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Net_Pending, 
 			Mlsas_RQ_TM_Aborted | Mlsas_RQ_Net_Done);
+		break;
 	case Mlsas_Rst_Abort_Diskio_TM:
 		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Local_Pending, 
 			Mlsas_RQ_Diskio_TM_Aborted | Mlsas_RQ_Local_Done);
