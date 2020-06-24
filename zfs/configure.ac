@@ -258,6 +258,7 @@ AC_CONFIG_FILES([
 	include/sys/scsi/generic/Makefile
 	include/sys/scsi/impl/Makefile
 	include/ipmitool/Makefile
+	include/sys/mltsas/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile
