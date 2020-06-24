@@ -1,0 +1,12 @@
+src = @abs_top_srcdir@/module/mltsas
+obj = @abs_builddir@
+
+MODULE := mltsas
+
+EXTRA_CFLAGS = $(ZFS_MODULE_CFLAGS) @KERNELCPPFLAGS@
+
+obj-$(CONFIG_ZFS) := $(MODULE).o
+
+$(MODULE)-objs = mlt_sas.o
+$(MODULE)-objs += Mlsas_rtx.o
+

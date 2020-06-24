@@ -17,6 +17,7 @@ typedef struct msgb {
 	cluster_tran_data_origin_t *origin_data;
 	boolean_t	is_sgl;
 	boolean_t	is_first;
+	boolean_t 	is_bio;
 	uint32_t	fc_tx_len;
 	uint32_t	fc_rx_len;
 	void 		*dst;

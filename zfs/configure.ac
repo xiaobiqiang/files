@@ -197,6 +197,8 @@ AC_CONFIG_FILES([
 	cmd/ipmi_monitor/Makefile
 	cmd/drbdmon/Makefile
 	cmd/drbdctl/Makefile
+	cmd/mltsas_svc/Makefile
+	cmd/mpathadm/Makefile
 	cmd/cm/Makefile
 	cmd/cm/base/Makefile
 	cmd/cm/cli/Makefile
@@ -243,6 +245,7 @@ AC_CONFIG_FILES([
 	module/iscsit/Makefile
 	module/ipmi_notify/Makefile
 	module/mpt3sas/Makefile
+	module/mltsas/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
@@ -255,6 +258,7 @@ AC_CONFIG_FILES([
 	include/sys/scsi/generic/Makefile
 	include/sys/scsi/impl/Makefile
 	include/ipmitool/Makefile
+	include/sys/mltsas/Makefile
 	scripts/Makefile
 	scripts/zpios-profile/Makefile
 	scripts/zpios-test/Makefile

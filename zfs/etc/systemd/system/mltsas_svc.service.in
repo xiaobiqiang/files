@@ -1,0 +1,14 @@
+[Unit]
+Description=SAS Multipath Control Service
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=zfs-boot.service
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe mltsas
+ExecStart=@sbindir@/mltsas_svc start
+Restart=on-failure
+
+[Install]
+WantedBy=zfs.target

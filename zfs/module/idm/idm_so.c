@@ -225,7 +225,7 @@ idm_socreate(int domain, int type, int protocol)
 	if (!sock_create_kern(&init_net, domain, type, protocol, &ks)) {
 		return (ks);
 #else
-	if (!sock_create_kern(domain, type, protocol, &ks)) {
+	if (!sock_create_kern(&init_net, domain, type, protocol, &ks)) {
 		return (ks);
 #endif
 	} else {

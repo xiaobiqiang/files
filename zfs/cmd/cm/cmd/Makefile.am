@@ -29,9 +29,9 @@ ceres_cmd_SOURCES = \
 	./cm_cmd_client.c \
 	./cm_main_cmd.c 
 EXTRA_DIST = \
-	./cm_cmd_client.h \
-	./config/cm_cfg_global.h 
+	./config/cm_cfg_global.h \
+	./cm_cmd_client.h 
 ceres_cmd_LDADD = \
 	$(top)/base/libcmbase.la
-ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_cmd_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=$(prefix)/lib
 
