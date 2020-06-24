@@ -204,7 +204,7 @@
 #include <sys/fmd_transport.h>
 
 #include <linux/notifier.h>
-//extern struct atomic_notifier_head mpt3sas_notifier_list;
+extern struct atomic_notifier_head mpt3sas_notifier_list;
 extern struct notifier_block vdev_disk_notifier;
 
 kmutex_t zfsdev_state_lock;
@@ -7336,8 +7336,8 @@ _init(void)
 	tsd_create(&zfs_allow_log_key, zfs_allow_log_destroy);
 	cluster_proto_register();
 
-//    zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
-//				       &vdev_disk_notifier);
+    zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
+				       &vdev_disk_notifier);
 
 	printk(KERN_NOTICE "ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
@@ -7373,8 +7373,8 @@ _fini(void)
 	zvol_fini();
 	cluster_proto_unregister();
 
-//    zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
-//				       &vdev_disk_notifier);
+    zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
+				       &vdev_disk_notifier);
 
 	tsd_destroy(&zfs_fsyncer_key);
 	tsd_destroy(&rrw_tsd_key);
