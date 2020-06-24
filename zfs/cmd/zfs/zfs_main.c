@@ -2662,17 +2662,9 @@ userspace_cb(void *arg, const char *domain, uid_t rid, uint64_t space)
 		propname = "quota";
 	}
 	sizeidx = us_field_index("prop");
-	if (sizelen > cb->cb_width[sizeidx])
-		cb->cb_width[sizeidx] = sizelen;
 	if (nvlist_add_string(props, "prop", propname) != 0)
 		nomem();
 
-	/* Calculate/update width of TYPE field */
-	typestr = us_type2str(type);
-	typelen = strlen(gettext(typestr));
-	typeidx = us_field_index("type");
-	if (typelen > cb->cb_width[typeidx])
-		cb->cb_width[typeidx] = typelen;
 	if (nvlist_add_uint32(props, "type", type) != 0)
 		nomem();
 
