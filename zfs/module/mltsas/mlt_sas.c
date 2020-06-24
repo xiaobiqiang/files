@@ -134,6 +134,7 @@ static uint32_t __Mlsas_majors(uint32_t index);
 static uint32_t Mlsas_npending = 0;
 static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
 static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
+static uint32_t Mlsas_local_req_tm = 5000;	/* ms */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
 static uint32_t Mlsas_virt_fail_threshold = 16;
 static uint32_t Mlsas_PR_fail_threshold = 16;
@@ -2202,6 +2203,9 @@ void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
 	case Mlsas_Rst_Abort_TM:
 		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Net_Pending, 
 			Mlsas_RQ_TM_Aborted | Mlsas_RQ_Net_Done);
+	case Mlsas_Rst_Abort_Diskio_TM:
+		__Mlsas_Req_St(rq, Mlbi, Mlsas_RQ_Local_Pending, 
+			Mlsas_RQ_Diskio_TM_Aborted | Mlsas_RQ_Local_Done);
 		break;
 	}
 }
@@ -3470,6 +3474,24 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 		}
 	}
 
+	for (rq = list_head(&vt->Mlb_local_rqs); rq; rq = next) {
+		next = list_next(&vt->Mlb_local_rqs, rq);
+
+		if ((now_jiffies - rq->Mlrq_start_jif) >
+				MSEC_TO_TICK(Mlsas_local_req_tm)) {
+			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
+				"start_jiffies(%llu) last_what(%u)) Diskio timeout, to ABORT...",
+				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
+				rq->Mlrq_start_jif, rq->Mlrq_state);
+
+			rq->Mlrq_back_bio = ERR_PTR(-EIO);
+			__Mlsas_Req_Stmt(rq, Mlsas_Rst_Abort_Diskio_TM, &m);
+
+			if (m.Mlbi_bio)
+				__Mlsas_Complete_Master_Bio(rq, &m);
+		}
+	}
+
 	spin_unlock_irq(&vt->Mlb_rq_spin);
 
 	return (0);
@@ -3680,6 +3702,7 @@ static void __exit __Mlsas_module_exit(void)
 module_param(Mlsas_npending, int, 0644);
 module_param(Mlsas_pr_req_tm, int, 0644);
 module_param(Mlsas_topr_req_tm, int, 0644);
+module_param(Mlsas_local_req_tm, int, 0644);
 module_param(Mlsas_wd_gap, int, 0644);
 module_param(Mlsas_virt_fail_threshold, int, 0644);
 module_param(Mlsas_PR_fail_threshold, int, 0644);
