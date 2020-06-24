@@ -590,7 +590,7 @@ int cs_addr_valid(void *addr, const char *name)
 
 	if (!ok) {
 		cmn_err(CE_WARN, "invalid addr %s=%p", name, addr);
-		/*dump_stack();*/
+		dump_stack();
 	}
 	return (ok);
 }
@@ -655,10 +655,7 @@ void csh_rx_data_free(cs_rx_data_t *cs_data, boolean_t csh_hold)
 			kmem_free(cs_data->data, cs_data->data_len);
 		}
 #else
-		if (cs_data->data_len > 1024 * 1024)
-			vfree(cs_data->data);
-		else
-			cs_kmem_free(cs_data->data, cs_data->data_len);
+		cs_kmem_free(cs_data->data, cs_data->data_len);
 #endif
 	}
 	if ((cs_data->ex_head != NULL) && (cs_data->ex_len != 0)) {
@@ -3613,16 +3610,11 @@ static void cts_tran_worker_thread(void *arg)
 static void cts_tran_worker_init(cluster_target_session_t *cts)
 {
 	int i;
-	cluster_target_port_t *ctp = cts->sess_port_private;
 
 	if (cluster_target_session_ntranwork == 0) {
 		cts->sess_tran_worker_n = num_online_cpus();
-		cmn_err(CE_NOTE, "zjn %s num_online_cpus %d", __func__, 
-			cts->sess_tran_worker_n);
 	} else {
 		cts->sess_tran_worker_n = cluster_target_session_ntranwork;
-		cmn_err(CE_NOTE, "zjn %s sess_tran_worker_n %d", __func__,
-			cts->sess_tran_worker_n);
 	}
 	cts->sess_tran_worker = (cluster_target_tran_worker_t *)kmem_zalloc(
 		sizeof(cluster_target_tran_worker_t) * cts->sess_tran_worker_n, KM_SLEEP);
@@ -4988,11 +4980,6 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	/*
-	 * avoid wait reply cause low performance
-	 */
-	need_reply = B_FALSE;
-
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5061,8 +5048,6 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	need_reply = B_FALSE;
-
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5128,9 +5113,7 @@ int cluster_san_host_send_bio(cluster_san_hostinfo_t *cshi,
 	boolean_t is_replyed;
 	int retry_cnt = 0;
 	int ret;
-
-	need_reply = B_FALSE;
-
+	
 	if (cshi == NULL) {
 		return (-1);
 	}
