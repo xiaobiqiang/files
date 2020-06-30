@@ -132,9 +132,9 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 static uint32_t __Mlsas_majors(uint32_t index);
 
 static uint32_t Mlsas_npending = 0;
-static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
-static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
-static uint32_t Mlsas_local_req_tm = 5000;	/* ms */
+static uint32_t Mlsas_pr_req_tm = 35;		/* s */
+static uint32_t Mlsas_topr_req_tm = 40;	/* s */
+static uint32_t Mlsas_local_req_tm = 35;	/* s */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
 static uint32_t Mlsas_virt_fail_threshold = 16;
 static uint32_t Mlsas_PR_fail_threshold = 16;
@@ -3414,7 +3414,7 @@ static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 		prr_next = list_next(&pr->Mlpd_pr_rqs, prr);
 
 		if ((now_jiffies - prr->prr_start_jif) > 
-				MSEC_TO_TICK(Mlsas_pr_req_tm)) {
+				SEC_TO_TICK(Mlsas_pr_req_tm)) {
 			cmn_err(CE_NOTE, "PR_RQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu)) timeout, to ABORT...", 
 				prr->prr_bsector, prr->prr_bsize, prr->prr_flags,
@@ -3461,7 +3461,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 		next = list_next(&vt->Mlb_topr_rqs, rq);
 
 		if ((now_jiffies - rq->Mlrq_start_jif) >
-				MSEC_TO_TICK(Mlsas_topr_req_tm)) {
+				SEC_TO_TICK(Mlsas_topr_req_tm)) {
 			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu) last_what(%u)) timeout, to ABORT...",
 				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
@@ -3479,7 +3479,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 		next = list_next(&vt->Mlb_local_rqs, rq);
 
 		if ((now_jiffies - rq->Mlrq_start_jif) >
-				MSEC_TO_TICK(Mlsas_local_req_tm)) {
+				SEC_TO_TICK(Mlsas_local_req_tm)) {
 			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu) last_what(%u)) Diskio timeout, to ABORT...",
 				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
