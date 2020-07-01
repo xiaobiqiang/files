@@ -73,7 +73,7 @@ int cluster_san_debug = 0;
 
 uint32_t cluster_session_select_strategy = CLUSTER_SESSION_SEL_ROUNDROBIN;
 
-volatile uint64_t cts_reply_timeout = 600; /* ms */
+volatile uint64_t cts_reply_timeout = 3000; /* ms */
 
 volatile uint64_t cs_wd_polltime = 10; /* s */
 volatile uint64_t cts_expired_handle_time = 10; /* s */
