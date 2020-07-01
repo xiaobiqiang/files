@@ -832,7 +832,7 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 	
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
-	__Mlsas_Detach_BDI(Mlb);
+	__Mlsas_Detach_BDI(&Mlb->Mlb_bdi);
 }
 
 static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
