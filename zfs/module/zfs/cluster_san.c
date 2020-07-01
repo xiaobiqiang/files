@@ -4980,7 +4980,7 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	need_reply = B_FALSE;
+//	need_reply = B_FALSE;
 
 	if (cshi == NULL) {
 		return (-1);
@@ -5050,7 +5050,7 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	need_reply = B_FALSE;
+//	need_reply = B_FALSE;
 
 	if (cshi == NULL) {
 		return (-1);
@@ -5118,7 +5118,7 @@ int cluster_san_host_send_bio(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	need_reply = B_FALSE;
+//	need_reply = B_FALSE;
 	
 	if (cshi == NULL) {
 		return (-1);
