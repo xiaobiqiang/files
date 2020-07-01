@@ -2044,7 +2044,7 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	Mlsas_bio_and_error_t Mlbi;
 
 	if (unlikely(bio->bi_error)) {
-		cmn_err(CE_NOTE, "RQ(%p) sect(%llu) size(%u) error(%d),"
+		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) size(%u) error(%d),"
 			"virt(%llx) state(%s) ",
 			__func__, rq, rq->Mlrq_sector, rq->Mlrq_bsize, 
 			bio->bi_error, Mlb->Mlb_hashkey, 
