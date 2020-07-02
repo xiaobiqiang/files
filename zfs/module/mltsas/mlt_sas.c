@@ -2141,7 +2141,9 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 			next = Mlsas_Devst_Attached;
 		else if (what == Mlsas_Devevt_PR_Attach)
 			next = Mlsas_Devst_Degraded;
-		none2has = B_TRUE;
+		/* dont report initial event */
+		if (Mlb->Mlb_st == Mlsas_Devst_Failed)
+			none2has = B_TRUE;
 		break;
 	case Mlsas_Devst_Degraded:
 		if (what == Mlsas_Devevt_Attach_OK)
