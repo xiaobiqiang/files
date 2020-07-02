@@ -1042,6 +1042,10 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
         zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_SMART_FAIL, vd->vdev_spa, vd, NULL, 0, 0);
         break;
 
+    case SAS_EVT_DEV_REPAIR:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_REPAIR, vd->vdev_spa, vd, NULL, 0, 0);
+        break;
+
     default :
         break;
     }
