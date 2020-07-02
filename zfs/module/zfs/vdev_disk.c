@@ -998,6 +998,43 @@ vdev_ops_t vdev_disk_ops = {
 	B_TRUE			/* leaf vdev */
 };
 
+void mlsas_link_evt_cb(const char *dev_path, uint32_t evt, void *param)
+{
+    char *wwn_key = "scsi-3";
+    char *wwn_pos = NULL;
+    u64 wwn;
+    vdev_t *vd= NULL;
+    
+    if(evt == Mlsas_Link_Evt_Has2None) {
+        wwn_pos = strstr(dev_path, wwn_key);
+        if(wwn_pos == NULL) {
+            zfs_dbgmsg("dev_path:%s invalid\n", dev_path);
+            return;
+        }
+
+        wwn_pos += strlen(wwn_key);
+        if(sscanf(wwn_pos, "%llx", &wwn) == 0) {        
+            zfs_dbgmsg("dev_path:%s invalid wwn\n", dev_path);
+            return;
+        }
+
+        vd = find_vdev_by_sas_addr(wwn);
+        if(vd == NULL) {
+            zfs_dbgmsg( "mltsas event:%lu for sas address:0x%llx vdev not found[%s:%d] \n",
+                        evt, wwn, __FILE__, __LINE__);
+            return;     /* Don't care */
+        }
+
+        zfs_dbgmsg( "mltsas event:%lu for sas address:0x%llx vdev found for vdev:%s[%s:%d]\n",
+                    evt, wwn, vd->vdev_path, __FILE__, __LINE__);
+
+        zfs_post_remove(vd->vdev_spa, vd);
+        vd->vdev_remove_wanted = B_TRUE;
+        spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);
+    }
+}
+
+
 #include <linux/notifier.h>
 
 
@@ -1025,9 +1062,9 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 	switch(val) {
     case SAS_EVT_DEV_REMOVE:
         zfs_ereport_post(FM_EREPORT_ZFS_DEV_REMOVED, vd->vdev_spa, vd, NULL, 0, 0);
-        zfs_post_remove(vd->vdev_spa, vd);
+        /*zfs_post_remove(vd->vdev_spa, vd);
         vd->vdev_remove_wanted = B_TRUE;
-        spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);
+        spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);*/
         break;
 
     case SAS_EVT_DEV_MERR:
@@ -1040,6 +1077,10 @@ static int vdev_disk_event(struct notifier_block *nb, unsigned long val,
 
     case SAS_EVT_DEV_SMART_FAIL:
         zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_SMART_FAIL, vd->vdev_spa, vd, NULL, 0, 0);
+        break;
+
+    case SAS_EVT_DEV_REPAIR:
+        zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_REPAIR, vd->vdev_spa, vd, NULL, 0, 0);
         break;
 
     default :

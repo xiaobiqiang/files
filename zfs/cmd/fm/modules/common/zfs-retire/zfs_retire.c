@@ -1165,7 +1165,8 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
     if(strcmp(class, "ereport.fs.zfs.vdev.merr") == 0 || 
         strcmp(class, "ereport.fs.zfs.vdev.smart_fail") == 0 ||
-        strcmp(class, "ereport.fs.zfs.vdev.noresponse") == 0) {
+        strcmp(class, "ereport.fs.zfs.vdev.noresponse") == 0 ||
+        strcmp(class, "ereport.fs.zfs.vdev.repair") == 0) {
         if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
 		    &pool_guid) != 0 ||
 		    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID,
@@ -1178,6 +1179,9 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
         if(vdev != NULL)
             dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
+
+        if(strcmp(class, "ereport.fs.zfs.vdev.repair") == 0)
+            is_repair = B_TRUE;
 
         syslog(LOG_ERR,"dev:%s will be lighted", dev_name);
 

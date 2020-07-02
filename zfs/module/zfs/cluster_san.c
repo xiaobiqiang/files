@@ -61,9 +61,9 @@ cluster_san_t *clustersan = NULL;
 uint32_t cluster_target_tran_work_ndefault = 0;
 uint64_t cluster_target_broadcast_index = 0;
 
-unsigned int cluster_target_session_ntranwork = 16;
+unsigned int cluster_target_session_ntranwork = 1;
 uint32_t cluster_target_session_count = 0;
-unsigned int cluster_target_session_nrxworker = 16;
+unsigned int cluster_target_session_nrxworker = 1;
 unsigned int cluster_san_host_nrxworker = 16;
 
 int cluster_san_debug = 0;
@@ -4983,11 +4983,6 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	/*
-	 * avoid wait reply cause low performance
-	 */
-	need_reply = B_FALSE;
-
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5056,8 +5051,6 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
-	need_reply = B_FALSE;
-
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5123,8 +5116,6 @@ int cluster_san_host_send_bio(cluster_san_hostinfo_t *cshi,
 	boolean_t is_replyed;
 	int retry_cnt = 0;
 	int ret;
-
-	need_reply = B_FALSE;
 	
 	if (cshi == NULL) {
 		return (-1);

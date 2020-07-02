@@ -186,12 +186,13 @@ function cm_get_localmanageport()
 
 function cm_get_localmanageip()
 {
+    local core=`uname -r`
     local port=`cm_get_localmanageport`
     if [ "X" == "X$port" ];then
         return 1
     fi
     local ip
-    if [ `uname -r|grep deepin|wc -l` -eq 0 ]; then
+    if [ `echo $core|grep deepin|wc -l` -eq 0 ] && [ `echo $core|grep kylin|wc -l` -eq 0 ]; then
         ip=`cat /etc/sysconfig/network-scripts/ifcfg-$port|grep IPADDR|awk -F'=' '{print $2}'`
     else
         cnt=`cat /etc/network/interfaces|grep -n "iface $port "|awk -F':' '{print $1}'`
