@@ -2155,6 +2155,9 @@ static int __removed_sas_device_repair(struct MPT3SAS_ADAPTER *ioc, u64 sas_addr
 
     retval = mpt3sas_base_hard_reset_handler(ioc, CAN_SLEEP,
         FORCE_BIG_HAMMER);
+
+    atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_REPAIR, &sas_addr);
+    
     pr_info(MPT3SAS_FMT "__sas_device_noresp_repair host reset: %s\n",
         ioc->name, ((!retval) ? "SUCCESS" : "FAILED"));
 

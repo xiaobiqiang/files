@@ -203,9 +203,11 @@
 
 #include <sys/fmd_transport.h>
 
+#include <sys/mltsas/mlt_sas.h>
 #include <linux/notifier.h>
 extern struct atomic_notifier_head mpt3sas_notifier_list;
 extern struct notifier_block vdev_disk_notifier;
+extern void mlsas_link_evt_cb(const char *dev_path, uint32_t evt, void *param);
 
 kmutex_t zfsdev_state_lock;
 zfsdev_state_t *zfsdev_state_list;
@@ -7339,6 +7341,9 @@ _init(void)
     zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier); 
 
+    
+    __Mlsas_Export_register_link_event("vdev_disk_fm", mlsas_link_evt_cb, NULL);
+
 	printk(KERN_NOTICE "ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
 	    ZFS_META_VERSION, ZFS_META_RELEASE, ZFS_DEBUG_STR,
@@ -7375,6 +7380,8 @@ _fini(void)
 
     zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier); 
+
+    __Mlsas_Export_deregister_link_event("vdev_disk_fm");
 
 	tsd_destroy(&zfs_fsyncer_key);
 	tsd_destroy(&rrw_tsd_key);
