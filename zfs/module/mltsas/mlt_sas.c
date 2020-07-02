@@ -2467,8 +2467,7 @@ static void __Mlsas_Retry(struct work_struct *w)
 			atomic_inc_32(&rq->Mlrq_bdev->Mlb_npending);
 
 			__Mlsas_Make_Request_impl(rq->Mlrq_bdev, 
-				rq->Mlrq_master_bio, 
-				rq->Mlrq_start_jif);
+				rq->Mlrq_master_bio, jiffies);
 			__Mlsas_put_RQ(rq);
 			break;
 		case Mlsas_Delayed_PR_RQ:
