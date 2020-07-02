@@ -1729,6 +1729,52 @@ static void __Mlsas_Abort_virt_PR_RQ(Mlsas_blkdev_t *vt)
 	}
 }
 
+static int __Mlsas_HDL_async_link_event(Mlsas_rtx_wk_t *w)
+{
+	Mlsas_post_event_t *pe = container_of(w,
+		Mlsas_post_event_t, PE_wk);
+	Mlsas_blkdev_t *vt = pe->PE_vt;
+	uint32_t event = pe->PE_event;
+	Mlsas_link_evt_suber_t *suber;
+	const char *path = strdup(vt->Mlb_bdi.Mlbd_path);
+	
+	kfree(pe);
+
+	mutex_enter(&gMlsas_ptr->Ml_link_evt_mtx);
+	for (suber = list_head(&gMlsas_ptr->Ml_link_evt_suber); suber;
+			suber = list_next(&gMlsas_ptr->Ml_link_evt_suber, suber)) {
+		if (suber->les_callback)
+			suber->les_callback(path, event, suber->les_private);
+	}
+	mutex_exit(&gMlsas_ptr->Ml_link_evt_mtx);
+
+	if (path)
+		strfree(path);
+	__Mlsas_put_virt(vt);
+
+	return (0);
+}
+
+static void __Mlsas_Post_async_link_event(Mlsas_blkdev_t *vt, uint32_t event)
+{
+	Mlsas_post_event_t *pe;
+
+	if ((event <= Mlsas_Link_Evt_First) ||
+		(event >= Mlsas_Link_Evt_Last))
+		return ;
+
+	VERIFY((pe = kzalloc(sizeof(Mlsas_post_event_t), 
+		GFP_ATOMIC)) != NULL);
+
+	__Mlsas_get_virt(vt);
+
+	pe->PE_event = event;
+	pe->PE_vt = vt;
+	pe->PE_wk.rtw_fn = __Mlsas_HDL_async_link_event;
+
+	__Mlsas_Queue_RTX(&gMlsas_ptr->Ml_link_evt_hdl_wq, &pe->PE_wk);
+}
+
 inline void __Mlsas_walk_virt(void *priv,
 		uint_t (*cb)(mod_hash_key_t, mod_hash_val_t *, void *))
 {
@@ -2077,7 +2123,10 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		Mlsas_pr_device_t *pr)
 {
 	Mlsas_devst_e next = Mlsas_Devst_Last;
-
+	boolean_t none2has = B_FALSE;
+	boolean_t has2none = B_FALSE;
+	uint32_t post_event = 0;
+	
 	switch (what) {
 	case Mlsas_Devevt_PR_Down2up:
 	case Mlsas_Devevt_PR_Commi_PRkey:
@@ -2092,6 +2141,7 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 			next = Mlsas_Devst_Attached;
 		else if (what == Mlsas_Devevt_PR_Attach)
 			next = Mlsas_Devst_Degraded;
+		none2has = B_TRUE;
 		break;
 	case Mlsas_Devst_Degraded:
 		if (what == Mlsas_Devevt_Attach_OK)
@@ -2102,12 +2152,18 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		else if (what == Mlsas_Devevt_PR_Disconnect)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Last : Mlsas_Devst_Failed;
+
+		if (next == Mlsas_Devst_Failed)
+			has2none = B_TRUE;
 		break;
 	case Mlsas_Devst_Attached:
 		if (what == Mlsas_Devevt_PR_Attach)
 			next = Mlsas_Devst_Healthy;
 		else if (what == Mlsas_Devevt_Error_Switch)
 			next = Mlsas_Devst_Failed;
+
+		if (next == Mlsas_Devst_Failed)
+			has2none = B_TRUE;
 		break;
 	case Mlsas_Devst_Healthy:
 		if (what == Mlsas_Devevt_Error_Switch)
@@ -2119,11 +2175,22 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 		else if (what == Mlsas_Devevt_PR_Disconnect)
 			next = __Mlsas_Has_Active_PR(Mlb, NULL) ?
 				Mlsas_Devst_Last : Mlsas_Devst_Attached;
+
+		if (next == Mlsas_Devst_Failed)
+			has2none = B_TRUE;
 		break;
 	}
 
 	if (next < Mlsas_Devst_Last)
 		__Mlsas_Devst_St(Mlb, next, what, pr);
+
+	if (none2has)
+		post_event = Mlsas_Link_Evt_None2Has;
+	if (has2none)
+		post_event = Mlsas_Link_Evt_Has2None;
+	
+	if (post_event)
+		__Mlsas_Post_async_link_event(Mlb, post_event);
 }
 
 static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb, 
@@ -3333,6 +3400,65 @@ static void __Mlsas_remove_rhost_locked(Mlsas_rh_t *rh)
 	__Mlsas_put_rhost(rh);
 }
 
+int __Mlsas_Export_register_link_event(const char *module, 
+		Mlsas_link_evt_callback cb, void *private)
+{
+	int rval = 0;
+	Mlsas_link_evt_suber_t *suber, *iter;
+
+	if (!module || !cb)
+		return -EINVAL;
+
+	suber = kmem_zalloc(sizeof(Mlsas_link_evt_suber_t), KM_SLEEP);
+
+	mutex_enter(&gMlsas_ptr->Ml_link_evt_mtx);
+	for (iter = list_head(&gMlsas_ptr->Ml_link_evt_suber); iter; 
+			iter = list_next(&gMlsas_ptr->Ml_link_evt_suber, iter)) {
+		if (strcmp(module, iter->les_module) == 0)
+			break;
+	}
+
+	if (iter) {
+		kmem_free(suber, sizeof(Mlsas_link_evt_suber_t));
+		rval = -EEXIST;
+	}
+
+	if (rval == 0) {
+		suber->les_callback = cb;
+		suber->les_private = private;
+		strncpy(suber->les_module, module, 64);
+		list_insert_tail(&gMlsas_ptr->Ml_link_evt_suber, suber);
+	}
+
+	mutex_exit(&gMlsas_ptr->Ml_link_evt_mtx);
+
+	return rval;
+}
+EXPORT_SYMBOL(__Mlsas_Export_register_link_event);
+
+void __Mlsas_Export_deregister_link_event(const char *module)
+{
+	Mlsas_link_evt_suber_t *suber;
+
+	if (!module)
+		return ;
+
+	mutex_enter(&gMlsas_ptr->Ml_link_evt_mtx);
+	for (suber = list_head(&gMlsas_ptr->Ml_link_evt_suber); suber; 
+			suber = list_next(&gMlsas_ptr->Ml_link_evt_suber, suber)) {
+		if (strcmp(module, suber->les_module) == 0)
+			break;
+	}
+
+	if (suber) {
+		list_remove(&gMlsas_ptr->Ml_link_evt_suber, suber);
+		kmem_free(suber, sizeof(Mlsas_link_evt_suber_t));
+	}
+
+	mutex_exit(&gMlsas_ptr->Ml_link_evt_mtx);
+}
+EXPORT_SYMBOL(__Mlsas_Export_deregister_link_event);
+
 static void __Mlsas_Update_PR_st(Mlsas_pr_device_t *pr, 
 		Mlsas_devst_e st, uint32_t what)
 {
@@ -3606,6 +3732,11 @@ static void __Mlsas_create_async_thread(Mlsas_t *ml)
 	list_create(&ml->Ml_rhs_list, sizeof(Mlsas_rh_t),
 		offsetof(Mlsas_rh_t, Mh_node));
 
+	__Mlsas_RTx_Init_WQ(&ml->Ml_link_evt_hdl_wq);
+	__Mlsas_Thread_Init(&ml->Ml_link_evt_hdl, __Mlsas_RTx, 
+		Mtt_Link_Evt_HDL, "__Mlsas_Link_Evt_HDL");
+	__Mlsas_Thread_Start(&ml->Ml_link_evt_hdl);
+
 	__Mlsas_RTx_Init_WQ(&ml->Ml_wd_wq);
 	__Mlsas_Thread_Init(&ml->Ml_wd, __Mlsas_RTx, Mtt_WatchDog, "__Mlsas_Watchdog");
 	__Mlsas_Thread_Start(&ml->Ml_wd);
@@ -3678,6 +3809,10 @@ static void __Mlsas_init(Mlsas_t *Mlsp)
 	bzero(Mlsp, sizeof(Mlsas_t));
 	Mlsp->Ml_state = Mlsas_St_Disabled;
 	mutex_init(&Mlsp->Ml_mtx, NULL, MUTEX_DEFAULT, NULL);
+
+	list_create(&Mlsp->Ml_link_evt_suber, sizeof(Mlsas_link_evt_suber_t),
+		offsetof(Mlsas_link_evt_suber_t, les_node));
+	mutex_init(&Mlsp->Ml_link_evt_mtx, NULL, MUTEX_DEFAULT, NULL);
 }
 
 static void __Mlsas_install_stat(Mlsas_t *Mlsp)
