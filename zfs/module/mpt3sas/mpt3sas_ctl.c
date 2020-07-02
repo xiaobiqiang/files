@@ -64,6 +64,7 @@
 static struct fasync_struct *async_queue;
 static DECLARE_WAIT_QUEUE_HEAD(ctl_poll_wait);
 
+extern struct atomic_notifier_head mpt3sas_notifier_list;
 
 /**
  * enum block_state - blocking state
