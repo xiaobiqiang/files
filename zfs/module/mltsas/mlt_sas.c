@@ -2043,12 +2043,13 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_bio_and_error_t Mlbi;
 
+	if (rq->Mlrq_flags & Mlsas_RQ_Diskio_TM_Aborted) {
+		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) flags(%x) DISKIO_TM_ABORTED", 
+			__func__, rq, rq->Mlrq_sector, rq->Mlrq_flags);
+		return ;
+	}
+
 	if (unlikely(bio->bi_error)) {
-		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) size(%u) error(%d),"
-			"virt(%llx) state(%s) ",
-			__func__, rq, rq->Mlrq_sector, rq->Mlrq_bsize, 
-			bio->bi_error, Mlb->Mlb_hashkey, 
-			Mlsas_devst_name[Mlb->Mlb_st]);
 		if (unlikely(bio->bi_rw & REQ_DISCARD))
 			what = Mlsas_Rst_Discard_Error;
 		else
