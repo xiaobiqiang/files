@@ -455,6 +455,10 @@ int __Mlsas_RTx(Mlsas_thread_t *thi)
 		Ml = container_of(thi, Mlsas_t, Ml_wd);
 		wq = &Ml->Ml_wd_wq;
 		break;
+	case Mtt_Link_Evt_HDL:
+		Ml = container_of(thi, Mlsas_t, Ml_link_evt_hdl);
+		wq = &Ml->Ml_link_evt_hdl_wq;
+		break;
 	default:
 		cmn_err(CE_NOTE, "%s Wrong Mlsas Thread Type(%02x)",
 			__func__, thi->Mt_type);

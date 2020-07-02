@@ -151,6 +151,11 @@
 #define Mlsas_Disk14_Major			318
 #define Mlsas_Disk15_Major			319
 
+#define Mlsas_Link_Evt_First		0x00
+#define Mlsas_Link_Evt_None2Has		0x01
+#define Mlsas_Link_Evt_Has2None		0x02
+#define Mlsas_Link_Evt_Last			0x03
+
 #define __Mlsas_Get_ldev_if_state(Mlb, __minSt)	\
 	((Mlb)->Mlb_st >= (__minSt))
 #define __Mlsas_Get_ldev_if_state_between(Mlb, __minSt, __maxSt)	\
@@ -179,7 +184,11 @@ typedef struct Mlsas_rtx_wk Mlsas_rtx_wk_t;
 typedef struct Mlsas_rtx_wq Mlsas_rtx_wq_t;
 typedef struct Mlsas_thread Mlsas_thread_t;
 typedef struct Mlsas_cs_rx_data Mlsas_cs_rx_data_t;
+typedef struct Mlsas_post_event Mlsas_post_event_t;
+typedef struct Mlsas_link_evt_suber Mlsas_link_evt_suber_t;
 typedef struct Mlsas Mlsas_t;
+
+typedef void (*Mlsas_link_evt_callback)(const char *, uint32_t, void *);
 
 enum Mlsas_tst {
 	Mt_None,
@@ -195,6 +204,7 @@ enum Mlsas_ttype {
 	Mtt_Asender,
 	Mtt_Sender,
 	Mtt_WatchDog,
+	Mtt_Link_Evt_HDL,
 	Mtt_Last
 };
 
@@ -443,6 +453,20 @@ struct Mlsas_rh {
 	void *Mh_session;
 };
 
+struct Mlsas_post_event {
+	Mlsas_rtx_wk_t PE_wk;
+	Mlsas_blkdev_t *PE_vt;
+	uint32_t PE_event;
+	uint32_t PE_pad;
+};
+
+struct Mlsas_link_evt_suber {
+	list_node_t les_node;
+	char les_module[64];
+	Mlsas_link_evt_callback les_callback;
+	void *les_private;
+};
+
 typedef struct Mlsas_stat {
 	kstat_named_t Mlst_virt_alloc_m;
 	kstat_named_t Mlst_rhost_alloc_m;
@@ -472,6 +496,11 @@ struct Mlsas {
 	Mlsas_thread_t Ml_wd;
 	Mlsas_rtx_wq_t Ml_wd_wq;
 	Mlsas_rtx_wk_t Ml_wd_wk;
+
+	Mlsas_thread_t Ml_link_evt_hdl;
+	Mlsas_rtx_wq_t Ml_link_evt_hdl_wq;
+	list_t Ml_link_evt_suber;
+	kmutex_t Ml_link_evt_mtx;
 
 	list_t Ml_virt_list;
 	list_t Ml_rhs_list;
@@ -627,5 +656,7 @@ extern void __Mlsas_RHost_walk_PR(Mlsas_rh_t *rh, void *priv,
 extern int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 		struct block_device **new_bdev);
 extern void __Mlsas_Virt_export_zfs_detach(const char *partial, struct block_device *vt_partial);
-
+extern int __Mlsas_Export_register_link_event(const char *module, 
+		Mlsas_link_evt_callback cb, void *private);
+extern void __Mlsas_Export_deregister_link_event(const char *module);
 #endif
