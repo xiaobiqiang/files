@@ -89,7 +89,7 @@ int fmd_kernel_send_msg(const fmd_msg_t *fmsg)
 	memcpy(NLMSG_DATA(nlh) + hlen, (char*)fmsg->fm_buf, fmsg->fm_len);
 
 	ret = netlink_unicast(nl_sk, nl_skb, pid, MSG_DONTWAIT);
-	printk("unicate pid = %d\n",pid);
+//	printk("unicate pid = %d\n",pid);
 
 	return (ret);
 }

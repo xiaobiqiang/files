@@ -320,10 +320,8 @@ static void Mlsas_Post_async_event(Mlsas_async_evt_t *ev)
 {
 	VERIFY(!list_link_active(&ev->ev_node));
 	
-	mutex_enter(&gMlsas_Srv->MS_event_mtx);
 	list_insert_tail(&gMlsas_Srv->MS_event_list, ev);
 	Mlsas_WAKE_event_locked;
-	mutex_exit(&gMlsas_Srv->MS_event_mtx);
 }
 
 static boolean_t Mlsas_Last_TXG_complete(void)
@@ -714,7 +712,7 @@ static void Mlsas_HDL_async_event_DEL_VIRT(Mlsas_async_evt_t *ev)
 	fprintf(stdout, "RECV async DEL VIRT event[path=%s]\n", vt->vt_path);
 
 	if ((rval = Mlsas_Del_phys_virt(ev->ev_path, 
-			__func__)) == Mlsas_OK) {
+			__func__)) != Mlsas_OK) {
 		ev->ev_error = rval;
 		if (!ev->ev_waiting)
 			Mlsas_Ins_new_virt(
@@ -929,8 +927,13 @@ static void Mlsas_Loop_lpc_impl(void)
 
 	VERIFY(avl_is_empty(&now_virt_list));
 
+	mutex_enter(&gMlsas_Srv->MS_event_mtx);
+
 	Mlsas_TOdel_virt(&todel_virt_list);
 	Mlsas_TOins_virt(&toins_virt_list);
+
+	mutex_exit(&gMlsas_Srv->MS_event_mtx);
+	
 	Mlsas_TOreclaim_virt(&toreclaim_virt_list);
 
 	mutex_exit(&gMlsas_Srv->MS_mtx);

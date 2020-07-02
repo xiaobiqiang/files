@@ -61,9 +61,9 @@ cluster_san_t *clustersan = NULL;
 uint32_t cluster_target_tran_work_ndefault = 0;
 uint64_t cluster_target_broadcast_index = 0;
 
-unsigned int cluster_target_session_ntranwork = 1;
+unsigned int cluster_target_session_ntranwork = 16;
 uint32_t cluster_target_session_count = 0;
-unsigned int cluster_target_session_nrxworker = 1;
+unsigned int cluster_target_session_nrxworker = 16;
 unsigned int cluster_san_host_nrxworker = 16;
 
 int cluster_san_debug = 0;
@@ -590,7 +590,7 @@ int cs_addr_valid(void *addr, const char *name)
 
 	if (!ok) {
 		cmn_err(CE_WARN, "invalid addr %s=%p", name, addr);
-		dump_stack();
+		/*dump_stack();*/
 	}
 	return (ok);
 }
@@ -2442,7 +2442,8 @@ static void cts_rx_data_check_link(cluster_target_session_t *cts)
 
 	if (DOWN2UP) {
 		if (cluster_target_session_hold(cts, "down2up evt") == 0) {
-			cts_link_down_to_up_handle(cts);
+			taskq_dispatch(clustersan->cs_async_taskq,
+				cts_link_down_to_up_handle, (void *)cts, TQ_SLEEP);
 		}
 	}
 }
@@ -2730,7 +2731,8 @@ static cs_rx_data_t *cluster_san_host_rxfragment_handle(
 		ctsfs->cs_data = cts_rx_data_alloc(total_len);
 		if (total_len && ctsfs->cs_data->data == NULL) {
 			mutex_exit(&w->fragment_lock);
-			csh_rx_data_free(cs_data, B_TRUE);
+			cts_rx_data_free(ctsfs->cs_data, B_FALSE);
+			kmem_free(ctsfs, sizeof(cts_fragments_t));
 			return NULL;
 		}
 		ctsfs->cs_data->data_index = data_index;
@@ -3434,7 +3436,8 @@ static int cts_hb_check_timeout(cluster_target_session_t *cts)
 			is_timeout = 1;
 			if (cluster_target_session_hold(cts, "up2down evt") == 0) {
 				cts->sess_linkstate = CTS_LINK_DOWN;
-				cts_link_up_to_down_handle(cts);
+				taskq_dispatch(clustersan->cs_async_taskq,
+					cts_link_up_to_down_handle, (void *)cts, TQ_SLEEP);
 			}
 		}
 		atomic_swap_32(&cts->sess_hb_timeout_cnt, 0);
@@ -4980,6 +4983,11 @@ int cluster_san_host_send(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
+	/*
+	 * avoid wait reply cause low performance
+	 */
+	need_reply = B_FALSE;
+
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5048,6 +5056,8 @@ int cluster_san_host_send_sgl(cluster_san_hostinfo_t *cshi,
 	int retry_cnt = 0;
 	int ret;
 
+	need_reply = B_FALSE;
+
 	if (cshi == NULL) {
 		return (-1);
 	}
@@ -5113,6 +5123,8 @@ int cluster_san_host_send_bio(cluster_san_hostinfo_t *cshi,
 	boolean_t is_replyed;
 	int retry_cnt = 0;
 	int ret;
+
+	need_reply = B_FALSE;
 	
 	if (cshi == NULL) {
 		return (-1);

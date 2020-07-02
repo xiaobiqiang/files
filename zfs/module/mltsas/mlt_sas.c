@@ -118,6 +118,7 @@ static void __Mlsas_Attach_Phys_size(Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Get_all_lu_info(uint32_t *count, mpath_adm_lu_info_t *li);
 static void __Mlsas_Virt_get_lu_info(Mlsas_blkdev_t *vt, mpath_adm_lu_info_t *li);
 static void __Mlsas_Release_PR_RQ(struct kref *);
+static void __Mlsas_Detach_BDI(Mlsas_backdev_info_t *bdi);
 static void __Mlsas_Conn_Evt_fn(cluster_san_hostinfo_t *cshi,
 		cts_link_evt_t link_evt, void *arg);
 static void __Mlsas_PR_RQ_st(Mlsas_pr_req_t *prr, uint32_t c, uint32_t s,
@@ -132,9 +133,9 @@ static void __Mlsas_clustersan_modload(nvlist_t *nvl);
 static uint32_t __Mlsas_majors(uint32_t index);
 
 static uint32_t Mlsas_npending = 0;
-static uint32_t Mlsas_pr_req_tm = 5000;		/* ms */
-static uint32_t Mlsas_topr_req_tm = 8000;	/* ms */
-static uint32_t Mlsas_local_req_tm = 5000;	/* ms */
+static uint32_t Mlsas_pr_req_tm = 35;		/* s */
+static uint32_t Mlsas_topr_req_tm = 40;	/* s */
+static uint32_t Mlsas_local_req_tm = 35;	/* s */
 static uint32_t Mlsas_wd_gap = 50;			/* ms */
 static uint32_t Mlsas_virt_fail_threshold = 16;
 static uint32_t Mlsas_PR_fail_threshold = 16;
@@ -675,7 +676,7 @@ typedef struct Mlsas_getblock_arg {
 	uint32_t waiting;
 } Mlsas_getblock_arg_t;
 
-static void __Mlsas_Get_backing_device(Mlsas_getblock_arg_t *getblk)
+static void __Mlsas_Get_backing_device_impl(Mlsas_getblock_arg_t *getblk)
 {
 	struct block_device *bdev = NULL;
 	
@@ -695,14 +696,12 @@ static void __Mlsas_Get_backing_device(Mlsas_getblock_arg_t *getblk)
 	}
 }
 
-static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
-		Mlsas_blkdev_t **vtptr)
+static struct block_device *__Mlsas_Get_backing_device(const char *path)
 {
-	Mlsas_blkdev_t *vt = NULL;
-	struct block_device *bdev = NULL;
 	struct task_struct *ts = NULL;
 	Mlsas_getblock_arg_t *arg = NULL;
 	int rval = 0;
+	struct block_device *bdev = NULL;
 
 	arg = kmem_zalloc(sizeof(Mlsas_getblock_arg_t), KM_SLEEP);
 	arg->backing = NULL;
@@ -711,50 +710,69 @@ static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey,
 	strncpy(arg->path, path, sizeof(arg->path));
 	init_completion(&arg->notify);
 
+	if (IS_ERR_OR_NULL(ts = kthread_run(__Mlsas_Get_backing_device_impl, 
+		arg, "Mlsas_get_backing_%s", arg->path)))
+		__Mlsas_Get_backing_device_impl(arg);
+	
+	if (!wait_for_completion_timeout(&arg->notify, 
+			MSEC_TO_TICK(5000))) {
+		arg->waiting = 0;
+		rval = -ETIMEDOUT;
+	}
+
+	if (!rval && !(rval = arg->error)) {
+		bdev = arg->backing;
+		kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
+	}
+
+	return bdev;
+}
+
+static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
+		Mlsas_blkdev_t **vtptr)
+{
+	Mlsas_blkdev_t *vt = NULL;
+	struct block_device *bdev = NULL;
+	int rval = 0;
+
 	cmn_err(CE_NOTE, "Requesting to NEW MINOR(%s)", path);
 
-	if (IS_ERR_OR_NULL(ts = kthread_run(__Mlsas_Get_backing_device, arg,
-			"Mlsas_get_backing_%s", arg->path))) {
-		cmn_err(CE_NOTE, "%s CREATE GET_BACKING(%s) thread FAIL,"
-			" DIRECTLY!", __func__, arg->path);
-		__Mlsas_Get_backing_device(arg);
+	if ((bdev = __Mlsas_Get_backing_device(path)) == NULL) 
+		rval = -ENXIO;
+
+	if (rval == 0) {
+		__Mlsas_New_Virt(hashkey, &vt);
+		__Mlsas_Attach_Local_Phys(bdev, path, vt);
+		*vtptr = vt;
 	}
+	
+	cmn_err(CE_NOTE, "%s New Minor Device(%s 0x%llx) Complete. Error(%d)",
+		__func__, path, hashkey, rval); 
 
-	if ((rval = wait_for_completion_timeout(&arg->notify, 
-			MSEC_TO_TICK(500))) == 0) {
-		cmn_err(CE_NOTE, "%s GET_BACKING(%s) TIMEOUT, "
-			"maybe a noresp disk", __func__, arg->path);
-		arg->waiting = 0;
-		return -ETIMEDOUT;
-	}
-
-	if ((rval = arg->error) != 0) {
-		cmn_err(CE_NOTE, "%s NEW MINOR(%s) FAIL by GET BACKING, "
-			"ERROR(%d)", __func__, path, rval);
-		kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
-		return rval;
-	}
-
-	bdev = arg->backing;
-	kmem_free(arg, sizeof(Mlsas_getblock_arg_t));
-
-	__Mlsas_New_Virt(hashkey, &vt);
-
-	__Mlsas_Attach_Local_Phys(bdev, path, vt);
-
-	*vtptr = vt;
-
-	cmn_err(CE_NOTE, "%s New Minor Device(%s 0x%llx) Complete.",
-		__func__, path, hashkey); 
-
-	return (0);
+	return rval;
 }
 
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 {
 	int rval = 0;
-
+	struct block_device *backing = NULL;
+	uint32_t try = 100, tries = 0;
+	const char *path = vt->Mlb_bdi.Mlbd_path;
+	
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
+	do {
+		if ((backing = __Mlsas_Get_backing_device(
+				path)) == NULL)
+			msleep(20);
+	} while (!backing && (++tries < try));
+	
+	if (!backing) {
+		cmn_err(CE_NOTE, "%s __Mlsas_Get_backing_device FAIL", __func__);
+		return -ENXIO;
+	}
+
+	(void)__Mlsas_Attach_BDI(&vt->Mlb_bdi, path, backing);
 	
 	spin_lock_irq(&vt->Mlb_rq_spin);
 	if (!__Mlsas_Get_ldev_if_state_between(vt, 
@@ -813,6 +831,8 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 	__Mlsas_Virt_wait_list_empty(Mlb, &Mlb->Mlb_peer_rqs);
 	
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
+
+	__Mlsas_Detach_BDI(&Mlb->Mlb_bdi);
 }
 
 static void __Mlsas_Init_Virt_MLB(Mlsas_blkdev_t *Mlb)
@@ -1041,6 +1061,20 @@ static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 	bdi->Mlbd_gdisk = total_bdev->bd_disk;
 
 	return (0);
+}
+
+static void __Mlsas_Detach_BDI(Mlsas_backdev_info_t *bdi)
+{
+	int mode = FMODE_READ | FMODE_WRITE;
+	
+	if (bdi->Mlbd_part_bdev)
+		blkdev_put(bdi->Mlbd_part_bdev, mode);
+	if (bdi->Mlbd_bdev)
+		blkdev_put(bdi->Mlbd_bdev, mode);
+
+	bdi->Mlbd_part_bdev = NULL;
+	bdi->Mlbd_bdev = NULL;
+	bdi->Mlbd_gdisk = NULL;
 }
 
 static void __Mlsas_Attach_Virt_Queue(Mlsas_blkdev_t *Mlb)
@@ -2009,6 +2043,12 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_bio_and_error_t Mlbi;
 
+	if (rq->Mlrq_flags & Mlsas_RQ_Diskio_TM_Aborted) {
+		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) flags(%x) DISKIO_TM_ABORTED", 
+			__func__, rq, rq->Mlrq_sector, rq->Mlrq_flags);
+		return ;
+	}
+
 	if (unlikely(bio->bi_error)) {
 		if (unlikely(bio->bi_rw & REQ_DISCARD))
 			what = Mlsas_Rst_Discard_Error;
@@ -2427,8 +2467,7 @@ static void __Mlsas_Retry(struct work_struct *w)
 			atomic_inc_32(&rq->Mlrq_bdev->Mlb_npending);
 
 			__Mlsas_Make_Request_impl(rq->Mlrq_bdev, 
-				rq->Mlrq_master_bio, 
-				rq->Mlrq_start_jif);
+				rq->Mlrq_master_bio, jiffies);
 			__Mlsas_put_RQ(rq);
 			break;
 		case Mlsas_Delayed_PR_RQ:
@@ -3414,7 +3453,7 @@ static int __Mlsas_PR_walk_cb_watchdog(void *private, Mlsas_pr_device_t *pr)
 		prr_next = list_next(&pr->Mlpd_pr_rqs, prr);
 
 		if ((now_jiffies - prr->prr_start_jif) > 
-				MSEC_TO_TICK(Mlsas_pr_req_tm)) {
+				SEC_TO_TICK(Mlsas_pr_req_tm)) {
 			cmn_err(CE_NOTE, "PR_RQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu)) timeout, to ABORT...", 
 				prr->prr_bsector, prr->prr_bsize, prr->prr_flags,
@@ -3461,7 +3500,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 		next = list_next(&vt->Mlb_topr_rqs, rq);
 
 		if ((now_jiffies - rq->Mlrq_start_jif) >
-				MSEC_TO_TICK(Mlsas_topr_req_tm)) {
+				SEC_TO_TICK(Mlsas_topr_req_tm)) {
 			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu) last_what(%u)) timeout, to ABORT...",
 				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
@@ -3479,7 +3518,7 @@ static uint_t __Mlsas_Virt_walk_cb_watchdog(Mlsas_blkdev_t *vt)
 		next = list_next(&vt->Mlb_local_rqs, rq);
 
 		if ((now_jiffies - rq->Mlrq_start_jif) >
-				MSEC_TO_TICK(Mlsas_local_req_tm)) {
+				SEC_TO_TICK(Mlsas_local_req_tm)) {
 			cmn_err(CE_NOTE, "REQ(sector(%llu) size(%u) flags(0x%x) "
 				"start_jiffies(%llu) last_what(%u)) Diskio timeout, to ABORT...",
 				rq->Mlrq_sector, rq->Mlrq_bsize, rq->Mlrq_flags,
