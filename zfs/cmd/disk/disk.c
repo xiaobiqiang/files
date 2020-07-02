@@ -1583,7 +1583,7 @@ disk_init(slice_req_t *req)
 		
 	}
 	free(stamp_tmp);
-	system("fmadm genxml -w &");
+	system("clumgt fmadm genxml -w &");
 	return (0);
 }
 
