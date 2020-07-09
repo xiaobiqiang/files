@@ -317,8 +317,8 @@ static struct bio *__Mlsas_Make_Backing_Bio(Mlsas_request_t *rq,
 {
 	struct bio *clone;
 
-	if ((clone = bio_clone(bio_src, GFP_NOIO)) == NULL)
-		return ERR_PTR(-ENOMEM);
+	if (IS_ERR_OR_NULL(clone = bio_clone(bio_src, GFP_NOIO)))
+		return NULL;
 	
 	clone->bi_next = NULL;
 	clone->bi_end_io = __Mlsas_Request_endio;
@@ -2027,6 +2027,9 @@ static void __Mlsas_Partion_Map_toTtl(Mlsas_request_t *rq)
 	struct block_device *bdev;
 	struct hd_struct *p;
 
+	if (!bio)
+		return ;
+
 	bio->bi_bdev = bdi->Mlbd_bdev;
 	/*
 	 * it's a partion
@@ -2113,8 +2116,7 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 			GFP_NOIO | __GFP_ZERO)) == NULL)
 		return NULL;
 	
-	if (IS_ERR(clone_bio = __Mlsas_Make_Backing_Bio(rq, bio)))
-		clone_bio = NULL;
+	clone_bio = __Mlsas_Make_Backing_Bio(rq, bio);
 
 	__Mlsas_Bump(req_alloc);
 	__Mlsas_Bump(req_kref);
