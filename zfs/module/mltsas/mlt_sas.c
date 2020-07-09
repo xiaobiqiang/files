@@ -312,14 +312,19 @@ static inline void __Mlsas_put_PR(Mlsas_pr_device_t *pr)
 	kref_put(&pr->Mlpd_ref, __Mlsas_Release_PR);
 }
 
-static inline void __Mlsas_Make_Backing_Bio(Mlsas_request_t *rq, struct bio *bio_src)
+static struct bio *__Mlsas_Make_Backing_Bio(Mlsas_request_t *rq, 
+		struct bio *bio_src)
 {
-	struct bio *backing = bio_clone(bio_src, GFP_NOIO);
+	struct bio *clone;
+
+	if ((clone = bio_clone(bio_src, GFP_NOIO)) == NULL)
+		return ERR_PTR(-ENOMEM);
 	
-	rq->Mlrq_back_bio = backing;
-	backing->bi_next = NULL;
-	backing->bi_end_io = __Mlsas_Request_endio;
-	backing->bi_private = rq;
+	clone->bi_next = NULL;
+	clone->bi_end_io = __Mlsas_Request_endio;
+	clone->bi_private = rq;
+
+	return clone;
 }
 
 static inline void __Mlsas_Start_Ioacct(Mlsas_blkdev_t *Mlb, Mlsas_request_t *rq)
@@ -1842,7 +1847,7 @@ static void __Mlsas_Make_Request_impl(Mlsas_blkdev_t *Mlb,
 	Mlsas_request_t *req = NULL;
 	
 	__Mlsas_Mkrequest_Prepare(Mlb, bio, start_jif, &req);
-	if (IS_ERR_OR_NULL(req))
+	if (req == NULL)
 		return ;
 
 	__Mlsas_Submit_or_Send(req);
@@ -1861,13 +1866,14 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 	spin_lock_irq(&Mlb->Mlb_rq_spin);
 	__Mlsas_Do_Policy(Mlb, req, &do_local, &do_remote, &do_restart);
 
-	switch ((do_local << 1) | do_remote) {
-	case 0x0:
-		if (do_restart)
-			break;
+	switch ((do_local << 2) | (do_remote << 1) | do_restart) {
+	case 0x00:
 		__Mlsas_Submit_none_prepare(req, &m);
 		break;
-	case 0x1:
+	case 0x01:
+		__Mlsas_Restart_DelayedRQ(req);
+		break;
+	case 0x02:
 		__Mlsas_Submit_Net_Prepare(req);
 		what = bio_data_dir(req->Mlrq_master_bio) == WRITE ?
 			Mlsas_Rst_Queue_Net_Write : 
@@ -1875,7 +1881,7 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 		__Mlsas_Req_Stmt(req, Mlsas_Rst_Submit_Net, NULL);
 		__Mlsas_Req_Stmt(req, what, NULL);
 		break;
-	case 0x2:
+	case 0x04:
 		__Mlsas_Submit_Local_Prepare(req);
 		__Mlsas_Req_Stmt(req, Mlsas_Rst_Submit_Local, NULL);
 		submit_backing = B_TRUE;
@@ -1954,13 +1960,19 @@ static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb,
 
 again:
 	if (__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) {
-		if (rq->Mlrq_flags & Mlsas_RQ_Write)
-			__Mlsas_HDL_write_conflict_with_PR(Mlb, rq, &wait);
-		if (wait)
-			goto again;
-		*do_local = B_TRUE;
-		return ;
+		if (rq->Mlrq_back_bio == NULL)
+			*do_restart = B_TRUE;
+		else {
+			if (rq->Mlrq_flags & Mlsas_RQ_Write)
+				__Mlsas_HDL_write_conflict_with_PR(Mlb, rq, &wait);
+			if (wait)
+				goto again;
+			*do_local = B_TRUE;
+		}
 	}
+
+	if (*do_restart || *do_local)
+		return ;
 
 	pr = list_head(&Mlb->Mlb_pr_devices);
 	while (pr != NULL) {
@@ -1984,6 +1996,7 @@ static void __Mlsas_Submit_Backing_Bio(Mlsas_request_t *rq)
 	struct bio *bio = rq->Mlrq_back_bio;
 	
 	VERIFY(rq->Mlrq_back_bio != NULL);
+	rq->Mlrq_back_bio = NULL;
 
 	if (!__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) 
 		bio_io_error(bio);
@@ -2073,21 +2086,15 @@ static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb,
  	Mlsas_request_t *Mlr = NULL;
 	int bi_error = -ENOMEM;
 
-	if (!(Mlr = __Mlsas_New_Request(Mlb, 
-			bio, start_jif)))
+	if ((Mlr = __Mlsas_New_Request(Mlb, bio, 
+			start_jif)) == NULL)
 		goto failed;
-
-	bi_error = -EIO;
-	if (!__Mlsas_Get_ldev(Mlb)) 
-		goto free_rq;
-
+	
 	__Mlsas_Start_Ioacct(Mlb, Mlr);
 
 	*rqpp = Mlr;
 	return ;
-	
-free_rq:
-	__Mlsas_put_RQ(Mlr);
+
 failed:
 	atomic_dec_32(&Mlsas_npending);
 	atomic_dec_32(&Mlb->Mlb_npending);
@@ -2099,11 +2106,15 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 		struct bio *bio, uint64_t start_jif)
 {
 	Mlsas_request_t *rq = NULL;
+	struct bio *clone_bio = NULL;
 	int rw = bio_data_dir(bio);
 	
 	if ((rq = mempool_alloc(gMlsas_ptr->Ml_request_mempool,
 			GFP_NOIO | __GFP_ZERO)) == NULL)
 		return NULL;
+	
+	if (IS_ERR(clone_bio = __Mlsas_Make_Backing_Bio(rq, bio)))
+		clone_bio = NULL;
 
 	__Mlsas_Bump(req_alloc);
 	__Mlsas_Bump(req_kref);
@@ -2113,16 +2124,20 @@ static Mlsas_request_t *__Mlsas_New_Request(Mlsas_blkdev_t *Mlb,
 	kref_init(&rq->Mlrq_ref);
 	rq->Mlrq_delayed_magic = Mlsas_Delayed_RQ;
 	rq->Mlrq_master_bio = bio;
+	rq->Mlrq_back_bio = clone_bio;
 	rq->Mlrq_flags = (rw == WRITE ? Mlsas_RQ_Write : 
 		((bio_rw(bio) == READ) ? 0 : Mlsas_RQ_ReadA));
 	rq->Mlrq_bdev = Mlb;
 	rq->Mlrq_start_jif = start_jif;
 	rq->Mlrq_sector = bio->bi_iter.bi_sector;
 	rq->Mlrq_bsize = bio->bi_iter.bi_size;
-	
-	__Mlsas_Make_Backing_Bio(rq, bio);
 
 	return rq;
+
+failed:
+	if (rq)
+		mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
+	return NULL;
 }
 
 static void __Mlsas_Release_RQ(struct kref *ref)
@@ -2170,6 +2185,9 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	Mlsas_request_t *rq = bio->bi_private;
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_bio_and_error_t Mlbi;
+	int error = bio->bi_error, rw = bio->bi_rw;
+
+	bio_put(bio);
 
 	if (rq->Mlrq_flags & Mlsas_RQ_Diskio_TM_Aborted) {
 		__Mlsas_put_RQ(rq);
@@ -2178,8 +2196,8 @@ static void __Mlsas_Request_endio(struct bio *bio)
 		return ;
 	}
 
-	if (unlikely(bio->bi_error)) {
-		if (unlikely(bio->bi_rw & REQ_DISCARD))
+	if (unlikely(error)) {
+		if (unlikely(rw & REQ_DISCARD))
 			what = Mlsas_Rst_Discard_Error;
 		else
 			what = (rq->Mlrq_flags & Mlsas_RQ_Write) ? 
@@ -2188,13 +2206,11 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	} else
 		what = Mlsas_Rst_Complete_OK;
 
-	bio_put(rq->Mlrq_back_bio);
-
 	spin_lock_irqsave(&Mlb->Mlb_rq_spin, flags);
 	if (rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)
 		rq->Mlrq_back_bio = NULL;
 	else
-		rq->Mlrq_back_bio = ERR_PTR(bio->bi_error);
+		rq->Mlrq_back_bio = ERR_PTR(error);
 	__Mlsas_Req_Stmt(rq, what, &Mlbi);
 	spin_unlock_irqrestore(&Mlb->Mlb_rq_spin, flags);
 
@@ -3894,13 +3910,13 @@ static void __Mlsas_create_slab_modhash(Mlsas_t *ml)
 		sizeof(Mlsas_request_t), 0, 
 		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
 	ml->Ml_request_mempool = mempool_create_slab_pool(
-		256, ml->Ml_skc);
+		4096, ml->Ml_skc);
 	
 	ml->Ml_prr_skc = kmem_cache_create("Mlsas_prr_skc",
 		sizeof(Mlsas_pr_req_t), 0, 
 		SLAB_RECLAIM_ACCOUNT | SLAB_PANIC, NULL);
 	ml->Ml_prr_mempool = mempool_create_slab_pool(
-		256, ml->Ml_prr_skc);
+		4096, ml->Ml_prr_skc);
 }
 
 static void __Mlsas_create_async_thread(Mlsas_t *ml)
