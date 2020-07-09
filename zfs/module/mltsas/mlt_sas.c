@@ -40,7 +40,7 @@ static void __Mlsas_Mkrequest_Prepare(Mlsas_blkdev_t *Mlb, struct bio *bio,
 		uint64_t start_jif, Mlsas_request_t **rqpp);
 static void __Mlsas_Submit_Local_Prepare(Mlsas_request_t *rq);
 static void __Mlsas_Submit_Net_Prepare(Mlsas_request_t *rq);
-static void __Mlsas_Submit_Backing_Bio(Mlsas_request_t *rq);
+static inline void __Mlsas_Submit_Backing_Bio(struct bio *bio, Mlsas_request_t *req);
 static void __Mlsas_Submit_none_prepare(Mlsas_request_t *rq, 
 		Mlsas_bio_and_error_t *m);
 static void __Mlsas_Do_Policy(Mlsas_blkdev_t *Mlb, Mlsas_request_t *rq,
@@ -1860,6 +1860,7 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 	boolean_t submit_backing = B_FALSE, do_restart = B_FALSE;
 	uint32_t what;
 	Mlsas_bio_and_error_t m = {NULL, 0, 0};
+	struct bio *submit_backing_bio = NULL;
 	
 	__Mlsas_Partion_Map_toTtl(req);
 	
@@ -1885,6 +1886,8 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 		__Mlsas_Submit_Local_Prepare(req);
 		__Mlsas_Req_Stmt(req, Mlsas_Rst_Submit_Local, NULL);
 		submit_backing = B_TRUE;
+		submit_backing_bio = req->Mlrq_back_bio;
+		req->Mlrq_back_bio = NULL;
 		break;
 	default:
 		VERIFY(0);
@@ -1893,7 +1896,7 @@ static void __Mlsas_Submit_or_Send(Mlsas_request_t *req)
 	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 
 	if (submit_backing)
-		__Mlsas_Submit_Backing_Bio(req);
+		__Mlsas_Submit_Backing_Bio(submit_backing_bio, req);
 	else if (m.Mlbi_bio)
 		__Mlsas_Complete_Master_Bio(req, &m);
 }
@@ -1990,20 +1993,14 @@ again:
 	*do_remote = B_TRUE;
 }
 
-static void __Mlsas_Submit_Backing_Bio(Mlsas_request_t *rq)
+static inline void __Mlsas_Submit_Backing_Bio(struct bio *bio, Mlsas_request_t *rq)
 {
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
-	struct bio *bio = rq->Mlrq_back_bio;
-	
-	VERIFY(rq->Mlrq_back_bio != NULL);
-	rq->Mlrq_back_bio = NULL;
 
 	if (!__Mlsas_Get_ldev_if_state(Mlb, Mlsas_Devst_Attached)) 
 		bio_io_error(bio);
-	else {
-		rq->Mlrq_submit_jif = jiffies;
+	else 
 		generic_make_request(bio);
-	}
 }
 
 static void __Mlsas_Submit_Net_Bio(Mlsas_request_t *rq,
@@ -2062,6 +2059,10 @@ static void __Mlsas_Submit_Local_Prepare(Mlsas_request_t *rq)
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	
 	__Mlsas_get_RQ(rq);
+
+	VERIFY(rq->Mlrq_back_bio != NULL);
+
+	rq->Mlrq_submit_jif = jiffies;
 	
 	list_insert_tail(&Mlb->Mlb_local_rqs, rq);
 }
