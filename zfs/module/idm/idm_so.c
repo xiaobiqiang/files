@@ -221,11 +221,11 @@ idm_socreate(int domain, int type, int protocol)
 {
 	struct socket *ks;
 
-#ifdef USE_HENGWEI
-	if (!sock_create_kern(&init_net, domain, type, protocol, &ks)) {
+#if (ZFS_PLATFORM == CENTOS_OLD)
+	if (!sock_create_kern(domain, type, protocol, &ks)) {
 		return (ks);
 #else
-	if (!sock_create_kern(domain, type, protocol, &ks)) {
+	if (!sock_create_kern(&init_net, domain, type, protocol, &ks)) {
 		return (ks);
 #endif
 	} else {

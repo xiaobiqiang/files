@@ -145,6 +145,7 @@ function install_version()
     cp $VERSION_FILE /etc
 }
 
+# install_mptsas2 only for centos-3.10.0
 function install_mptsas2()
 {
     gzip -d mpt2sas.ko.gz
@@ -174,6 +175,7 @@ function install_mptsas2()
     rm -rf initramfs-3.10.0-514.el7.x86_64.img
 }
 
+# install_mptsas2 only for jiagu
 function install_drbd()
 {
     local drbdrpm=`ls |grep drbd`

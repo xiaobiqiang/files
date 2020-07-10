@@ -636,6 +636,7 @@ CONFIG_KERNEL_FALSE
 CONFIG_KERNEL_TRUE
 CONFIG_USER_FALSE
 CONFIG_USER_TRUE
+current_platform
 DEBUG_KMEM_TRACKING
 DEBUG_KMEM
 DEBUG_SPL
@@ -808,7 +809,6 @@ ac_user_opts='
 enable_option_checking
 enable_maintainer_mode
 enable_silent_rules
-enable_hengwei
 enable_dependency_tracking
 enable_shared
 enable_static
@@ -1460,7 +1460,6 @@ Optional Features:
                           sometimes confusing) to the casual installer
   --enable-silent-rules   less verbose build output (undo: "make V=1")
   --disable-silent-rules  verbose build output (undo: "make V=0")
-  --enable-hengwei        use hengwei platform
   --enable-dependency-tracking
                           do not reject slow dependency extractors
   --disable-dependency-tracking
@@ -3032,19 +3031,6 @@ am__tar='$${TAR-tar} chof - "$$tardir"' am__untar='$${TAR-tar} xf -'
 
 ac_config_headers="$ac_config_headers spl_config.h"
 
-
-# Check whether --enable-hengwei was given.
-if test "${enable_hengwei+set}" = set; then :
-  enableval=$enable_hengwei;
-fi
-
-enable_hengwei=`uname -m`
-if test "$enable_hengwei" = "sw_64"; then
-	echo "use hengwei platform"
-
-$as_echo "#define USE_HENGWEI /**/" >>confdefs.h
-
-fi
 
 
 ac_ext=c
@@ -14728,6 +14714,64 @@ fi
 
 	EXTRA_KCFLAGS="$tmp_flags"
 
+
+
+$as_echo "#define CENTOS_OLD 0" >>confdefs.h
+
+
+$as_echo "#define CENTOS 1" >>confdefs.h
+
+
+$as_echo "#define DEEPIN 2" >>confdefs.h
+
+
+$as_echo "#define ZB_KYLIN 3" >>confdefs.h
+
+
+$as_echo "#define YH_KYLIN 4" >>confdefs.h
+
+
+	uname_m=$(uname -m)
+	uname_r=$(uname -r)
+
+	if test "x$uname_m" = xx86_64; then
+		temp=$(echo $uname_r | grep 3.10.0-514)
+		if test "x$temp" != x; then
+			use_platform=0
+			current_platform="centos-3.10.0-514"
+		else
+			use_platform=1
+			current_platform="centos-4.4.15"
+		fi
+	elif test "x$uname_m" = xsw_64; then
+		temp=$(echo $uname_r | grep deepin)
+		if test "x$temp" != x; then
+			use_platform=2
+			current_platform="deepin"
+		else
+			use_platform=3
+			current_platform="zb-kylin"
+		fi
+	elif test "x$uname_m" = xaarch64; then
+		use_platform=4
+		current_platform="yh-kylin"
+	else
+		use_platform=2
+		current_platform="use default deepin"
+	fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking checking spl platform" >&5
+$as_echo_n "checking checking spl platform... " >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define SPL_PLATFORM $use_platform
+_ACEOF
+
+
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $current_platform" >&5
+$as_echo "$current_platform" >&6; }
+
  ;;
 		user)      ;;
 		all)
@@ -17678,6 +17722,64 @@ fi
 
 
 	EXTRA_KCFLAGS="$tmp_flags"
+
+
+
+$as_echo "#define CENTOS_OLD 0" >>confdefs.h
+
+
+$as_echo "#define CENTOS 1" >>confdefs.h
+
+
+$as_echo "#define DEEPIN 2" >>confdefs.h
+
+
+$as_echo "#define ZB_KYLIN 3" >>confdefs.h
+
+
+$as_echo "#define YH_KYLIN 4" >>confdefs.h
+
+
+	uname_m=$(uname -m)
+	uname_r=$(uname -r)
+
+	if test "x$uname_m" = xx86_64; then
+		temp=$(echo $uname_r | grep 3.10.0-514)
+		if test "x$temp" != x; then
+			use_platform=0
+			current_platform="centos-3.10.0-514"
+		else
+			use_platform=1
+			current_platform="centos-4.4.15"
+		fi
+	elif test "x$uname_m" = xsw_64; then
+		temp=$(echo $uname_r | grep deepin)
+		if test "x$temp" != x; then
+			use_platform=2
+			current_platform="deepin"
+		else
+			use_platform=3
+			current_platform="zb-kylin"
+		fi
+	elif test "x$uname_m" = xaarch64; then
+		use_platform=4
+		current_platform="yh-kylin"
+	else
+		use_platform=2
+		current_platform="use default deepin"
+	fi
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking checking spl platform" >&5
+$as_echo_n "checking checking spl platform... " >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define SPL_PLATFORM $use_platform
+_ACEOF
+
+
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $current_platform" >&5
+$as_echo "$current_platform" >&6; }
 
 
 		           ;;
