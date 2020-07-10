@@ -345,3 +345,56 @@ AC_DEFUN([ZFS_AC_PACKAGE], [
 	ZFS_AC_DPKG
 	ZFS_AC_ALIEN
 ])
+
+dnl #
+dnl # checking zfs platform
+dnl #
+AC_DEFUN([ZFS_AC_PLATFORM], [
+        AC_DEFINE([CENTOS_OLD], [0], ["centos-3.10"])
+        AC_DEFINE([CENTOS], [1], ["centos-4.4.15"])
+        AC_DEFINE([DEEPIN], [2], ["deepin"])
+        AC_DEFINE([ZB_KYLIN], [3], ["zb_kylin"])
+        AC_DEFINE([YH_KYLIN], [4], ["yh_kylin"])
+
+        uname_m=$(uname -m)
+        uname_r=$(uname -r)
+	work_space=$(pwd)
+
+        if test "x$uname_m" = xx86_64; then
+                temp=$(echo $uname_r | grep 3.10.0-514)
+                if test "x$temp" != x; then
+                        use_platform=0
+                        current_platform="centos-3.10.0-514"
+			cp "$work_space/module/Makefile_1.in" "$work_space/module/Makefile.in"
+                else
+                        use_platform=1
+                        current_platform="centos-4.4.15"
+			cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+                fi
+        elif test "x$uname_m" = xsw_64; then
+                temp=$(echo $uname_r | grep deepin)
+                if test "x$temp" != x; then
+                        use_platform=2
+                        current_platform="deepin"
+                else
+                        use_platform=3
+                        current_platform="zb-kylin"
+                fi
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        elif test "x$uname_m" = xaarch64; then
+                use_platform=4
+                current_platform="yh-kylin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        else
+                use_platform=2
+                current_platform="use default deepin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        fi
+
+        AC_MSG_CHECKING([checking zfs platform])
+        AC_DEFINE_UNQUOTED([ZFS_PLATFORM], [$use_platform], ["zfs platform"])
+
+        AC_SUBST(current_platform)
+        AC_MSG_RESULT([$current_platform])
+])
+
