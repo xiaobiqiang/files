@@ -657,6 +657,7 @@ udevdir
 mounthelperdir
 KERNELCPPFLAGS
 KERNELMAKE_PARAMS
+current_platform
 SPL_SYMBOLS
 SPL_VERSION
 SPL_OBJ
@@ -839,7 +840,6 @@ ac_user_opts='
 enable_option_checking
 enable_maintainer_mode
 enable_silent_rules
-enable_hengwei
 enable_dependency_tracking
 enable_shared
 enable_static
@@ -1504,7 +1504,6 @@ Optional Features:
                           sometimes confusing) to the casual installer
   --enable-silent-rules   less verbose build output (undo: "make V=1")
   --disable-silent-rules  verbose build output (undo: "make V=0")
-  --enable-hengwei        use hengwei platform
   --enable-dependency-tracking
                           do not reject slow dependency extractors
   --disable-dependency-tracking
@@ -2726,7 +2725,7 @@ else
 fi
 AM_BACKSLASH='\'
 
-am__api_version='1.14'
+am__api_version='1.13'
 
 # Find a good install program.  We prefer a C program (faster),
 # so one script is as good as another.  But avoid the broken or
@@ -3182,61 +3181,8 @@ am__tar='$${TAR-tar} chof - "$$tardir"' am__untar='$${TAR-tar} xf -'
 
 
 
-# POSIX will say in a future version that running "rm -f" with no argument
-# is OK; and we want to be able to make that assumption in our Makefile
-# recipes.  So use an aggressive probe to check that the usage we want is
-# actually supported "in the wild" to an acceptable degree.
-# See automake bug#10828.
-# To make any issue more visible, cause the running configure to be aborted
-# by default if the 'rm' program in use doesn't match our expectations; the
-# user can still override this though.
-if rm -f && rm -fr && rm -rf; then : OK; else
-  cat >&2 <<'END'
-Oops!
-
-Your 'rm' program seems unable to run without file operands specified
-on the command line, even when the '-f' option is present.  This is contrary
-to the behaviour of most rm programs out there, and not conforming with
-the upcoming POSIX standard: <http://austingroupbugs.net/view.php?id=542>
-
-Please tell bug-automake@gnu.org about your system, including the value
-of your $PATH and any error possibly output before this message.  This
-can help us improve future automake versions.
-
-END
-  if test x"$ACCEPT_INFERIOR_RM_PROGRAM" = x"yes"; then
-    echo 'Configuration will proceed anyway, since you have set the' >&2
-    echo 'ACCEPT_INFERIOR_RM_PROGRAM variable to "yes"' >&2
-    echo >&2
-  else
-    cat >&2 <<'END'
-Aborting the configuration process, to ensure you take notice of the issue.
-
-You can download and install GNU coreutils to get an 'rm' implementation
-that behaves properly: <http://www.gnu.org/software/coreutils/>.
-
-If you want to complete the configuration process using your problematic
-'rm' anyway, export the environment variable ACCEPT_INFERIOR_RM_PROGRAM
-to "yes", and re-run configure.
-
-END
-    as_fn_error $? "Your 'rm' program is bad, sorry." "$LINENO" 5
-  fi
-fi
 ac_config_headers="$ac_config_headers zfs_config.h"
 
-
-# Check whether --enable-hengwei was given.
-if test "${enable_hengwei+set}" = set; then :
-  enableval=$enable_hengwei;
-fi
-
-if test "$enable_hengwei" = yes; then
-	echo "use hengwei platform"
-
-$as_echo "#define USE_HENGWEI /**/" >>confdefs.h
-
-fi
 
 
 ac_ext=c
@@ -4027,65 +3973,6 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
-ac_ext=c
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_c_compiler_gnu
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC understands -c and -o together" >&5
-$as_echo_n "checking whether $CC understands -c and -o together... " >&6; }
-if ${am_cv_prog_cc_c_o+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-  # Make sure it works both with $CC and with simple cc.
-  # Following AC_PROG_CC_C_O, we do the test twice because some
-  # compilers refuse to overwrite an existing .o file with -o,
-  # though they will create one.
-  am_cv_prog_cc_c_o=yes
-  for am_i in 1 2; do
-    if { echo "$as_me:$LINENO: $CC -c conftest.$ac_ext -o conftest2.$ac_objext" >&5
-   ($CC -c conftest.$ac_ext -o conftest2.$ac_objext) >&5 2>&5
-   ac_status=$?
-   echo "$as_me:$LINENO: \$? = $ac_status" >&5
-   (exit $ac_status); } \
-         && test -f conftest2.$ac_objext; then
-      : OK
-    else
-      am_cv_prog_cc_c_o=no
-      break
-    fi
-  done
-  rm -f core conftest*
-  unset am_i
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $am_cv_prog_cc_c_o" >&5
-$as_echo "$am_cv_prog_cc_c_o" >&6; }
-if test "$am_cv_prog_cc_c_o" != yes; then
-   # Losing compiler, so override with the script.
-   # FIXME: It is wrong to rewrite CC.
-   # But if we don't then we get into trouble of one sort or another.
-   # A longer-term fix would be to have automake use am__CC in this case,
-   # and then we could set am__CC="\$(top_srcdir)/compile \$(CC)"
-   CC="$am_aux_dir/compile $CC"
-fi
-ac_ext=c
-ac_cpp='$CPP $CPPFLAGS'
-ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
-ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
-ac_compiler_gnu=$ac_cv_c_compiler_gnu
-
 DEPDIR="${am__leading_dot}deps"
 
 ac_config_commands="$ac_config_commands depfiles"
@@ -6617,7 +6504,7 @@ ia64-*-hpux*)
   rm -rf conftest*
   ;;
 
-x86_64-*kfreebsd*-gnu|x86_64-*linux*|powerpc*-*linux*| \
+x86_64-*kfreebsd*-gnu|x86_64-*linux*|ppc*-*linux*|powerpc*-*linux*| \
 s390*-*linux*|s390*-*tpf*|sparc*-*linux*)
   # Find out which ABI we are using.
   echo 'int i;' > conftest.$ac_ext
@@ -6635,10 +6522,7 @@ s390*-*linux*|s390*-*tpf*|sparc*-*linux*)
 	  x86_64-*linux*)
 	    LD="${LD-ld} -m elf_i386"
 	    ;;
-	  powerpc64le-*linux*)
-	    LD="${LD-ld} -m elf32lppclinux"
-	    ;;
-	  powerpc64-*linux*)
+	  ppc64-*linux*|powerpc64-*linux*)
 	    LD="${LD-ld} -m elf32ppclinux"
 	    ;;
 	  s390x-*linux*)
@@ -6657,10 +6541,7 @@ s390*-*linux*|s390*-*tpf*|sparc*-*linux*)
 	  x86_64-*linux*)
 	    LD="${LD-ld} -m elf_x86_64"
 	    ;;
-	  powerpcle-*linux*)
-	    LD="${LD-ld} -m elf64lppc"
-	    ;;
-	  powerpc-*linux*)
+	  ppc*-*linux*|powerpc*-*linux*)
 	    LD="${LD-ld} -m elf64ppc"
 	    ;;
 	  s390*-*linux*|s390*-*tpf*)
@@ -12713,6 +12594,70 @@ fi
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $SPL_SYMBOLS" >&5
 $as_echo "$SPL_SYMBOLS" >&6; }
 
+
+
+
+$as_echo "#define CENTOS_OLD 0" >>confdefs.h
+
+
+$as_echo "#define CENTOS 1" >>confdefs.h
+
+
+$as_echo "#define DEEPIN 2" >>confdefs.h
+
+
+$as_echo "#define ZB_KYLIN 3" >>confdefs.h
+
+
+$as_echo "#define YH_KYLIN 4" >>confdefs.h
+
+
+        uname_m=$(uname -m)
+        uname_r=$(uname -r)
+	work_space=$(pwd)
+
+        if test "x$uname_m" = xx86_64; then
+                temp=$(echo $uname_r | grep 3.10.0-514)
+                if test "x$temp" != x; then
+                        use_platform=0
+                        current_platform="centos-3.10.0-514"
+			cp "$work_space/module/Makefile_1.in" "$work_space/module/Makefile.in"
+                else
+                        use_platform=1
+                        current_platform="centos-4.4.15"
+			cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+                fi
+        elif test "x$uname_m" = xsw_64; then
+                temp=$(echo $uname_r | grep deepin)
+                if test "x$temp" != x; then
+                        use_platform=2
+                        current_platform="deepin"
+                else
+                        use_platform=3
+                        current_platform="zb-kylin"
+                fi
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        elif test "x$uname_m" = xaarch64; then
+                use_platform=4
+                current_platform="yh-kylin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        else
+                use_platform=2
+                current_platform="use default deepin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        fi
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking checking zfs platform" >&5
+$as_echo_n "checking checking zfs platform... " >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define ZFS_PLATFORM $use_platform
+_ACEOF
+
+
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $current_platform" >&5
+$as_echo "$current_platform" >&6; }
 
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether modules can be built" >&5
@@ -24301,6 +24246,70 @@ $as_echo "$SPL_SYMBOLS" >&6; }
 
 
 
+
+$as_echo "#define CENTOS_OLD 0" >>confdefs.h
+
+
+$as_echo "#define CENTOS 1" >>confdefs.h
+
+
+$as_echo "#define DEEPIN 2" >>confdefs.h
+
+
+$as_echo "#define ZB_KYLIN 3" >>confdefs.h
+
+
+$as_echo "#define YH_KYLIN 4" >>confdefs.h
+
+
+        uname_m=$(uname -m)
+        uname_r=$(uname -r)
+	work_space=$(pwd)
+
+        if test "x$uname_m" = xx86_64; then
+                temp=$(echo $uname_r | grep 3.10.0-514)
+                if test "x$temp" != x; then
+                        use_platform=0
+                        current_platform="centos-3.10.0-514"
+			cp "$work_space/module/Makefile_1.in" "$work_space/module/Makefile.in"
+                else
+                        use_platform=1
+                        current_platform="centos-4.4.15"
+			cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+                fi
+        elif test "x$uname_m" = xsw_64; then
+                temp=$(echo $uname_r | grep deepin)
+                if test "x$temp" != x; then
+                        use_platform=2
+                        current_platform="deepin"
+                else
+                        use_platform=3
+                        current_platform="zb-kylin"
+                fi
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        elif test "x$uname_m" = xaarch64; then
+                use_platform=4
+                current_platform="yh-kylin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        else
+                use_platform=2
+                current_platform="use default deepin"
+		cp "$work_space/module/Makefile_2.in" "$work_space/module/Makefile.in"
+        fi
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking checking zfs platform" >&5
+$as_echo_n "checking checking zfs platform... " >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define ZFS_PLATFORM $use_platform
+_ACEOF
+
+
+
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: $current_platform" >&5
+$as_echo "$current_platform" >&6; }
+
+
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether modules can be built" >&5
 $as_echo_n "checking whether modules can be built... " >&6; }
 
@@ -35567,7 +35576,7 @@ $as_echo_n "checking whether dmu tx validation is enabled... " >&6; }
 $as_echo "$enable_debug_dmu_tx" >&6; }
 
 
-ac_config_files="$ac_config_files Makefile udev/Makefile udev/rules.d/Makefile etc/Makefile etc/init.d/Makefile etc/zfs/Makefile etc/systemd/Makefile etc/systemd/system/Makefile etc/modules-load.d/Makefile man/Makefile man/man1/Makefile man/man5/Makefile man/man8/Makefile lib/Makefile lib/libspl/Makefile lib/libspl/asm-generic/Makefile lib/libspl/asm-i386/Makefile lib/libspl/asm-x86_64/Makefile lib/libspl/include/Makefile lib/libspl/include/ia32/Makefile lib/libspl/include/ia32/sys/Makefile lib/libspl/include/rpc/Makefile lib/libspl/include/sys/Makefile lib/libspl/include/sys/sysevent/Makefile lib/libspl/include/sys/dktp/Makefile lib/libspl/include/util/Makefile lib/libdiskmgt/Makefile lib/libfmd/Makefile lib/libavl/Makefile lib/libefi/Makefile lib/libnvpair/Makefile lib/libunicode/Makefile lib/libuutil/Makefile lib/libcomm/Makefile lib/libzpool/Makefile lib/libzfs/libzfs.pc lib/libzfs/libzfs_core.pc lib/libzfs/Makefile lib/libzfs_core/Makefile lib/libstmf/Makefile lib/libshare/Makefile lib/libclumgt/Makefile lib/fm/Makefile lib/fm/libdiagcode/Makefile lib/fm/libdiagcode/common/Makefile lib/fm/libfmd_msg/Makefile lib/fm/libfmd_msg/common/Makefile lib/fm/libfmd_log/Makefile lib/fm/libfmd_log/common/Makefile lib/fm/libfmd_adm/Makefile lib/fm/libfmd_adm/common/Makefile lib/fm/libdiskstatus/Makefile lib/fm/libdiskstatus/common/Makefile lib/fm/libexacct/Makefile lib/fm/libexacct/common/Makefile lib/fm/topo/Makefile lib/fm/topo/libtopo/Makefile lib/fm/topo/libtopo/common/Makefile lib/fm/topo/modules/Makefile lib/fm/topo/modules/common/Makefile lib/fm/topo/modules/common/ipmi/Makefile lib/fm/topo/modules/common/fac_prov_ipmi/Makefile lib/fm/topo/modules/common/fanpsu/Makefile lib/fm/topo/modules/common/link/Makefile lib/fm/topo/modules/common/disk/Makefile lib/fm/topo/maps/Makefile lib/fm/topo/maps/i86pc/Makefile lib/libipmi/Makefile lib/libiscsit/Makefile cmd/Makefile cmd/zdb/Makefile cmd/zhack/Makefile cmd/zfs/Makefile cmd/zinject/Makefile cmd/zpool/Makefile cmd/zstreamdump/Makefile cmd/ztest/Makefile cmd/zpios/Makefile cmd/mount_zfs/Makefile cmd/fsck_zfs/Makefile cmd/zvol_id/Makefile cmd/vdev_id/Makefile cmd/arcstat/Makefile cmd/dbufstat/Makefile cmd/iostat/Makefile cmd/arc_summary/Makefile cmd/zed/Makefile cmd/sas3show/Makefile  cmd/mpt3ctl/Makefile cmd/perf_stat/Makefile cmd/clusterd/Makefile cmd/clumgt/Makefile cmd/pmm/Makefile cmd/disk/Makefile cmd/synckey/Makefile cmd/fm/Makefile cmd/fm/fmd/Makefile cmd/fm/fmd/common/Makefile cmd/fm/fmtopo/Makefile cmd/fm/fmtopo/common/Makefile cmd/fm/fmdump/Makefile cmd/fm/fmdump/common/Makefile cmd/fm/fmadm/Makefile cmd/fm/fmadm/common/Makefile cmd/fm/modules/Makefile cmd/fm/modules/common/Makefile cmd/fm/modules/common/zfs-retire/Makefile cmd/fm/modules/common/zfs-diagnosis/Makefile cmd/fm/modules/common/fanpsu-transport/Makefile cmd/fm/modules/common/disk-transport/Makefile cmd/fm/modules/common/snmp-trapgen/Makefile cmd/fm/modules/common/link-transport/Makefile cmd/fm/modules/common/pool-transport/Makefile cmd/fm/modules/common/eversholt/Makefile cmd/fm/modules/common/eversholt/files/Makefile cmd/fm/modules/common/disk-sense-de/Makefile cmd/fm/modules/common/io-retire/Makefile cmd/fm/modules/common/noresponse-disk-de/Makefile cmd/fm/modules/common/slow-io-de/Makefile cmd/fm/fmd/schemes/Makefile cmd/fm/fmd/schemes/zfs/Makefile cmd/fm/dicts/Makefile cmd/stmfadm/Makefile cmd/configd/Makefile cmd/stmfsvc/Makefile cmd/lunadm/Makefile cmd/sethostid/Makefile cmd/scripts/Makefile cmd/iscsitsvc/Makefile cmd/itadm/Makefile cmd/ipmi_monitor/Makefile cmd/drbdmon/Makefile cmd/drbdctl/Makefile contrib/Makefile contrib/bash_completion.d/Makefile contrib/dracut/Makefile contrib/dracut/90zfs/Makefile contrib/initramfs/Makefile module/Makefile module/avl/Makefile module/cn_hbx/Makefile module/fmd_transport/Makefile module/nvpair/Makefile module/unicode/Makefile module/zcommon/Makefile module/zfs/Makefile module/vmpt3sas/Makefile module/zpios/Makefile module/fct/Makefile module/qlt/Makefile module/qlf/Makefile module/qlf_hengwei/Makefile module/stmf/Makefile module/stmf_sbd/Makefile module/pppt/Makefile module/utils/Makefile module/idm/Makefile module/iscsit/Makefile module/ipmi_notify/Makefile module/mpt3sas/Makefile include/Makefile include/linux/Makefile include/sys/Makefile include/sys/fs/Makefile include/sys/fm/Makefile include/sys/fm/fs/Makefile include/sys/idm/Makefile include/sys/iscsit/Makefile scripts/Makefile scripts/zpios-profile/Makefile scripts/zpios-test/Makefile scripts/zpool-config/Makefile scripts/common.sh rpm/Makefile rpm/redhat/Makefile rpm/redhat/zfs.spec rpm/redhat/zfs-kmod.spec rpm/redhat/zfs-dkms.spec rpm/generic/Makefile rpm/generic/zfs.spec rpm/generic/zfs-kmod.spec rpm/generic/zfs-dkms.spec zfs-script-config.sh zfs.release"
+ac_config_files="$ac_config_files Makefile udev/Makefile udev/rules.d/Makefile etc/Makefile etc/init.d/Makefile etc/zfs/Makefile etc/systemd/Makefile etc/systemd/system/Makefile etc/modules-load.d/Makefile man/Makefile man/man1/Makefile man/man5/Makefile man/man8/Makefile lib/Makefile lib/libspl/Makefile lib/libspl/asm-generic/Makefile lib/libspl/asm-i386/Makefile lib/libspl/asm-x86_64/Makefile lib/libspl/include/Makefile lib/libspl/include/ia32/Makefile lib/libspl/include/ia32/sys/Makefile lib/libspl/include/rpc/Makefile lib/libspl/include/sys/Makefile lib/libspl/include/sys/sysevent/Makefile lib/libspl/include/sys/dktp/Makefile lib/libspl/include/util/Makefile lib/libdiskmgt/Makefile lib/libfmd/Makefile lib/libavl/Makefile lib/libefi/Makefile lib/libnvpair/Makefile lib/libunicode/Makefile lib/libuutil/Makefile lib/libcomm/Makefile lib/libzpool/Makefile lib/libzfs/libzfs.pc lib/libzfs/libzfs_core.pc lib/libzfs/Makefile lib/libzfs_core/Makefile lib/libstmf/Makefile lib/libshare/Makefile lib/fm/Makefile lib/fm/libdiagcode/Makefile lib/fm/libdiagcode/common/Makefile lib/fm/libfmd_msg/Makefile lib/fm/libfmd_msg/common/Makefile lib/fm/libfmd_log/Makefile lib/fm/libfmd_log/common/Makefile lib/fm/libfmd_adm/Makefile lib/fm/libfmd_adm/common/Makefile lib/fm/libdiskstatus/Makefile lib/fm/libdiskstatus/common/Makefile lib/fm/libexacct/Makefile lib/fm/libexacct/common/Makefile lib/fm/topo/Makefile lib/fm/topo/libtopo/Makefile lib/fm/topo/libtopo/common/Makefile lib/fm/topo/modules/Makefile lib/fm/topo/modules/common/Makefile lib/fm/topo/modules/common/ipmi/Makefile lib/fm/topo/modules/common/fac_prov_ipmi/Makefile lib/fm/topo/modules/common/link/Makefile lib/fm/topo/modules/common/disk/Makefile lib/fm/topo/modules/common/fanpsu/Makefile lib/fm/topo/maps/Makefile lib/fm/topo/maps/i86pc/Makefile lib/libipmi/Makefile lib/libiscsit/Makefile cmd/Makefile cmd/common/Makefile cmd/zdb/Makefile cmd/zhack/Makefile cmd/zfs/Makefile cmd/zinject/Makefile cmd/zpool/Makefile cmd/zstreamdump/Makefile cmd/ztest/Makefile cmd/zpios/Makefile cmd/mount_zfs/Makefile cmd/fsck_zfs/Makefile cmd/zvol_id/Makefile cmd/vdev_id/Makefile cmd/arcstat/Makefile cmd/dbufstat/Makefile cmd/iostat/Makefile cmd/arc_summary/Makefile cmd/zed/Makefile cmd/sas3show/Makefile cmd/mpt3ctl/Makefile cmd/perf_stat/Makefile cmd/clusterd/Makefile cmd/pmm/Makefile cmd/disk/Makefile cmd/fcboot/Makefile cmd/synckey/Makefile cmd/fm/Makefile cmd/fm/fmd/Makefile cmd/fm/fmd/common/Makefile cmd/fm/fmtopo/Makefile cmd/fm/fmtopo/common/Makefile cmd/fm/fmdump/Makefile cmd/fm/fmdump/common/Makefile cmd/fm/fmadm/Makefile cmd/fm/fmadm/common/Makefile cmd/fm/fm_simulate/Makefile cmd/fm/modules/Makefile cmd/fm/modules/common/Makefile cmd/fm/modules/common/zfs-retire/Makefile cmd/fm/modules/common/zfs-diagnosis/Makefile cmd/fm/modules/common/fanpsu-transport/Makefile cmd/fm/modules/common/disk-transport/Makefile cmd/fm/modules/common/link-transport/Makefile cmd/fm/modules/common/pool-transport/Makefile cmd/fm/modules/common/eversholt/Makefile cmd/fm/modules/common/eversholt/files/Makefile cmd/fm/modules/common/snmp-trapgen/Makefile cmd/fm/fmd/schemes/Makefile cmd/fm/fmd/schemes/zfs/Makefile cmd/fm/dicts/Makefile cmd/stmfadm/Makefile cmd/configd/Makefile cmd/stmfsvc/Makefile cmd/lunadm/Makefile cmd/sethostid/Makefile cmd/scripts/Makefile cmd/iscsitsvc/Makefile cmd/itadm/Makefile cmd/ipmi_monitor/Makefile cmd/drbdmon/Makefile cmd/drbdctl/Makefile cmd/cm/Makefile cmd/cm/base/Makefile cmd/cm/cli/Makefile cmd/cm/cmd/Makefile cmd/cm/config/Makefile cmd/cm/exec/Makefile cmd/cm/jni/Makefile cmd/cm/main/Makefile cmd/cm/opensrc/Makefile cmd/cm/script_linux/Makefile cmd/cm/script_py2/Makefile cmd/cm/static/Makefile cmd/cm/static/comm/Makefile cmd/cm/static/res_ch/Makefile cmd/cm/static/res_en/Makefile cmd/cm/static/task/Makefile cmd/cm/build/Makefile cmd/cm/tools/Makefile cmd/cm/tools/alarm_tool/Makefile contrib/Makefile contrib/bash_completion.d/Makefile contrib/dracut/Makefile contrib/dracut/90zfs/Makefile contrib/initramfs/Makefile module/Makefile module/avl/Makefile module/cn_hbx/Makefile module/fmd_transport/Makefile module/nvpair/Makefile module/unicode/Makefile module/zcommon/Makefile module/zfs/Makefile module/vmpt3sas/Makefile module/zpios/Makefile module/fct/Makefile module/qlt/Makefile module/qlf/Makefile module/qlf_hengwei/Makefile module/stmf/Makefile module/stmf_sbd/Makefile module/pppt/Makefile module/utils/Makefile module/idm/Makefile module/iscsit/Makefile module/ipmi_notify/Makefile module/mpt3sas/Makefile include/Makefile include/linux/Makefile include/sys/Makefile include/sys/fs/Makefile include/sys/fm/Makefile include/sys/fm/fs/Makefile include/sys/idm/Makefile include/sys/iscsit/Makefile include/sys/scsi/Makefile include/sys/scsi/generic/Makefile include/sys/scsi/impl/Makefile include/ipmitool/Makefile scripts/Makefile scripts/zpios-profile/Makefile scripts/zpios-test/Makefile scripts/zpool-config/Makefile scripts/common.sh rpm/Makefile rpm/redhat/Makefile rpm/redhat/zfs.spec rpm/redhat/zfs-kmod.spec rpm/redhat/zfs-dkms.spec rpm/generic/Makefile rpm/generic/zfs.spec rpm/generic/zfs-kmod.spec rpm/generic/zfs-dkms.spec zfs-script-config.sh zfs.release"
 
 
 cat >confcache <<\_ACEOF
@@ -36632,7 +36641,6 @@ do
     "lib/libzfs_core/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libzfs_core/Makefile" ;;
     "lib/libstmf/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libstmf/Makefile" ;;
     "lib/libshare/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libshare/Makefile" ;;
-    "lib/libclumgt/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libclumgt/Makefile" ;;
     "lib/fm/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/Makefile" ;;
     "lib/fm/libdiagcode/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/libdiagcode/Makefile" ;;
     "lib/fm/libdiagcode/common/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/libdiagcode/common/Makefile" ;;
@@ -36653,14 +36661,15 @@ do
     "lib/fm/topo/modules/common/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/Makefile" ;;
     "lib/fm/topo/modules/common/ipmi/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/ipmi/Makefile" ;;
     "lib/fm/topo/modules/common/fac_prov_ipmi/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/fac_prov_ipmi/Makefile" ;;
-    "lib/fm/topo/modules/common/fanpsu/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/fanpsu/Makefile" ;;
     "lib/fm/topo/modules/common/link/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/link/Makefile" ;;
     "lib/fm/topo/modules/common/disk/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/disk/Makefile" ;;
+    "lib/fm/topo/modules/common/fanpsu/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/modules/common/fanpsu/Makefile" ;;
     "lib/fm/topo/maps/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/maps/Makefile" ;;
     "lib/fm/topo/maps/i86pc/Makefile") CONFIG_FILES="$CONFIG_FILES lib/fm/topo/maps/i86pc/Makefile" ;;
     "lib/libipmi/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libipmi/Makefile" ;;
     "lib/libiscsit/Makefile") CONFIG_FILES="$CONFIG_FILES lib/libiscsit/Makefile" ;;
     "cmd/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/Makefile" ;;
+    "cmd/common/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/common/Makefile" ;;
     "cmd/zdb/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/zdb/Makefile" ;;
     "cmd/zhack/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/zhack/Makefile" ;;
     "cmd/zfs/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/zfs/Makefile" ;;
@@ -36682,9 +36691,9 @@ do
     "cmd/mpt3ctl/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/mpt3ctl/Makefile" ;;
     "cmd/perf_stat/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/perf_stat/Makefile" ;;
     "cmd/clusterd/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/clusterd/Makefile" ;;
-    "cmd/clumgt/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/clumgt/Makefile" ;;
     "cmd/pmm/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/pmm/Makefile" ;;
     "cmd/disk/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/disk/Makefile" ;;
+    "cmd/fcboot/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fcboot/Makefile" ;;
     "cmd/synckey/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/synckey/Makefile" ;;
     "cmd/fm/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/Makefile" ;;
     "cmd/fm/fmd/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmd/Makefile" ;;
@@ -36695,21 +36704,18 @@ do
     "cmd/fm/fmdump/common/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmdump/common/Makefile" ;;
     "cmd/fm/fmadm/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmadm/Makefile" ;;
     "cmd/fm/fmadm/common/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmadm/common/Makefile" ;;
+    "cmd/fm/fm_simulate/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fm_simulate/Makefile" ;;
     "cmd/fm/modules/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/Makefile" ;;
     "cmd/fm/modules/common/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/Makefile" ;;
     "cmd/fm/modules/common/zfs-retire/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/zfs-retire/Makefile" ;;
     "cmd/fm/modules/common/zfs-diagnosis/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/zfs-diagnosis/Makefile" ;;
     "cmd/fm/modules/common/fanpsu-transport/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/fanpsu-transport/Makefile" ;;
     "cmd/fm/modules/common/disk-transport/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/disk-transport/Makefile" ;;
-    "cmd/fm/modules/common/snmp-trapgen/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/snmp-trapgen/Makefile" ;;
     "cmd/fm/modules/common/link-transport/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/link-transport/Makefile" ;;
     "cmd/fm/modules/common/pool-transport/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/pool-transport/Makefile" ;;
     "cmd/fm/modules/common/eversholt/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/eversholt/Makefile" ;;
     "cmd/fm/modules/common/eversholt/files/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/eversholt/files/Makefile" ;;
-    "cmd/fm/modules/common/disk-sense-de/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/disk-sense-de/Makefile" ;;
-    "cmd/fm/modules/common/io-retire/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/io-retire/Makefile" ;;
-    "cmd/fm/modules/common/noresponse-disk-de/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/noresponse-disk-de/Makefile" ;;
-    "cmd/fm/modules/common/slow-io-de/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/slow-io-de/Makefile" ;;
+    "cmd/fm/modules/common/snmp-trapgen/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/modules/common/snmp-trapgen/Makefile" ;;
     "cmd/fm/fmd/schemes/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmd/schemes/Makefile" ;;
     "cmd/fm/fmd/schemes/zfs/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/fmd/schemes/zfs/Makefile" ;;
     "cmd/fm/dicts/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/fm/dicts/Makefile" ;;
@@ -36724,6 +36730,25 @@ do
     "cmd/ipmi_monitor/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/ipmi_monitor/Makefile" ;;
     "cmd/drbdmon/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/drbdmon/Makefile" ;;
     "cmd/drbdctl/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/drbdctl/Makefile" ;;
+    "cmd/cm/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/Makefile" ;;
+    "cmd/cm/base/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/base/Makefile" ;;
+    "cmd/cm/cli/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/cli/Makefile" ;;
+    "cmd/cm/cmd/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/cmd/Makefile" ;;
+    "cmd/cm/config/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/config/Makefile" ;;
+    "cmd/cm/exec/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/exec/Makefile" ;;
+    "cmd/cm/jni/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/jni/Makefile" ;;
+    "cmd/cm/main/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/main/Makefile" ;;
+    "cmd/cm/opensrc/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/opensrc/Makefile" ;;
+    "cmd/cm/script_linux/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/script_linux/Makefile" ;;
+    "cmd/cm/script_py2/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/script_py2/Makefile" ;;
+    "cmd/cm/static/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/static/Makefile" ;;
+    "cmd/cm/static/comm/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/static/comm/Makefile" ;;
+    "cmd/cm/static/res_ch/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/static/res_ch/Makefile" ;;
+    "cmd/cm/static/res_en/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/static/res_en/Makefile" ;;
+    "cmd/cm/static/task/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/static/task/Makefile" ;;
+    "cmd/cm/build/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/build/Makefile" ;;
+    "cmd/cm/tools/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/tools/Makefile" ;;
+    "cmd/cm/tools/alarm_tool/Makefile") CONFIG_FILES="$CONFIG_FILES cmd/cm/tools/alarm_tool/Makefile" ;;
     "contrib/Makefile") CONFIG_FILES="$CONFIG_FILES contrib/Makefile" ;;
     "contrib/bash_completion.d/Makefile") CONFIG_FILES="$CONFIG_FILES contrib/bash_completion.d/Makefile" ;;
     "contrib/dracut/Makefile") CONFIG_FILES="$CONFIG_FILES contrib/dracut/Makefile" ;;
@@ -36759,6 +36784,10 @@ do
     "include/sys/fm/fs/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/fm/fs/Makefile" ;;
     "include/sys/idm/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/idm/Makefile" ;;
     "include/sys/iscsit/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/iscsit/Makefile" ;;
+    "include/sys/scsi/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/scsi/Makefile" ;;
+    "include/sys/scsi/generic/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/scsi/generic/Makefile" ;;
+    "include/sys/scsi/impl/Makefile") CONFIG_FILES="$CONFIG_FILES include/sys/scsi/impl/Makefile" ;;
+    "include/ipmitool/Makefile") CONFIG_FILES="$CONFIG_FILES include/ipmitool/Makefile" ;;
     "scripts/Makefile") CONFIG_FILES="$CONFIG_FILES scripts/Makefile" ;;
     "scripts/zpios-profile/Makefile") CONFIG_FILES="$CONFIG_FILES scripts/zpios-profile/Makefile" ;;
     "scripts/zpios-test/Makefile") CONFIG_FILES="$CONFIG_FILES scripts/zpios-test/Makefile" ;;

@@ -13,11 +13,12 @@
 #define CMD_lmod			"/sbin/lsmod"
 #define CMD_emod(mod)		CMD_lmod" | cut -d ' ' -f 1 | grep -w %s | wc -l",	\
 							(mod)
-#define OS_RELEASE			"/etc/os-release"
-#define CMD_os_release		"cat "OS_RELEASE" | grep PRETTY_NAME | cut -d '\"' -f 2"
 
-#define FC_DRV_SW			"qlf_hengwei"
-#define FC_DRV_X86			"qlf"
+#define CMD_UNAME_M			"uname -m"
+#define CMD_UNAME_R			"uname -r"
+
+#define FC_QLF				"qlf"
+#define FC_QLF_HENGWEI		"qlf_hengwei"
 #define FC_DRV_ORIG			"qla2xxx"
 
 #define maybe_sleep_on_cv(cond, mp, cvp, tsp)	\
@@ -46,18 +47,7 @@
 	pthread_mutex_unlock(&mtx);	\
 }
 
-typedef struct os_fc_map {
-	char *os;
-	char *driver;
-} os_fc_map_t;
-
 static char *fc_drv = NULL;
-static os_fc_map_t os_fc_map[] = {
-	{"NeoKylin", 				FC_DRV_SW},
-	{"CentOS Linux", 			FC_DRV_X86},
-	{"deepin GNU/Linux 15.0", 	FC_DRV_SW},
-	{NULL, NULL}
-};
 
 static void init_drv(char **name_ptr);
 static void loop_load_drv(char *drv);
@@ -94,24 +84,6 @@ static int exec_blank_echo(char *fmt, ...)
 	return system(cmd);
 }
 
-/*
- * default is FC_DRV_X86
- */
-static void search_fc_drv(const char *os, char **drv_p)
-{
-	os_fc_map_t *mapping = &os_fc_map;
-	int idx = 0;
-	char *iter_os = NULL;
-
-	while ((iter_os = mapping[idx++].os) != NULL) {
-		if (strncmp(iter_os, os, strlen(iter_os)) == 0)
-			break;
-	}
-
-	*drv_p = iter_os ? strdup(mapping[idx - 1].driver) :
-		strdup(FC_DRV_X86);
-}
-
 static int drv_exist(char *drv)
 {
 	char echo[64] = "0";
@@ -130,13 +102,19 @@ int main(int argc, char **argv)
 
 static void init_drv(char **name_ptr)
 {
-	char os_name[128] = {0};
+	char uname_m[64] = {0};
+	char uname_r[64] = {0};
 	
-	maybe_sleep(access(OS_RELEASE, F_OK) == 0, -1U);
-	exec_for_echo(os_name, 128, CMD_os_release);
-	search_fc_drv(os_name, name_ptr);
-}
+	exec_for_echo(uname_m, sizeof(uname_m), CMD_UNAME_M);
+	exec_for_echo(uname_r, sizeof(uname_r), CMD_UNAME_R);
 
+	if (strncmp(uname_m, "x86_64", strlen(uname_m)) == 0 &&
+		!strstr(uname_r, "3.10.0")) {
+		*name_ptr = strdup(FC_QLF);
+	} else {
+		*name_ptr = strdup(FC_QLF_HENGWEI);
+	}
+}
 static void loop_load_drv(char *drv)
 {
 	while (!drv_exist(drv)) {

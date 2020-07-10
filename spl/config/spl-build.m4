@@ -50,6 +50,7 @@ AC_DEFUN([SPL_AC_CONFIG_KERNEL], [
 	SPL_AC_INODE_LOCK
 	SPL_AC_MUTEX_OWNER
 	SPL_AC_GROUP_INFO_GID
+	SPL_AC_PLATFORM
 ])
 
 AC_DEFUN([SPL_AC_MODULE_SYMVERS], [
@@ -1597,3 +1598,50 @@ AC_DEFUN([SPL_AC_GROUP_INFO_GID], [
 	])
 	EXTRA_KCFLAGS="$tmp_flags"
 ])
+
+dnl #
+dnl # checking spl platform
+dnl #
+AC_DEFUN([SPL_AC_PLATFORM], [
+	AC_DEFINE([CENTOS_OLD], [0], ["centos-3.10"])
+	AC_DEFINE([CENTOS], [1], ["centos-4.4.15"])
+	AC_DEFINE([DEEPIN], [2], ["deepin"])
+	AC_DEFINE([ZB_KYLIN], [3], ["zb_kylin"])
+	AC_DEFINE([YH_KYLIN], [4], ["yh_kylin"])
+
+	uname_m=$(uname -m)
+	uname_r=$(uname -r)
+
+	if test "x$uname_m" = xx86_64; then
+		temp=$(echo $uname_r | grep 3.10.0-514)
+		if test "x$temp" != x; then
+			use_platform=0
+			current_platform="centos-3.10.0-514"
+		else
+			use_platform=1
+			current_platform="centos-4.4.15"
+		fi
+	elif test "x$uname_m" = xsw_64; then
+		temp=$(echo $uname_r | grep deepin)
+		if test "x$temp" != x; then
+			use_platform=2
+			current_platform="deepin"
+		else
+			use_platform=3
+			current_platform="zb-kylin"
+		fi
+	elif test "x$uname_m" = xaarch64; then
+		use_platform=4
+		current_platform="yh-kylin"
+	else
+		use_platform=2
+		current_platform="use default deepin"
+	fi
+
+	AC_MSG_CHECKING([checking spl platform])
+	AC_DEFINE_UNQUOTED([SPL_PLATFORM], [$use_platform], ["spl platform"])
+
+        AC_SUBST(current_platform)
+	AC_MSG_RESULT([$current_platform])
+])
+

@@ -241,7 +241,7 @@ static int find_mpt_host(mpt_ioc_t **ioc_ids, int *ioc_ids_nr)
 
         close(fd);
 
-#ifdef USE_HENGWEI
+#if (ZFS_PLATFORM != CENTOS_OLD)
         /* fetch scsi host sas device number. */
         snprintf(filename, sizeof(filename), "%s/%s/host_sas_dev_cnt", SCSIHOST_DIR, dirent->d_name);
 
@@ -297,10 +297,10 @@ static int do_mpt3ctl_simu(mpt3_simu_subcmd_e subcmd, mpt3simu_action_e action, 
     int idx = 0;
     char *mpt_ctl_dev;
     
-#ifdef USE_HENGWEI
-    mpt_ctl_dev = MPT3CTL_DEV;
-#else
+#if (ZFS_PLATFORM == CENTOS_OLD)
     mpt_ctl_dev = MPT2CTL_DEV;
+#else
+    mpt_ctl_dev = MPT3CTL_DEV;
 #endif
 
 
