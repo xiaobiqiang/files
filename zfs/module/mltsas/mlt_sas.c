@@ -2203,9 +2203,9 @@ static void __Mlsas_Request_endio(struct bio *bio)
 
 	bio_put(bio);
 
+	spin_lock_irqsave(&Mlb->Mlb_rq_spin, flags);
 	if (rq->Mlrq_flags & Mlsas_RQ_Diskio_TM_Aborted) {
-		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) flags(%x) DISKIO_TM_ABORTED", 
-			__func__, rq, rq->Mlrq_sector, rq->Mlrq_flags);
+		spin_unlock_irqrestore(&Mlb->Mlb_rq_spin, flags);
 		__Mlsas_put_RQ(rq);
 		return ;
 	}
@@ -2220,7 +2220,6 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	} else
 		what = Mlsas_Rst_Complete_OK;
 
-	spin_lock_irqsave(&Mlb->Mlb_rq_spin, flags);
 	if (rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)
 		rq->Mlrq_back_bio = NULL;
 	else
