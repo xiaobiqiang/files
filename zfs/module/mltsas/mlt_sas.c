@@ -1182,7 +1182,7 @@ static int __Mlsas_RRPART_virt(const char *path)
 	struct block_device *bdev;
 	struct gendisk *disk;
 	int error = -ENODEV, partno;
-	int mode = FMODE_WRITE | FMODE_READ;
+	int mode = FMODE_READ;
 
 	bdev = blkdev_get_by_path(path, mode, path);
 	if (IS_ERR(bdev))
@@ -1252,8 +1252,6 @@ static const char *__Mlsas_Virt_zfs_part2mlsas(const char *zfs_partial,
 
 	snprintf(vt_partial, 64, "/dev/Mlsas%llxs%d", hash_key, part_no);
 
-	cmn_err(CE_NOTE, "mltsas partial=%s", vt_partial);
-
 	return strdup(vt_partial);
 }
 
@@ -1264,6 +1262,7 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 	uint64_t hash_key = 0;
 	Mlsas_blkdev_t *Mlb = NULL;
 	struct block_device *vt_partial = NULL;
+	const char *vt_partial_path = NULL;
 	
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if ((gMlsas_ptr->Ml_state <= Mlsas_St_Enabling) ||
@@ -1283,9 +1282,10 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 	__Mlsas_get_virt(Mlb);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
+	vt_partial_path = __Mlsas_Virt_zfs_part2mlsas(path, hash_key);
 	
-	if (IS_ERR_OR_NULL(vt_partial = __Mlsas_Virt_rrpart_get_partial(Mlb, 
-			__Mlsas_Virt_zfs_part2mlsas(path, hash_key)))) {
+	if (IS_ERR_OR_NULL(vt_partial = __Mlsas_Virt_rrpart_get_partial(
+			Mlb, vt_partial_path))) {
 		rval = -EFAULT;
 		if (IS_ERR(vt_partial))
 			rval = PTR_ERR(vt_partial);
@@ -1300,6 +1300,8 @@ int __Mlsas_Virt_export_zfs_attach(const char *path, struct block_device *bdev,
 put_vt:
 	if (Mlb)
 		__Mlsas_put_virt(Mlb);
+	if (vt_partial_path)
+		strfree(vt_partial_path);
 	return rval;
 }
 EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_attach);
