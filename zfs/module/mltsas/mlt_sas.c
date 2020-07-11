@@ -1183,6 +1183,7 @@ static int __Mlsas_RRPART_virt(const char *path)
 	struct gendisk *disk;
 	int error = -ENODEV, partno;
 	int mode = FMODE_READ;
+	int tries = 500, tried = 0;
 
 	bdev = blkdev_get_by_path(path, mode, path);
 	if (IS_ERR(bdev))
@@ -1195,8 +1196,13 @@ static int __Mlsas_RRPART_virt(const char *path)
 		bdev = bdget(disk_devt(disk));
 		if (bdev) {
 			error = blkdev_get(bdev, mode, path);
-			if (error == 0)
-				error = ioctl_by_bdev(bdev, BLKRRPART, 0);
+			if (error == 0) {
+				do {
+					error = ioctl_by_bdev(bdev, BLKRRPART, 0);
+					if (error == -EBUSY)
+						msleep(10);
+				} while ((error == -EBUSY) && (++tried < tries));
+			}
 			blkdev_put(bdev, mode);
 		}
 		put_disk(disk);
