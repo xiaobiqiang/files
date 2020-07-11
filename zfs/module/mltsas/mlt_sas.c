@@ -140,7 +140,7 @@ static uint32_t Mlsas_topr_req_tm = 3000;		/* ms */
 static uint32_t Mlsas_local_req_tm = 2000;		/* ms */
 static uint32_t Mlsas_reclaim_req_tm = 35;		/* s */
 static uint32_t Mlsas_fast_reclaim_req_tm = 3;	/* s */
-static uint32_t Mlsas_wd_gap = 50;				/* ms */
+static uint32_t Mlsas_wd_gap = 200;				/* ms */
 static uint32_t Mlsas_virt_fail_threshold = 128;
 static uint32_t Mlsas_PR_fail_threshold = 128;
 
@@ -2193,9 +2193,9 @@ static void __Mlsas_Request_endio(struct bio *bio)
 	bio_put(bio);
 
 	if (rq->Mlrq_flags & Mlsas_RQ_Diskio_TM_Aborted) {
-		__Mlsas_put_RQ(rq);
 		cmn_err(CE_NOTE, "%s RQ(%p) sect(%llu) flags(%x) DISKIO_TM_ABORTED", 
 			__func__, rq, rq->Mlrq_sector, rq->Mlrq_flags);
+		__Mlsas_put_RQ(rq);
 		return ;
 	}
 
