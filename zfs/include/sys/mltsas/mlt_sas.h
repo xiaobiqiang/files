@@ -230,6 +230,14 @@ struct Mlsas_backdev_info {
 	 * requests submitted
 	 */
 	list_t Mldb_pending_rqs;
+	/* 
+	 * last attach time
+	 */
+	uint64_t Mldb_last_attach_jif;
+	/*
+	 * last detach time
+	 */
+	uint64_t Mldb_last_detach_jif;
 };
 
 struct Mlsas_pr_device {

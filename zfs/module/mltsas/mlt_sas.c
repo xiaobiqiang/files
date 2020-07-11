@@ -143,6 +143,7 @@ static uint32_t Mlsas_fast_reclaim_req_tm = 3;	/* s */
 static uint32_t Mlsas_wd_gap = 200;				/* ms */
 static uint32_t Mlsas_virt_fail_threshold = 128;
 static uint32_t Mlsas_PR_fail_threshold = 128;
+static uint32_t Mlsas_attach_stable_tm = 20;	/* s */
 
 Mlsas_stat_t Mlsas_stat = {
 	{"virt_alloc", 			KSTAT_DATA_UINT64},
@@ -792,6 +793,8 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 		rval = -EALREADY;
 	if (rval == 0) {
 		vt->Mlb_in_resume_virt = B_TRUE;
+		vt->Mlb_bdi.Mldb_last_attach_jif = jiffies;
+		vt->Mlb_bdi.Mldb_last_detach_jif = 0;
 		/* HDL write conflicts, move to policy */
 //		__Mlsas_Virt_wait_list_empty(vt, &vt->Mlb_topr_rqs);
 		__Mlsas_Devst_Stmt(vt, Mlsas_Devevt_Attach_OK, NULL);
@@ -828,7 +831,9 @@ static void __Mlsas_Do_Failoc_impl(Mlsas_blkdev_t *Mlb)
 		spin_unlock_irq(&Mlb->Mlb_rq_spin);
 		return ;
 	}
-	
+
+	Mlb->Mlb_bdi.Mldb_last_detach_jif = jiffies;
+	Mlb->Mlb_bdi.Mldb_last_attach_jif = 0;
 	/* no more local request */
 	__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 	
@@ -2576,6 +2581,7 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 	uint32_t flags = rq->Mlrq_flags;
 	Mlsas_blkdev_t *Mlb = rq->Mlrq_bdev;
 	Mlsas_pr_device_t *pr = rq->Mlrq_pr;
+	Mlsas_backdev_info_t *bdi = &Mlb->Mlb_bdi;
 	int ok, error;
 	
 	VERIFY(rq->Mlrq_master_bio != NULL);
@@ -2604,26 +2610,17 @@ static void __Mlsas_Complete_RQ(Mlsas_request_t *rq,
 		error = -EIO;
 
 	if (!ok) {
-		/*
-		 * Maybe PR report degraded or FAIL state at soon, but
-		 * avoid to choose the same PR for restarting RQ,
-		 * set to Mlsas_Devst_Degraded now.
-		 */
-		if (pr && (++pr->Mlpd_error_now >= pr->Mlpd_switch)) {
-			__Mlsas_Update_PR_st(pr, Mlsas_Devst_Degraded, Mlsas_PRevt_Error_Sw);
-		} else if (!(rq->Mlrq_flags & Mlsas_RQ_Local_Aborted)){
-			if (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch)
-				__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
-		}
+		if (!(rq->Mlrq_flags & Mlsas_Rst_Abort_Diskio_TM) &&
+				!rq->Mlrq_pr &&
+				(++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch) &&
+				(jiffies - bdi->Mldb_last_attach_jif > 
+					SEC_TO_TICK(Mlsas_attach_stable_tm)))
+			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
 
 		if (__Mlsas_Get_ldev(Mlb))
 			rq->Mlrq_flags |= Mlsas_RQ_Delayed; 
-	} else {	/* ok, clear error state */
-		if (pr)
-			pr->Mlpd_error_now = 0;
-		else 
-			Mlb->Mlb_error_cnt = 0;
-	}
+	} else	/* ok, clear error state */
+		Mlb->Mlb_error_cnt = 0;
 	
 	if (!(rq->Mlrq_flags & Mlsas_RQ_Delayed)) {
 		Mlbi->Mlbi_bio = rq->Mlrq_master_bio;
@@ -3323,7 +3320,8 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 {
 	boolean_t iook = B_FALSE, ok = B_FALSE;
 	Mlsas_blkdev_t *Mlb = prr->prr_pr->Mlpd_mlb;
-
+	Mlsas_backdev_info_t *bdi = &Mlb->Mlb_bdi;
+	
 	if ((prr->prr_flags & Mlsas_PRRfl_Local_Pending) &&
 		!(prr->prr_flags & Mlsas_PRRfl_Local_Aborted))
 		cmn_err(CE_PANIC, "%s PR_RQ(%p) & Mlsas_PRRfl_Local_Pending"
@@ -3344,10 +3342,13 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 	 * IO pending done or abort local disk IO.
 	 */
 	if (!(prr->prr_flags & Mlsas_PRRfl_Net_Sent)) {
-		if (!iook && (++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch))
-			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);
-		else if (iook)
+		if (iook)
 			Mlb->Mlb_error_cnt = 0;
+		else if ((++Mlb->Mlb_error_cnt >= Mlb->Mlb_switch) &&
+			(jiffies - bdi->Mldb_last_attach_jif > 
+				SEC_TO_TICK(Mlsas_attach_stable_tm)))
+			__Mlsas_Devst_Stmt(Mlb, Mlsas_Devevt_Error_Switch, NULL);		
+		
 		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
 			prr->prr_flags |= Mlsas_PRRfl_Continue;
 	} 
