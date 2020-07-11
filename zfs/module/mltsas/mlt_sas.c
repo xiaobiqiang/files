@@ -2160,8 +2160,6 @@ static void __Mlsas_Release_RQ(struct kref *ref)
 	__Mlsas_Down(req_alloc);
 	
 	rq->Mlrq_back_bio = NULL;
-	rq->Mlrq_bdev = NULL;
-	rq->Mlrq_pr = NULL;
 	mempool_free(rq, gMlsas_ptr->Ml_request_mempool);
 }
 
@@ -3346,13 +3344,7 @@ static void __Mlsas_PR_RQ_complete(Mlsas_pr_req_t *prr)
 			Mlb->Mlb_error_cnt = 0;
 		if (prr->prr_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
 			prr->prr_flags |= Mlsas_PRRfl_Continue;
-		return ;
 	} 
-
-	if (!(prr->prr_flags & Mlsas_PRRfl_Continue)) {
-		if (!ok)
-			prr->prr_flags |= Mlsas_PRRfl_Delayed;
-	}
 }
 
 static void __Mlsas_PR_RQ_Write_endio(Mlsas_pr_req_t *prr)
