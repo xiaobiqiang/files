@@ -2819,7 +2819,11 @@ static void __Mlsas_RX_Brw_Rsp(Mlsas_Msh_t *mms,
 	Mlsas_rtx_wk_t *w = (Mlsas_rtx_wk_t *)xd;
 
 	w->rtw_fn = __Mlsas_RX_Brw_Rsp_impl;
-	__Mlsas_Queue_RTX(&rq->Mlrq_pr->Mlpd_mlb->Mlb_asender_wq, w);
+
+	if (rq->Mlrq_flags & Mlsas_RQ_Net_Done)
+		__Mlsas_clustersan_rx_data_free_ext(xd);
+	else
+		__Mlsas_Queue_RTX(&rq->Mlrq_bdev->Mlb_asender_wq, w);
 }
 
 static int __Mlsas_RX_Brw_Rsp_impl(Mlsas_rtx_wk_t *w)
