@@ -190,6 +190,7 @@ void raidz_aggre_zio_create(zio_t *pio, zio_t *zio)
         zio->io_aggre_order = pio->io_aggre_order;
         bcopy(&pio->io_prop, &zio->io_prop, sizeof(zio_prop_t));
 		zio->io_aggre_root = B_FALSE;
+        zio->io_flags |= ZIO_FLAG_DONT_AGGREGATE;
     } else {
         zio->io_aggre_io = NULL;
         zio->io_aggre_order = 0;
