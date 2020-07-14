@@ -308,7 +308,7 @@ unsigned long zfs_deadman_synctime_ms = 1000000ULL;
 /*
  * By default the deadman is enabled.
  */
-int zfs_deadman_enabled = 1;
+int zfs_deadman_enabled = 0;
 
 /*
  * The worst case is single-sector max-parity RAID-Z blocks, in which
