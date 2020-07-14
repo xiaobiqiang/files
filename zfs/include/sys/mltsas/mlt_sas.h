@@ -78,6 +78,7 @@
 #define Mlsas_Rst_Abort_Netio		0x15
 #define Mlsas_Rst_Abort_TM			0x16
 #define Mlsas_Rst_Abort_Diskio_TM	0x17
+#define Mlsas_Rst_Abort_Reclaim		0x18
 
 #define Mlsas_PRRst_Submit_Local 	0x01
 #define Mlsas_PRRst_Discard_Error	0x02
@@ -229,6 +230,14 @@ struct Mlsas_backdev_info {
 	 * requests submitted
 	 */
 	list_t Mldb_pending_rqs;
+	/* 
+	 * last attach time
+	 */
+	uint64_t Mldb_last_attach_jif;
+	/*
+	 * last detach time
+	 */
+	uint64_t Mldb_last_detach_jif;
 };
 
 struct Mlsas_pr_device {
@@ -240,6 +249,8 @@ struct Mlsas_pr_device {
 	list_t Mlpd_rqs;
 	list_t Mlpd_pr_rqs;
 	list_t Mlpd_net_pr_rqs;
+	list_t Mlpd_reclaim_rqs;
+	list_t Mlpd_fast_reclaim_rqs;
 
 	wait_queue_head_t Mlpd_wait;
 	
@@ -298,6 +309,7 @@ struct Mlsas_blkdev {
 	uint32_t 		Mlb_index;
 
 	wait_queue_head_t Mlb_wait;
+	wait_queue_head_t Mlb_overlap_wait;
 
 	struct sg_table *Mlb_w_sgl;
 	void *Mlb_txbuf;
@@ -344,6 +356,7 @@ struct Mlsas_request {
 	uint32_t Mlrq_delayed_magic;
 	uint32_t Mlrq_delayed_pad;
 	list_node_t Mlrq_delayed_node;
+	list_node_t Mlrq_reclaim_node;
 	list_node_t Mlrq_node;
 	list_node_t Mlrq_pr_node;
 	struct kref Mlrq_ref;
@@ -352,6 +365,7 @@ struct Mlsas_request {
 	uint32_t Mlrq_flags;
 	uint32_t Mlrq_state;
 	uint64_t Mlrq_start_jif;
+	uint64_t Mlrq_reclaim_jif;
 	uint64_t Mlrq_submit_jif;
 	struct bio *Mlrq_master_bio;
 	struct bio *Mlrq_back_bio;
@@ -370,6 +384,9 @@ struct Mlsas_request {
 	sector_t Mlrq_sector;
 
 	timeout_id_t Mlrq_tm;
+	
+	boolean_t Mlrq_waiting;
+	boolean_t Mlrq_fast_reclaim;
 };
 
 struct Mlsas_pr_req {
@@ -451,6 +468,9 @@ struct Mlsas_rh {
 	kmutex_t Mh_mtx;
 	list_t Mh_devices;
 	void *Mh_session;
+
+	/* protected by gMlsas_ptr->mtx */
+	boolean_t Mh_fast_reclaim;
 };
 
 struct Mlsas_post_event {
@@ -504,6 +524,7 @@ struct Mlsas {
 
 	list_t Ml_virt_list;
 	list_t Ml_rhs_list;
+	list_t Ml_reclaim_rhs_list;
 	
 	kstat_t *Ml_kstat;
 	kmutex_t Ml_mtx;

@@ -4473,6 +4473,8 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 	u8 scsi_status;
 	u32 log_info;
 	struct MPT3SAS_DEVICE *sas_device_priv_data;
+	struct MPT3SAS_TARGET *sas_device_mpt3sas_target;
+	struct MPT3SAS_TARGET *scsi_target_mpt3sas_target;
 	u32 response_code = 0;
 	unsigned long flags;
 
@@ -4482,19 +4484,21 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		return 1;
 
     sas_device_priv_data = scmd->device->hostdata;
-    if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-         sas_device_priv_data->sas_target->deleted) {
+    if (!sas_device_priv_data || 
+		!(sas_device_mpt3sas_target = sas_device_priv_data->sas_target) ||
+         sas_device_mpt3sas_target->deleted) {
         scmd->result = DID_NO_CONNECT << 16;
         goto out;
     }
 
-    if(sas_device_priv_data->sas_target->noresp_simu == 1) {
-        printk(KERN_ERR "sas target:%llx io dropped as noresp_simu been 1\n", sas_device_priv_data->sas_target->sas_address);
+    if(sas_device_mpt3sas_target->noresp_simu == 1) {
+        printk(KERN_ERR "sas target:%llx io dropped as noresp_simu been 1\n", 
+			sas_device_mpt3sas_target->sas_address);
         scsi_dma_unmap(scmd);
         return 1;
     }
 
-    atomic64_set(&sas_device_priv_data->sas_target->noresp_cnt, 0);
+    atomic64_set(&sas_device_mpt3sas_target->noresp_cnt, 0);
 
 	mpi_request = mpt3sas_base_get_msg_frame(ioc, smid);
 
@@ -4518,9 +4522,9 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		mpt3sas_scsi_direct_io_set(ioc, smid, 0);
 		memcpy(mpi_request->CDB.CDB32, scmd->cmnd, scmd->cmd_len);
 		mpi_request->DevHandle =
-		    cpu_to_le16(sas_device_priv_data->sas_target->handle);
+		    cpu_to_le16(sas_device_mpt3sas_target->handle);
 		mpt3sas_base_put_smid_scsi_io(ioc, smid,
-		    sas_device_priv_data->sas_target->handle);
+		    sas_device_mpt3sas_target->handle);
 		return 0;
 	}
 	/* turning off TLR */
@@ -4555,7 +4559,7 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 		ioc_status = MPI2_IOCSTATUS_SUCCESS;
 	}
 
-    if(sas_device_priv_data->sas_target->merr_simu == 1) {
+    if(sas_device_mpt3sas_target->merr_simu == 1) {
        printk(KERN_ERR "simulate merr\n");
        scsi_state |= MPI2_SCSI_STATE_AUTOSENSE_VALID;
     }
@@ -4574,7 +4578,7 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 			    le16_to_cpu(mpi_reply->DevHandle));
 		mpt3sas_trigger_scsi(ioc, data.skey, data.asc, data.ascq);
 
-        if(sas_device_priv_data->sas_target->merr_simu == 1) {
+        if(sas_device_mpt3sas_target->merr_simu == 1) {
             scmd->sense_buffer[2] = MEDIUM_ERROR;
         }
 
@@ -4586,12 +4590,14 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
             _scsih_scsi_ioc_info(ioc, scmd, mpi_reply, smid);
 
             if(scmd->sense_buffer[2] == MEDIUM_ERROR) {
+				scsi_target_mpt3sas_target = scmd->device->sdev_target->hostdata;
                 printk(KERN_ERR "report sense:%d, [host's target adderess:%llx], [target's host address:%llx]\n",
                     scmd->sense_buffer[2],
-                    sas_device_priv_data->sas_target->sas_address,
-                   ((struct MPT3SAS_TARGET *)(scmd->device->sdev_target->hostdata))->sas_address);
+                    sas_device_mpt3sas_target->sas_address,
+                    scsi_target_mpt3sas_target ? scsi_target_mpt3sas_target->sas_address : 0);
 
-                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, &sas_device_priv_data->sas_target->sas_address);
+                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_MERR, 
+					&sas_device_mpt3sas_target->sas_address);
 
                 /*mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);*/
             }
@@ -9008,7 +9014,8 @@ void mpt3sas_eh_strategy(struct Scsi_Host *shost)
     struct MPT3SAS_DEVICE *sas_device_priv_data;
     //struct MPT3SAS_ADAPTER *ioc;
     struct scsi_cmnd *scmd, *next;
-    
+    struct MPT3SAS_TARGET *sas_device_mpt3sas_target;
+	
     unsigned long flags;
     LIST_HEAD(eh_work_q);
     LIST_HEAD(eh_done_q);    
@@ -9023,12 +9030,13 @@ void mpt3sas_eh_strategy(struct Scsi_Host *shost)
         sas_device_priv_data = scmd->device->hostdata;
 
         if (sas_device_priv_data && 
-            sas_device_priv_data->sas_target &&
-            !sas_device_priv_data->sas_target->deleted) {
-            if(atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) > 0) {
-                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &sas_device_priv_data->sas_target->sas_address);
+            (sas_device_mpt3sas_target = sas_device_priv_data->sas_target) &&
+            !sas_device_mpt3sas_target->deleted) {
+            if(atomic64_read(&sas_device_mpt3sas_target->noresp_cnt) > 0) {
+                atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, 
+					&sas_device_mpt3sas_target->sas_address);
                 printk(KERN_ERR "mpt3sas_eh_strategy remove target:%llx\n", 
-                        sas_device_priv_data->sas_target->sas_address);
+                        sas_device_mpt3sas_target->sas_address);
                 /*
                 ioc = shost_priv(scmd->device->host);
                 mpt3sas_trigger_remove_target_event(ioc, sas_device_priv_data->sas_target->sas_address);
@@ -9054,22 +9062,24 @@ static enum blk_eh_timer_return mpt3sas_trans_timeout(struct scsi_cmnd *scmd)
     struct _sas_device *sas_device = NULL;
     struct scsi_target *starget = scmd->device->sdev_target;
     struct MPT3SAS_TARGET *target_priv_data = starget->hostdata;
+	struct MPT3SAS_TARGET *sas_device_mpt3sas_target;
 
     sas_device_priv_data = scmd->device->hostdata;
-    if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-        sas_device_priv_data->sas_target->deleted) {
+    if (!sas_device_priv_data || 
+		!(sas_device_mpt3sas_target = sas_device_priv_data->sas_target) ||
+        sas_device_mpt3sas_target->deleted) {
 		printk(KERN_WARNING "target been deleted! scmd(%p)\n", scmd);
 		return BLK_EH_NOT_HANDLED;   /* for scsi_times_out to abort this command. */
 	}
 
-    sas_device = sas_device_priv_data->sas_target->sdev;
+    sas_device = sas_device_mpt3sas_target->sdev;
 
     printk(KERN_ERR "scmd(%p) no response, [target:%llx], cnt:%ld\n",
         scmd,
         target_priv_data->sas_address,
-        atomic64_read(&sas_device_priv_data->sas_target->noresp_cnt) + 1);
+        atomic64_read(&sas_device_mpt3sas_target->noresp_cnt) + 1);
 
-    if(atomic64_inc_return(&sas_device_priv_data->sas_target->noresp_cnt) >= 6) {
+    if(atomic64_inc_return(&sas_device_mpt3sas_target->noresp_cnt) >= 6) {
         atomic_notifier_call_chain(&mpt3sas_notifier_list, SAS_EVT_DEV_NORESP, &target_priv_data->sas_address);
         /*mpt3sas_trigger_remove_target_event(ioc, target_priv_data->sas_address);*/
     }
