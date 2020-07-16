@@ -1,39 +1,39 @@
 #!/bin/bash
 
-UNAME_M=
-UNAME_R=
-PLATFORM=
-CENTOS_3_10="centos-3.10"
-CENTOS_4_4_15="centos-4.4.15"
-DEEPIN="deepin"
-ZB_KYLIN="zb-kylin"
-YH_KYLIN="yh-kylin"
+UNAME_M=`uname -m`
+UNAME_R=`uname -r`
 
-function choose_platform()
+KERNEL_VERSION3="3"
+KERNEL_VERSION4="4"
+KERNEL_VERSION=
+
+CENTOS_PLATFORM_V3="centos-3"
+CENTOS_PLATFORM_V4="centos-4"
+
+CENTOS="CentOS Linux"
+DEEPIN="deepin GNU/Linux"
+ZB_KYLIN="NeoKylin" 	#jz
+YH_KYLIN="kylin" 	#ft
+PLATFORM=
+
+function choose_platform_and_kernel()
 {
     local temp
+    local platform=`cat /etc/os-release | grep -w NAME | cut -d '=' -f 2 | cut -d '"' -f 2`
+    local kernel=`uname -r | cut -d '-' -f 1 | cut -d '.' -f 1`
 
-    UNAME_M=`uname -m`
-    UNAME_R=`uname -r`
-    if [ x$UNAME_M == xx86_64 ]; then
-        temp=`echo $UNAME_R | grep 3.10`
-	if [[ -n $temp ]]; then
-            PLATFORM=$CENTOS_3_10
-        else
-            PLATFORM=$CENTOS_4_4_15
-        fi
-    elif [ x$UNAME_M == xsw_64 ]; then
-        temp=`echo $UNAME_R | grep deepin`
-        if [[ -n $temp ]]; then
-            PLATFROM=$DEEPIN
-        else
-            PLATFROM=$ZB_KYLIN
-        fi
-    elif [ x$UNAME_M == xaarch64 ]; then
-        PLATFORM=$YH_KYLIN
-    else
-        PLATFORM=$DEEPIN
-    fi 
+    KERNEL_VERSION=$kernel
+
+    [[ x"$platform" == x$ZB_KYLIN ]] && PLATFORM=$ZB_KYLIN
+    [[ x"$platform" == x$YH_KYLIN ]] && PLATFORM=$YH_KYLIN
+    [[ x"$platform" == x$DEEPIN ]] && PLATFORM=$DEEPIN
+    if [[ x"$platform" == x$CENTOS ]]; then
+        [[ x"$KERNEL_VERSION" == x$KERNEL_VERSION3 ]] && PLATFORM=$CENTOS_PLATFORM_V3
+		[[ x"$KERNEL_VERSION" == x$KERNEL_VERSION4 ]] && PLATFORM=$CENTOS_PLATFORM_V4
+    fi
+
+    [ -z $PLATFORM ] && exit 1
+    [ -z $KERNEL_VERSION ] && exit 1
 }
 
 function prepare_cm()
@@ -42,7 +42,6 @@ function prepare_cm()
     cd cmd/cm/
     chmod 755 ./cpcmfile.sh
     ./cpcmfile.sh
-
     cd build/
     chmod 755 ./makeam.sh
     ./makeam.sh
@@ -51,6 +50,8 @@ function prepare_cm()
 
 function prepare_snmp()
 {
+    netsnmp_so_loc=
+
     SNMP_DIR="cmd/fm/modules/common/snmp-trapgen"
     SNMP_HEADERS="/usr/include/net-snmp"
 
@@ -61,15 +62,13 @@ function prepare_snmp()
         rm -rf ./net-snmp/
     fi
 
-    if [ x$UNAME_M = xx86_64 ]; then
-        netsnmp_so_loc=/usr/lib64
-    elif [ x$PLATFORM = x$DEEPIN ]; then
-        netsnmp_so_loc=/usr/lib/sw_64-linux-gnu
-    elif [ x$PLATFORM = x$ZB_KYLIN ] || [ x$PLATFORM = x$YH_KYLIN ]; then
-        netsnmp_so_loc=/usr/lib
-    else
-        netsnmp_so_loc=/usr/lib/sw_64-linux-gnu
-    fi
+    [[ x$PLATFORM == x$CENTOS_PLATFORM_V3 ]] && netsnmp_so_loc=/usr/lib64
+    [[ x$PLATFORM == x$CENTOS_PLATFORM_V4 ]] && netsnmp_so_loc=/usr/lib64
+    [[ x$PLATFORM == x$DEEPIN ]] && netsnmp_so_loc=/usr/lib/sw_64-linux-gnu
+    [[ x$PLATFORM == x$ZB_KYLIN ]] && netsnmp_so_loc=/usr/lib
+    [[ x$PLATFORM == x$YH_KYLIN ]] && netsnmp_so_loc=/usr/lib
+
+    [ -z $netsnmp_so_loc ] && exit 1
 
     netsnmp_so="libnetsnmp.so libnetsnmpagent.so"
     for so in ${netsnmp_so}; do
@@ -80,7 +79,7 @@ function prepare_snmp()
 
 function prepare_compile_env()
 {
-    if [ x$PLATFORM == x$DEEPIN ]; then
+    if [[ x$PLATFORM == x$DEEPIN ]]; then
         [ ! -f /usr/bin/sw_64sw6-sunway-linux-gnu-gcc ] && ln -s /usr/bin/gcc /usr/bin/sw_64sw6-sunway-linux-gnu-gcc
         [ ! -f /usr/bin/sw_64sw6-sunway-linux-gnu-ld ] && ln -s /usr/bin/ld /usr/bin/sw_64sw6-sunway-linux-gnu-ld
         [ ! -f /usr/bin/sw_64sw6-sunway-linux-gnu-ar ]&& ln -s /usr/bin/ar /usr/bin/sw_64sw6-sunway-linux-gnu-ar
@@ -100,7 +99,7 @@ function prepare_compile_env()
 
 function pre_build()
 {
-    choose_platform
+    choose_platform_and_kernel
     prepare_cm
     prepare_snmp
     prepare_compile_env
@@ -109,7 +108,7 @@ function pre_build()
 function build()
 {
     ./autogen.sh
-    if [ x$UNAME_M = xx86_64 ]; then
+    if [[ x$PLATFORM == x$CENTOS_PLATFORM_V3 ]] || [[ x$PLATFORM == x$CENTOS_PLATFORM_V4 ]]; then 
         ./configure --with-spl=$1
     else
         ./configure --with-spl=$1 --prefix=/usr --sbindir=/sbin
