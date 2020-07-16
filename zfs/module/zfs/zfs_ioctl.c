@@ -5387,11 +5387,11 @@ static int
 zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 {
 	uint64_t bs, cnt;
-	boolean_t need_reply;
+	boolean_t need_reply = B_TRUE;
 	void *buf;
 	uint64_t *index;
 	uint64_t i;
-	int ret = 0;
+	int ret = 0, nthread = 1;
 	zfs_mirror_speed_test_t *arg[128];
 	
 	/* block size */
@@ -5399,7 +5399,7 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 	/* block cnt */
 	cnt = zc->zc_cookie;
 	/* send thread num, max 128 */
-	need_reply = zc->zc_simple;
+	nthread = zc->zc_simple;
 
 	if (bs > 1048576) {
 		printk("%s: bs too big\n", __func__);
@@ -5409,7 +5409,7 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 //	cluster_san_hb_stop();
 	zfs_mirror_stop_watchdog_thread();
 
-	for (i = 0; i < need_reply; i++) {
+	for (i = 0; i < nthread; i++) {
 		arg[i] = kmem_zalloc(sizeof(zfs_mirror_speed_test_t), KM_SLEEP);
 		arg[i]->block = bs;
 		arg[i]->cnt = cnt;
@@ -5421,7 +5421,7 @@ zfs_ioc_mirror_speed_test(zfs_cmd_t *zc)
 			"zfs_mirror_speed_send_thread_%d", i);
 	}
 
-	for (i = 0; i < need_reply; i++) {
+	for (i = 0; i < nthread; i++) {
 		mutex_enter(&arg[i]->mtx);
 		while (arg[i]->is_running)
 			cv_wait(&arg[i]->cv, &arg[i]->mtx);
