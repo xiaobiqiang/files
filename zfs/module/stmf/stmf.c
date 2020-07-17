@@ -2180,7 +2180,8 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 {
 	stmf_i_lu_t *ilu;
 	stmf_i_scsi_task_t *itask;
-
+    uint32_t new, old;
+    
 	mutex_enter(&stmf_state.stmf_lock);
 	for (ilu = stmf_state.stmf_ilulist; ilu != NULL; ilu = ilu->ilu_next) {
 		if (bcmp(lu_id, ilu->ilu_lu->lu_id->ident, 16) == 0) {
@@ -2204,19 +2205,11 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 			continue;
 		}
 		if (itask->itask_proxy_msg_id == task_msgid) {
-			/* remove itask form list */
-			/*
-			if (itask->itask_lu_next)
-				itask->itask_lu_next->itask_lu_prev =
-				    itask->itask_lu_prev;
-			if (itask->itask_lu_prev)
-				itask->itask_lu_prev->itask_lu_next =
-				    itask->itask_lu_next;
-			else
-				ilu->ilu_tasks = itask->itask_lu_next;
-			
-			ilu->ilu_ntasks--;
-			*/	
+            do {
+		        new = old = itask->itask_flags;
+			    new |= ITASK_BEING_PPPT;
+	        } while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+            
 			break;
 		}
 	}

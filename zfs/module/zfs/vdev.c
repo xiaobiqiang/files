@@ -3537,15 +3537,17 @@ vdev_deadman(vdev_t *vd)
 			 * the spa_deadman_synctime we log a zevent.
 			 */
 			fio = avl_first(&vq->vq_active_tree);
-			delta = gethrtime() - fio->io_timestamp;
-			if (delta > spa_deadman_synctime(spa)) {
-				zfs_dbgmsg("SLOW IO: zio timestamp %lluns, "
-				    "delta %lluns, last io %lluns",
-				    fio->io_timestamp, delta,
-				    vq->vq_io_complete_ts);
-				zfs_ereport_post(FM_EREPORT_ZFS_DELAY,
-				    spa, vd, fio, 0, 0);
-			}
+            if (fio!=NULL) {
+    			delta = gethrtime() - fio->io_timestamp;
+    			if (delta > spa_deadman_synctime(spa)) {
+    				zfs_dbgmsg("SLOW IO: zio timestamp %lluns, "
+    				    "delta %lluns, last io %lluns",
+    				    fio->io_timestamp, delta,
+    				    vq->vq_io_complete_ts);
+    				zfs_ereport_post(FM_EREPORT_ZFS_DELAY,
+    				    spa, vd, fio, 0, 0);
+    			}
+            }
 		}
 		mutex_exit(&vq->vq_lock);
 	}
