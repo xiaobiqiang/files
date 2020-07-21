@@ -471,15 +471,20 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 		return (SET_ERROR(-PTR_ERR(bdev)));
 	}
 	
-	vd->vd_phys = bdev;
-	if ((rval = __Mlsas_Virt_export_zfs_attach(v->vdev_path, 
-			bdev, &vd->vd_bdev)) != 0) {
-		vd->vd_bdev = bdev;
-		vd->vd_phys = NULL;
-		cmn_err(CE_NOTE, "SPA(%s) attach Virt(%s) FAIL, ERROR(%d), "
-			"Use physical Disk instead",
-			spa_name(v->vdev_spa), v->vdev_path, rval);
-	}
+#if (ZFS_PLATFORM == CENTOS_OLD)
+        vd->vd_bdev = bdev;
+	vd->vd_phys = NULL;
+#else
+        vd->vd_phys = bdev;
+        if ((rval = __Mlsas_Virt_export_zfs_attach(v->vdev_path,
+                        bdev, &vd->vd_bdev)) != 0) {
+                vd->vd_bdev = bdev;
+                vd->vd_phys = NULL;
+                cmn_err(CE_NOTE, "SPA(%s) attach Virt(%s) FAIL, ERROR(%d), "
+                        "Use physical Disk instead",
+                        spa_name(v->vdev_spa), v->vdev_path, rval);
+        }
+#endif
 
 	v->vdev_tsd = vd;
 
@@ -526,20 +531,27 @@ vdev_disk_close(vdev_t *v)
 	if (v->vdev_reopening || vd == NULL)
 		return;
 
-	phys = vd->vd_phys;
-	virt = vd->vd_bdev;
+#if (ZFS_PLATFORM == CENTOS_OLD)
+        if (vd->vd_bdev != NULL)
+                vdev_bdev_close(vd->vd_bdev,
+                    vdev_bdev_mode(spa_mode(v->vdev_spa)));
+#else
+        phys = vd->vd_phys;
+        virt = vd->vd_bdev;
+                
+        if (phys == NULL) {
+                phys = virt;
+                virt = NULL;
+        }
+        
+        VERIFY(phys || virt);
+        
+        if (phys)
+                vdev_bdev_close(phys, vdev_bdev_mode(spa_mode(v->vdev_spa)));
+        if (virt)
+                __Mlsas_Virt_export_zfs_detach(v->vdev_path, virt);
 
-	if (phys == NULL) {
-		phys = virt;
-		virt = NULL;
-	}
-
-	VERIFY(phys || virt);
-
-	if (phys)
-		vdev_bdev_close(phys, vdev_bdev_mode(spa_mode(v->vdev_spa)));
-	if (virt)
-		__Mlsas_Virt_export_zfs_detach(v->vdev_path, virt);
+#endif
 	
 	kmem_free(vd, sizeof (vdev_disk_t));
 	v->vdev_tsd = NULL;
@@ -998,6 +1010,7 @@ vdev_ops_t vdev_disk_ops = {
 	B_TRUE			/* leaf vdev */
 };
 
+#if (ZFS_PLATFORM != CENTOS_OLD)
 void mlsas_link_evt_cb(const char *dev_path, uint32_t evt, void *param)
 {
     char *wwn_key = "scsi-3";
@@ -1033,7 +1046,7 @@ void mlsas_link_evt_cb(const char *dev_path, uint32_t evt, void *param)
         spa_async_request(vd->vdev_spa, SPA_ASYNC_REMOVE);
     }
 }
-
+#endif
 
 #include <linux/notifier.h>
 
