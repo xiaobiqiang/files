@@ -719,8 +719,13 @@ static int cluster_target_mac_tran_data_fragment_bio(
 	cluster_target_msg_header_t *ct_head;
 	struct page *page = NULL;
 	struct bio *bio;
+#if (ZFS_PLATFORM == CENTOS_OLD)
+	struct bio_vec *bvec, *bv;
+	int  iter;
+#else
 	struct bio_vec bvec, *bv;
 	struct bvec_iter iter;
+#endif
 	size_t head_len = sizeof(struct ether_header) +
 		sizeof(cluster_target_msg_header_t);
 	cluster_target_mac_tran_data_t *mac_tran_data;
@@ -790,9 +795,14 @@ static int cluster_target_mac_tran_data_fragment_bio(
 			head_mp->is_first = is_first;
 			head_mp->dst = dst;
 			head_mp->fragment_offset = fragment_offset;
-			fragment_len = min((size_t)bvec.bv_len, remain);
+#if (ZFS_PLATFORM == CENTOS_OLD)
+			fragment_len = min((size_t)bvec->bv_len, remain);
+			*(bv + do_fragment_cnt) = *bvec;
+#else
+                        fragment_len = min((size_t)bvec.bv_len, remain);
+                        *(bv + do_fragment_cnt) = bvec;
+#endif
 			head_mp->fragment_len = fragment_len;
-			*(bv + do_fragment_cnt) = bvec;
 			head_mp->fragment_data = bv + do_fragment_cnt;
 			mac_tran_data->len = head_len + ex_len + fragment_len;		
 			data_array[do_fragment_cnt].fragmentation = mac_tran_data;
