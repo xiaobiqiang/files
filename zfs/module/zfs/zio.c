@@ -1718,8 +1718,6 @@ zio_suspend(spa_t *spa, zio_t *zio)
 		    ZIO_FLAG_GODFATHER);
 
 	spa->spa_suspended = B_TRUE;
-	cmn_err(CE_WARN, "%s pool(%s) suspend, io_err=%d io_flags=0x%x", __func__, 
-		spa->spa_name, zio->io_error, zio->io_flags);
 
 	if (zio != NULL) {
 		ASSERT(!(zio->io_flags & ZIO_FLAG_GODFATHER));
@@ -1728,8 +1726,12 @@ zio_suspend(spa_t *spa, zio_t *zio)
 		ASSERT(zio_unique_parent(zio) == NULL);
 		ASSERT(zio->io_stage == ZIO_STAGE_DONE);
 		zio_add_child(spa->spa_suspend_zio_root, zio);
+		cmn_err(CE_WARN, "%s pool(%s) suspend, io_err=%d io_flags=0x%x", __func__, 
+			spa->spa_name, zio->io_error, zio->io_flags);
 		zfs_dbgmsg("zio %p error %d flags %x",
 			zio, zio->io_error, zio->io_flags);
+	} else {
+		cmn_err(CE_WARN, "%s pool(%s) suspend", __func__, spa->spa_name);
 	}
 
 	mutex_exit(&spa->spa_suspend_lock);
