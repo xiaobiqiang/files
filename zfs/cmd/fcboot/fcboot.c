@@ -49,14 +49,6 @@
 
 static char *fc_drv = NULL;
 
-static os_fc_map_t os_fc_map[] = {
-	{"NeoKylin", 				FC_DRV_SW},
-	{"CentOS Linux", 			FC_DRV_X86},
-	{"deepin GNU/Linux 15.0", 	FC_DRV_SW},
-	{"Kylin 4.0.2",				FC_DRV_SW},
-	{NULL, NULL}
-};
-
 static void init_drv(char **name_ptr);
 static void loop_load_drv(char *drv);
 	
