@@ -6590,7 +6590,7 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 	for (itask = ilu->ilu_tasks; itask != NULL;
 	    itask = itask->itask_lu_next) {
 		if (itask->itask_flags & (ITASK_IN_FREE_LIST |
-		    ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS )) {
+		    ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT )) {
 			continue;
 		}
 		task = itask->itask_task;
@@ -6598,9 +6598,7 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			to = stmf_default_task_timeout;
 		else
 			to = task->task_timeout;
-
-        if(itask->itask_flags & ITASK_BEING_PPPT)
-            to*=10;
+      
 		if ((itask->itask_start_time + (to * ps)) > l) {
 			continue;
         }
@@ -7667,7 +7665,6 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s, uint32_t abort_typ
 		mutex_exit(&w->worker_lock);
 		return;
 	}
-
 
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 	do {

@@ -439,6 +439,8 @@ pppt_msg_data_xfer_done(stmf_ic_msg_t *msg)
 	pppt_task_t				*pppt_task;
 	stmf_ic_scsi_data_xfer_done_msg_t	*data_xfer_done;
 	scsi_task_t *task;
+    stmf_i_scsi_task_t *itask;
+    uint32_t new, old;
 
 	data_xfer_done = msg->icm_msg;
 
@@ -454,6 +456,13 @@ pppt_msg_data_xfer_done(stmf_ic_msg_t *msg)
 			pppt_task->pt_task_proxy_seq_no = data_xfer_done->icsx_proxy_seq_no;
 			pppt_xfer_read_complete(pppt_task, data_xfer_done->icsx_status);
 		}
+        
+        itask = task->task_stmf_private;
+        do {
+	        new = old = itask->itask_flags;
+		    new &= ~ITASK_BEING_PPPT;
+        } while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+        
 	}
 	stmf_ic_msg_free(msg);
 }
@@ -466,7 +475,9 @@ pppt_msg_data_res(stmf_ic_msg_t *msg)
 	pppt_buf_t *pbuf;
 	stmf_data_buf_t *dbuf;
 	scsi_task_t *task;
-
+    stmf_i_scsi_task_t *itask;
+    uint32_t new, old;
+    
 	data_res = msg->icm_msg;
 
 	/* task = find_task_from_msgid(msg->icsq_lun_id, msg->icsq_task_msgid); */
@@ -508,6 +519,14 @@ pppt_msg_data_res(stmf_ic_msg_t *msg)
 
 	stmf_data_xfer_done(ptask->pt_stmf_task, dbuf, 0);
 out:
+    if (task){
+        itask = task->task_stmf_private;
+        do {
+	        new = old = itask->itask_flags;
+		    new &= ~ITASK_BEING_PPPT;
+        } while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+    }
+    
 	stmf_ic_msg_free(msg);
 }
 
