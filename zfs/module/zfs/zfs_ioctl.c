@@ -205,9 +205,13 @@
 
 #include <sys/mltsas/mlt_sas.h>
 #include <linux/notifier.h>
+
+#if (ZFS_PLATFORM != CENTOS_OLD)
 extern struct atomic_notifier_head mpt3sas_notifier_list;
 extern struct notifier_block vdev_disk_notifier;
+
 extern void mlsas_link_evt_cb(const char *dev_path, uint32_t evt, void *param);
+#endif
 
 kmutex_t zfsdev_state_lock;
 zfsdev_state_t *zfsdev_state_list;
@@ -7338,11 +7342,12 @@ _init(void)
 	tsd_create(&zfs_allow_log_key, zfs_allow_log_destroy);
 	cluster_proto_register();
 
+#if (ZFS_PLATFORM != CENTOS_OLD) 
     zfs_ev_notify_chain_register(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier); 
 
-    
     __Mlsas_Export_register_link_event("vdev_disk_fm", mlsas_link_evt_cb, NULL);
+#endif
 
 	printk(KERN_NOTICE "ZFS: Loaded module v%s-%s%s, "
 	    "ZFS pool version %s, ZFS filesystem version %s\n",
@@ -7378,10 +7383,12 @@ _fini(void)
 	zvol_fini();
 	cluster_proto_unregister();
 
+#if (ZFS_PLATFORM != CENTOS_OLD)
     zfs_ev_notify_chain_unregister(&mpt3sas_notifier_list,
 				       &vdev_disk_notifier); 
 
     __Mlsas_Export_deregister_link_event("vdev_disk_fm");
+#endif
 
 	tsd_destroy(&zfs_fsyncer_key);
 	tsd_destroy(&rrw_tsd_key);

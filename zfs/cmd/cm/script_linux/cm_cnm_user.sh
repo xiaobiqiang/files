@@ -11,7 +11,7 @@ function cm_cnm_user_update_smbpasswd()
     local pwd=$2
 
 /usr/bin/expect<<-EOF
-spawn smbpasswd $user
+spawn smbpasswd -a $user
 expect "*password:"
 send "$pwd\r"
 expect "*password:"
