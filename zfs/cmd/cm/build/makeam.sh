@@ -179,6 +179,7 @@ function make_am_base()
 		fi
 	done
 	cd $BUILD_DIR
+	echo "libcmbase_la_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=\$(prefix)/lib" >>  $am
 }
 
 function make_am_cli()

@@ -353,7 +353,7 @@ sint32 cm_cnm_nas_local_get(
 static sint32 cm_cnm_nas_local_get_each(void *arg, sint8 **cols, uint32 col_num)
 {
     cm_cnm_nas_info_t *info = arg;
-    const uint32 def_num=11;
+    const uint32 def_num=13;
     
     if(def_num != col_num)
     {
@@ -390,9 +390,9 @@ bandwidth,nasavsbw */
 
     info->aclinherit = (uint8)cm_cnm_get_enum(&CmOmiMapAclInheritType,cols[9],0);
 
-    CM_VSPRINTF(info->qos_avs,sizeof(info->qos_avs),"%s",cols[10]);
-    //CM_VSPRINTF(info->qos_val,sizeof(info->qos_val),"%s",cols[11]);
-    //info->access = (uint16)atoi(cols[12]);
+    CM_VSPRINTF(info->qos_avs,sizeof(info->qos_avs),"%s",cols[11]);
+    CM_VSPRINTF(info->qos_val,sizeof(info->qos_val),"%s",cols[10]);
+    info->access = (uint16)atoi(cols[12]);
     return CM_OK;
 }
 

@@ -2381,10 +2381,27 @@ static void* cm_cnm_lunmap_thread(void* arg)
         }
         cm_cnm_lunmap_update_each(cols[0],cols[1],handle);
     }
-    cm_system("rm -f %s",tmpfile);
+    //cm_system("rm -f %s",tmpfile);
     isrun = CM_FALSE;
     return NULL;
 }
+sint32 cm_cnm_lunmap_update_pre(void* arg)
+{
+    sint32 iRet = CM_OK;
+    uint32 time_wait = 60;
+    uint32 cut = 0;
+    while(1)
+    {
+        sleep(1);
+        cut++;
+        if(cut >= time_wait)
+        {
+            cm_cnm_lunmap_thread((void*)g_cm_lunmap_handle);
+            break;
+        }
+    }
+    return CM_OK;
+}    
 
 sint32 cm_cnm_lunmap_init(void)
 {
@@ -2396,7 +2413,7 @@ sint32 cm_cnm_lunmap_init(void)
             "tg VARCHAR(255),"
             "lunid INT)";
 
-    (void)cm_system("rm -f "CM_CNM_LUNMAP_DB_FILE" 2>/dev/null");
+    //(void)cm_system("rm -f "CM_CNM_LUNMAP_DB_FILE" 2>/dev/null");
     iRet = cm_db_open_ext(CM_CNM_LUNMAP_DB_FILE,&g_cm_lunmap_handle);
     if(CM_OK != iRet)
     {
@@ -2409,7 +2426,7 @@ sint32 cm_cnm_lunmap_init(void)
         CM_LOG_ERR(CM_MOD_CNM,"create table fail[%d]",iRet);
         return iRet;
     }
-    iRet = CM_THREAD_CREATE(&handle,cm_cnm_lunmap_thread,g_cm_lunmap_handle);
+    iRet = CM_THREAD_CREATE(&handle,cm_cnm_lunmap_update_pre,g_cm_lunmap_handle);
     if(CM_OK != iRet)
     {
         CM_LOG_ERR(CM_MOD_CNM,"create thread fail[%d]",iRet);
@@ -2575,7 +2592,7 @@ sint32 cm_cnm_lunmap_create(
     {
         tg = info->tg;
     }
-
+    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     CM_CNM_CHECK_ALL_NODE_ONLINE();
     
     iRet = cm_cnm_lun_local_get_stmfid(info->lun,NULL,stmfid,sizeof(stmfid));
@@ -2627,7 +2644,7 @@ void cm_cnm_lunmap_update_period(void)
         return;
     }
 #endif    
-    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
+    //(void)cm_cnm_lunmap_update(NULL,NULL,NULL);
 }
 
 sint32 cm_cnm_lunmap_count(
@@ -2683,7 +2700,7 @@ sint32 cm_cnm_lunmap_delete(
     {
         tg = info->tg;
     }
-
+    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     CM_CNM_CHECK_ALL_NODE_ONLINE();
     
     iRet = cm_cnm_lun_local_get_stmfid(info->lun,NULL,stmfid,sizeof(stmfid));
