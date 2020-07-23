@@ -1587,7 +1587,7 @@ function cm_cnm_nas_getbatch_def()
         if [ "X$laccess" == "X" ]; then
             laccess=755
         fi
-        echo "$line $laccess"
+        echo "$line none 0 $laccess"
     done
     return 0
 }

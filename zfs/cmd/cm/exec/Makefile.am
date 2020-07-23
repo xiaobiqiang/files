@@ -31,5 +31,5 @@ EXTRA_DIST = \
 	./config/cm_cfg_global.h 
 ceres_exec_LDADD = \
 	$(top)/base/libcmbase.la
-ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -lcmopensrc -Wl,-rpath=$(prefix)/lib
+ceres_exec_CFLAGS = -std=gnu99 -lpthread -ldl -L../opensrc -lcmopensrc -Wl,-rpath=$(prefix)/lib
 
