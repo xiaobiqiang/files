@@ -2180,7 +2180,6 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 {
 	stmf_i_lu_t *ilu;
 	stmf_i_scsi_task_t *itask;
-    uint32_t new, old;
     
 	mutex_enter(&stmf_state.stmf_lock);
 	for (ilu = stmf_state.stmf_ilulist; ilu != NULL; ilu = ilu->ilu_next) {
@@ -2205,11 +2204,6 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 			continue;
 		}
 		if (itask->itask_proxy_msg_id == task_msgid) {
-            do {
-		        new = old = itask->itask_flags;
-			    new |= ITASK_BEING_PPPT;
-	        } while (atomic_cas_32(&itask->itask_flags, old, new) != old);
-            
 			break;
 		}
 	}
@@ -7669,12 +7663,11 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s, uint32_t abort_typ
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 	do {
 		old = new = itask->itask_flags;
-		if ((old & ITASK_BEING_PPPT) || ((s!=STMF_TIMEOUT) && 
-		    ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS)) ||
-		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0)))) {
-		    mutex_exit(&w->worker_lock);
-			return;
-		}
+                if ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
+                    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0)) {
+                    mutex_exit(&w->worker_lock);
+                    return;
+                }
 		new |= ITASK_BEING_ABORTED;
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 
