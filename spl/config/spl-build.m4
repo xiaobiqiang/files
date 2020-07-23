@@ -1613,10 +1613,10 @@ AC_DEFUN([SPL_AC_PLATFORM], [
 	uname_r=$(uname -r)
 
 	if test "x$uname_m" = xx86_64; then
-		temp=$(echo $uname_r | grep 3.10.0-514)
+		temp=$(echo $uname_r | grep 3.10.0)
 		if test "x$temp" != x; then
 			use_platform=0
-			current_platform="centos-3.10.0-514"
+			current_platform="centos-3.10.0"
 		else
 			use_platform=1
 			current_platform="centos-4.4.15"
