@@ -361,10 +361,10 @@ AC_DEFUN([ZFS_AC_PLATFORM], [
 	work_space=$(pwd)
 
         if test "x$uname_m" = xx86_64; then
-                temp=$(echo $uname_r | grep 3.10.0-514)
+                temp=$(echo $uname_r | grep 3.10.0)
                 if test "x$temp" != x; then
                         use_platform=0
-                        current_platform="centos-3.10.0-514"
+                        current_platform="centos-3.10.0"
 			cp "$work_space/module/Makefile_1.in" "$work_space/module/Makefile.in"
                 else
                         use_platform=1
