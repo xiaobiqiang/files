@@ -1248,6 +1248,11 @@ void topo_fru_alarm_xml_init()
 	(void) pthread_mutex_init(&g_topo_fru_xml_lock, NULL);
 }
 
+void topo_fru_alarm_xml_fini()
+{
+	(void) pthread_mutex_destroy(&g_topo_fru_xml_lock);
+}
+
 static topo_xml_hd_t topo_fru_open_xml()
 {
 	xmlNodePtr rootNode;
@@ -1268,10 +1273,6 @@ static topo_xml_hd_t topo_fru_open_xml()
 
 static void topo_fru_close_xml()
 {
-	xmlChar *xmlbuff;
-	int buffersize;
-	xmlDocDumpFormatMemory(topo_xml_doc, &xmlbuff, &buffersize, 1);
-
 	xmlSaveFormatFileEnc(TOPO_FRU_XML_PATH, topo_xml_doc, "UTF-8", 1);
 	xmlFreeDoc(topo_xml_doc);
 	xmlCleanupParser();
@@ -1360,19 +1361,36 @@ static void topo_fru_set_tocm_xml(xmlNodePtr xmlNode){
 	return;
 }
 
+static int same_node(xmlChar * content,const char *name,int flag){
+	if(flag & ISCLEAR){
+		return(!xmlStrncmp(content,BAD_CAST(name),strlen(name)));
+	}
+	else{
+		return(!strcmp((const char*) content,name));
+	}
+}
+
 static int topo_fru_search_fault_xml(
 	topo_xml_hd_t xml_hd,const char *name,xml_nodes_t * xml_nodesp,int flag){
 	int ret = TOPO_NODE_NON_EXIST;
 	int cnt = 0;
 	int tocm = TOPO_XML_SUCCESS;
-	xmlChar * content ;
-	xmlChar * status;
+	xmlChar * content = NULL;
+	xmlChar * status = NULL;
 	xmlNodePtr curNode = (xmlNodePtr)xml_hd->xmlChildrenNode;
 	
 	while(curNode){
 		content = xmlNodeGetContent(curNode);
-		if(!xmlStrncmp(content,BAD_CAST(name),strlen(name))){
+		if(content == NULL){
+			continue;
+		}
+		if(same_node(content,name,flag)){
 			status = xmlGetProp(curNode,BAD_CAST("status"));
+			if(status == NULL){
+				xmlFree(content);
+				content = NULL;
+				continue;
+			}
 			if(xmlStrEqual(status,BAD_CAST(NON_ALARMED))){
 				ret = TOPO_NODE_EXIST;
 				if(flag & TISSET)
@@ -1392,7 +1410,21 @@ static int topo_fru_search_fault_xml(
 				xmlSetProp(curNode,BAD_CAST("status"),BAD_CAST(NON_ALARMED));
 			}
 		}
+		xmlFree(content);
+		content = NULL;
+		xmlFree(status);
+		status = NULL;
 		curNode = curNode->next;
+	}
+
+	if(content){
+		xmlFree(content);
+		content = NULL;
+	}
+
+	if(status){
+		xmlFree(status);
+		status = NULL;
 	}
 	return (ret);
 }

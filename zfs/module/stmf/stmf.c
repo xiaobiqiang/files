@@ -2180,7 +2180,7 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 {
 	stmf_i_lu_t *ilu;
 	stmf_i_scsi_task_t *itask;
-
+    
 	mutex_enter(&stmf_state.stmf_lock);
 	for (ilu = stmf_state.stmf_ilulist; ilu != NULL; ilu = ilu->ilu_next) {
 		if (bcmp(lu_id, ilu->ilu_lu->lu_id->ident, 16) == 0) {
@@ -2204,19 +2204,6 @@ stmf_find_and_hold_task(uint8_t *lu_id, uint64_t task_msgid)
 			continue;
 		}
 		if (itask->itask_proxy_msg_id == task_msgid) {
-			/* remove itask form list */
-			/*
-			if (itask->itask_lu_next)
-				itask->itask_lu_next->itask_lu_prev =
-				    itask->itask_lu_prev;
-			if (itask->itask_lu_prev)
-				itask->itask_lu_prev->itask_lu_next =
-				    itask->itask_lu_next;
-			else
-				ilu->ilu_tasks = itask->itask_lu_next;
-			
-			ilu->ilu_ntasks--;
-			*/	
 			break;
 		}
 	}
@@ -2502,8 +2489,13 @@ stmf_ic_rx_scsi_status(stmf_ic_scsi_status_msg_t *msg)
 	stmf_queue_sendstatus_to_task( task);
 	return (STMF_SUCCESS);
 out:
-	if (itask != NULL)
-	 	itask->itask_flags &= ~ITASK_BEING_PPPT;
+	if (itask != NULL) {
+	 	uint32_t old, new;
+		do {
+			old = new = itask->itask_flags;
+			new &= ~ITASK_BEING_PPPT;
+		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	}
 	return (STMF_SUCCESS);
 }
 
@@ -2637,8 +2629,14 @@ stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg, void *sess)
 	(void) stmf_xfer_data(task, dbuf, 0);
 
 out:
-	if(itask != NULL)
-	 	itask->itask_flags &= ~ITASK_BEING_PPPT;
+	if(itask != NULL) {
+		uint32_t old, new;
+		do {
+			old = new = itask->itask_flags;
+			new &= ~ITASK_BEING_PPPT;
+		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	}
+	
 	return (ret);
 
 }
@@ -2702,8 +2700,13 @@ stmf_ic_rx_scsi_data_req(stmf_ic_scsi_data_req_msg_t *msg)
 	}
 	lu->lu_dbuf_xfer(task, msg->icsq_offset, msg->icsq_len);
 out:	
-	if(itask != NULL)
-	 	itask->itask_flags &= ~ITASK_BEING_PPPT;
+	if(itask != NULL) {
+	 	uint32_t old, new;
+		do {
+			old = new = itask->itask_flags;
+			new &= ~ITASK_BEING_PPPT;
+		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	}
 	return (ret);
 }
 
@@ -6581,7 +6584,7 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 	for (itask = ilu->ilu_tasks; itask != NULL;
 	    itask = itask->itask_lu_next) {
 		if (itask->itask_flags & (ITASK_IN_FREE_LIST |
-		    ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS)) {
+		    ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT )) {
 			continue;
 		}
 		task = itask->itask_task;
@@ -6589,6 +6592,7 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			to = stmf_default_task_timeout;
 		else
 			to = task->task_timeout;
+      
 		if ((itask->itask_start_time + (to * ps)) > l) {
 			continue;
         }
@@ -7409,11 +7413,8 @@ void stmf_queue_sendstatus_to_task(scsi_task_t *task){
 	mutex_enter(&w->worker_lock);
 	do {
 		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
-			itask->itask_flags &= ~ITASK_BEING_PPPT;
-			mutex_exit(&w->worker_lock);
-			return;
-		}
+		if (old & ITASK_BEING_ABORTED)
+			goto out;
 				
 		if (old & ITASK_IN_WORKER_QUEUE) {
 			queue_it = 0;
@@ -7448,7 +7449,12 @@ void stmf_queue_sendstatus_to_task(scsi_task_t *task){
 		}
 		
 	}
-	itask->itask_flags &= ~ITASK_BEING_PPPT;
+
+out:
+	do {
+		old = new = itask->itask_flags;
+		new &= ~ITASK_BEING_PPPT;
+	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 	mutex_exit(&w->worker_lock);
 	
 }
@@ -7654,16 +7660,14 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s, uint32_t abort_typ
 		return;
 	}
 
-
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 	do {
 		old = new = itask->itask_flags;
-		if ( (s!=STMF_TIMEOUT) && 
-		    ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
-		    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0))) {
-		    mutex_exit(&w->worker_lock);
-			return;
-		}
+                if ((old & (ITASK_BEING_ABORTED | ITASK_CHECKER_PROCESS | ITASK_BEING_PPPT)) ||
+                    ((old & (ITASK_KNOWN_TO_TGT_PORT | ITASK_KNOWN_TO_LU)) == 0)) {
+                    mutex_exit(&w->worker_lock);
+                    return;
+                }
 		new |= ITASK_BEING_ABORTED;
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 

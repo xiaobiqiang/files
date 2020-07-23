@@ -466,7 +466,7 @@ pppt_msg_data_res(stmf_ic_msg_t *msg)
 	pppt_buf_t *pbuf;
 	stmf_data_buf_t *dbuf;
 	scsi_task_t *task;
-
+    
 	data_res = msg->icm_msg;
 
 	/* task = find_task_from_msgid(msg->icsq_lun_id, msg->icsq_task_msgid); */
