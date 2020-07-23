@@ -1107,6 +1107,15 @@ dbuf_free_range(dnode_t *dn, uint64_t start_blkid, uint64_t end_blkid,
 		}
 		ASSERT3U(db->db_blkid, >=, start_blkid);
 
+#ifdef _KERNEL
+		mutex_enter(&db->db_seg_mtx);
+		if (db->db_has_segments) {
+			if(dbuf_handle_segs(db, B_FALSE, 0))
+				continue;
+		} else {
+			mutex_exit(&db->db_seg_mtx);
+		}
+#endif
 		/* found a level 0 buffer in the range */
 		mutex_enter(&db->db_mtx);
 		if (dbuf_undirty(db, tx)) {
@@ -1127,19 +1136,7 @@ dbuf_free_range(dnode_t *dn, uint64_t start_blkid, uint64_t end_blkid,
 			mutex_exit(&db->db_mtx);
 			continue;
 		}
-#ifdef _KERNEL
-		mutex_exit(&db->db_mtx);
 		
-		mutex_enter(&db->db_seg_mtx);
-		if (db->db_has_segments) {
-			if(dbuf_handle_segs(db, B_FALSE, 0))
-				continue;
-		} else {
-			mutex_exit(&db->db_seg_mtx);
-		}
-		
-		mutex_enter(&db->db_mtx);
-#endif
 		if (refcount_count(&db->db_holds) == 0) {
 			ASSERT(db->db_buf);
 			dbuf_clear(db);
