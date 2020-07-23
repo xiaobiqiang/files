@@ -2411,13 +2411,16 @@ static void cts_fragments_free(cts_fragments_t *ctsfs)
 static boolean_t cts_fragments_entired(
 	cts_fragments_t *ctsfs, cts_fragment_data_t *fragment, boolean_t *is_corrupt)
 {
+	uint64_t ctsfs_rxlen = 0;
 	cs_rx_data_t *cs_data = ctsfs->cs_data;
+	
 	cts_fragment_insert_by_sort(ctsfs, fragment);
-	if (ctsfs->rx_len == cs_data->data_len) {
+	ctsfs_rxlen = atomic_add_64_nv(&ctsfs->rx_len, 0);
+	if (ctsfs_rxlen == cs_data->data_len) {
 		*is_corrupt = B_FALSE;
 		return (B_TRUE);
 	}
-	if (ctsfs->rx_len > cs_data->data_len) {
+	if (ctsfs_rxlen > cs_data->data_len) {
 		cmn_err(CE_WARN, "%s: the data rx failed(msg_type:0x%x, data_index:%"
 			PRId64", data_len:0x%"PRIx64", rx_len:0x%"PRIx64")",
 			__func__, ctsfs->cs_data->msg_type, ctsfs->cs_data->data_index,
