@@ -418,6 +418,7 @@ pppt_msg_scsi_cmd(stmf_ic_msg_t *msg)
 		pbuf->pbuf_is_immed = B_TRUE;
 		pbuf->pbuf_immed_msg = msg;
 		pbuf->pbuf_stmf_buf->db_data_size = scmd->icsc_immed_data_len;
+		pbuf->pbuf_stmf_buf->db_buf_size = scmd->icsc_immed_data_len;
 		pbuf->pbuf_stmf_buf->db_relative_offset = scmd->icsc_db_relative_offset;
 		pbuf->pbuf_stmf_buf->db_sglist[0].seg_length =
 		    scmd->icsc_immed_data_len;
