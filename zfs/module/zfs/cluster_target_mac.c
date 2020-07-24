@@ -33,16 +33,9 @@
 #endif
 */
 
-#ifdef USE_HENGWEI
-#define	register_netdevice_notifier_rh	register_netdevice_notifier
-#define	unregister_netdevice_notifier_rh	unregister_netdevice_notifier
-#else
-/* support centos 7.2 */
-#ifndef	netdev_notifier_info_to_dev
-#define	netdev_notifier_info_to_dev(x)	x
-#define	register_netdevice_notifier_rh	register_netdevice_notifier
-#define	unregister_netdevice_notifier_rh	unregister_netdevice_notifier
-#endif
+#if (ZFS_PLATFORM != CENTOS_OLD)
+#define register_netdevice_notifier_rh  register_netdevice_notifier
+#define unregister_netdevice_notifier_rh        unregister_netdevice_notifier
 #endif
 
 #define	CLUSTER_MAC_TX_MAX_REPEAT_COUNT		3
@@ -88,17 +81,12 @@ unsigned int cluster_target_mac_nrxworker = 16;
 #ifndef SOLARIS
 #define	ETHERTYPE_CLUSTERSAN	(0x8908)	/* cluster san */
 
-#ifdef  SPEC_NET_IP_ALIGN
-        #define NET_IP_ALIGN_C  2
+#if (ZFS_PLATFORM == CENTOS_OLD || ZFS_PLATFORM == CENTOS)
+	#define NET_IP_ALIGN_C  2
 #else
-
-#ifdef USE_HENGWEI
-        #define NET_IP_ALIGN_C  0
-#else
-        #define NET_IP_ALIGN_C  2
+	#define NET_IP_ALIGN_C  0
 #endif
 
-#endif
 
 struct ether_header
 {
