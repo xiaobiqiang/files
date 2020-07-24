@@ -188,7 +188,7 @@ function install_drbd()
 
 function install_vmlinux1()
 {
-    if [ ! -f vmlinux1 ];
+    if [ ! -f vmlinux1 ]; then
         return
     fi
     cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
