@@ -1234,8 +1234,6 @@ static void topo_fru_node_list_free(xml_nodes_t * xml_nodesp){
 
 void topo_fru_alarm_xml_init()
 {
-	xmlChar *xmlbuff;
-	int buffersize;
 	if(!TOPO_FRU_XML_IS_EXIST){
 		xmlDocPtr doc = xmlNewDoc((xmlChar *)"1.0");
 		xmlNodePtr root_node = xmlNewNode(NULL, (xmlChar *)"root");
@@ -1325,8 +1323,11 @@ static int topo_fru_delete_node_xml(xmlNodePtr xmlNode)
 
 static int topo_fru_get_alarm_cnt(xmlNodePtr xmlNode){
 	xmlChar * cnt;
+	int icnt = 0;
 	cnt = xmlGetProp(xmlNode,BAD_CAST("cnt"));
-	return (int)atoi((char *)cnt);
+	icnt = (int)atoi((char *)cnt);
+	xmlFree(cnt);
+	return (icnt);
 }
 
 static int topo_fru_increase_alarm_cnt(xmlNodePtr xmlNode)
@@ -1346,14 +1347,17 @@ static int topo_fru_get_tocm_xml(xmlNodePtr xmlNode){
 	if(xmlStrEqual(tocm,BAD_CAST("no"))){
 		ret = TOPO_XML_FAULT;
 	}
-	
+	xmlFree(tocm);
 	return (ret);
 }
 
 static int topo_fru_get_alarmid_xml(xmlNodePtr xmlNode){
 	char * alarmidStr = NULL;
+	int ialarmidStr = 0;
 	alarmidStr = (char *)xmlGetProp(xmlNode,BAD_CAST("alarmid"));
-	return (int)atoi(alarmidStr);
+	ialarmidStr = (int)atoi(alarmidStr);
+	xmlFree(ialarmidStr);
+	return (ialarmidStr);
 }
 
 static void topo_fru_set_tocm_xml(xmlNodePtr xmlNode){
@@ -1462,6 +1466,7 @@ static void topo_fru_free_cm_alarm_node(xmlNodePtr xmlNode,const int alarmid,con
 			cm_alarm_cmd(cmd_buf,sizeof(cmd_buf),"recovery %d \"%s,%s\"", alarmid, hostname, (char *)name);
 			break;
 	}
+	xmlFree(name);
 	return;
 }
 
