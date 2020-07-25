@@ -1356,7 +1356,7 @@ static int topo_fru_get_alarmid_xml(xmlNodePtr xmlNode){
 	int ialarmidStr = 0;
 	alarmidStr = (char *)xmlGetProp(xmlNode,BAD_CAST("alarmid"));
 	ialarmidStr = (int)atoi(alarmidStr);
-	xmlFree(ialarmidStr);
+	xmlFree(alarmidStr);
 	return (ialarmidStr);
 }
 
