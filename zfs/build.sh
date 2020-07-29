@@ -13,7 +13,7 @@ CENTOS_PLATFORM_V4="centos-4"
 CENTOS="CentOS Linux"
 DEEPIN="deepin GNU/Linux"
 ZB_KYLIN="NeoKylin" 	#jz
-YH_KYLIN="kylin" 	#ft
+YH_KYLIN="Kylin" 		#ft
 PLATFORM=
 
 function choose_platform_and_kernel()
@@ -66,7 +66,7 @@ function prepare_snmp()
     [[ x$PLATFORM == x$CENTOS_PLATFORM_V4 ]] && netsnmp_so_loc=/usr/lib64
     [[ x$PLATFORM == x$DEEPIN ]] && netsnmp_so_loc=/usr/lib/sw_64-linux-gnu
     [[ x$PLATFORM == x$ZB_KYLIN ]] && netsnmp_so_loc=/usr/lib
-    [[ x$PLATFORM == x$YH_KYLIN ]] && netsnmp_so_loc=/usr/lib
+    [[ x$PLATFORM == x$YH_KYLIN ]] && netsnmp_so_loc=/usr/lib/aarch64-linux-gnu
 
     [ -z $netsnmp_so_loc ] && exit 1
 
