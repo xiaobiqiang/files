@@ -118,6 +118,14 @@ extern struct rw_semaphore spl_kmem_cache_sem;
 		#define	SPL_MAX_KMEM_CACHE_ORDER	10	
 	#elif PAGE_SIZE == 8192
 		#define	SPL_MAX_KMEM_CACHE_ORDER	9
+	#elif PAGE_SIZE == 16384
+		#define SPL_MAX_KMEM_CACHE_ORDER	8
+	#elif PAGE_SIZE == 32768
+		#define SPL_MAX_KMEM_CACHE_ORDER	7
+	#elif PAGE_SIZE == 65536
+		#define SPL_MAX_KMEM_CACHE_ORDER	6
+	#elif PAGE_SIZE == 131072
+		#define SPL_MAX_KMEM_CACHE_ORDER	5
 	#else
 		#error "SPL_MAX_KMEM_ORDER_NR_PAGES must be 2M "		/*with CLUSTERSAN_MAXBLOCKSIZE*/	
 	#endif
