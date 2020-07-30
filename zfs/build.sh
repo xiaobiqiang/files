@@ -118,9 +118,9 @@ function build()
 
 function post_build()
 {
-    if [ x$UNAME_M == xsw_64 ]; then
-        cp -f /lib/modules/$(uname -r)/extra/mpt3sas/mpt3sas.ko /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
-    fi
+	[[ x$PLATFORM == x$DEEPIN ]] 	&& cp -f /lib/modules/$UNAME_R/extra/mpt3sas/mpt3sas.ko /lib/modules/$UNAME_R/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+	[[ x$PLATFORM == x$ZB_KYLIN ]] 	&& cp -f /lib/modules/$UNAME_R/extra/mpt3sas/mpt3sas.ko /lib/modules/$UNAME_R/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+	[[ x$PLATFORM == x$YH_KYLIN ]] 	&& cp -f /lib/modules/$UNAME_R/extra/mpt3sas/mpt3sas.ko /lib/modules/$UNAME_R/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
 }
 
 pre_build
