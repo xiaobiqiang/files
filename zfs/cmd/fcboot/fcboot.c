@@ -13,9 +13,9 @@
 #define CMD_lmod			"/sbin/lsmod"
 #define CMD_emod(mod)		CMD_lmod" | cut -d ' ' -f 1 | grep -w %s | wc -l",	\
 							(mod)
-
-#define CMD_UNAME_M			"uname -m"
-#define CMD_UNAME_R			"uname -r"
+#define CMD_kernel_version	"uname -r | cut -d '-' -f 1 | cut -d '.' -f 1"
+#define KERNEL_RELEASE_V3	3
+#define KERNEL_RELEASE_V4	4
 
 #define FC_QLF				"qlf"
 #define FC_QLF_HENGWEI		"qlf_hengwei"
@@ -92,6 +92,22 @@ static int drv_exist(char *drv)
 	return atoi(echo);
 }
 
+static const char *kernel_version_to_fc_drv(int v)
+{
+	const char *drv = NULL;
+	
+	switch (v) {
+	case KERNEL_RELEASE_V3:
+		drv = strdup(FC_QLF);
+		break;
+	case KERNEL_RELEASE_V4:
+		drv = strdup(FC_QLF_HENGWEI);
+		break;
+	}
+
+	return drv;
+}
+
 int main(int argc, char **argv)
 {
 	init_drv(&fc_drv);
@@ -102,18 +118,15 @@ int main(int argc, char **argv)
 
 static void init_drv(char **name_ptr)
 {
-	char uname_m[64] = {0};
-	char uname_r[64] = {0};
+	char kernel_version_string[16] = {0};
+	int kernel_version = 0;
 	
-	exec_for_echo(uname_m, sizeof(uname_m), CMD_UNAME_M);
-	exec_for_echo(uname_r, sizeof(uname_r), CMD_UNAME_R);
+	exec_for_echo(kernel_version_string, 
+		sizeof(kernel_version_string), 
+		CMD_kernel_version);
+	kernel_version = atoi(kernel_version_string);
 
-	if (strncmp(uname_m, "x86_64", strlen(uname_m)) == 0 &&
-		!strstr(uname_r, "3.10.0")) {
-		*name_ptr = strdup(FC_QLF);
-	} else {
-		*name_ptr = strdup(FC_QLF_HENGWEI);
-	}
+	*name_ptr = kernel_version_to_fc_drv(kernel_version);
 }
 static void loop_load_drv(char *drv)
 {
