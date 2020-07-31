@@ -1289,6 +1289,10 @@ dmu_objset_evict(objset_t *os)
 	if (os->os_sa)
 		sa_tear_down(os);
 
+#ifdef _KERNEL
+	list_destroy(&os->os_zil_list);
+#endif
+
 	dmu_objset_evict_dbufs(os);
 
 	mutex_enter(&os->os_lock);
@@ -1299,10 +1303,6 @@ dmu_objset_evict(objset_t *os)
 	} else {
 		mutex_exit(&os->os_lock);
 	}
-
-#ifdef _KERNEL
-    list_destroy(&os->os_zil_list);
-#endif
 }
 
 void
