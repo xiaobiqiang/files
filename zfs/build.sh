@@ -25,9 +25,9 @@ function choose_platform()
     elif [ x$UNAME_M == xsw_64 ]; then
         temp=`echo $UNAME_R | grep deepin`
         if [[ -n $temp ]]; then
-            PLATFROM=$DEEPIN
+            PLATFORM=$DEEPIN
         else
-            PLATFROM=$ZB_KYLIN
+            PLATFORM=$ZB_KYLIN
         fi
     elif [ x$UNAME_M == xaarch64 ]; then
         PLATFORM=$YH_KYLIN
