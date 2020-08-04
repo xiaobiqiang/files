@@ -2553,6 +2553,7 @@ sint32 cm_cnm_lunmap_getbatch(
     cm_cnm_lunmap_where(cmd,CM_STRING_512,decode);
     CM_SNPRINTF_ADD(cmd,CM_STRING_512," LIMIT %llu,%u",decode->offset,decode->total);
     //CM_LOG_INFO(CM_MOD_CNM,"%s",cmd);
+    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     return CM_OK;
 }    
 
@@ -2592,7 +2593,6 @@ sint32 cm_cnm_lunmap_create(
     {
         tg = info->tg;
     }
-    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     CM_CNM_CHECK_ALL_NODE_ONLINE();
     
     iRet = cm_cnm_lun_local_get_stmfid(info->lun,NULL,stmfid,sizeof(stmfid));
@@ -2616,7 +2616,7 @@ sint32 cm_cnm_lunmap_create(
         CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,buf);
         return cm_cnm_get_errcode(&CmCnmMapCommErrCfg,buf,iRet);
     }
-    
+    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     return CM_OK;
 }    
     
@@ -2700,7 +2700,6 @@ sint32 cm_cnm_lunmap_delete(
     {
         tg = info->tg;
     }
-    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     CM_CNM_CHECK_ALL_NODE_ONLINE();
     
     iRet = cm_cnm_lun_local_get_stmfid(info->lun,NULL,stmfid,sizeof(stmfid));
@@ -2724,7 +2723,7 @@ sint32 cm_cnm_lunmap_delete(
         CM_LOG_ERR(CM_MOD_CNM,"iRet[%d]\n%s",iRet,buf);
         return cm_cnm_get_errcode(&CmCnmMapCommErrCfg,buf,iRet);
     }
-
+    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     return CM_OK;
 }    
 
