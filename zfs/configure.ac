@@ -233,6 +233,7 @@ AC_CONFIG_FILES([
 	module/iscsit/Makefile
 	module/ipmi_notify/Makefile
 	module/mpt3sas/Makefile
+	module/mpt2sas/Makefile
 	include/Makefile
 	include/linux/Makefile
 	include/sys/Makefile
