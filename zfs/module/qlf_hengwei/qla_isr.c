@@ -706,7 +706,7 @@ skip_rio:
 		ql_log(ql_log_warn, vha, 0x5006,
 		    "ISP Request Transfer Error (%x).\n",  mb[1]);
 		atomic_inc(&qla2xxx_mbx_transfer_error_stat);
-//		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+		set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		break;
 
 	case MBA_RSP_TRANSFER_ERR:	/* Response Transfer Error */
