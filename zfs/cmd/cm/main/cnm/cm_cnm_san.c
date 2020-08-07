@@ -2553,7 +2553,7 @@ sint32 cm_cnm_lunmap_getbatch(
     cm_cnm_lunmap_where(cmd,CM_STRING_512,decode);
     CM_SNPRINTF_ADD(cmd,CM_STRING_512," LIMIT %llu,%u",decode->offset,decode->total);
     //CM_LOG_INFO(CM_MOD_CNM,"%s",cmd);
-    (void)cm_cnm_lunmap_update(NULL,NULL,NULL);
+    //(void)cm_cnm_lunmap_update(NULL,NULL,NULL);
     return CM_OK;
 }    
 
