@@ -19,13 +19,13 @@ if CONFIG_KERNEL
 	name=${PACKAGE}; \
 	has_dpkg=`which dpkg | wc -l`;	\
 	sy_architecture=`lscpu | awk 'NR==1 {print $2}'`;	\
-	if test "${has_dpkg}" = "1"; then	\
+	if test "$${has_dpkg}" = "1"; then	\
 		sy_architecture=`dpkg --print-architecture`;	\
 	fi;	\
 	version=${VERSION}-${RELEASE}; \
 	arch=`$(RPM) -qp $${name}-kmod-$${version}.src.rpm --qf %{arch} | tail -1`; \
 	pkg1=kmod-$${name}*$${version}.$${arch}.rpm; \
-	fakeroot $(ALIEN) --bump=0 --scripts --to-deb $$pkg1; \
+	fakeroot $(ALIEN) --target=$${sy_architecture} --bump=0 --scripts --to-deb $$pkg1; \
 	$(RM) $$pkg1
 endif
 
@@ -34,7 +34,7 @@ if CONFIG_USER
 	name=${PACKAGE}; \
 	has_dpkg=`which dpkg | wc -l`;	\
 	sy_architecture=`lscpu | awk 'NR==1 {print $2}'`;	\
-	if test "${has_dpkg}" = "1"; then	\
+	if test "$${has_dpkg}" = "1"; then	\
 		sy_architecture=`dpkg --print-architecture`;	\
 	fi;	\
 	version=${VERSION}-${RELEASE}; \
@@ -48,7 +48,7 @@ if CONFIG_USER
 	pkg7=$${name}-test-$${version}.$${arch}.rpm; \
 	pkg8=$${name}-dracut-$${version}.$${arch}.rpm; \
 	pkg9=$${name}-initramfs-$${version}.$${arch}.rpm; \
-	fakeroot $(ALIEN) --bump=0 --scripts --to-deb \
+	fakeroot $(ALIEN) --target=$${sy_architecture} --bump=0 --scripts --to-deb \
 	    $$pkg1 $$pkg2 $$pkg3 $$pkg4 $$pkg5 $$pkg6 $$pkg7 \
 	    $$pkg8 $$pkg9;
 	$(RM) $$pkg1 $$pkg2 $$pkg3 $$pkg4 $$pkg5 $$pkg6 $$pkg7 \
