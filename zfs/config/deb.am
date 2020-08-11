@@ -17,6 +17,11 @@ deb-local:
 deb-kmod: deb-local rpm-kmod
 if CONFIG_KERNEL
 	name=${PACKAGE}; \
+	has_dpkg=`which dpkg | wc -l`;	\
+	sy_architecture=`lscpu | awk 'NR==1 {print $2}'`;	\
+	if test "${has_dpkg}" = "1"; then	\
+		sy_architecture=`dpkg --print-architecture`;	\
+	fi;	\
 	version=${VERSION}-${RELEASE}; \
 	arch=`$(RPM) -qp $${name}-kmod-$${version}.src.rpm --qf %{arch} | tail -1`; \
 	pkg1=kmod-$${name}*$${version}.$${arch}.rpm; \
@@ -27,6 +32,11 @@ endif
 deb-utils: deb-local rpm-utils
 if CONFIG_USER
 	name=${PACKAGE}; \
+	has_dpkg=`which dpkg | wc -l`;	\
+	sy_architecture=`lscpu | awk 'NR==1 {print $2}'`;	\
+	if test "${has_dpkg}" = "1"; then	\
+		sy_architecture=`dpkg --print-architecture`;	\
+	fi;	\
 	version=${VERSION}-${RELEASE}; \
 	arch=`$(RPM) -qp $${name}-$${version}.src.rpm --qf %{arch} | tail -1`; \
 	pkg1=$${name}-$${version}.$${arch}.rpm; \
