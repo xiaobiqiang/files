@@ -1,40 +1,66 @@
 #!/bin/bash
 
-RPM_DIR="./rpm"
+RPM_DIR="rpm"
 SPL_RPM=$RPM_DIR"/spl"
 ZFS_RPM=$RPM_DIR"/zfs"
 GUI_DIR="/gui"
 SYSTEM_DIR="../etc/systemd/system"
 RELY_DEB="deepinrely.tar.gz"
 VERSION_FILE="release"
-IS_DEEP=`uname -r|grep deepin|wc -l`
+UNAME_R=`uname -r`
+MODULE_DIR="/lib/modules/${UNAME_R}"
+INITRAMFS=initramfs-${UNAME_R}.img
+CENTOS_V3_BOOT_IMG="/boot/${INITRAMFS}"
+
+OS_RELEASE_DEEPIN="deepin"	#deepin
+OS_RELEASE_CENTOS="centos"	#centos
+OS_RELEASE_NEOKYLIN="neokylin"	#neokylin
+OS_RELEASE_KYLIN="kylin"	#kylin
+OS_RELEASE_ALL=($OS_RELEASE_DEEPIN $OS_RELEASE_CENTOS $OS_RELEASE_NEOKYLIN $OS_RELEASE_KYLIN)
+OS_RELEASE=`cat /etc/os-release | grep -w ID | sed 's/"//g' | cut -d '=' -f 2`
+
+KERNEL_VERSION_V3="3"
+KERNEL_VERSION_V4="4"
+KERNEL_VERSION=`uname -r | cut -d '-' -f 1 | cut -d '.' -f 1`
+
+function is_supported_system()
+{
+	local is_supported_os=0
+	
+	echo "Now Operating System Platform is ${OS_RELEASE}..."
+	
+	for pf in `echo ${OS_RELEASE_ALL[*]}`; do
+		[[ $OS_RELEASE == $pf ]] && is_supported_os=1
+	done
+	
+	[ $is_supported_os -eq 0 ] && echo "Unsupported System Platform --> ${OS_RELEASE}!"
+	[ $is_supported_os -eq 0 ] && exit 1
+}
 
 function install_gui()
 {
-    local gui_tar=`ls ./ |grep G1`
-    if [  "X"$gui_tar = "X" ]; then
-        echo "no GUI"
-        return
-    fi
-
-    rm -rf $GUI_DIR
+    local gui_tar=`ls ./ | grep G1`
+	local cmjni_dir=
+	
+	[ -z $gui_tar ] && echo "WARNNING: Can Not Find GUI tarball..."
+	[ -z $gui_tar ] && return 1
+	
+    [ -d $GUI_DIR ] && rm -rf $GUI_DIR
+	mkdir -p $GUI_DIR
     
-    if [ ! -d $GUI_DIR ]; then
-        mkdir -p $GUI_DIR
-    fi
-    
-    cp $gui_tar $GUI_DIR
+    cp $gui_tar ${GUI_DIR}/
+	
     cd $GUI_DIR
-    tar -xvf $gui_tar
+    tar -zxvf $gui_tar
     ./prepare.sh
     cd -
 
     if [ ! -f /usr/local/lib/libcmjni.so ]; then
-        if [ `uname -m` = "sw_64" ]; then
-            ln -s /lib/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so 
-        else
-            ln -s /usr/lib64/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so
-        fi
+		[[ $OS_RELEASE == $OS_RELEASE_DEEPIN || $OS_RELEASE == $OS_RELEASE_NEOKYLIN ]] && cmjni_dir=/lib
+		[[ $OS_RELEASE == $OS_RELEASE_KYLIN ]] && cmjni_dir=/usr/lib
+		[[ $OS_RELEASE == $OS_RELEASE_CENTOS ]] && cmjni_dir=/lib64
+		
+		[ ! -z $cmjni_dir ] && ln -s ${cmjni_dir}/libcmjni.so.0.0.0 /usr/local/lib/libcmjni.so
     fi
     chmod 755 /etc/rc.d/rc.local
 }
@@ -61,25 +87,22 @@ function install_type_deb()
     cd -
 }
 
-function install_scsi()
+function install_scsi_tools()
 {
     tar -xzvf scsi_tool.tar.gz
-    cp scsi/sg_* /usr/local/bin
-    cp scsi/lsscsi /usr/local/bin
-    if [ `uname -m` = "sw_64" ]; then
-        cp scsi/lib/* /lib
-    else
-        cp scsi/lib/* /lib64
-    fi
+    cp -f scsi/sg_* /usr/local/bin
+    cp -f scsi/lsscsi /usr/local/bin
+	
+	[[ $OS_RELEASE == $OS_RELEASE_CENTOS ]] && cp -f scsi/lib/* /lib64/
+	[[ $OS_RELEASE == $OS_RELEASE_DEEPIN || $OS_RELEASE == $OS_RELEASE_NEOKYLIN \
+		|| $OS_RELEASE == $OS_RELEASE_KYLIN ]] && cp -f scsi/lib/* /lib/
 }
 
 function install_java()
 {
     local jdk_file=$1
     
-    if [ "X"$jdk_file = "X" ]; then
-        return
-    fi
+	[ -z $jdk_file ] && return 1
     
     mkdir -p /usr/lib/jvm/
     if [ `ls /usr/lib/jvm/|grep jdk8|wc -l 2>/dev/null` -eq 0 ]; then
@@ -99,7 +122,8 @@ function install_java()
 
 function install_deepin_rely()
 {
-    local rely_nmae=`echo $RELY_DEB|sed 's/.tar.gz//g'`
+    local rely_nmae=`echo $RELY_DEB | sed 's/.tar.gz//g'`
+	
     tar -xzvf $RELY_DEB
     
     cd $rely_nmae/deb-pkg
@@ -114,9 +138,9 @@ function install_deepin_rely()
     ln -s /usr/lib/sw_64-linux-gnu/libnetsnmpagent.so.30.0.3 /usr/lib/sw_64-linux-gnu/libnetsnmpagent.so    
     ln -s /usr/lib/sw_64-linux-gnu/libnetsnmp.so.30.0.3 /usr/lib/sw_64-linux-gnu/libnetsnmp.so 
 
-    mkdir -p /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
-    cp $rely_nmae/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink
-    depmod
+    mkdir -p ${MODULE_DIR}/kernel/net/netlink
+    cp $rely_nmae/cn.ko ${MODULE_DIR}/kernel/net/netlink
+    depmod -a
     
     rm -rf $rely_nmae
 }
@@ -140,102 +164,189 @@ function install_centos_rely()
     rm -rf centosrely
 }
 
-function install_version()
+function install_kylin_rely()
+{	
+	local kylin_rely="kylinrely.tar.gz"
+	
+	[ ! -f $kylin_rely ] && echo "FATAL:Can Not Find ${kylin_rely}, Aborting..."
+	[ ! -f $kylin_rely ] && return 1
+	
+	tar -xvf $kylin_rely
+
+	cd kylinrely
+	
+	cp -f gelf.h /usr/include/
+	cp -f libelf.h /usr/include/
+	dpkg --force-overwrite -i ./*.deb
+	
+	cd -
+	
+	rm -rf kylinrely
+}
+
+function install_zfsonlinux_version()
 {
-    cp $VERSION_FILE /etc
+    cp -f $VERSION_FILE /etc/
 }
 
 # install_mptsas2 only for centos-3.10.0
-function install_mptsas2()
+function install_mpt2sas()
 {
-    gzip -d mpt2sas.ko.gz
-    if [  ! -f mpt2sas.ko ]; then
-        echo "no mpt2sas.ko"
-        return
-    fi
-    
-    if [ `file /root/initramfs-3.10.0-514.el7.x86_64.img |grep gzip|wc -l` -eq 0 ]; then
-        cp mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
-        return 
-    fi
-    
-    mkdir mptsas2
-    cp  /boot/initramfs-3.10.0-514.el7.x86_64.img  /boot/initramfs-3.10.0-514.el7.x86_64.img_bak
-    cp  /boot/initramfs-3.10.0-514.el7.x86_64.img mptsas2 
-    cd mptsas2
-    gzip -dc initramfs-3.10.0-514.el7.x86_64.img | cpio -ivd
-    rm -rf initramfs-3.10.0-514.el7.x86_64.img
+	local img_attr=
+	
+	[ -f mpt2sas.ko.gz ] && gzip -d mpt2sas.ko.gz
+	[ ! -f mpt2sas.ko ] && echo "WARNNING: Can Not Find mpt2sas.ko..."
+	[ ! -f mpt2sas.ko ] && return 1
+	
+	cp -f mpt2sas.ko ${MODULE_DIR}/kernel/drivers/scsi/mpt3sas/
+	
+	[ -z $CENTOS_V3_BOOT_IMG ] && echo "WARNNING: Can Not Find Boot Image..."
+	[ -z $CENTOS_V3_BOOT_IMG ] && return 1
+	
+	img_attr=`file ${CENTOS_V3_BOOT_IMG} | awk '{print $3}'`
+	[[ $img_attr == cpio ]] && return 0
+	
+	#gzip initramfs
+    cp -f $CENTOS_V3_BOOT_IMG  ${CENTOS_V3_BOOT_IMG}_bak
+	
+    mkdir centos_v3_initramfs
+    cp  -f $CENTOS_V3_BOOT_IMG centos_v3_initramfs/
+	
+    cd centos_v3_initramfs
+	
+    gzip -dc $INITRAMFS | cpio -ivd
+    rm -rf $INITRAMFS
 
-    cp ../mpt2sas.ko /usr/lib/modules/3.10.0-514.el7.x86_64/kernel/drivers/scsi/mpt3sas/
-    find . 2>/dev/null | cpio -c -o | gzip > ../initramfs-3.10.0-514.el7.x86_64.img
-    cp ../initramfs-3.10.0-514.el7.x86_64.img /boot
+    cp -f ../mpt2sas.ko lib/modules/${UNAME_R}/kernel/drivers/scsi/mpt3sas/
+    find . 2>/dev/null | cpio -c -o | gzip > ../$INITRAMFS
+    cp -f ../$INITRAMFS $CENTOS_V3_BOOT_IMG
     cd -
+	
+	rm -rf $INITRAMFS
 }
 
 # install_mptsas2 only for jiagu
 function install_drbd()
 {
-    local drbdrpm=`ls |grep drbd`
-    if [ "X"$drbdrpm = "X" ]; then
-        return
-    fi
-    local drbddir=`echo $drbdrpm|sed 's/.tar.gz//g'`
-
-    tar -xzvf $drbdrpm
-    rpm -ivh $drbddir/drbd-rpm/*
-    rpm -ivh $drbddir/drbd-utils-rpm/*
+    local drbdrpm=`ls | grep drbd`
+	local drbddir=`echo $drbdrpm | sed 's/.tar.gz//g'`
+	
+    [ -z $drbdrpm ] && echo "WARNNING: Can Not Find DRBD RPM..."
+	[ -z $drbdrpm ] && return 1
+	
+	tar -zxvf $drbdrpm
+	
+    rpm -ivh ${drbddir}/drbd-rpm/*
+    rpm -ivh ${drbddir}/drbd-utils-rpm/*
+	
+	rm -rf $drbddir
 }
 
 function install_vmlinux1()
 {
-    if [ ! -f vmlinux1 ]; then
-        return
-    fi
-    cp vmlinux1 /boot/vmlinuz-4.4.15-deepin-wutip
-    mv /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko /lib/modules/4.4.15-deepin-wutip/kernel/net/netlink/cn.ko.bak
-    cd /lib/modules/4.4.15-deepin-wutip
+    [ ! -f vmlinux1 ] && return 1
+	
+    cp vmlinux1 /boot/vmlinuz-${UNAME_R}
+    mv ${MODULE_DIR}/kernel/net/netlink/cn.ko ${MODULE_DIR}/kernel/net/netlink/cn.ko.bak
+	
+    cd ${MODULE_DIR}
+	
     rm modules.dep
-    cd -
     depmod -a
+	
+	cd -
+}
+
+function install_some_other_dependency()
+{
+	/usr/local/sbin/rpm_install.sh
+}
+
+function install_copy_mpt3sas()
+{
+	cp -f ${MODULE_DIR}/extra/zfs/mpt3sas/mpt3sas.ko ${MODULE_DIR}/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+}
+
+function install_ceres_cm()
+{
+	/usr/cm/script/cm_rpm.sh
+}
+
+function install_systemd_service()
+{
+	mkdir -p /lib/systemd/system-preset/
+	cp system/*service /lib/systemd/system
+	cp system/*target /lib/systemd/system
+	cp system/50-zfs.preset /lib/systemd/system-preset/
+}
+
+function install_centos_kernel_version_v3()
+{
+	install_mptsas2
+	install_drbd
+	install_type_rpm
+}
+
+function install_centos_kernel_version_v4()
+{
+	install_type_rpm
+	install_copy_mpt3sas
+}
+
+function install_unique_platform_kylin()
+{
+	install_type_deb
+	install_systemd_service
+	install_ceres_cm
+	install_copy_mpt3sas
+	install_some_other_dependency
+}
+
+function install_unique_platform_deepin()
+{
+	install_type_deb
+	install_systemd_service
+	install_ceres_cm
+	install_copy_mpt3sas
+	install_vmlinux1
+	install_some_other_dependency
+	
+	systemctl disable network-manager.service
+}
+
+function install_unique_platform_neokylin()
+{
+	install_type_rpm
+	install_copy_mpt3sas
+}
+
+function install_unique_platform_centos()
+{
+	[[ ${KERNEL_VERSION} == ${KERNEL_VERSION_V3} ]] && install_centos_kernel_version_v3
+	[[ ${KERNEL_VERSION} == ${KERNEL_VERSION_V4} ]] && install_centos_kernel_version_v4
+}	
+
+function install_post()
+{
+	cd $MODULE_DIR
+	depmod -a
+	cd -
 }
 
 function install()
 {
-    if [  ! -f zfsonlinuxrpm.tar.gz ]; then
-        echo "no rpm"
-        return
-    fi
-    install_mptsas2
-    install_drbd
-    tar -xzvf zfsonlinuxrpm.tar.gz
-        
-    if [ $IS_DEEP -eq 0 ]; then
-        install_type_rpm
-    else
-        #if [ -f $RELY_DEB ]; then
-        #    install_deepin_rely
-        #fi
+	is_supported_system
 
-        install_type_deb
-        
-        mkdir -p /lib/systemd/system-preset/
-        cp system/*service /lib/systemd/system
-        cp system/*target /lib/systemd/system
-        cp system/50-zfs.preset /lib/systemd/system-preset/
-
-        /usr/cm/script/cm_rpm.sh
-        /usr/local/sbin/rpm_install.sh
-        systemctl disable network-manager.service
-    fi
-    
-    if [ `uname -m` = "sw_64" ]; then
-        cp  /lib/modules/$(uname -r)/extra/zfs/mpt3sas/mpt3sas.ko  /lib/modules/$(uname -r)/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
-    fi
+	tar -xzvf zfsonlinuxrpm.tar.gz
+	tar -xzvf scsi_tool.tar.gz
+	
+	install_unique_platform_${OS_RELEASE}
         
     install_gui
-    install_scsi
-    install_version
-    install_vmlinux1
+    install_scsi_tools
+    install_zfsonlinux_version
+	
+	install_post
     
     rm -rf rpm
     rm -rf scsi
@@ -244,20 +355,24 @@ function install()
 
 function unload()
 {
-
-    if [ $IS_DEEP -eq 0 ]; then
-        rpm -qa | grep 0.6.5.9 |xargs rpm -e
-    else
-        dpkg -l |grep 0.6.5.9|awk '{print $2}'|xargs dpkg -r
-    fi
+	rm -rf /var/fm/*
+	rm -rf /usr/local/lib/*
+	[[ $OS_RELEASE == $OS_RELEASE_CENTOS || $OS_RELEASE == $OS_RELEASE_NEOKYLIN ]] \
+		&& rpm -qa | grep 0.6.5.9 | xargs rpm -e
+	[[ $OS_RELEASE == $OS_RELEASE_DEEPIN || $OS_RELEASE == $OS_RELEASE_KYLIN ]] \
+		&& dpkg -l | grep 0.6.5.9 | awk '{print $2}' | xargs dpkg -r
     
     rm -rf /usr/local/sbin/*
-    rm -rf /usr/local/lib/*
-    rm -rf /lib/modules/$(uname -r)/extra/*
+    rm -rf /lib/modules/${UNAME_R}/extra/*
     systemctl stop ceres_cm 2>/dev/null
     rm -rf /usr/local/bin/ceres*
     rm -rf /var/cm
     rm -rf /lib/systemd/system/ceres_cm.service
+}
+
+function install_rely()
+{
+	install_${OS_RELEASE}_rely
 }
 
 function help()
@@ -266,7 +381,7 @@ function help()
     echo ""
     echo "  unload:           ./installrpm.sh unload"
     echo "  install:          ./installrpm.sh install"
-    echo "  install rely:     ./installrpm.sh install_deepin_rely"
+    echo "  install rely:     ./installrpm.sh install_rely"
 }
 
 
