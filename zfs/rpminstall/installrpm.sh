@@ -51,7 +51,7 @@ function install_gui()
     cp $gui_tar ${GUI_DIR}/
 	
     cd $GUI_DIR
-    tar -zxvf $gui_tar
+    tar -xvf $gui_tar
     ./prepare.sh
     cd -
 
@@ -280,6 +280,14 @@ function install_systemd_service()
 	cp system/50-zfs.preset /lib/systemd/system-preset/
 }
 
+function install_lib_zpool_so()
+{
+	[ ! -d /lib64 ] && return 1
+	
+	mv /lib64/* /usr/lib/
+	rm -rf /lib64
+}
+
 function install_centos_kernel_version_v3()
 {
 	install_mptsas2
@@ -296,6 +304,7 @@ function install_centos_kernel_version_v4()
 function install_unique_platform_kylin()
 {
 	install_type_deb
+	install_lib_zpool_so
 	install_systemd_service
 	install_ceres_cm
 	install_copy_mpt3sas
