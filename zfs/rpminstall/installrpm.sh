@@ -384,8 +384,6 @@ function install()
 	is_supported_system
 	determine_initramfs_and_boot_img
 	
-	echo ${OS_RELEASE} ${INITRAMFS} ${BOOT_IMG}
-	
 	tar -xzvf zfsonlinuxrpm.tar.gz
 	tar -xzvf scsi_tool.tar.gz
 	
