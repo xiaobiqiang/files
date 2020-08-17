@@ -64,8 +64,10 @@ sbd_zvol_get_volume_params(sbd_lu_t *sl)
 
 	if (ret == 0 && sl->sl_blksize < PAGE_SIZE) {
 		cmn_err(CE_NOTE, " reduced copy disabled due to "
-		    "small  blocksize (%d)\n", (int)sl->sl_blksize);
-		ret = ENOTSUP;
+		    "small  blocksize (%d) %d\n", (int)sl->sl_blksize, PAGE_SIZE);
+        /*
+        ret = ENOTSUP;
+        */
 	}
 
 	return (ret);
