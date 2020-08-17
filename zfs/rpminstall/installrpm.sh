@@ -9,8 +9,12 @@ RELY_DEB="deepinrely.tar.gz"
 VERSION_FILE="release"
 UNAME_R=`uname -r`
 MODULE_DIR="/lib/modules/${UNAME_R}"
-INITRAMFS=initramfs-${UNAME_R}.img
-CENTOS_V3_BOOT_IMG="/boot/${INITRAMFS}"
+
+CENTOS_INITRAMFS=initramfs-${UNAME_R}.img
+KYLIN_INITRAMFS=initramfs.img-${UNAME_R}
+INITRAMFS=
+
+BOOT_IMG=
 
 OS_RELEASE_DEEPIN="deepin"	#deepin
 OS_RELEASE_CENTOS="centos"	#centos
@@ -35,6 +39,14 @@ function is_supported_system()
 	
 	[ $is_supported_os -eq 0 ] && echo "Unsupported System Platform --> ${OS_RELEASE}!"
 	[ $is_supported_os -eq 0 ] && exit 1
+}
+
+function determine_initramfs_and_boot_img()
+{
+	[[ $OS_RELEASE == $OS_RELEASE_CENTOS ]] && INITRAMFS=$CENTOS_INITRAMFS
+	[[ $OS_RELEASE == $OS_RELEASE_KYLIN ]] && INITRAMFS=$KYLIN_INITRAMFS
+	
+	BOOT_IMG=/boot/$INITRAMFS
 }
 
 function install_gui()
@@ -200,17 +212,17 @@ function install_mpt2sas()
 	
 	cp -f mpt2sas.ko ${MODULE_DIR}/kernel/drivers/scsi/mpt3sas/
 	
-	[ -z $CENTOS_V3_BOOT_IMG ] && echo "WARNNING: Can Not Find Boot Image..."
-	[ -z $CENTOS_V3_BOOT_IMG ] && return 1
+	[ -z $INITRAMFS ] && echo "WARNNING: Can Not Find Boot Image..."
+	[ -z $INITRAMFS ] && return 1
 	
-	img_attr=`file ${CENTOS_V3_BOOT_IMG} | awk '{print $3}'`
+	img_attr=`file ${BOOT_IMG} | awk '{print $3}'`
 	[[ $img_attr == cpio ]] && return 0
 	
 	#gzip initramfs
-    cp -f $CENTOS_V3_BOOT_IMG  ${CENTOS_V3_BOOT_IMG}_bak
+    cp -f $BOOT_IMG  ${BOOT_IMG}_bak
 	
     mkdir centos_v3_initramfs
-    cp  -f $CENTOS_V3_BOOT_IMG centos_v3_initramfs/
+    cp  -f $BOOT_IMG centos_v3_initramfs/
 	
     cd centos_v3_initramfs
 	
@@ -219,7 +231,7 @@ function install_mpt2sas()
 
     cp -f ../mpt2sas.ko lib/modules/${UNAME_R}/kernel/drivers/scsi/mpt3sas/
     find . 2>/dev/null | cpio -c -o | gzip > ../$INITRAMFS
-    cp -f ../$INITRAMFS $CENTOS_V3_BOOT_IMG
+    cp -f ../$INITRAMFS $BOOT_IMG
     cd -
 	
 	rm -rf $INITRAMFS
@@ -264,7 +276,32 @@ function install_some_other_dependency()
 
 function install_copy_mpt3sas()
 {
+	local img_attr=
+	
 	cp -f ${MODULE_DIR}/extra/zfs/mpt3sas/mpt3sas.ko ${MODULE_DIR}/kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+	
+	[ -z $INITRAMFS ] && return 1
+	
+	img_attr=`file ${BOOT_IMG} | awk '{print $3}'`
+	[[ $img_attr == cpio ]] && return 0
+	
+	#gzip initramfs
+    cp -f $BOOT_IMG  ${BOOT_IMG}_bak
+	
+    mkdir initramfs_decomp
+    cp  -f $BOOT_IMG initramfs_decomp/
+	
+    cd initramfs_decomp
+	
+    gzip -dc $INITRAMFS | cpio -ivd
+    rm -rf $INITRAMFS
+
+    cp -f ${MODULE_DIR}/extra/zfs/mpt3sas/mpt3sas.ko lib/modules/${UNAME_R}/kernel/drivers/scsi/mpt3sas/
+    find . 2>/dev/null | cpio -o -H newc | gzip > ../$INITRAMFS
+    cp -f ../$INITRAMFS $BOOT_IMG
+    cd -
+	
+	rm -rf $INITRAMFS
 }
 
 function install_ceres_cm()
@@ -345,7 +382,10 @@ function install_post()
 function install()
 {
 	is_supported_system
-
+	determine_initramfs_and_boot_img
+	
+	echo ${OS_RELEASE} ${INITRAMFS} ${BOOT_IMG}
+	
 	tar -xzvf zfsonlinuxrpm.tar.gz
 	tar -xzvf scsi_tool.tar.gz
 	
