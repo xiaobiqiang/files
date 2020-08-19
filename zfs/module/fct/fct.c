@@ -1968,6 +1968,8 @@ fct_scsi_data_xfer_done(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 	uint32_t	old, new;
 	uint32_t	iof = 0;
 
+	if (!icmd || icmd->icmd_flags & ICMD_BEING_ABORTED)
+		return ;
 
 	if (ioflags & FCT_IOF_FCA_DONE) {
 		do {
@@ -1980,9 +1982,7 @@ fct_scsi_data_xfer_done(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		iof = STMF_IOF_LPORT_DONE;
 		cmd->cmd_comp_status = dbuf->db_xfer_status;
 	}
-
-	if (icmd->icmd_flags & ICMD_BEING_ABORTED)
-		return;
+	
 	if (!(dbuf->db_flags & DB_LPORT_XFER_ACTIVE) ) {
 		cmn_err(CE_WARN, "repeat done task %p dbuf %p",
 		    cmd->cmd_specific, (void *)dbuf);
