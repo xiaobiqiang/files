@@ -12,10 +12,6 @@
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi_bsg_fc.h>
 #include <scsi/scsi_eh.h>
-#include <linux/atomic.h>
-
-static uint32_t qla2xxx_reg32_disconnect_stat = 0;
-static uint32_t qla2xxx_mbx_transfer_error_stat = 0;
 
 static void qla2x00_mbx_completion(scsi_qla_host_t *, uint16_t);
 static void qla2x00_status_entry(scsi_qla_host_t *, struct rsp_que *, void *);
@@ -129,8 +125,7 @@ qla2x00_check_reg32_for_disconnect(scsi_qla_host_t *vha, uint32_t reg)
 			 * workqueue so that all the adapter workqueues and the
 			 * DPC thread can be shutdown cleanly.
 			 */
-//			schedule_work(&vha->hw->board_disable);
-			atomic_inc((atomic_t *)&qla2xxx_reg32_disconnect_stat);
+			schedule_work(&vha->hw->board_disable);
 		}
 		return true;
 	} else
@@ -3671,6 +3666,3 @@ int qla25xx_request_irq(struct rsp_que *rsp)
 	msix->rsp = rsp;
 	return ret;
 }
-
-module_param(qla2xxx_reg32_disconnect_stat, int, S_IRUGO);
-module_param(qla2xxx_mbx_transfer_error_stat, int, S_IRUGO);
