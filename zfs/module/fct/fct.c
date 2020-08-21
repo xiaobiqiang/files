@@ -1957,6 +1957,10 @@ stmf_status_t
 fct_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 {
 	fct_cmd_t *cmd = (fct_cmd_t *)task->task_port_private;
+	fct_i_cmd_t	*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
+
+	if (!icmd || icmd->icmd_flags & ICMD_BEING_ABORTED)
+		return STMF_FAILURE;
 
 	return (cmd->cmd_port->port_xfer_scsi_data(cmd, dbuf, ioflags));
 }
