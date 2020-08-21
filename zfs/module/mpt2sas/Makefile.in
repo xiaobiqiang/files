@@ -1,0 +1,14 @@
+src = @abs_top_srcdir@/module/mpt2sas
+obj = @abs_builddir@
+
+MODULE := mpt2sas
+
+obj-$(CONFIG_ZFS) := $(MODULE).o
+
+$(MODULE)-objs += mpt3sas_base.o
+$(MODULE)-objs += mpt3sas_config.o
+$(MODULE)-objs += wrapper_mpt3sas_scsih.o
+$(MODULE)-objs += mpt3sas_transport.o
+$(MODULE)-objs += mpt3sas_ctl.o
+$(MODULE)-objs += mpt3sas_trigger_diag.o
+$(MODULE)-objs += mpt3sas_warpdrive.o
