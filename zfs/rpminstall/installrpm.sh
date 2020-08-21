@@ -172,7 +172,6 @@ function install_mptsas2()
     cd -
 }
 
-# install_mptsas2 only for jiagu
 function install_drbd()
 {
     local drbdrpm=`ls |grep drbd`
@@ -205,7 +204,7 @@ function install()
         echo "no rpm"
         return
     fi
-    install_mptsas2
+    #install_mptsas2
     install_drbd
     tar -xzvf zfsonlinuxrpm.tar.gz
         

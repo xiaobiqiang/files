@@ -17,6 +17,7 @@ subdir-m += fmd_transport
 subdir-m += utils
 subdir-m += idm
 subdir-m += iscsit
+subdir-m += mpt2sas
 
 INSTALL_MOD_DIR ?= extra
 
