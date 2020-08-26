@@ -1495,7 +1495,7 @@ int disk_get_info(disk_table_t *dt)
 		}
 
 		if ((buf_dev[len - 1] >= '0' && buf_dev[len - 1] <= '9') && 
-			(strstr(buf_dev, "nvme"))&&((buf_dev[len - 2] >= 'p')){
+			(strstr(buf_dev, "nvme"))&&(buf_dev[len - 2] >= 'p')){
 			continue;
 		}
 		
