@@ -1,10 +1,12 @@
 udevrule_DATA = \
 	69-vdev.rules \
+	60-nvme.rules \
 	60-zvol.rules \
 	90-zfs.rules
 
 EXTRA_DIST = \
 	$(top_srcdir)/udev/rules.d/69-vdev.rules.in \
+	$(top_srcdir)/udev/rules.d/60-nvme.rules.in \
 	$(top_srcdir)/udev/rules.d/60-zvol.rules.in \
 	$(top_srcdir)/udev/rules.d/90-zfs.rules.in
 
