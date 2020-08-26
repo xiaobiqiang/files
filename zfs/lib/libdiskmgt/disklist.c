@@ -1297,6 +1297,8 @@ void slot_map_find_value(slot_map_t *sm, disk_info_t *di)
 	di->dk_slot = 0;
 	char tmp_name[16] = {0};
 	for (search = sm->sm_head; search != NULL; search = search->sr_next) {
+		if(search->sr_addr[0] == 0)
+			continue;
 		if (strcasestr(di->dk_scsid, search->sr_addr) != NULL) {	
 		    //printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,search->sr_addr);
 			di->dk_enclosure = search->sr_enclosure;
@@ -1309,6 +1311,8 @@ void slot_map_find_value(slot_map_t *sm, disk_info_t *di)
 		for (search = sm->sm_head; search != NULL; search = search->sr_next) {
 			snprintf(tmp_name,sizeof(tmp_name),"%s",search->sr_addr);
 			tmp_name[15] = 0;
+			if(search->sr_addr[0] == 0)
+				continue;
 			if (strcasestr(di->dk_scsid, tmp_name) != NULL) {	
 				//printf("di->dk_scsid:%s, search->sr_addr:%s\n",di->dk_scsid,tmp_name);
 				di->dk_enclosure = search->sr_enclosure;
