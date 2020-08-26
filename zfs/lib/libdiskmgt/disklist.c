@@ -1489,8 +1489,13 @@ int disk_get_info(disk_table_t *dt)
 			continue;
 		sscanf(ptr, "%s %s %s", buf_scsi, buf_other, buf_dev);
 		len = strlen(buf_dev);
-		if (buf_dev[len - 1] >= '0' && buf_dev[len - 1] <= '9') && 
-			(strncmp(buf_dev,"nvme",4)){
+		if ((buf_dev[len - 1] >= '0' && buf_dev[len - 1] <= '9') && 
+			(strstr(buf_dev, "sd"))){
+			continue;
+		}
+
+		if ((buf_dev[len - 1] >= '0' && buf_dev[len - 1] <= '9') && 
+			(strstr(buf_dev, "nvme"))&&((buf_dev[len - 2] >= 'p')){
 			continue;
 		}
 		
