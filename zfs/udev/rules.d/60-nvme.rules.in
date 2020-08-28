@@ -1,0 +1,2 @@
+KERNEL=="nvme*[0-9]n*[0-9]", ENV{DEVTYPE}=="disk",  SYMLINK+="disk/by-id/scsi-30000000000000000"
+KERNEL=="nvme*[0-9]n*[0-9]p*[0-9]", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-30000000000000000-part%n"

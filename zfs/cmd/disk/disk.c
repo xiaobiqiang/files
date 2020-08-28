@@ -300,18 +300,9 @@ static void disk_info_show(disk_table_t *tb, int all)
 	for (current = tb->next; current != NULL; current = current->next) {
 		pstr = (char*)current->dk_name;
 		len = strlen(current->dk_name);
-
-		if (*(pstr + len - 1) >= '0' && *(pstr + len - 1) <= '9') {
-			if (all == 1) {
-				create_lun_node( current) ;
-				print_info(current, order);
-				order++;
-			}
-		} else {
-			create_lun_node( current) ;
-			print_info(current, order);
-			order++;
-		}
+		create_lun_node( current) ;
+		print_info(current, order);
+		order++;
 	}
 
 	return;
