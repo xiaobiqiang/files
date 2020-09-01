@@ -685,7 +685,7 @@ zil_replay_func_t zvol_replay_vector[TX_MAX_TYPE] = {
  * We store data in the log buffers if it's small enough.
  * Otherwise we will later flush the data out via dmu_sync().
  */
-ssize_t zvol_immediate_write_sz = 262144;	/* default 256KB */
+ssize_t zvol_immediate_write_sz = 32768;	/* default 32KB */
 
 void 
 zvol_log_write(void *zv_minor, dmu_tx_t *tx, uint64_t offset,
