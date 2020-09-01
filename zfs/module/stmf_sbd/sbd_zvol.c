@@ -459,6 +459,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 	/* sbd_zvol_sgl_write_remote_mirror(sl, dbuf); */
 	write_direct = B_FALSE;
+	/* disk and mirror is sync=TRUE */
 	sync = !zvol_get_volume_wce(sl->sl_zvol_minor_hdl);
 	ASSERT(flags == 0 || flags == ZVIO_COMMIT || flags == ZVIO_ABORT);
 	dmu_get_lock_para(sl->sl_zvol_bonus_hdl, offset, len, &lock_off, &lock_len);

@@ -685,7 +685,7 @@ zil_replay_func_t zvol_replay_vector[TX_MAX_TYPE] = {
  * We store data in the log buffers if it's small enough.
  * Otherwise we will later flush the data out via dmu_sync().
  */
-ssize_t zvol_immediate_write_sz = 32768;
+ssize_t zvol_immediate_write_sz = 262144;	/* default 256KB */
 
 void 
 zvol_log_write(void *zv_minor, dmu_tx_t *tx, uint64_t offset,
@@ -836,14 +836,15 @@ zvol_write(struct bio *bio)
 	int error = 0;
 	dmu_tx_t *tx;
 	rl_t *rl;
-    boolean_t sync;
+    boolean_t sync, direct;
     uint64_t write_flag = 0;
 	int flag = 0;
 
 	ASSERT(zv && zv->zv_open_count > 0);
 
+/*
 	if (bio_is_flush(bio))
-		zil_commit(zv->zv_zilog, ZVOL_OBJ);
+		zil_commit(zv->zv_zilog, ZVOL_OBJ); */
 
 	/*
 	 * Some requests are just for flush and nothing else.
@@ -887,15 +888,15 @@ zvol_write(struct bio *bio)
 	}
 
     error = dmu_write_bio(zv->zv_objset, ZVOL_OBJ, bio, tx, write_flag);
-	
-	if (error == 0)
-		zvol_log_write(zv, tx, offset, size,
-		    !!(bio_is_fua(bio)));
+
+	direct = dmu_tx_sync_log(tx);
+	if (direct && sync)
+		zvol_log_write(zv, tx, offset, size, sync);
 	dmu_tx_commit(tx);
 	
 	zfs_range_unlock(rl);
 
-	if (bio_is_fua(bio) || zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS)
+	if (direct && sync)
 		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 out:
 	return (error);
@@ -2922,3 +2923,5 @@ MODULE_PARM_DESC(zvol_max_discard_blocks, "Max number of blocks to discard");
 
 module_param(zvol_prefetch_bytes, uint, 0644);
 MODULE_PARM_DESC(zvol_prefetch_bytes, "Prefetch N bytes at zvol start+end");
+
+module_param(zvol_immediate_write_sz, uint, 0644);
