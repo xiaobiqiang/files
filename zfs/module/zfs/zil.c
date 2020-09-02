@@ -70,6 +70,8 @@
  * needed from the blocks available. Figure X shows the ZIL structure:
  */
 
+#define ZIL_MAX_BLOCKSIZE	1048576
+
 /*
  * See zil.h for more information about these fields.
  */
@@ -246,7 +248,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, blkptr_t *nbp, void *dst,
 			    sizeof (cksum)) || BP_IS_HOLE(&zilc->zc_next_blk)) {
 				error = SET_ERROR(ECKSUM);
 			} else {
-				ASSERT3U(len, <=, SPA_OLD_MAXBLOCKSIZE);
+				ASSERT3U(len, <=, ZIL_MAX_BLOCKSIZE);
 				bcopy(lr, dst, len);
 				*end = (char *)dst + len;
 				*nbp = zilc->zc_next_blk;
@@ -262,7 +264,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, blkptr_t *nbp, void *dst,
 				error = SET_ERROR(ECKSUM);
 			} else {
 				ASSERT3U(zilc->zc_nused, <=,
-				    SPA_OLD_MAXBLOCKSIZE);
+				    ZIL_MAX_BLOCKSIZE);
 				bcopy(lr, dst, zilc->zc_nused);
 				*end = (char *)dst + zilc->zc_nused;
 				*nbp = zilc->zc_next_blk;
@@ -348,7 +350,7 @@ zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
 	 * If the log has been claimed, stop if we encounter a sequence
 	 * number greater than the highest claimed sequence number.
 	 */
-	lrbuf = zio_buf_alloc(SPA_OLD_MAXBLOCKSIZE);
+	lrbuf = zio_buf_alloc(ZIL_MAX_BLOCKSIZE);
 	zil_bp_tree_init(zilog);
 
 	for (blk = zh->zh_log; !BP_IS_HOLE(&blk); blk = next_blk) {
@@ -395,7 +397,7 @@ done:
 	    (max_blk_seq == claim_blk_seq && max_lr_seq == claim_lr_seq));
 
 	zil_bp_tree_fini(zilog);
-	zio_buf_free(lrbuf, SPA_OLD_MAXBLOCKSIZE);
+	zio_buf_free(lrbuf, ZIL_MAX_BLOCKSIZE);
 
 	return (error);
 }
@@ -946,7 +948,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
  *
  * These must be a multiple of 4KB. Note only the amount used (again
  * aligned to 4KB) actually gets written. However, we can't always just
- * allocate SPA_OLD_MAXBLOCKSIZE as the slog space could be exhausted.
+ * allocate ZIL_MAX_BLOCKSIZE as the slog space could be exhausted.
  */
 uint64_t zil_block_buckets[] = {
     4096,		/* non TX_WRITE */
@@ -1028,7 +1030,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 		continue;
 	zil_blksz = zil_block_buckets[i];
 	if (zil_blksz == UINT64_MAX)
-		zil_blksz = SPA_OLD_MAXBLOCKSIZE;
+		zil_blksz = ZIL_MAX_BLOCKSIZE;
 	zilog->zl_prev_blks[zilog->zl_prev_rotor] = zil_blksz;
 	for (i = 0; i < ZIL_PREV_BLKS; i++)
 		zil_blksz = MAX(zil_blksz, zilog->zl_prev_blks[i]);
