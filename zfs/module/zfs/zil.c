@@ -70,7 +70,7 @@
  * needed from the blocks available. Figure X shows the ZIL structure:
  */
 
-const int zil_max_block_size = 1048576;
+static int zil_max_block_size = 1048576;
 
 /*
  * See zil.h for more information about these fields.
