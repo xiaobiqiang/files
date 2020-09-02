@@ -70,7 +70,7 @@
  * needed from the blocks available. Figure X shows the ZIL structure:
  */
 
-#define ZIL_MAX_BLOCKSIZE	1048576
+const int zil_max_block_size = 1048576;
 
 /*
  * See zil.h for more information about these fields.
@@ -248,7 +248,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, blkptr_t *nbp, void *dst,
 			    sizeof (cksum)) || BP_IS_HOLE(&zilc->zc_next_blk)) {
 				error = SET_ERROR(ECKSUM);
 			} else {
-				ASSERT3U(len, <=, ZIL_MAX_BLOCKSIZE);
+				ASSERT3U(len, <=, zil_max_block_size);
 				bcopy(lr, dst, len);
 				*end = (char *)dst + len;
 				*nbp = zilc->zc_next_blk;
@@ -264,7 +264,7 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, blkptr_t *nbp, void *dst,
 				error = SET_ERROR(ECKSUM);
 			} else {
 				ASSERT3U(zilc->zc_nused, <=,
-				    ZIL_MAX_BLOCKSIZE);
+				    zil_max_block_size);
 				bcopy(lr, dst, zilc->zc_nused);
 				*end = (char *)dst + zilc->zc_nused;
 				*nbp = zilc->zc_next_blk;
@@ -350,7 +350,7 @@ zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
 	 * If the log has been claimed, stop if we encounter a sequence
 	 * number greater than the highest claimed sequence number.
 	 */
-	lrbuf = zio_buf_alloc(ZIL_MAX_BLOCKSIZE);
+	lrbuf = zio_buf_alloc(zil_max_block_size);
 	zil_bp_tree_init(zilog);
 
 	for (blk = zh->zh_log; !BP_IS_HOLE(&blk); blk = next_blk) {
@@ -397,7 +397,7 @@ done:
 	    (max_blk_seq == claim_blk_seq && max_lr_seq == claim_lr_seq));
 
 	zil_bp_tree_fini(zilog);
-	zio_buf_free(lrbuf, ZIL_MAX_BLOCKSIZE);
+	zio_buf_free(lrbuf, zil_max_block_size);
 
 	return (error);
 }
@@ -948,7 +948,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
  *
  * These must be a multiple of 4KB. Note only the amount used (again
  * aligned to 4KB) actually gets written. However, we can't always just
- * allocate ZIL_MAX_BLOCKSIZE as the slog space could be exhausted.
+ * allocate zil_max_block_size as the slog space could be exhausted.
  */
 uint64_t zil_block_buckets[] = {
     4096,		/* non TX_WRITE */
@@ -962,7 +962,7 @@ uint64_t zil_block_buckets[] = {
  * limit or the total list size is less than 2X the limit.  Limit
  * checking is disabled by setting zil_slog_limit to UINT64_MAX.
  */
-unsigned long zil_slog_limit = 1024 * 1024;
+unsigned long zil_slog_limit = 1024 * 1024 * 1024;
 #define	USE_SLOG(zilog) (((zilog)->zl_cur_used < zil_slog_limit) || \
 	((zilog)->zl_itx_list_sz < (zil_slog_limit << 1)))
 
@@ -1030,7 +1030,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 		continue;
 	zil_blksz = zil_block_buckets[i];
 	if (zil_blksz == UINT64_MAX)
-		zil_blksz = ZIL_MAX_BLOCKSIZE;
+		zil_blksz = zil_max_block_size;
 	zilog->zl_prev_blks[zilog->zl_prev_rotor] = zil_blksz;
 	for (i = 0; i < ZIL_PREV_BLKS; i++)
 		zil_blksz = MAX(zil_blksz, zilog->zl_prev_blks[i]);
@@ -2544,4 +2544,8 @@ MODULE_PARM_DESC(zfs_nocacheflush, "Disable cache flushes");
 
 module_param(zil_slog_limit, ulong, 0644);
 MODULE_PARM_DESC(zil_slog_limit, "Max commit bytes to separate log device");
+
+module_param(zil_max_block_size, int, 0644);
+MODULE_PARM_DESC(zil_max_block_size, "Max every zil chain block size");
+
 #endif
