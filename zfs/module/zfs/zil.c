@@ -852,8 +852,8 @@ zil_flush_vdevs(zilog_t *zilog)
 
 	while ((zv = avl_destroy_nodes(t, &cookie)) != NULL) {
 		vdev_t *vd = vdev_lookup_top(spa, zv->zv_vdev);
-/*		if (vd != NULL)
-			zio_flush(zio, vd); */
+		if (vd != NULL)
+			zio_flush(zio, vd); 
 		kmem_free(zv, sizeof (*zv));
 	}
 
