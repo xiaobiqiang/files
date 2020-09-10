@@ -3857,7 +3857,7 @@ cluster_leaf_nvme_vdev_is_exist(nvlist_t *config)
 		*siptr = '\0';
 
 	if ((readlink(vdev_path, readlink_path, 64) < 0) ||
-		(strstr(vdev_path, "nvme") == NULL)
+		(strstr(vdev_path, "nvme") == NULL))
 		rval = B_FALSE;
 	else
 		rval = B_TRUE;
