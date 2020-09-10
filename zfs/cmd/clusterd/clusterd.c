@@ -3903,7 +3903,7 @@ cluster_check_pool_is_missing_log(nvlist_t *config)
 		if ((nvlist_lookup_uint64_array(childs[i], ZPOOL_CONFIG_VDEV_STATS, 
 				(uint64_t **)&vs, &vs_num) == 0) &&
 			(vs->vs_state <= VDEV_STATE_CANT_OPEN) &&
-			(nvlist_lookup_string(childs[i], ZPOOL_CONFIG_ID, 
+			(nvlist_lookup_uint64(childs[i], ZPOOL_CONFIG_ID, 
 				&vdev_id) == 0)) 
 			missing_vdevs_ids[idx++] = vdev_id;
 	}
@@ -3914,7 +3914,7 @@ cluster_check_pool_is_missing_log(nvlist_t *config)
 
 	for (i = 0; i < missing_vdevs_children; i++) {
 		uint_t vdev_id = 0;
-		if ((nvlist_lookup_string(missing_vdevs_childs[i], 
+		if ((nvlist_lookup_uint64(missing_vdevs_childs[i], 
 				ZPOOL_CONFIG_ID, &vdev_id) != 0) ||
 			(vdev_id != missing_vdevs_ids[i]))
 			return B_FALSE;
