@@ -223,6 +223,7 @@ typedef struct thr_list_node {
 
 typedef struct todo_import_pool_node {
 	char poolname[ZPOOL_MAXNAMELEN];
+	char *extra_options;
 	uint64_t guid;
 	int imported;
 	list_node_t list;
@@ -633,17 +634,26 @@ pool_in_cluster(nvlist_t *pool_config)
 }
 
 static int
-cluster_do_import(const char *name, uint64_t guid)
+cluster_do_import(const char *name, uint64_t guid, 
+		const char *ext_opts)
 {
 	char buf[256];
 	int ret, retry = 0;
 
 	assert(name != NULL || guid > 0);
 	if (name) {
-		snprintf(buf, 256, "%s %s", ZPOOL_IMPORT, name);
+		if (ext_opts)
+			snprintf(buf, 256, "%s %s %s", 
+				ZPOOL_IMPORT, ext_opts, name);
+		else
+			snprintf(buf, 256, "%s %s", ZPOOL_IMPORT, name);
 	} else {
-		snprintf(buf, 256, "%s %llu",
-			ZPOOL_IMPORT, (unsigned long long)guid);
+		if (ext_opts)
+			snprintf(buf, 256, "%s %s %llu",
+				ZPOOL_IMPORT, ext_opts, (unsigned long long)guid);
+		else
+			snprintf(buf, 256, "%s %llu",
+				ZPOOL_IMPORT, (unsigned long long)guid);
 	}
 
 	while ((ret = excute_cmd_common(buf, B_TRUE)) != 0) {
@@ -663,7 +673,7 @@ cluster_do_import(const char *name, uint64_t guid)
 			c_log(LOG_WARNING, "import pool %llu error %d",
 				(unsigned long long)guid, ret);
 		}
-
+		
 		snprintf(buf, 256, "%s import -ib", ZPOOL_CMD);
 		(void) excute_cmd_common(buf, B_TRUE);
 	}
@@ -1072,7 +1082,7 @@ _compete:
 		}
 		pthread_mutex_unlock(&import_state.mtx);
 
-		ret = cluster_do_import(NULL, pool_guid);
+		ret = cluster_do_import(NULL, pool_guid, NULL);
 		if (ret == 0) {
 			/* remove the pool from host info */
 			hdl = libzfs_init();
@@ -1948,7 +1958,7 @@ cluster_change_pool_owner(char *buf, size_t buflen)
 	}
 
 	pthread_mutex_lock(&failover_ip_check.lock);
-	(void) cluster_do_import(spa_name, 0);
+	(void) cluster_do_import(spa_name, 0, NULL);
 	failover_ip_check.event_falg = 1;
 	pthread_cond_signal(&failover_ip_check.cond);
 	pthread_mutex_unlock(&failover_ip_check.lock);
@@ -3034,7 +3044,7 @@ cluster_import_pools_thr(void *arg)
 		!list_is_empty(&import_thr_conf.todo_import_pools)) {
 		pool = list_head(&import_thr_conf.todo_import_pools);
 		if (pool) {
-			(void) cluster_do_import(NULL, pool->guid);
+			(void) cluster_do_import(NULL, pool->guid, pool->extra_options);
 			pool->imported = 1;
 			pthread_mutex_lock(&import_thr_conf.list_mtx);
 			list_remove(&import_thr_conf.todo_import_pools, pool);
@@ -3050,7 +3060,8 @@ cluster_import_pools_thr(void *arg)
 }
 
 static todo_import_pool_node_t *
-add_todo_import_pool(const char *name, uint64_t guid)
+add_todo_import_pool(const char *name, uint64_t guid, 
+		const char *extra_options)
 {
 	todo_import_pool_node_t *pool;
 
@@ -3062,6 +3073,9 @@ add_todo_import_pool(const char *name, uint64_t guid)
 	strlcpy(pool->poolname, name, ZPOOL_MAXNAMELEN);
 	pool->guid = guid;
 	pool->imported = 0;
+	pool->extra_options = NULL;
+	if (extra_options)
+		pool->extra_options = strdup(extra_options);
 	pthread_mutex_lock(&import_thr_conf.list_mtx);
 	list_insert_tail(&import_thr_conf.todo_import_pools, pool);
 	pthread_mutex_unlock(&import_thr_conf.list_mtx);
@@ -3798,6 +3812,120 @@ cluster_zpool_search_free(nvlist_t *nvl)
 	}
 }
 
+static boolean_t 
+cluster_pool_is_local_before_boot(nvlist_t *config)
+{
+	uint64_t pool_hostid = 0;
+	uint64_t my_hostid = get_system_hostid();
+
+	if ((nvlist_lookup_uint64(config, ZPOOL_CONFIG_HOSTID, 
+			&pool_hostid) != 0) ||
+		(pool_hostid != my_hostid))
+		return B_FALSE;
+	return B_TRUE;
+}
+
+static boolean_t 
+cluster_leaf_nvme_vdev_is_exist(nvlist_t *config)
+{
+	nvlist_t **childs = NULL;
+	uint_t children = 0;
+	boolean_t rval = B_TRUE;
+	char *vdev_path = NULL, *siptr;
+	char readlink_path[64];
+	
+	if (nvlist_lookup_nvlist_array(config, 
+			ZPOOL_CONFIG_CHILDREN,
+			&childs, &children) == 0) {
+		int i;
+		for (i = 0; i < children; i++) {
+			rval &= cluster_leaf_nvme_vdev_is_exist(childs[i]);
+			if (rval == B_FALSE)
+				break;
+		}
+		return rval;
+	}
+
+	if (nvlist_lookup_string(config, ZPOOL_CONFIG_PATH, 
+			&vdev_path) != 0)
+		return B_FALSE;
+
+	vdev_path = strdup(vdev_path);
+
+	/* truncate partion to whole disk */
+	if ((siptr = strstr(vdev_path, "-part")) != NULL)
+		*siptr = '\0';
+
+	if ((readlink(vdev_path, readlink_path, 64) < 0) ||
+		(strstr(vdev_path, "nvme") == NULL)
+		rval = B_FALSE;
+	else
+		rval = B_TRUE;
+
+	if (vdev_path)
+		free(vdev_path);
+
+	return rval;
+}
+
+static boolean_t 
+cluster_check_pool_is_missing_log(nvlist_t *config)
+{
+	nvlist_t *nvroot = NULL;
+	nvlist_t *load_info, *missing_vdevs;
+	nvlist_t **childs = NULL;
+	nvlist_t **missing_vdevs_childs = NULL;
+	int missing_vdevs_children = 0;
+	int children = 0, i, idx = 0;
+	int missing_vdevs_ids[16];
+
+	bzero(missing_vdevs_ids, sizeof(int) * 16);
+
+	if ((nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO, 
+			&load_info) != 0) ||
+		(nvlist_lookup_nvlist(load_info, ZPOOL_CONFIG_MISSING_DEVICES, 
+			&missing_vdevs) != 0) ||
+		(nvlist_lookup_nvlist_array(missing_vdevs, ZPOOL_CONFIG_CHILDREN, 
+			&missing_vdevs_childs, &missing_vdevs_children) != 0) ||
+		(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, 
+			&nvroot) != 0) ||
+		(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN, 
+			&childs, &children) != 0))
+		return B_FALSE;
+
+	/* 
+	 * missing log must be top vdevs, 
+	 * see spa_config_valid function in spa.c
+	 */
+	for (i = 0; i < children; i++) {
+		vdev_stat_t *vs = NULL;
+		uint_t vdev_id = 0, vs_num = 0;
+		if ((nvlist_lookup_uint64_array(childs[i], ZPOOL_CONFIG_VDEV_STATS, 
+				(uint64_t **)&vs, &vs_num) == 0) &&
+			(vs->vs_state <= VDEV_STATE_CANT_OPEN) &&
+			(nvlist_lookup_string(childs[i], ZPOOL_CONFIG_ID, 
+				&vdev_id) == 0)) 
+			missing_vdevs_ids[idx++] = vdev_id;
+	}
+
+	/* missing vdevs must be log vdevs. */
+	if (idx != missing_vdevs_children)
+		return B_FALSE;
+
+	for (i = 0; i < missing_vdevs_children; i++) {
+		uint_t vdev_id = 0;
+		if ((nvlist_lookup_string(missing_vdevs_childs[i], 
+				ZPOOL_CONFIG_ID, &vdev_id) != 0) ||
+			(vdev_id != missing_vdevs_ids[i]))
+			return B_FALSE;
+
+		if (!cluster_leaf_nvme_vdev_is_exist(missing_vdevs_childs[i]))
+			return B_FALSE;
+	}
+
+	return B_TRUE;
+}
+
 /*
  * return 1 the pool can be import, return 0 the pool can't be import,
  * otherwise indicate error or the pool not exists.
@@ -3848,8 +3976,10 @@ cluster_check_pool_replicas(uint64_t pool_guid, char **search_disks, int nsearch
 					ret = -1;
 				else
 					ret = 1;
- 			} else
- 				ret = 0;
+ 			} else if (cluster_check_pool_is_missing_log(config))
+ 				ret = 2;
+			else 
+				ret = 0;
 			break;
 		}
 	}
@@ -4096,6 +4226,7 @@ cluster_compete_pool(void *arg)
 	int check_replicas_trytimes = 0;
 	boolean_t is_failover = param->import_state != NULL;
 	boolean_t update_stamp_ok = B_FALSE;
+	const char *extra_options = NULL;
 
 	if (!config) {
 		c_log(LOG_WARNING, "NULL config");
@@ -4273,6 +4404,7 @@ ready_import:
 	cluster_run_import(cip);
 	pthread_mutex_unlock(&cip->import_lock);
 
+	/* clusterd initial stage import */
 	if (!is_failover) {
 		err = cluster_check_pool_replicas(guid, NULL, 0, NULL);
 		if (err == 0) {
@@ -4303,6 +4435,12 @@ ready_import:
 		} else if (err < 0) {
 			c_log(LOG_WARNING, "pool '%s' not exists or error", poolname);
 			goto exit_thr;
+		} else if (err == 2) {	/* missing nvme log devices */
+			extra_options = "-m";
+			if (!cluster_pool_is_local_before_boot(config)) {
+				c_log(LOG_WARNING, "pool '%s' is not in local before boot", poolname);
+				goto exit_thr;
+			}
 		}
 	}
 
@@ -4439,8 +4577,9 @@ quantum_check:
 		(void) cluster_write_stamp(stamp, pool_root, path);
 	}
 
+	/* clusterd initial stage import */
 	if (param->import_state == NULL) {
-		todo_import_pool = add_todo_import_pool(poolname, guid);
+		todo_import_pool = add_todo_import_pool(poolname, guid, extra_options);
 		if (!todo_import_pool)
 			goto exit_thr;
 	} else {
@@ -4631,6 +4770,8 @@ exit_func:
 			tmp_todo_node= todo_node;
 			todo_node = list_next(&import_thr_conf.imported_pools, todo_node);
 			list_remove(&import_thr_conf.imported_pools, tmp_todo_node);
+			if (tmp_todo_node->extra_options)
+				free(tmp_todo_node->extra_options);
 			free(tmp_todo_node);
 		}
 	}
@@ -6315,7 +6456,7 @@ handle_release_pools_event(const void *buffer, int bufsiz)
 	for (p = pool_list; p != NULL; p = p->next) {
 		param = (release_pool_param_t *) p->ptr;
 		for (i = 0; i < 10; i++) {
-			err = cluster_do_import(param->pool_name, 0);
+			err = cluster_do_import(param->pool_name, 0, NULL);
 			if (err == 0)
 				break;
 		}
