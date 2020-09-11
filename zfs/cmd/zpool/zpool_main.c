@@ -2613,38 +2613,40 @@ print_lows(zpool_handle_t *zhp, nvlist_t *nv, int namewidth,
 static int zpool_import_log_replace(nvlist_t *missing_log, void *private)
 {
 	int rval = 0;
-	char *partpath = NULL;
-	char readlink_path[128] = {0};
+	char *partpath = NULL, *temp;
+	char whole_disk[64] = {0};
+	char readlink_path[64] = {0};
+	char command[128] = {0};
 	const char *pool_name = private;
 	
 	if ((rval = nvlist_lookup_string(missing_log, ZPOOL_CONFIG_PATH, 
 			&partpath)) != 0)
 		return rval;
 
+	/* convert to whole disk path */
+	strcpy(whole_disk, partpath);
+	verify((temp = strstr(whole_disk, "-part")) != NULL);
+	*temp = '\0';
+
 	/* new log device is busy state */
 	if (readlink(partpath, readlink_path, 64) > 0) {
-		/* convert to whole disk path */
-		strcpy(readlink_path, partpath);
-		verify((partpath = strstr(readlink_path, "-part")) != NULL);
-		*partpath = '\0';
-
-		snprintf(readlink_path, 128, 
-			"echo \"y\n\" | disk initialize -d %s", 
-			readlink_path);
-		(void) system(readlink_path);
+		snprintf(command, 128, "echo \"y\\n\" "
+			"| disk initialize -d %s 2>/dev/null",
+            whole_disk);
+		(void) system(command);
 	}
 
 	/* new log device is free */
 	/* so replace the missing log device */
-	if ((partpath = strrchr(readlink_path, '\/')) == NULL)
-		partpath = strdup(readlink_path);
+	if ((temp = strrchr(whole_disk, '\/')) == NULL)
+		partpath = strdup(whole_disk);
 	else
-		partpath = strdup(partpath);
+		partpath = strdup(temp + 1);
 
-	snprintf(readlink_path, 128,
+	snprintf(command, 128,
 		"zpool replace %s %s %s", pool_name, 
 		partpath, partpath);
-	(void) system(readlink_path);
+	(void) system(command);
 
 	return (0);
 }
