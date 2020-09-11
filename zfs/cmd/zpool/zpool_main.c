@@ -2662,7 +2662,7 @@ static int zpool_traverse_leaf_vdev(nvlist_t *vdev_tree,
 		
 		for (i = 0; i < children; i++) {
 			if ((rval = zpool_traverse_leaf_vdev(childs[i], 
-					cb, private)) != 0)
+					cb, priv)) != 0)
 				break;
 		}
 
