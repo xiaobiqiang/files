@@ -2636,7 +2636,7 @@ static int zpool_import_log_replace(nvlist_t *missing_log, void *private)
 
 	/* new log device is free */
 	/* so replace the missing log device */
-	if ((partpath = strtchr(readlink_path, '\/')) == NULL)
+	if ((partpath = strrchr(readlink_path, '\/')) == NULL)
 		partpath = strdup(readlink_path);
 	else
 		partpath = strdup(partpath);
@@ -3299,7 +3299,7 @@ zpool_do_import(int argc, char **argv)
 	popen("partprobe 2>/dev/null", "r");
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":abCc:d:DEfFimnNo:qR:s:tT:VX")) != -1) {
+	while ((c = getopt(argc, argv, ":abCc:d:DEfFilmnNo:qR:s:tT:VX")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
