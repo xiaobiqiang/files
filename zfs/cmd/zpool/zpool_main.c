@@ -2610,6 +2610,69 @@ print_lows(zpool_handle_t *zhp, nvlist_t *nv, int namewidth,
 	}
 }
 
+static int zpool_import_log_replace(nvlist_t *missing_log, void *private)
+{
+	int rval = 0;
+	const char *partpath = NULL;
+	char readlink_path[128] = {0};
+	const char *pool_name = private;
+	
+	if ((rval = nvlist_lookup_string(missing_log, ZPOOL_CONFIG_PATH, 
+			&partpath)) != 0)
+		return rval;
+
+	/* new log device is busy state */
+	if (readlink(partpath, readlink_path, 64) > 0) {
+		/* convert to whole disk path */
+		strcpy(readlink_path, partpath);
+		verify((partpath = strstr(readlink_path, "-part")) != NULL);
+		*partpath = '\0';
+
+		snprintf(readlink_path, 128, 
+			"echo \"y\n\" | disk initialize -d %s", 
+			readlink_path);
+		(void) system(readlink_path);
+	}
+
+	/* new log device is free */
+	/* so replace the missing log device */
+	if ((partpath = strtchr(readlink_path, '\/')) == NULL)
+		partpath = strdup(readlink_path);
+	else
+		partpath = strdup(partpath);
+
+	snprintf(readlink_path, 128,
+		"zpool replace %s %s %s", pool_name, 
+		partpath, partpath);
+	(void) system(readlink_path);
+
+	return (0);
+}
+
+static int zpool_traverse_leaf_vdev(nvlist_t *vdev_tree, 
+	int (*cb)(nvlist_t *, void *), void *priv)
+{
+	uint_t children = 0;
+	nvlist_t **childs = NULL;
+	int rval = 0;
+	
+	if (nvlist_lookup_nvlist_array(vdev_tree, ZPOOL_CONFIG_CHILDREN,
+			&childs, &children) == 0) {
+		int i;
+		
+		for (i = 0; i < children; i++) {
+			if ((rval = zpool_traverse_leaf_vdev(childs[i], 
+					cb, private)) != 0)
+				break;
+		}
+
+		return rval;
+	}
+
+	/* leaf vdev vdev_tree */
+	return cb(vdev_tree, priv);
+}
+
 /*
  * Display the status for the given pool.
  */
@@ -2984,6 +3047,10 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	zfs_cmd_t *zc;
 	int ret;
 
+	nvlist_t *load_info = NULL;
+	nvlist_t *missing_vdevs = NULL;
+	
+
 	stamp = malloc(sizeof(zpool_stamp_t));
 	if (stamp == NULL) {
 		syslog(LOG_ERR, "do import mallco stamp failed");
@@ -3122,6 +3189,21 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	}
 	free(zc);
 
+	/* 
+	 * detach missing log device, and attach 
+	 * the same name new log device.
+	 */
+	if ((flags & ZFS_IMPORT_LOG_REPLACE) &&
+		(flags & ZFS_IMPORT_MISSING_LOG)) {
+		if ((nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO, 
+				&load_info) == 0) &&
+			(nvlist_lookup_nvlist(load_info, ZPOOL_CONFIG_MISSING_DEVICES, 
+				&missing_vdevs) == 0)) {
+			zpool_traverse_leaf_vdev(missing_vdevs,
+				zpool_import_log_replace, name);
+		}
+	}
+
 	syslog(LOG_NOTICE, "%s: all volume create minor finished, start to import lu", __func__);
 	cprint("import '%s': start import lu", name);
 	zfs_import_all_lus(g_zfs, name);
@@ -3252,6 +3334,9 @@ zpool_do_import(int argc, char **argv)
 			break;
 		case 'i':
 			flags |= ZFS_IMPORT_IGNORE_CLUSTER;
+			break;
+		case 'l':
+			flags |= ZFS_IMPORT_LOG_REPLACE;
 			break;
 		case 'm':
 			flags |= ZFS_IMPORT_MISSING_LOG;

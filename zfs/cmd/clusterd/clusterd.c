@@ -4442,7 +4442,8 @@ ready_import:
 				goto exit_thr;
 			}
 		}
-	}
+	} else if (cluster_check_pool_is_missing_log(config))
+		extra_options = "-ml";
 
 	uint_t quantum_in_use = 0;
 	uint_t quantum_not_in_use = 0;

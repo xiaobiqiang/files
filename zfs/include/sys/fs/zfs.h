@@ -1171,6 +1171,7 @@ typedef  enum {
 #define	ZFS_IMPORT_TEMP_NAME	0x10
 #define	ZFS_IMPORT_IGNORE_CLUSTER		0x20
 #define	ZFS_IMPORT_MULTICLUS_UPDATE		0x40
+#define ZFS_IMPORT_LOG_REPLACE		0x80
 
 #define	ZFS_SINGLE_DATA		"zfs:single_data"
 
