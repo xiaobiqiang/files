@@ -205,6 +205,7 @@ struct cluster_failover_conf cf_conf;
 
 typedef struct failover_pool_import_state {
 	nvlist_t	*pool_config;
+	char		*extra_options;
 	boolean_t	imported;
 	pthread_mutex_t	mtx;
 	pthread_cond_t	cond;
@@ -1063,6 +1064,7 @@ _compete:
 		pthread_cond_init(&import_state.cond, NULL);
 		import_state.imported = B_FALSE;
 		import_state.pool_config = config;
+		import_state.extra_options = NULL;
 
 		param.arg = import_state.pool_config;
 		param.import_state = &import_state;
@@ -1082,7 +1084,7 @@ _compete:
 		}
 		pthread_mutex_unlock(&import_state.mtx);
 
-		ret = cluster_do_import(NULL, pool_guid, NULL);
+		ret = cluster_do_import(NULL, pool_guid, import_state.extra_options);
 		if (ret == 0) {
 			/* remove the pool from host info */
 			hdl = libzfs_init();
@@ -4585,7 +4587,8 @@ quantum_check:
 			goto exit_thr;
 	} else {
 		failover_pool_import_state_t *import_state = param->import_state;
-
+		import_state->extra_options = extra_options;
+		
 		pthread_cond_signal(&import_state->cond);
 		c_log(LOG_WARNING, "compete won.");
 	}
