@@ -2613,7 +2613,7 @@ print_lows(zpool_handle_t *zhp, nvlist_t *nv, int namewidth,
 static int zpool_import_log_replace(nvlist_t *missing_log, void *private)
 {
 	int rval = 0;
-	const char *partpath = NULL;
+	char *partpath = NULL;
 	char readlink_path[128] = {0};
 	const char *pool_name = private;
 	
