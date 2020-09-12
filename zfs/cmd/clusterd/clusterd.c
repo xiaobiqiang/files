@@ -1085,6 +1085,10 @@ _compete:
 		pthread_mutex_unlock(&import_state.mtx);
 
 		ret = cluster_do_import(NULL, pool_guid, import_state.extra_options);
+		if (import_state.extra_options) {
+			free(import_state.extra_options);
+			import_state.extra_options = NULL;
+		}
 		if (ret == 0) {
 			/* remove the pool from host info */
 			hdl = libzfs_init();
@@ -4444,8 +4448,7 @@ ready_import:
 				goto exit_thr;
 			}
 		}
-	} else if (cluster_check_pool_is_missing_log(config))
-		extra_options = "-ml";
+	}
 
 	uint_t quantum_in_use = 0;
 	uint_t quantum_not_in_use = 0;
@@ -4587,8 +4590,8 @@ quantum_check:
 			goto exit_thr;
 	} else {
 		failover_pool_import_state_t *import_state = param->import_state;
-		import_state->extra_options = extra_options;
-		
+
+		import_state->extra_options = strdup("-ml");
 		pthread_cond_signal(&import_state->cond);
 		c_log(LOG_WARNING, "compete won.");
 	}
