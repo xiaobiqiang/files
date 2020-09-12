@@ -162,16 +162,16 @@ int __Mlsas_Tx_biow(Mlsas_rtx_wk_t *w)
 	rwfl = __Mlsas_Setup_RWmsg(rq)->rw_flags;
 
 	if (rwfl & REQ_DISCARD)
-		rval = Mlsas_TX(rh->Mh_session, 
+		rval = __Mlsas_TX(rh->Mh_session, 
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
-			NULL, 0, B_FALSE);
+			NULL, 0, Mlsas_TX_Type_Normal);
 	else if (rwfl & REQ_WRITE)
-		rval = Mlsas_TX(rh->Mh_session, 
+		rval = __Mlsas_TX(rh->Mh_session, 
 			rq->Mlrq_bdev->Mlb_txbuf, 
 			rq->Mlrq_bdev->Mlb_txbuf_used, 
 			rq->Mlrq_master_bio, 
-			rq->Mlrq_bsize, B_TRUE);
+			rq->Mlrq_bsize, Mlsas_TX_Type_Bio);
 	else 
 		cmn_err(CE_PANIC, "!(rwfl & (Mlsas_RXfl_Disc | Mlsas_RXfl_Write))");
 
@@ -228,10 +228,10 @@ int __Mlsas_Tx_bior(Mlsas_rtx_wk_t *w)
 
 	__Mlsas_Setup_RWmsg(rq);
 
-	rval = Mlsas_TX(rh->Mh_session, 
+	rval = __Mlsas_TX(rh->Mh_session, 
 		rq->Mlrq_bdev->Mlb_txbuf, 
 		rq->Mlrq_bdev->Mlb_txbuf_used, 
-		NULL, 0, B_FALSE);
+		NULL, 0, Mlsas_TX_Type_Normal);
 
 	spin_lock_irq(&rq->Mlrq_bdev->Mlb_rq_spin);
 	if (rq->Mlrq_pr->Mlpd_rh->Mh_state == Mlsas_RHS_New)
@@ -365,10 +365,10 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 			prr->prr_error); */
 
 	if (prr->prr_flags & Mlsas_PRRfl_Write) {
-		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
+		rval = __Mlsas_TX(pr->Mlpd_rh->Mh_session, 
 			pr->Mlpd_mlb->Mlb_astx_buf,
 			pr->Mlpd_mlb->Mlb_astxbuf_used,
-			NULL, 0, B_FALSE);
+			NULL, 0, Mlsas_TX_Type_Normal);
 		if (prr->prr_flags & Mlsas_PRRfl_Addl_Kmem) {
 			__Mlsas_clustersan_kmem_free(prr->prr_dt, prr->prr_dtlen);
 			prr->prr_dt = NULL;
@@ -376,11 +376,11 @@ int __Mlsas_Tx_PR_RQ_rsp(Mlsas_rtx_wk_t *w)
 		}
 	}
 	else 
-		rval = Mlsas_TX(pr->Mlpd_rh->Mh_session, 
+		rval = __Mlsas_TX(pr->Mlpd_rh->Mh_session, 
 			pr->Mlpd_mlb->Mlb_astx_buf,
 			pr->Mlpd_mlb->Mlb_astxbuf_used,
 			prr->prr_dt, prr->prr_dtlen, 
-			B_FALSE);
+			Mlsas_TX_Type_Normal);
 
 	what = rval ? Mlsas_PRRst_Send_Error :
 		Mlsas_PRRst_Send_OK;

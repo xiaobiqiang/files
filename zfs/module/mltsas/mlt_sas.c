@@ -52,7 +52,8 @@ static blk_qc_t __Mlsas_Make_Request_fn(struct request_queue *rq, struct bio *bi
 static int __Mlsas_Path_to_Hashkey(const char *path, uint64_t *hash_key);
 static void __Mlsas_Destroy_Gendisk(Mlsas_blkdev_t *Mlbp);
 static void __Mlsas_Alloc_Virt_disk(Mlsas_blkdev_t *Mlbp);
-static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp);
+static void __Mlsas_New_Virt(uint64_t hash_key, uint32_t hostid, 
+		uint32_t *scsi_id, Mlsas_blkdev_t **Mlbpp);
 static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_Failoc(Mlsas_iocdt_t *Mlip);
 static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip);
@@ -62,7 +63,7 @@ static void __Mlsas_Do_Virtinfo_impl(Mlsas_blkdev_t *vt,
 		Mlsas_virtinfo_return_t *vti);
 static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt);
 static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
-		Mlsas_blkdev_t **vtptr);
+		nvlist_t *nvl, Mlsas_blkdev_t **vtptr);
 static int __Mlsas_Attach_BDI(Mlsas_backdev_info_t *bdi,
 		const char *path, 
 		struct block_device *phys_dev);
@@ -75,9 +76,9 @@ static void __Mlsas_Devst_Stmt(Mlsas_blkdev_t *Mlb, uint32_t what,
 static void __Mlsas_Free_Mms(Mlsas_Msh_t *mms);
 static Mlsas_Msh_t *__Mlsas_Alloc_Mms(uint32_t extsz, uint8_t type, 
 		uint64_t hashkey, void **dt_ptr);
-static void Mlsas_RX(cs_rx_data_t *xd, void *priv);
-int Mlsas_TX(void *session, void *header, uint32_t hdlen,
-		void *dt, uint32_t dtlen, boolean_t io);
+static void __Mlsas_RX(cs_rx_data_t *xd, void *priv);
+int __Mlsas_TX(void *session, void *header, uint32_t hdlen,
+		void *dt, uint32_t dtlen, uint32_t type);
 static int __Mlsas_Do_Aggregate_Virt_impl(const char *path,
 		Mlsas_blkdev_t *Mlb);
 static void __Mlsas_Attach_Local_Phys(struct block_device *phys, 
@@ -196,6 +197,7 @@ static Mlsas_RX_pfn_t Mlsas_rx_hdl[Mlsas_Mms_Last] = {
 	[Mlsas_Mms_Bio_RW]		= 	__Mlsas_RX_Bio_RW,
 	[Mlsas_Mms_Brw_Rsp]		=	__Mlsas_RX_Brw_Rsp,
 	[Mlsas_Mms_State_Change]=	__Mlsas_RX_State_Change,
+	[Mlsas_Mms_Vmpt]		=	__Mlsas_RX_Vmpt,
 };
 
 static DEFINE_IDA(Mlsas_virt_index_ida);
@@ -206,6 +208,8 @@ int (*__Mlsas_clustersan_link_evt_hook_add)(cs_link_evt_cb_t, void *);
 int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
 int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
+int (*__Mlsas_clustersan_host_send_sgl)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
 void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
 void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
@@ -492,7 +496,7 @@ static int __Mlsas_Do_EnableSvc(Mlsas_iocdt_t *Mlip)
 	__Mlsas_create_async_thread(gMlsas_ptr);
 	__Mlsas_create_retry(&gMlsas_ptr->Ml_retry);
 
-	(void) __Mlsas_clustersan_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, Mlsas_RX, NULL);
+	(void) __Mlsas_clustersan_rx_hook_add(CLUSTER_SAN_MSGTYPE_MLTSAS, __Mlsas_RX, NULL);
 	(void) __Mlsas_clustersan_link_evt_hook_add(__Mlsas_Conn_Evt_fn, NULL);
 		
 	gMlsas_ptr->Ml_state = Mlsas_St_Enabled;
@@ -529,7 +533,7 @@ static int __Mlsas_Do_NewMinor(Mlsas_iocdt_t *Mlip)
 			hash_key, &vt)) == 0))
 		rval = __Mlsas_Resume_failoc_virt(vt);
 	else {
-		rval = __Mlsas_New_minor_impl(path, hash_key, &vt);
+		rval = __Mlsas_New_minor_impl(path, hash_key, invlp, &vt);
 		if (vt && !rval) {
 			list_insert_tail(&gMlsas_ptr->Ml_virt_list, vt);
 			VERIFY(mod_hash_insert(gMlsas_ptr->Ml_devices, 
@@ -739,19 +743,27 @@ static struct block_device *__Mlsas_Get_backing_device(const char *path)
 }
 
 static int __Mlsas_New_minor_impl(const char *path, uint64_t hashkey, 
-		Mlsas_blkdev_t **vtptr)
+		nvlist_t *nvlp, Mlsas_blkdev_t **vtptr)
 {
 	Mlsas_blkdev_t *vt = NULL;
 	struct block_device *bdev = NULL;
-	int rval = 0;
+	int rval = 0, nele = 0;
+	uint32_t scsi_idt[4];
 
 	cmn_err(CE_NOTE, "Requesting to NEW MINOR(%s)", path);
 
 	if ((bdev = __Mlsas_Get_backing_device(path)) == NULL) 
 		rval = -ENXIO;
 
+	if (!rval && ((rval = nvlist_lookup_uint32_array(nvlp,
+			"scsi_identify", &scsi_idt, &nele)) != 0))
+		rval = -EINVAL;
+
 	if (rval == 0) {
-		__Mlsas_New_Virt(hashkey, &vt);
+		VERIFY(nele == 4);
+		__Mlsas_New_Virt(hashkey, zone_get_hostid(NULL),
+				scsi_idt, &vt);
+		__Mlsas_Alloc_Virt_disk(vt);
 		__Mlsas_Attach_Local_Phys(bdev, path, vt);
 		*vtptr = vt;
 	}
@@ -770,6 +782,8 @@ static int __Mlsas_Resume_failoc_virt(Mlsas_blkdev_t *vt)
 	const char *path = vt->Mlb_bdi.Mlbd_path;
 	
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
+
+	__Mlsas_Resume_wait_new_vmpt_inprocess(vt);
 
 	do {
 		if ((backing = __Mlsas_Get_backing_device(
@@ -903,7 +917,8 @@ retry:
 	__Mlsas_RTx_Init_WQ(&Mlb->Mlb_sender_wq);
 }
 
-static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
+static void __Mlsas_New_Virt(uint64_t hash_key, uint32_t hostid,
+		uint32_t *scsi_id, Mlsas_blkdev_t **Mlbpp)
 {
 	Mlsas_blkdev_t *Mlbp = NULL;
 	
@@ -919,10 +934,14 @@ static void __Mlsas_New_Virt(uint64_t hash_key, Mlsas_blkdev_t **Mlbpp)
 	Mlbp->Mlb_txbuf_len 	= 32 << 10;
 	Mlbp->Mlb_stxbuf_len 	= 32 << 10;
 	Mlbp->Mlb_switch 		= Mlsas_virt_fail_threshold;
+
+	Mlbp->Mlb_hostid = hostid;
+	Mlbp->Mlb_shostno = scsi_id[0];
+	Mlbp->Mlb_channel = scsi_id[1];
+	Mlbp->Mlb_id = scsi_id[2];
+	Mlbp->Mlb_lun = scsi_id[3];
 	
 	__Mlsas_Init_Virt_MLB(Mlbp);
-
-	__Mlsas_Alloc_Virt_disk(Mlbp);
 	
 	*Mlbpp = Mlbp;
 }
@@ -1337,7 +1356,7 @@ void __Mlsas_Virt_export_zfs_detach(const char *partial,
 }
 EXPORT_SYMBOL(__Mlsas_Virt_export_zfs_detach);
 
-static void Mlsas_RX(cs_rx_data_t *xd, void *priv)
+static void __Mlsas_RX(cs_rx_data_t *xd, void *priv)
 {
 	Mlsas_Msh_t *mms = NULL;
 	Mlsas_RX_pfn_t Rx_fn = NULL;
@@ -1366,8 +1385,8 @@ free_xd:
 	__Mlsas_clustersan_rx_data_free_ext(xd);
 }
 
-int Mlsas_TX(void *session, void *header, uint32_t hdlen,
-		void *dt, uint32_t dtlen, boolean_t io)
+int __Mlsas_TX(void *session, void *header, uint32_t hdlen,
+		void *dt, uint32_t dtlen, uint32_t type)
 {
 	int rval = 0;
 	uint32_t msg_type = CLUSTER_SAN_MSGTYPE_MLTSAS;
@@ -1378,10 +1397,14 @@ int Mlsas_TX(void *session, void *header, uint32_t hdlen,
 	if (session == Mlsas_Noma_Session)
 		__Mlsas_clustersan_broadcast_send(dt, dtlen, 
 			header, hdlen, msg_type, 0);
-	else if (likely(io))
+	else if (type == Mlsas_TX_Type_Bio)
 		rval = __Mlsas_clustersan_host_send_bio(session, 
 			dt, dtlen, header, hdlen, 
 			msg_type,  0, B_TRUE, 3);
+	else if (type == Mlsas_TX_Type_Sgl)
+		rval = __Mlsas_clustersan_host_send_sgl(session,
+			dt, dtlen, header, hdlen, 
+			msg_type,  0, B_TRUE, 3););
 	else 
 		rval = __Mlsas_clustersan_host_send(session, 
 			dt, dtlen, header, hdlen, 
@@ -1525,8 +1548,8 @@ static int __Mlsas_Tx_virt_down2up_attach(Mlsas_rtx_wk_t *w)
 	Mlsas_Msh_t *mms = container_of(w, Mlsas_Msh_t, Mms_wk);
 	cluster_san_hostinfo_t *cshi = (cluster_san_hostinfo_t *)mms->Mms_rh;
 	
-	if ((rval = Mlsas_TX(cshi, mms, mms->Mms_len, 
-			NULL, 0, B_FALSE)) != 0)
+	if ((rval = __Mlsas_TX(cshi, mms, mms->Mms_len, NULL, 0, 
+			Mlsas_TX_Type_Normal)) != 0)
 		cmn_err(CE_NOTE, "TX VIRT(0x%llx) attach_message FAIL,"
 			"ERROR(%d) when UP2DOWN", mms->Mms_hashkey, rval);
 
@@ -1673,8 +1696,8 @@ static int __Mlsas_Tx_async_event(Mlsas_rtx_wk_t *work)
 	switch (mms->Mms_type) {
 	case Mlsas_Mms_Attach:
 	case Mlsas_Mms_State_Change:
-		if ((rval = Mlsas_TX(sess, mms, mms->Mms_len, 
-			NULL, 0, B_FALSE)) != 0)
+		if ((rval = __Mlsas_TX(sess, mms, mms->Mms_len, NULL, 0, 
+				Mlsas_TX_Type_Normal)) != 0)
 			goto error_HDL;
 		break;
 	}
@@ -2335,6 +2358,15 @@ static void __Mlsas_Devst_St(Mlsas_blkdev_t *Mlb,
 		mms->Mms_wk.rtw_fn = __Mlsas_Tx_async_event;
 		atm->Atm_pr = pr;
 		atm->Atm_st = Mlb->Mlb_st;
+
+		atm->Atm_scsi_id_valid = 1;
+		/* unable to sleep when call this. */
+		atm->Atm_hostid = zone_get_hostid(NULL);
+		atm->Atm_shostno = Mlb->Mlb_shostno;
+		atm->Atm_channel = Mlb->Mlb_channel;
+		atm->Atm_id = Mlb->Mlb_id;
+		atm->Atm_lun = Mlb->Mlb_lun;
+		
 		atm->Atm_rsp = 1;
 		if (what == Mlsas_Devevt_Attach_OK)
 			atm->Atm_rsp = 0;
@@ -2707,21 +2739,18 @@ static void __Mlsas_RX_Attach(Mlsas_Msh_t *mms,
 	
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
 	if (((rval = mod_hash_find(gMlsas_ptr->Ml_devices, 
-			mms->Mms_hashkey, &Mlb)) != 0)) {
-		mutex_exit(&gMlsas_ptr->Ml_mtx);
-		cmn_err(CE_NOTE, "%s None Local Virt(0x%llx)",
-			__func__, mms->Mms_hashkey);
-		goto failed;
-	}
+			mms->Mms_hashkey, &Mlb)) != 0))
+		goto direct_ex;
 
 	__Mlsas_get_virt(Mlb);
+
+direct_ex:
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
 	Atm->Atm_ext = (uint64_t)Mlb;
-
 	if (taskq_dispatch(gMlsas_ptr->Ml_async_tq, 
-			__Mlsas_RX_Attach_impl,
-			xd, TQ_NOSLEEP) == NULL)
+			__Mlsas_RX_Attach_impl, xd, 
+			TQ_NOSLEEP) == NULL)
 		__Mlsas_RX_Attach_impl(xd);
 	return ;
 
@@ -2738,10 +2767,34 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	cluster_san_hostinfo_t *cshi = xd->cs_private;
 	Mlsas_pr_device_t *pr, *exist = NULL, *pr_tofree = NULL;
 	Mlsas_rh_t *rh = NULL;
-	boolean_t new_rh = B_FALSE;
+	boolean_t new_rh = B_FALSE, new_virt = B_FALSE;
 	uint32_t what = Mlsas_PRevt_Attach_OK;
 
 	mutex_enter(&gMlsas_ptr->Ml_mtx);
+	/* none local phys, check again */
+	if (Mlb == NULL) {
+		if ((rval = mod_hash_find(gMlsas_ptr->Ml_devices, 
+				mms->Mms_hashkey, &Mlb)) != 0) {
+			new_virt = B_TRUE;
+			/*
+			 * why we new a virt instead of call __Mlsas_Rx_Attach_new_vmpt
+			 * directly ? consider this, local node has the same scsi disk,
+			 * but hasn't register to MODULE yet, in this solution, after phys 
+			 * register, we need to unregister this virt scsi accordding this 
+			 * Mlsas virt.
+			 */
+			__Mlsas_New_Virt(mms->Mms_hashkey, Atm->Atm_hostid, 
+				&Atm->Atm_shostno, &Mlb);
+			
+			list_insert_tail(&gMlsas_ptr->Ml_virt_list, Mlb);
+			VERIFY(mod_hash_insert(gMlsas_ptr->Ml_devices, 
+				mms->Mms_hashkey, Mlb) == 0);
+			__Mlsas_get_virt(Mlb);
+			
+			/* for extra another release by vmpt */
+			__Mlsas_get_virt(Mlb);
+		}
+	}
 	if ((rval = mod_hash_find(gMlsas_ptr->Ml_rhs, 
 			cshi->hostid, &rh)) != 0) {
 		VERIFY(rh = __Mlsas_Alloc_rhost(cshi->hostid, cshi));
@@ -2755,7 +2808,7 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 	pr = __Mlsas_Alloc_PR(cshi->hostid, Mlsas_Devst_Standalone, Mlb, rh);
 	
 	mutex_enter(&rh->Mh_mtx);
-	spin_lock(&Mlb->Mlb_rq_spin);
+	spin_lock_irq(&Mlb->Mlb_rq_spin);
 
 	if ((exist = __Mlsas_Lookup_PR_locked(Mlb, 
 			cshi->hostid)) != NULL) {
@@ -2779,19 +2832,22 @@ static void __Mlsas_RX_Attach_impl(cs_rx_data_t *xd)
 		what = Mlsas_PRevt_PR_Down2up;
 	__Mlsas_Update_PR_st(pr, Atm->Atm_st, what);
 	
-	spin_unlock(&Mlb->Mlb_rq_spin);
+	spin_unlock_irq(&Mlb->Mlb_rq_spin);
 	mutex_exit(&rh->Mh_mtx);
 	mutex_exit(&gMlsas_ptr->Ml_mtx);
 
-	__Mlsas_put_virt(Mlb);
+	if (pr_tofree)
+		__Mlsas_put_PR(pr_tofree);
 
-	if (exist || !new_rh)
+	if (new_virt)
+		__Mlsas_Vmpt_Rx_Attach_new_vmpt(Mlb);
+	else
+		__Mlsas_put_virt(Mlb);
+
+	if (exist || !new_rh || new_virt)
 		__Mlsas_clustersan_rx_data_free_ext(xd);
 	else if (new_rh) 
 		__Mlsas_clustersan_rx_data_free(xd, B_FALSE);
-
-	if (pr_tofree)
-		__Mlsas_put_PR(pr_tofree);
 }
 
 static void __Mlsas_RX_Bio_RW(Mlsas_Msh_t *mms, 

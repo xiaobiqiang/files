@@ -27,6 +27,11 @@
 #define Mlsas_Delayed_PR_RQ	0x02
 
 #define Mlsas_Module_Name	"Mlsas"
+#define Mlsas_Vmpt_Shost_Name	"vmpt3sas"
+
+#define Mlsas_TX_Type_Normal	0x00
+#define Mlsas_TX_Type_Bio		0x01
+#define Mlsas_TX_Type_Sgl		0x02
 
 /*
  * use clustersan
@@ -335,6 +340,14 @@ struct Mlsas_blkdev {
 
 	Mlsas_thread_t Mlb_sender;
 	Mlsas_rtx_wq_t Mlb_sender_wq;
+
+	uint32_t Mlb_hostid;
+	uint32_t Mlb_pad;
+	/* can be all zero when valid */
+	uint32_t Mlb_shostno;
+	uint32_t Mlb_channel;
+	uint32_t Mlb_id;
+	uint32_t Mlb_lun;
 	
 	uint32_t Mlb_attach_status;
 	
@@ -343,6 +356,9 @@ struct Mlsas_blkdev {
 	uint32_t Mlb_switch;
 	uint32_t Mlb_error_cnt;
 
+	taskqid_t Mlb_vmpt_probe_qid;
+
+	uint32_t Mlb_vmpt_probe_stage;
 	boolean_t Mlb_in_resume_virt;
 };
 
@@ -548,6 +564,7 @@ extern Mlsas_stat_t Mlsas_stat;
 #define Mlsas_Mms_Bio_RW			0x03
 #define Mlsas_Mms_Brw_Rsp			0x04
 #define Mlsas_Mms_State_Change		0x05
+#define Mlsas_Mms_Vmpt				0x06
 #define Mlsas_Mms_Last				0x10
 
 #define Mlsas_RXfl_Sync			0x01
@@ -579,7 +596,16 @@ typedef struct Mlsas_Attach_msg {
 	uint32_t Atm_st;
 	uint32_t Atm_rsp:1,
 			 Atm_down2up_attach:1,
-			 Atm_rsvd:30;
+			 Atm_scsi_id_valid:1,
+			 Atm_rsvd_bits:29;
+
+	uint32_t Atm_hostid;
+	uint32_t Atm_shostno;
+	uint32_t Atm_channel;
+	uint32_t Atm_id;
+	uint32_t Atm_lun;
+	uint32_t Atm_pad;
+	
 	uint64_t Atm_pr;
 	uint64_t Atm_ext;
 } Mlsas_Attach_msg_t;
@@ -625,6 +651,8 @@ extern int (*__Mlsas_clustersan_host_send)(cluster_san_hostinfo_t *, void *, uin
 	void *, uint64_t, uint8_t, int, boolean_t, int);
 extern int (*__Mlsas_clustersan_host_send_bio)(cluster_san_hostinfo_t *, void *, uint64_t, 
 	void *, uint64_t, uint8_t, int, boolean_t, int);
+extern int (*__Mlsas_clustersan_host_send_sgl)(cluster_san_hostinfo_t *, void *, uint64_t, 
+	void *, uint64_t, uint8_t, int, boolean_t, int);
 extern void (*__Mlsas_clustersan_broadcast_send)(void *, uint64_t, void *, uint64_t, uint8_t, int);
 extern void (*__Mlsas_clustersan_hostinfo_hold)(cluster_san_hostinfo_t *);
 extern void (*__Mlsas_clustersan_hostinfo_rele)(cluster_san_hostinfo_t *);
@@ -652,8 +680,8 @@ extern Mlsas_tst_e __Mlsas_Thread_State(Mlsas_thread_t *thi);
 
 extern void __Mlsas_Submit_PR_request(Mlsas_blkdev_t *Mlb,
 		unsigned long rw, Mlsas_pr_req_t *prr);
-extern int Mlsas_TX(void *session, void *header, uint32_t hdlen,
-                void *dt, uint32_t dtlen, boolean_t io);
+extern int __Mlsas_TX(void *session, void *header, uint32_t hdlen,
+                void *dt, uint32_t dtlen, uint32_t type);
 extern void __Mlsas_Req_Stmt(Mlsas_request_t *rq, uint32_t what,
                 Mlsas_bio_and_error_t *Mlbi);
 extern void __Mlsas_Complete_Master_Bio(Mlsas_request_t *rq,       
